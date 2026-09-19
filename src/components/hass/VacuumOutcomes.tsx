@@ -4,23 +4,31 @@ import { MaterialIcon } from '../core/Icon'
 import { SectionHeader } from '../core/SectionHeader'
 import { Separator } from '../core/Separator'
 import type { VacuumConfig } from '../../constants/portedDashboard'
-import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, formatDate, type CopyKey, type CopyValues, useCopy } from '../../i18n'
+import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, formatDate, formatNumber, type CopyKey, type CopyValues, useCopy } from '../../i18n'
 import {
   vacuumOutcomeEventsForRoom,
   type VacuumOutcomeAttemptMode,
   type VacuumOutcomeAttemptResult,
+  type VacuumOutcomeCompletionStatus,
   type VacuumOutcomeContract,
+  type VacuumOutcomeEvidence,
   type VacuumOutcomeEvent,
+  type VacuumOutcomeIterationStatus,
+  type VacuumOutcomeMeasurementEvidence,
+  type VacuumOutcomeMeasurementStatus,
   type VacuumOutcomeOperation,
+  type VacuumOutcomePhysicalWorkStatus,
   type VacuumOutcomeRoom,
   type VacuumOutcomeStatus,
+  type VacuumOutcomeTelemetryStatus,
+  type VacuumWhileAwayPresentation,
 } from './vacuumOutcomes'
 import { countVacuumOutcomes, vacuumOutcomeDayValue, vacuumOutcomeReasonValue } from './vacuumOutcomePresentation'
 import styles from './VacuumOutcomes.module.css'
 
 type VacuumCopy = (key: CopyKey<'modalVacuum'>, values?: CopyValues) => string
-type OutcomeGroupKey = 'needsAttention' | 'interrupted' | 'stillDue' | 'done'
-type OutcomeTone = 'danger' | 'interrupted' | 'success' | 'warning'
+type OutcomeGroupKey = 'needsAttention' | 'unverified' | 'interrupted' | 'stillDue' | 'done'
+type OutcomeTone = 'danger' | 'interrupted' | 'success' | 'uncertain' | 'warning'
 
 interface OutcomeVisual {
   icon: string
@@ -32,7 +40,7 @@ interface OutcomeGroup {
   rooms: VacuumOutcomeRoom[]
 }
 
-const GROUP_ORDER: OutcomeGroupKey[] = ['needsAttention', 'interrupted', 'stillDue', 'done']
+const GROUP_ORDER: OutcomeGroupKey[] = ['needsAttention', 'unverified', 'interrupted', 'stillDue', 'done']
 const OUTCOME_COPY_KEYS = VACUUM_COPY_KEYS.outcomes
 
 const STATUS_VISUAL: Record<VacuumOutcomeStatus, OutcomeVisual> = {
@@ -41,6 +49,7 @@ const STATUS_VISUAL: Record<VacuumOutcomeStatus, OutcomeVisual> = {
   partial: { icon: 'mdi:progress-check', tone: 'warning' },
   deferred: { icon: 'mdi:clock-outline', tone: 'warning' },
   completed: { icon: 'mdi:check-circle', tone: 'success' },
+  uncertain: { icon: 'mdi:help-circle-outline', tone: 'uncertain' },
 }
 
 const STATUS_COPY_KEYS: Record<VacuumOutcomeStatus, CopyKey<'modalVacuum'>> = {
@@ -49,6 +58,7 @@ const STATUS_COPY_KEYS: Record<VacuumOutcomeStatus, CopyKey<'modalVacuum'>> = {
   failed: OUTCOME_COPY_KEYS.statuses.failed,
   interrupted: OUTCOME_COPY_KEYS.statuses.interrupted,
   partial: OUTCOME_COPY_KEYS.statuses.partial,
+  uncertain: OUTCOME_COPY_KEYS.statuses.uncertain,
 }
 
 const GROUP_COPY_KEYS: Record<OutcomeGroupKey, CopyKey<'modalVacuum'>> = {
@@ -56,6 +66,7 @@ const GROUP_COPY_KEYS: Record<OutcomeGroupKey, CopyKey<'modalVacuum'>> = {
   interrupted: OUTCOME_COPY_KEYS.groups.interrupted,
   needsAttention: OUTCOME_COPY_KEYS.groups.needsAttention,
   stillDue: OUTCOME_COPY_KEYS.groups.stillDue,
+  unverified: OUTCOME_COPY_KEYS.groups.unverified,
 }
 
 const PRIMARY_COPY_KEYS: Record<VacuumOutcomeAttemptResult, Record<VacuumOutcomeAttemptMode, CopyKey<'modalVacuum'>>> = {
@@ -74,6 +85,16 @@ const PRIMARY_COPY_KEYS: Record<VacuumOutcomeAttemptResult, Record<VacuumOutcome
     vacuum: OUTCOME_COPY_KEYS.primary.interrupted.vacuum,
     vacuum_mop: OUTCOME_COPY_KEYS.primary.interrupted.vacuumMop,
   },
+  partial: {
+    fallback_vacuum: OUTCOME_COPY_KEYS.primary.partial.fallbackVacuum,
+    vacuum: OUTCOME_COPY_KEYS.primary.partial.vacuum,
+    vacuum_mop: OUTCOME_COPY_KEYS.primary.partial.vacuumMop,
+  },
+  uncertain: {
+    fallback_vacuum: OUTCOME_COPY_KEYS.primary.uncertain.fallbackVacuum,
+    vacuum: OUTCOME_COPY_KEYS.primary.uncertain.vacuum,
+    vacuum_mop: OUTCOME_COPY_KEYS.primary.uncertain.vacuumMop,
+  },
 }
 
 const DEFERRED_COPY_KEYS: Record<VacuumOutcomeOperation, CopyKey<'modalVacuum'>> = {
@@ -88,8 +109,39 @@ const OUTSTANDING_COPY_KEYS: Record<VacuumOutcomeOperation, CopyKey<'modalVacuum
   vacuum_mop: OUTCOME_COPY_KEYS.outstanding.vacuumMop,
 }
 
+const PHYSICAL_WORK_COPY_KEYS: Record<VacuumOutcomePhysicalWorkStatus, CopyKey<'modalVacuum'>> = {
+  not_observed: OUTCOME_COPY_KEYS.evidence.statuses.notObserved,
+  observed: OUTCOME_COPY_KEYS.evidence.statuses.observed,
+  substantial: OUTCOME_COPY_KEYS.evidence.statuses.substantial,
+}
+
+const MEASUREMENT_STATUS_COPY_KEYS: Record<VacuumOutcomeMeasurementStatus, CopyKey<'modalVacuum'>> = {
+  failed: OUTCOME_COPY_KEYS.evidence.statuses.failed,
+  not_required: OUTCOME_COPY_KEYS.evidence.statuses.notRequired,
+  passed: OUTCOME_COPY_KEYS.evidence.statuses.passed,
+  passed_lower_bound: OUTCOME_COPY_KEYS.evidence.statuses.passedLowerBound,
+  unknown: OUTCOME_COPY_KEYS.evidence.statuses.unknown,
+}
+
+const ITERATION_STATUS_COPY_KEYS: Record<VacuumOutcomeIterationStatus, CopyKey<'modalVacuum'>> = {
+  unverified: OUTCOME_COPY_KEYS.evidence.statuses.unverified,
+  verified: OUTCOME_COPY_KEYS.evidence.statuses.verified,
+}
+
+const COMPLETION_STATUS_COPY_KEYS: Record<VacuumOutcomeCompletionStatus, CopyKey<'modalVacuum'>> = {
+  completed: OUTCOME_COPY_KEYS.evidence.statuses.completed,
+  incomplete: OUTCOME_COPY_KEYS.evidence.statuses.incomplete,
+  uncertain: OUTCOME_COPY_KEYS.evidence.statuses.uncertain,
+}
+
+const TELEMETRY_STATUS_COPY_KEYS: Record<VacuumOutcomeTelemetryStatus, CopyKey<'modalVacuum'>> = {
+  recovered: OUTCOME_COPY_KEYS.evidence.statuses.recovered,
+  unresolved: OUTCOME_COPY_KEYS.evidence.statuses.unresolved,
+}
+
 function outcomeGroupKey(status: VacuumOutcomeStatus): OutcomeGroupKey {
   if (status === 'failed') return 'needsAttention'
+  if (status === 'uncertain') return 'unverified'
   if (status === 'interrupted') return 'interrupted'
   if (status === 'completed') return 'done'
   return 'stillDue'
@@ -116,6 +168,49 @@ function deferredSentence(copy: VacuumCopy, operation: VacuumOutcomeOperation) {
 
 function outstandingSentence(copy: VacuumCopy, operation: VacuumOutcomeOperation) {
   return copy(OUTSTANDING_COPY_KEYS[operation])
+}
+
+function evidenceUnit(copy: VacuumCopy, measurement: VacuumOutcomeMeasurementEvidence) {
+  return copy(
+    measurement.unit === 'seconds'
+      ? OUTCOME_COPY_KEYS.evidence.units.seconds
+      : OUTCOME_COPY_KEYS.evidence.units.squareInches,
+  )
+}
+
+function evidenceValue(label: string, value: string | number) {
+  return `${label}: ${value}`
+}
+
+function measurementEvidenceValue(copy: VacuumCopy, measurement: VacuumOutcomeMeasurementEvidence) {
+  const unit = evidenceUnit(copy, measurement)
+  const values = [copy(MEASUREMENT_STATUS_COPY_KEYS[measurement.status])]
+  if (measurement.observed !== null) {
+    values.push(evidenceValue(
+      copy(OUTCOME_COPY_KEYS.evidence.labels.observed),
+      `${formatNumber(measurement.observed)} ${unit}`,
+    ))
+  }
+  if (measurement.lower_bound !== undefined) {
+    values.push(evidenceValue(
+      copy(OUTCOME_COPY_KEYS.evidence.labels.lowerBound),
+      `${formatNumber(measurement.lower_bound)} ${unit}`,
+    ))
+  }
+  if (measurement.status !== 'not_required') {
+    values.push(evidenceValue(
+      copy(OUTCOME_COPY_KEYS.evidence.labels.minimum),
+      `${formatNumber(measurement.minimum)} ${unit}`,
+    ))
+  }
+  values.push(evidenceValue(
+    copy(OUTCOME_COPY_KEYS.evidence.labels.resetCount),
+    formatNumber(measurement.reset_count),
+  ))
+  if (measurement.attribution_uncertain) {
+    values.push(copy(OUTCOME_COPY_KEYS.evidence.attributionUncertain))
+  }
+  return values.join(' • ')
 }
 
 function failedProgressSentence(copy: VacuumCopy, room: VacuumOutcomeRoom) {
@@ -151,6 +246,74 @@ function ExpandGlyph({ expanded }: { expanded: boolean }) {
   return <MaterialIcon name={expanded ? 'mdi:minus' : 'mdi:plus'} size={20} />
 }
 
+function EvidenceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  )
+}
+
+function VacuumOutcomeEvidencePanel({
+  evidence,
+}: {
+  evidence: VacuumOutcomeEvidence
+}) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
+  const targetDwell = `${formatNumber(evidence.physical_work.target_room_dwell_seconds)} ${copy(OUTCOME_COPY_KEYS.evidence.units.seconds)}`
+  const iterationValue = [
+    copy(ITERATION_STATUS_COPY_KEYS[evidence.iterations.status]),
+    evidenceValue(copy(OUTCOME_COPY_KEYS.evidence.labels.observed), formatNumber(evidence.iterations.observed)),
+    evidenceValue(copy(OUTCOME_COPY_KEYS.evidence.labels.requested), formatNumber(evidence.iterations.requested)),
+  ].join(' • ')
+
+  return (
+    <dl className={styles.evidenceGrid}>
+      <EvidenceRow
+        label={copy(OUTCOME_COPY_KEYS.evidence.labels.physicalWork)}
+        value={copy(PHYSICAL_WORK_COPY_KEYS[evidence.physical_work.status])}
+      />
+      <EvidenceRow
+        label={copy(OUTCOME_COPY_KEYS.evidence.labels.targetRoomDwell)}
+        value={targetDwell}
+      />
+      <EvidenceRow
+        label={copy(OUTCOME_COPY_KEYS.evidence.labels.duration)}
+        value={measurementEvidenceValue(copy, evidence.duration)}
+      />
+      <EvidenceRow
+        label={copy(OUTCOME_COPY_KEYS.evidence.labels.area)}
+        value={measurementEvidenceValue(copy, evidence.area)}
+      />
+      <EvidenceRow
+        label={copy(OUTCOME_COPY_KEYS.evidence.labels.iterations)}
+        value={iterationValue}
+      />
+      <EvidenceRow
+        label={copy(OUTCOME_COPY_KEYS.evidence.labels.completion)}
+        value={copy(COMPLETION_STATUS_COPY_KEYS[evidence.completion.status])}
+      />
+      {evidence.telemetry && (
+        <>
+          <EvidenceRow
+            label={copy(OUTCOME_COPY_KEYS.evidence.labels.telemetry)}
+            value={copy(TELEMETRY_STATUS_COPY_KEYS[evidence.telemetry.status])}
+          />
+          <EvidenceRow
+            label={copy(OUTCOME_COPY_KEYS.evidence.labels.sourceOutages)}
+            value={formatNumber(evidence.telemetry.source_outage_count)}
+          />
+          <EvidenceRow
+            label={copy(OUTCOME_COPY_KEYS.evidence.labels.sourceOutageDuration)}
+            value={`${formatNumber(evidence.telemetry.source_outage_seconds)} ${copy(OUTCOME_COPY_KEYS.evidence.units.seconds)}`}
+          />
+        </>
+      )}
+    </dl>
+  )
+}
+
 function vacuumOutcomeEventSentence(copy: VacuumCopy, event: VacuumOutcomeEvent) {
   return event.type === 'attempt'
     ? primaryAttemptSentence(copy, event.attempt_mode, event.attempt_result)
@@ -180,9 +343,7 @@ function VacuumOutcomeHistory({
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const diagnostics = useMemo(() => rawDiagnostics(events), [events])
-  const hasUnknownReason = events.some((event) => event.reason?.code === 'unknown')
-  // Events come from the contract captured when detail opened, so this initial disclosure state stays stable.
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(hasUnknownReason)
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const diagnosticsId = useId()
   const diagnosticsLabel = diagnosticsOpen
     ? copy(OUTCOME_COPY_KEYS.history.hideDiagnostics, { room: room.room_name })
@@ -199,7 +360,16 @@ function VacuumOutcomeHistory({
             </time>
             <div>
               <p>{vacuumOutcomeEventSentence(copy, event)}</p>
-              {event.reason && <OutcomeReasonLine value={vacuumOutcomeReasonValue(copy, event.reason, roomNames)} />}
+              {event.reason && (
+                <OutcomeReasonLine
+                  value={vacuumOutcomeReasonValue(
+                    copy,
+                    event.reason,
+                    roomNames,
+                    event.type === 'attempt' && event.attempt_result === 'uncertain' ? 'uncertain' : 'default',
+                  )}
+                />
+              )}
             </div>
           </li>
         ))}
@@ -240,17 +410,27 @@ export function VacuumOutcomeRow({
   const events = vacuumOutcomeEventsForRoom(contract, room)
   const isFailed = room.status === 'failed'
   const isInterrupted = room.status === 'interrupted'
+  const reasonVariant = room.status === 'uncertain' ? 'uncertain' : 'default'
   const historyAvailable = !isFailed && !isInterrupted && hasUsefulHistory(events)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
   const historyId = useId()
+  const evidenceId = useId()
   const attemptsId = useId()
   const roomNameId = useId()
   const statusId = useId()
   const visual = STATUS_VISUAL[room.status]
+  const evidenceResult = room.latest_attempt?.evidence
+  const availableEvidence = evidenceResult?.kind === 'available' ? evidenceResult.data : null
+  const evidenceMalformed = evidenceResult?.kind === 'malformed'
   const resultReason = room.latest_attempt?.reason ?? null
   const outstandingReason = room.outstanding?.reason ?? null
-  const resultReasonValue = resultReason ? vacuumOutcomeReasonValue(copy, resultReason, roomNames) : null
-  const outstandingReasonValue = outstandingReason ? vacuumOutcomeReasonValue(copy, outstandingReason, roomNames) : null
+  const resultReasonValue = resultReason && !(room.status === 'uncertain' && resultReason.code === 'unknown')
+    ? vacuumOutcomeReasonValue(copy, resultReason, roomNames, reasonVariant)
+    : null
+  const outstandingReasonValue = outstandingReason && !(room.status === 'uncertain' && outstandingReason.code === 'unknown')
+    ? vacuumOutcomeReasonValue(copy, outstandingReason, roomNames, reasonVariant)
+    : null
   const bothReasons = Boolean(resultReasonValue && outstandingReasonValue)
   const reasonsDiffer = bothReasons && resultReasonValue !== outstandingReasonValue
   const primary = room.latest_attempt
@@ -260,11 +440,15 @@ export function VacuumOutcomeRow({
     ? resultReasonValue ?? outstandingReasonValue ?? primary
     : null
   const errorProgress = isFailed ? failedProgressSentence(copy, room) : null
-  const showPartialCredit = room.credit.status === 'partial' && room.status !== 'partial'
+  const showPartialCredit = room.credit.status === 'partial'
+    && (room.status !== 'partial' || room.latest_attempt?.result === 'partial')
   const showStatusLabel = !roomStatusIsRedundant(room.status)
   const historyLabel = historyOpen
     ? copy(OUTCOME_COPY_KEYS.history.hide, { room: room.room_name })
     : copy(OUTCOME_COPY_KEYS.history.show, { room: room.room_name })
+  const evidenceLabel = evidenceOpen
+    ? copy(OUTCOME_COPY_KEYS.evidence.hide, { room: room.room_name })
+    : copy(OUTCOME_COPY_KEYS.evidence.show, { room: room.room_name })
 
   return (
     <article
@@ -311,7 +495,35 @@ export function VacuumOutcomeRow({
             )}
           </>
         )}
+        {availableEvidence && (
+          <p className={styles.evidenceSummary}>
+            <span>{copy(OUTCOME_COPY_KEYS.evidence.labels.physicalWork)}</span>
+            <strong>{copy(PHYSICAL_WORK_COPY_KEYS[availableEvidence.physical_work.status])}</strong>
+          </p>
+        )}
+        {evidenceMalformed && (
+          <p className={styles.evidenceUnavailable}>{copy(OUTCOME_COPY_KEYS.evidence.unavailable)}</p>
+        )}
       </div>
+      {availableEvidence && (
+        <button
+          aria-controls={evidenceId}
+          aria-expanded={evidenceOpen}
+          aria-label={evidenceLabel}
+          className={styles.evidenceButton}
+          data-action-kind="command"
+          onClick={() => setEvidenceOpen((current) => !current)}
+          type="button"
+        >
+          <span>{copy(OUTCOME_COPY_KEYS.evidence.title)}</span>
+          <ExpandGlyph expanded={evidenceOpen} />
+        </button>
+      )}
+      {availableEvidence && (
+        <div className={styles.evidencePanel} hidden={!evidenceOpen} id={evidenceId}>
+          <VacuumOutcomeEvidencePanel evidence={availableEvidence} />
+        </div>
+      )}
       {historyAvailable && (
         <button
           aria-controls={historyId}
@@ -381,10 +593,92 @@ function reasonRoomNames(contract: VacuumOutcomeContract, vacuum: VacuumConfig) 
   return { ...names, ...vacuum.outcomeRoomNames }
 }
 
+type VacuumOutcomeProtocolPresentation = Extract<
+  VacuumWhileAwayPresentation,
+  { kind: 'incompatible' | 'incomplete' | 'malformed' }
+>
+
+function protocolCopyKeys(kind: VacuumOutcomeProtocolPresentation['kind']) {
+  if (kind === 'incomplete') {
+    return {
+      description: OUTCOME_COPY_KEYS.protocol.incompleteDescription,
+      title: OUTCOME_COPY_KEYS.protocol.incompleteTitle,
+    }
+  }
+  if (kind === 'incompatible') {
+    return {
+      description: OUTCOME_COPY_KEYS.protocol.incompatibleDescription,
+      title: OUTCOME_COPY_KEYS.protocol.incompatibleTitle,
+    }
+  }
+  return {
+    description: OUTCOME_COPY_KEYS.protocol.malformedDescription,
+    title: OUTCOME_COPY_KEYS.protocol.malformedTitle,
+  }
+}
+
+export function VacuumOutcomeProtocolNotice({
+  presentation,
+  vacuum,
+}: {
+  presentation: VacuumOutcomeProtocolPresentation
+  vacuum: VacuumConfig
+}) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
+  const [legacyOpen, setLegacyOpen] = useState(false)
+  const legacyId = useId()
+  const protocolCopy = protocolCopyKeys(presentation.kind)
+  const hasLegacy = presentation.cleaned.length > 0 || presentation.issues.length > 0
+  const legacyLabel = legacyOpen
+    ? copy(OUTCOME_COPY_KEYS.protocol.hideLegacyDetails, { room: vacuum.title })
+    : copy(OUTCOME_COPY_KEYS.protocol.showLegacyDetails, { room: vacuum.title })
+
+  return (
+    <section className={styles.overviewSection} data-vacuum-outcome-protocol={presentation.kind}>
+      <SectionHeader title={copy(OUTCOME_COPY_KEYS.sectionTitle, { room: vacuum.title })} />
+      <div className={styles.protocolNotice} data-action-kind="state" role="note">
+        <h4>{copy(protocolCopy.title)}</h4>
+        <p>{copy(protocolCopy.description)}</p>
+        {hasLegacy && (
+          <button
+            aria-controls={legacyId}
+            aria-expanded={legacyOpen}
+            aria-label={legacyLabel}
+            className={styles.protocolButton}
+            data-action-kind="command"
+            onClick={() => setLegacyOpen((current) => !current)}
+            type="button"
+          >
+            <span>{copy(OUTCOME_COPY_KEYS.protocol.legacyDetailsTitle)}</span>
+            <ExpandGlyph expanded={legacyOpen} />
+          </button>
+        )}
+        {hasLegacy && (
+          <div className={styles.legacyDiagnostics} hidden={!legacyOpen} id={legacyId}>
+            <p>{copy(OUTCOME_COPY_KEYS.protocol.legacyWarning)}</p>
+            {presentation.cleaned.length > 0 && (
+              <div>
+                <h5>{copy(VACUUM_COPY_KEYS.cleaned)}</h5>
+                <ul>{presentation.cleaned.map((line) => <li key={line}>{line}</li>)}</ul>
+              </div>
+            )}
+            {presentation.issues.length > 0 && (
+              <div>
+                <h5>{copy(VACUUM_COPY_KEYS.issues)}</h5>
+                <ul>{presentation.issues.map((line) => <li key={line}>{line}</li>)}</ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function summaryTileTone(tone: OutcomeTone): TileTone {
   if (tone === 'danger') return 'danger'
   if (tone === 'interrupted') return 'security'
-  if (tone === 'warning') return 'warning'
+  if (tone === 'uncertain' || tone === 'warning') return 'warning'
   return 'presence'
 }
 
@@ -394,7 +688,7 @@ export function VacuumOutcomeOverview({
   vacuum,
 }: {
   contract: VacuumOutcomeContract
-  onOpen: () => void
+  onOpen?: () => void
   vacuum: VacuumConfig
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
@@ -402,13 +696,16 @@ export function VacuumOutcomeOverview({
   const formattedDay = vacuumOutcomeDayValue(contract.day)
   const visual = summary.attention > 0
     ? STATUS_VISUAL.failed
-    : summary.interrupted > 0
-      ? STATUS_VISUAL.interrupted
-      : summary.due > 0
-        ? STATUS_VISUAL.deferred
-        : STATUS_VISUAL.completed
+    : summary.unverified > 0
+      ? STATUS_VISUAL.uncertain
+      : summary.interrupted > 0
+        ? STATUS_VISUAL.interrupted
+        : summary.due > 0
+          ? STATUS_VISUAL.deferred
+          : STATUS_VISUAL.completed
   const subtitle = [
     summary.completed > 0 ? copy(OUTCOME_COPY_KEYS.summary.completedRooms, { count: summary.completed }) : null,
+    summary.unverified > 0 ? copy(OUTCOME_COPY_KEYS.summary.unverifiedRooms, { count: summary.unverified }) : null,
     summary.needsAttention > 0 ? copy(OUTCOME_COPY_KEYS.summary.roomsNeedAttention, { count: summary.needsAttention }) : null,
     summary.attention > 0 ? copy(OUTCOME_COPY_KEYS.summary.errors, { count: summary.attention }) : null,
   ].filter((value): value is string => Boolean(value)).join(' • ')
@@ -416,12 +713,12 @@ export function VacuumOutcomeOverview({
   return (
     <section className={styles.overviewSection}>
       <SectionHeader title={copy(OUTCOME_COPY_KEYS.sectionTitle, { room: vacuum.title })} />
-      <div data-modal-detail-trigger="vacuum-outcomes">
+      <div data-modal-detail-trigger={onOpen ? 'vacuum-outcomes' : undefined}>
         <GlassTile
-          ariaLabel={copy(OUTCOME_COPY_KEYS.openDetail, { date: formattedDay, room: vacuum.title })}
+          ariaLabel={onOpen ? copy(OUTCOME_COPY_KEYS.openDetail, { date: formattedDay, room: vacuum.title }) : undefined}
           icon={visual.icon}
           onClick={onOpen}
-          semantics={{ kind: 'modal' }}
+          semantics={onOpen ? { kind: 'modal' } : { kind: 'state' }}
           subtitle={subtitle || undefined}
           title={formattedDay}
           tone={summaryTileTone(visual.tone)}

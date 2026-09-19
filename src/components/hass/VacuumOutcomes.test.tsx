@@ -1,14 +1,25 @@
+// @covers src/components/hass/vacuumOutcomePresentation.ts
+// @covers src/i18n/locales/en/modals/vacuum.json
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { VACUUMS } from '../../constants/portedDashboard'
 import { copy, type CopyKey, type CopyValues } from '../../i18n'
-import { NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../../test/fixtures/vacuumOutcomes'
-import type { VacuumOutcomeReason } from './vacuumOutcomes'
+import {
+  EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD,
+  EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD,
+  FUTURE_VACUUM_OUTCOME_PAYLOAD,
+  INCOMPLETE_V2_VACUUM_OUTCOME_PAYLOAD,
+  LEGACY_VACUUM_OUTCOMES,
+  MALFORMED_V2_VACUUM_OUTCOME_PAYLOAD,
+  NINE_ROOM_VACUUM_OUTCOME_CONTRACT,
+} from '../../test/fixtures/vacuumOutcomes'
+import { parseVacuumOutcomeContract, vacuumWhileAwayPresentation, type VacuumOutcomeContract, type VacuumOutcomeReason } from './vacuumOutcomes'
 import {
   VacuumOutcomeDetail,
   VacuumOutcomeOverview,
+  VacuumOutcomeProtocolNotice,
 } from './VacuumOutcomes'
 import { countVacuumOutcomes, vacuumOutcomeReasonValue } from './vacuumOutcomePresentation'
 
@@ -17,6 +28,32 @@ const vacuum = VACUUMS.find((candidate) => candidate.coordinatorSessionEntityId)
 
 function cloneContract() {
   return structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT)
+}
+
+function parsedContract(payload: unknown): VacuumOutcomeContract {
+  const contract = parseVacuumOutcomeContract(structuredClone(payload))
+  if (!contract) throw new Error('Expected valid vacuum outcome fixture')
+  return contract
+}
+
+function record(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected record fixture')
+  return value as Record<string, unknown>
+}
+
+function protocolPresentation(payload: unknown) {
+  const presentation = vacuumWhileAwayPresentation({
+    ...LEGACY_VACUUM_OUTCOMES,
+    while_away_outcomes: structuredClone(payload),
+  })
+  if (
+    presentation.kind !== 'incomplete'
+    && presentation.kind !== 'malformed'
+    && presentation.kind !== 'incompatible'
+  ) {
+    throw new Error('Expected protocol presentation fixture')
+  }
+  return presentation
 }
 
 function contractForRooms(roomIds: string[]) {
@@ -90,6 +127,22 @@ describe('VacuumOutcomeOverview', () => {
     expect(opener).toHaveAttribute('data-tone', 'security')
     expect(opener).toHaveAttribute('data-icon', 'mdi:pause-circle')
   })
+
+  it('keeps unverified completion distinct from errors and outstanding work', () => {
+    render(
+      <VacuumOutcomeOverview
+        contract={parsedContract(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD)}
+        onOpen={() => undefined}
+        vacuum={vacuum}
+      />,
+    )
+
+    const opener = screen.getByRole('button', { name: /Open Main Floor Automatic Cleaning Report/ })
+    expect(opener).toHaveTextContent('2 Rooms Unverified • 3 Rooms Need Attention')
+    expect(opener).not.toHaveTextContent('Error')
+    expect(opener).toHaveAttribute('data-tone', 'warning')
+    expect(opener).toHaveAttribute('data-icon', 'mdi:help-circle-outline')
+  })
 })
 
 describe('VacuumOutcomeDetail', () => {
@@ -122,6 +175,77 @@ describe('VacuumOutcomeDetail', () => {
     expect(document.querySelector('[data-vacuum-outcome-detail="true"]')).toHaveAttribute('data-modal-detail-autofocus', 'true')
     expect(document.querySelectorAll('[data-group] > button')).toHaveLength(0)
     expect(document.querySelector('[data-modal-disclosure="right-chevron"]')).not.toBeInTheDocument()
+  })
+
+  it('renders v2 uncertainty, partial credit, and structured evidence without treating uncertainty as failure', () => {
+    render(<VacuumOutcomeDetail contract={parsedContract(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD)} vacuum={vacuum} />)
+
+    const groupHeaders = [...document.querySelectorAll<HTMLElement>('[data-group] > div:first-child')]
+    expect(groupHeaders.map((header) => header.textContent)).toEqual([
+      'Completion Unverified',
+      'Work Still Due',
+    ])
+
+    const gym = screen.getByLabelText('Gym Completion Unverified')
+    expect(gym).toHaveAttribute('data-status', 'uncertain')
+    expect(gym).toHaveTextContent('Vacuuming completion could not be verified.')
+    expect(gym).toHaveTextContent('Observed 1 of 2 requested iterations.')
+    expect(within(gym).getAllByText('Physical Work')[0]).toBeInTheDocument()
+    expect(within(gym).getAllByText('Substantial')[0]).toBeInTheDocument()
+    expect(gym).toHaveTextContent('Vacuuming remains due.')
+    expect(gym).not.toHaveTextContent('Failed')
+
+    const gymEvidence = within(gym).getByRole('button', { name: 'Show Gym Cleaning Evidence' })
+    expect(gymEvidence).toHaveAttribute('data-action-kind', 'command')
+    fireEvent.click(gymEvidence)
+    expect(within(gym).getByText('Duration').nextElementSibling).toHaveTextContent(
+      'Passed • Observed: 1,500 seconds • Minimum: 120 seconds • Reset Count: 1',
+    )
+    expect(within(gym).getByText('Iterations').nextElementSibling).toHaveTextContent(
+      'Unverified • Observed: 1 • Requested: 2',
+    )
+    expect(within(gym).getByText('Completion').nextElementSibling).toHaveTextContent('Uncertain')
+
+    const office = screen.getByLabelText('Office Completion Unverified')
+    expect(office).toHaveTextContent('Telemetry recovery was not coherent within 300 seconds.')
+    fireEvent.click(within(office).getByRole('button', { name: 'Show Office Cleaning Evidence' }))
+    expect(within(office).getByText('Duration').nextElementSibling).toHaveTextContent(
+      'Passed Lower Bound • Lower Bound: 1,440 seconds • Minimum: 120 seconds • Reset Count: 1 • Attribution Uncertain',
+    )
+    expect(within(office).getByText('Telemetry').nextElementSibling).toHaveTextContent('Unresolved')
+    expect(within(office).getByText('Source Outage Duration').nextElementSibling).toHaveTextContent('258 seconds')
+
+    const livingRoom = screen.getByLabelText('Living Room Partially Complete')
+    expect(livingRoom).toHaveTextContent('The vacuuming and mopping attempt was partially completed.')
+    expect(livingRoom).toHaveTextContent('Home Assistant credited vacuuming; work may remain.')
+    expect(livingRoom).toHaveTextContent('Mopping remains due.')
+    expect(livingRoom).not.toHaveTextContent('Failed')
+  })
+
+  it('renders current evidence-free v2 uncertainty without legacy or raw failure wording', () => {
+    render(<VacuumOutcomeDetail contract={parsedContract(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD)} vacuum={vacuum} />)
+
+    const office = screen.getByLabelText('Office Completion Unverified')
+    expect(office).toHaveTextContent('Vacuuming completion could not be verified.')
+    expect(office).toHaveTextContent('Vacuuming remains due.')
+    expect(office).not.toHaveTextContent('Could not clean')
+    expect(office).not.toHaveTextContent('The vacuum outcome reason was not recognized.')
+    expect(within(office).getByText('Floor completion time was unavailable during dock servicing after error sensor is unavailable')).not.toBeVisible()
+    expect(within(office).queryByRole('button', { name: /Cleaning Evidence/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps the core v2 outcome when only its optional evidence is malformed', () => {
+    const payload = structuredClone(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD)
+    const room = record(payload.rooms[0])
+    const attempt = record(room.latest_attempt)
+    record(record(attempt.evidence).duration).minimum = 'bad'
+
+    render(<VacuumOutcomeDetail contract={parsedContract(payload)} vacuum={vacuum} />)
+
+    const gym = screen.getByLabelText('Gym Completion Unverified')
+    expect(gym).toHaveTextContent('Vacuuming completion could not be verified.')
+    expect(gym).toHaveTextContent('Evidence Unavailable')
+    expect(within(gym).queryByRole('button', { name: /Cleaning Evidence/ })).not.toBeInTheDocument()
   })
 
   it('shows a full vacuum-and-mop failure as one cause plus concise remaining work', () => {
@@ -327,6 +451,8 @@ describe('VacuumOutcomeDetail', () => {
   it('uses 44px command targets and defines no press-only or chevron treatment', () => {
     expect(styles).toMatch(/\.historyButton\s*\{[^}]*min-height:\s*44px;/s)
     expect(styles).toMatch(/\.diagnosticsButton\s*\{[^}]*min-height:\s*44px;/s)
+    expect(styles).toMatch(/\.evidenceButton\s*\{[^}]*min-height:\s*44px;/s)
+    expect(styles).toMatch(/\.protocolButton\s*\{[^}]*min-height:\s*44px;/s)
     expect(styles).toMatch(/\.attemptBadge\s*\{[^}]*min-width:\s*22px;[^}]*padding:\s*0 5px;/s)
     expect(styles).toMatch(/\.errorOutstandingLine\s*\{[^}]*color:\s*var\(--color-text\);/s)
     expect(styles).not.toMatch(/\.groupButton/)
@@ -342,6 +468,49 @@ describe('VacuumOutcomeDetail', () => {
     const history = screen.getByRole('button', { name: 'Show Office History' })
     expect(history).toHaveAttribute('data-has-attempt-count', 'true')
     expect(within(history).getByText('12')).toBeInTheDocument()
+  })
+})
+
+describe('VacuumOutcomeProtocolNotice', () => {
+  it.each([
+    [
+      'incomplete',
+      INCOMPLETE_V2_VACUUM_OUTCOME_PAYLOAD,
+      'Report Still Being Prepared',
+      'Final counts are not available.',
+    ],
+    [
+      'malformed',
+      MALFORMED_V2_VACUUM_OUTCOME_PAYLOAD,
+      'Report Could Not Be Read',
+      'Structured cleaning results are unavailable.',
+    ],
+    [
+      'incompatible',
+      FUTURE_VACUUM_OUTCOME_PAYLOAD,
+      'Dashboard Update Required',
+      'This cleaning report uses an unsupported version.',
+    ],
+  ])('renders an explicit %s report state with collapsed secondary legacy details', (
+    kind,
+    payload,
+    title,
+    description,
+  ) => {
+    const presentation = protocolPresentation(payload)
+    render(<VacuumOutcomeProtocolNotice presentation={presentation} vacuum={vacuum} />)
+
+    const notice = document.querySelector(`[data-vacuum-outcome-protocol="${kind}"]`)
+    expect(notice).toBeInTheDocument()
+    expect(screen.getByText(title)).toBeInTheDocument()
+    expect(screen.getByText(description)).toBeInTheDocument()
+    expect(screen.getByText('Cleaned Gym')).not.toBeVisible()
+    expect(screen.getByText('Could not clean Dining Room because the clean water tank is empty')).not.toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show Main Floor Unstructured Report Details' }))
+    expect(screen.getByText('These details may be inconsistent with the typed status.')).toBeVisible()
+    expect(screen.getByText('Cleaned Gym')).toBeVisible()
+    expect(screen.getByText('Could not clean Dining Room because the clean water tank is empty')).toBeVisible()
   })
 })
 
@@ -376,6 +545,14 @@ describe('vacuum outcome reason copy', () => {
     ['dirty water', reason('mop.dirty_water_unavailable')],
     ['detergent', reason('mop.detergent_unavailable')],
     ['mop hardware', reason('mop.hardware_unavailable')],
+    ['ambiguous duration attribution', reason('telemetry.counter_attribution_ambiguous', { measurement: 'time' })],
+    ['ambiguous area attribution', reason('telemetry.counter_attribution_ambiguous', { measurement: 'area' })],
+    ['unresolved telemetry outage', reason('telemetry.source_outage_unresolved', { timeout_seconds: 300 })],
+    ['telemetry identity conflict', reason('telemetry.task_identity_conflict')],
+    ['incomplete iterations', reason('verification.iterations_incomplete', { observed_iterations: 1, requested_iterations: 2 })],
+    ['uncertain iterations', reason('verification.iterations_uncertain')],
+    ['unavailable duration measurement', reason('verification.measurement_unavailable', { measurement: 'time' })],
+    ['unavailable area measurement', reason('verification.measurement_unavailable', { measurement: 'area' })],
     ['unknown code', reason('future.new_reason')],
   ]
 
@@ -429,6 +606,17 @@ describe('vacuum outcome reason copy', () => {
     expect(rendered).toBe('Observed cleaning time was dominated elsewhere, with 45 seconds versus 20 seconds in the requested room.')
   })
 
+  it('uses an uncertainty-specific generic explanation for an unknown future reason', () => {
+    const rendered = vacuumOutcomeReasonValue(
+      (key: CopyKey<'modalVacuum'>, values?: CopyValues) => copy('modalVacuum', key, values),
+      reason('future.new_uncertain_reason'),
+      {},
+      'uncertain',
+    )
+
+    expect(rendered).toBe('Completion could not be verified from the available vacuum data.')
+  })
+
   it('summarizes the exact nine-room state without reducing event history', () => {
     expect(countVacuumOutcomes(cloneContract())).toMatchObject({
       attention: 1,
@@ -436,6 +624,18 @@ describe('vacuum outcome reason copy', () => {
       due: 5,
       interrupted: 1,
       needsAttention: 4,
+      unverified: 0,
+    })
+  })
+
+  it('counts v2 uncertainty separately while deriving outstanding work from the projection', () => {
+    expect(countVacuumOutcomes(parsedContract(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD))).toEqual({
+      attention: 0,
+      completed: 0,
+      due: 3,
+      interrupted: 0,
+      needsAttention: 3,
+      unverified: 2,
     })
   })
 })

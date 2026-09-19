@@ -58,8 +58,6 @@ const state = (value: string, attributes: Record<string, unknown> = {}) => ({
 
 function baseStates() {
   return {
-    [HOT_FLASH.sides.left.alarmState]: state('idle'),
-    [HOT_FLASH.sides.right.alarmState]: state('idle'),
     [HOT_FLASH.sides.left.climate]: state('off', { current_temperature: 70 }),
     [HOT_FLASH.sides.right.climate]: state('off', { current_temperature: 70 }),
     [HOT_FLASH.sides.left.currentTemperature]: state('70'),
@@ -112,7 +110,7 @@ const targetCalls = (result: RuntimeResult, sideName: HotFlashSide) => result.ca
   (call) => call.action === 'number.set_value' && call.target === HOT_FLASH.sides[sideName].target,
 )
 const modeCalls = (result: RuntimeResult) => result.calls.filter((call) => call.action === 'climate.set_hvac_mode')
-const feedbackCalls = (result: RuntimeResult) => result.calls.filter(
+const alarmCommandCalls = (result: RuntimeResult) => result.calls.filter(
   (call) => call.action === 'mqtt.publish'
     && call.data.topic === 'sleepypod/eight-pod/cmd/set-alarm',
 )
@@ -297,7 +295,7 @@ describe('generated Hot Flash graph in the network-disabled HA interpreter', () 
     expect(result.states[HOT_FLASH.helpers.desiredMode]).toBe('off')
   })
 
-  it('protects a newer owned target from stale echoes and buzzes only the accepted manual command', () => {
+  it('protects a newer owned target from stale echoes without issuing an alarm command', () => {
     const states = {
       ...baseStates(),
       [HOT_FLASH.sides.left.climate]: state('heat'),
@@ -329,8 +327,7 @@ describe('generated Hot Flash graph in the network-disabled HA interpreter', () 
     expect(Number(result.states[HOT_FLASH.helpers.leftTargetPayload])).toBe(3)
     expect(result.states[HOT_FLASH.helpers.leftPhase]).toBe('idle')
     expect(targetCalls(result, 'left').map((call) => call.data.value)).toEqual([3, 3])
-    expect(feedbackCalls(result)).toHaveLength(1)
-    expect(feedbackCalls(result)[0].data.payload).toContain('"side":"left"')
+    expect(alarmCommandCalls(result)).toEqual([])
   })
 
   it('treats available-to-different target reports as external intent but reconnect reports as retry evidence', () => {
@@ -505,7 +502,7 @@ describe('generated Hot Flash graph in the network-disabled HA interpreter', () 
     expect(modeCalls(result).map((call) => call.data.hvac_mode)).toEqual(['heat', 'heat'])
   })
 
-  it('executes the transformed Tonight and All Nights wrappers with one live command and one feedback pulse', () => {
+  it('executes the transformed Tonight and All Nights wrappers without an alarm feedback command', () => {
     const tonight = run(baseStates(), [{
       at: NOW,
       actions: [{
@@ -514,7 +511,7 @@ describe('generated Hot Flash graph in the network-disabled HA interpreter', () 
       }],
     }])
     expect(targetCalls(tonight, 'left').map((call) => call.data.value)).toEqual([3])
-    expect(feedbackCalls(tonight)).toHaveLength(1)
+    expect(alarmCommandCalls(tonight)).toEqual([])
     expect(tonight.calls.filter((call) => call.action === 'input_number.set_value' && call.target === 'input_number.eight_sleep_stephen_bedtime_level')).toEqual([])
 
     const allNights = run(baseStates(), [{
@@ -535,10 +532,10 @@ describe('generated Hot Flash graph in the network-disabled HA interpreter', () 
     expect(recurringIndex).toBeGreaterThanOrEqual(0)
     expect(liveIndex).toBeGreaterThan(recurringIndex)
     expect(targetCalls(allNights, 'left').map((call) => call.data.value)).toEqual([4])
-    expect(feedbackCalls(allNights)).toHaveLength(1)
+    expect(alarmCommandCalls(allNights)).toEqual([])
   })
 
-  it('fails wrapper guards closed and skips physical feedback while an alarm is active', () => {
+  it('fails wrapper guards closed and keeps target delivery independent of alarm state', () => {
     const wrongPhase = {
       ...baseStates(),
       [HOT_FLASH.sides.left.schedulePhase]: state('outside'),
@@ -551,15 +548,15 @@ describe('generated Hot Flash graph in the network-disabled HA interpreter', () 
       }],
     }])
     expect(targetCalls(guarded, 'left')).toEqual([])
-    expect(feedbackCalls(guarded)).toEqual([])
+    expect(alarmCommandCalls(guarded)).toEqual([])
 
     const alarmActive = {
       ...baseStates(),
-      [HOT_FLASH.sides.left.alarmState]: state('ringing'),
+      'sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state': state('ringing'),
     }
-    const noBuzz = run(alarmActive, [brokerStep('target', 'left', { level: 3 })])
-    expect(targetCalls(noBuzz, 'left').map((call) => call.data.value)).toEqual([3])
-    expect(feedbackCalls(noBuzz)).toEqual([])
+    const targetWhileRinging = run(alarmActive, [brokerStep('target', 'left', { level: 3 })])
+    expect(targetCalls(targetWhileRinging, 'left').map((call) => call.data.value)).toEqual([3])
+    expect(alarmCommandCalls(targetWhileRinging)).toEqual([])
   })
 
   it('recovers safely after a crash at every activation helper, persistence, and command boundary', () => {

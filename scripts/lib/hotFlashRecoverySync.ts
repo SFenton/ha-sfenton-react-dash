@@ -18,9 +18,12 @@ export const HOT_FLASH_ORIGINALS = [
 
 export const HOT_FLASH_NEW_IDS = [
   HOT_FLASH.broker,
-  HOT_FLASH.feedback,
   'automation.sleepypod_hot_flash_state_reconciler',
   'automation.sleepypod_hot_flash_startup_followup',
+] as const
+
+export const HOT_FLASH_RETIRED_IDS = [
+  'script.sleepypod_temperature_feedback',
 ] as const
 
 export const HOT_FLASH_MANAGED_AUTOMATIONS = [
@@ -78,11 +81,13 @@ export interface HotFlashSyncClient {
 }
 
 export interface HotFlashSnapshot {
-  version: 3
+  version: 4
   originals: Record<string, HaRecord>
   originalEnabled: Record<string, boolean>
   managedBefore: Record<string, HaRecord | null>
   managedEnabledBefore: Record<string, boolean>
+  retiredBefore: Record<string, HaRecord | null>
+  retiredConsumersBefore: Record<string, string[]>
   helpersBefore: Record<string, HaRecord | null>
   helperStatesBefore: Record<string, HotFlashState | null>
   lifecycleBefore: Record<string, HotFlashState | null>
@@ -197,6 +202,32 @@ function generatedObjects(generated: ReturnType<typeof hotFlashRecoveryConfig>) 
   }
 }
 
+function assertOwnedRetiredObjects(retiredBefore: Record<string, HaRecord | null>) {
+  for (const id of HOT_FLASH_RETIRED_IDS) {
+    const current = retiredBefore[id]
+    if (!current) continue
+    const serialized = JSON.stringify(current)
+    if (current.alias !== 'SleepyPod temperature command feedback'
+      || current.mode !== 'queued'
+      || !serialized.includes('sleepypod/eight-pod/cmd/set-alarm')
+      || !serialized.includes('vibrationPattern')
+      || !serialized.includes('duration')) {
+      throw new Error(`Retired managed object ${id} has unexpected configuration drift.`)
+    }
+  }
+}
+
+function assertRetiredObjectsUnreferenced(managedAfter: Record<string, HaRecord>) {
+  for (const retiredId of HOT_FLASH_RETIRED_IDS) {
+    const consumers = Object.entries(managedAfter)
+      .filter(([, config]) => JSON.stringify(config).includes(retiredId))
+      .map(([id]) => id)
+    if (consumers.length) {
+      throw new Error(`Retired managed object ${retiredId} is still referenced by ${consumers.join(', ')}.`)
+    }
+  }
+}
+
 async function readHelpers(client: HotFlashSyncClient) {
   const domains = new Map<ManagedHelper['domain'], HaRecord[]>()
   for (const helper of hotFlashHelpers) {
@@ -223,15 +254,51 @@ function assertConsumers(consumers: Record<string, string[]>) {
   if (unknown.length) throw new Error(`Unknown SleepyPod target/HVAC consumers block cutover: ${unknown.join(', ')}.`)
 }
 
+function isRetiredFeedbackCall(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as HaRecord
+  const data = record.data as HaRecord | undefined
+  return record.action === HOT_FLASH_RETIRED_IDS[0]
+    && Object.keys(record).sort().join(',') === 'action,data'
+    && data !== undefined
+    && Object.keys(data).join(',') === 'side'
+    && (data.side === 'left' || data.side === 'right')
+}
+
+function withoutRetiredFeedbackCalls(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => !isRetiredFeedbackCall(item))
+      .map(withoutRetiredFeedbackCalls)
+  }
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value as HaRecord)
+    .map(([key, item]) => [key, withoutRetiredFeedbackCalls(item)]))
+}
+
 function assertOwnedNewObjects(managedBefore: Record<string, HaRecord | null>, managedAfter: Record<string, HaRecord>) {
   for (const id of HOT_FLASH_NEW_IDS) {
     const current = managedBefore[id]
     if (!current) continue
     const desired = managedAfter[id]
-    if (fingerprint(current) !== fingerprint(desired)
-      && (!isAutomation(id) || fingerprint(current) !== fingerprint(staged(desired)))) {
+    const allowed = new Set([
+      fingerprint(desired),
+      ...(isAutomation(id) ? [fingerprint(staged(desired))] : []),
+    ])
+    if (!allowed.has(fingerprint(current))
+      && !allowed.has(fingerprint(withoutRetiredFeedbackCalls(current)))) {
       throw new Error(`Managed object ${id} has unexpected configuration drift.`)
     }
+  }
+}
+
+function assertRetiredConsumersOwned(
+  consumers: Record<string, string[]>,
+  managedAfter: Record<string, HaRecord>,
+) {
+  const unexpected = Object.keys(consumers).filter((id) => !Object.hasOwn(managedAfter, id))
+  if (unexpected.length) {
+    throw new Error(`Retired SleepyPod feedback still has unmanaged consumers: ${unexpected.join(', ')}.`)
   }
 }
 
@@ -265,8 +332,16 @@ export async function hotFlashPlan(client: HotFlashSyncClient): Promise<HotFlash
     id,
     await client.getObject(id),
   ]))) as Record<string, HaRecord | null>
+  const retiredBefore = Object.fromEntries(await Promise.all(HOT_FLASH_RETIRED_IDS.map(async (id) => [
+    id,
+    await client.getObject(id),
+  ]))) as Record<string, HaRecord | null>
   assertOwnedNewObjects(managedBefore, managedAfter)
+  assertOwnedRetiredObjects(retiredBefore)
+  assertRetiredObjectsUnreferenced(managedAfter)
   await validateGenerated(client, managedAfter)
+  const retiredConsumersBefore = await client.findConsumers(HOT_FLASH_RETIRED_IDS)
+  assertRetiredConsumersOwned(retiredConsumersBefore, managedAfter)
   const originalEnabled = Object.fromEntries(await Promise.all(HOT_FLASH_ORIGINALS
     .filter(isAutomation)
     .map(async (id) => [id, await client.getEnabled(id)]))) as Record<string, boolean>
@@ -293,6 +368,9 @@ export async function hotFlashPlan(client: HotFlashSyncClient): Promise<HotFlash
     ...Object.entries(managedAfter)
       .filter(([id, desired]) => fingerprint(managedBefore[id]) !== fingerprint(desired))
       .map(([id]) => `${managedBefore[id] ? 'Update' : 'Create'} ${id}`),
+    ...HOT_FLASH_RETIRED_IDS
+      .filter((id) => retiredBefore[id] !== null)
+      .map((id) => `Remove ${id}`),
     ...hotFlashHelpers
       .filter((helper) => !helpersBefore[helperEntity(helper)])
       .map((helper) => `Create ${helperEntity(helper)}`),
@@ -301,11 +379,13 @@ export async function hotFlashPlan(client: HotFlashSyncClient): Promise<HotFlash
       .map((id) => `Enable ${id}`),
   ]
   const snapshot: HotFlashSnapshot = {
-    version: 3,
+    version: 4,
     originals,
     originalEnabled,
     managedBefore,
     managedEnabledBefore,
+    retiredBefore,
+    retiredConsumersBefore,
     helpersBefore,
     helperStatesBefore,
     lifecycleBefore,
@@ -454,6 +534,14 @@ async function assertRollbackOwned(client: HotFlashSyncClient, snapshot: HotFlas
       throw new Error(`Hot Flash rollback drift check failed for ${id}.`)
     }
   }
+  for (const id of HOT_FLASH_RETIRED_IDS) {
+    const actual = fingerprint(await client.getObject(id))
+    const allowed = new Set([
+      fingerprint(snapshot.retiredBefore[id]),
+      fingerprint(null),
+    ])
+    if (!allowed.has(actual)) throw new Error(`Hot Flash rollback drift check failed for ${id}.`)
+  }
   const helpers = await readHelpers(client)
   for (const helper of hotFlashHelpers) {
     const entity = helperEntity(helper)
@@ -462,6 +550,35 @@ async function assertRollbackOwned(client: HotFlashSyncClient, snapshot: HotFlas
     if (fingerprint(actual) !== fingerprint(before) && !helperMatches(actual, helper)) {
       throw new Error(`Hot Flash rollback drift check failed for ${entity}.`)
     }
+  }
+}
+
+async function retireManagedObjects(client: HotFlashSyncClient, snapshot: HotFlashSnapshot) {
+  const consumers = await client.findConsumers(HOT_FLASH_RETIRED_IDS)
+  if (Object.keys(consumers).length) {
+    throw new Error(`Retired SleepyPod feedback is still referenced by ${Object.keys(consumers).join(', ')}.`)
+  }
+  let removed = false
+  for (const id of HOT_FLASH_RETIRED_IDS) {
+    const before = snapshot.retiredBefore[id]
+    if (!before) continue
+    if (fingerprint(await client.getObject(id)) !== fingerprint(before)) {
+      throw new Error(`Retired managed object ${id} changed immediately before deletion.`)
+    }
+    await client.removeObject(id)
+    removed = true
+  }
+  return removed
+}
+
+async function verifyRetiredObjectsAbsent(client: HotFlashSyncClient) {
+  for (const id of HOT_FLASH_RETIRED_IDS) {
+    if (await client.getObject(id)) throw new Error(`Retired managed object ${id} still exists in stored configuration.`)
+    if (await client.loaded(id)) throw new Error(`Retired managed object ${id} is still loaded.`)
+  }
+  const consumers = await client.findConsumers(HOT_FLASH_RETIRED_IDS)
+  if (Object.keys(consumers).length) {
+    throw new Error(`Retired SleepyPod feedback still has consumers: ${Object.keys(consumers).join(', ')}.`)
   }
 }
 
@@ -475,13 +592,14 @@ export async function hotFlashStage(
   try {
     await assertProtectedConsumers(client, plan.snapshot)
     await installHelpers(client, plan.snapshot)
-    for (const id of HOT_FLASH_STAGE_IDS) {
+    const stageIds = [...HOT_FLASH_STAGE_IDS].filter((id) => plan.snapshot.managedBefore[id] === null)
+    for (const id of stageIds) {
       const desired = plan.snapshot.managedAfter[id]
       const stagedConfig = isAutomation(id) ? staged(desired) : desired
       await setChecked(client, id, plan.snapshot.managedBefore[id], stagedConfig, isAutomation(id) ? false : undefined)
     }
     await client.reload()
-    for (const id of HOT_FLASH_STAGE_IDS) {
+    for (const id of stageIds) {
       const desired = plan.snapshot.managedAfter[id]
       const stagedConfig = isAutomation(id) ? staged(desired) : desired
       await waitForLoaded(client, id, stagedConfig, isAutomation(id) ? false : undefined)
@@ -506,7 +624,7 @@ export async function hotFlashActivate(
   rollbackSnapshot: HotFlashSnapshot,
 ) {
   const plan = await requireFreshPlan(client, expected)
-  if (rollbackSnapshot.version !== 3) throw new Error('Activation requires the version 3 pre-stage rollback snapshot.')
+  if (rollbackSnapshot.version !== 4) throw new Error('Activation requires the version 4 pre-stage rollback snapshot.')
   try {
     await assertProtectedConsumers(client, plan.snapshot)
     for (const id of HOT_FLASH_MANAGED_AUTOMATIONS) await client.setEnabled(id, false)
@@ -518,6 +636,8 @@ export async function hotFlashActivate(
     for (const [id, desired] of Object.entries(plan.snapshot.managedAfter)) {
       await waitForLoaded(client, id, desired, isAutomation(id) ? false : undefined)
     }
+    if (await retireManagedObjects(client, plan.snapshot)) await client.reload()
+    await verifyRetiredObjectsAbsent(client)
     await client.validateCore()
     await assertProtectedConsumers(client, plan.snapshot)
     await verifyConsumers(client)
@@ -546,6 +666,7 @@ export async function hotFlashVerify(client: HotFlashSyncClient) {
   for (const [id, desired] of Object.entries(plan.snapshot.managedAfter)) {
     await waitForLoaded(client, id, desired, isAutomation(id) ? true : undefined)
   }
+  await verifyRetiredObjectsAbsent(client)
   for (const entity of MANAGED_LIFECYCLE_ENTITIES) {
     const value = (await client.getState(entity))?.state
     if (value !== 'idle') throw new Error(`Hot Flash lifecycle ${entity} is not idle after verification.`)
@@ -554,7 +675,7 @@ export async function hotFlashVerify(client: HotFlashSyncClient) {
 }
 
 export async function hotFlashRollback(client: HotFlashSyncClient, snapshot: HotFlashSnapshot) {
-  if (snapshot.version !== 3) throw new Error('Unsupported Hot Flash rollback snapshot.')
+  if (snapshot.version !== 4) throw new Error('Unsupported Hot Flash rollback snapshot.')
   await assertRollbackOwned(client, snapshot)
   await assertProtectedConsumers(client, snapshot)
   const errors: Error[] = []
@@ -573,6 +694,12 @@ export async function hotFlashRollback(client: HotFlashSyncClient, snapshot: Hot
   await attempt('Persist disabled automation states', () => client.persistStates())
   for (const [id, before] of Object.entries(snapshot.managedBefore)) {
     await attempt(`Restore stored object ${id}`, async () => {
+      if (before === null) await client.removeObject(id)
+      else await client.setObject(id, before)
+    })
+  }
+  for (const [id, before] of Object.entries(snapshot.retiredBefore)) {
+    await attempt(`Restore retired object ${id}`, async () => {
       if (before === null) await client.removeObject(id)
       else await client.setObject(id, before)
     })
@@ -598,6 +725,19 @@ export async function hotFlashRollback(client: HotFlashSyncClient, snapshot: Hot
         return
       }
       if (fingerprint(await client.getObject(id)) !== fingerprint(before)) throw new Error(`Rollback failed to restore stored ${id}.`)
+      await waitForLoaded(client, id, before)
+    })
+  }
+  for (const [id, before] of Object.entries(snapshot.retiredBefore)) {
+    await attempt(`Verify restored retired object ${id}`, async () => {
+      if (before === null) {
+        if (await client.getObject(id)) throw new Error(`Rollback failed to remove ${id}.`)
+        if (await client.loaded(id)) throw new Error(`Rollback failed to unload ${id}.`)
+        return
+      }
+      if (fingerprint(await client.getObject(id)) !== fingerprint(before)) {
+        throw new Error(`Rollback failed to restore retired object ${id}.`)
+      }
       await waitForLoaded(client, id, before)
     })
   }
