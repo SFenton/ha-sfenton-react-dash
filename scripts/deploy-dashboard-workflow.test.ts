@@ -85,7 +85,9 @@ describe('dashboard deployment workflow', () => {
     expect(proxy).not.toContain('192.168.1.22')
     expect(service).toContain('NoNewPrivileges=true')
     expect(service).toContain('Restart=always')
-    expect(runner).toContain('--jitconfig')
+    expect(runner).toContain(
+      'exec ./bin/Runner.Listener run --jitconfig "$ACTIONS_RUNNER_JIT_CONFIG"',
+    )
   })
 
   it('documents automatic frontend ownership and the manual HA fallback', () => {
