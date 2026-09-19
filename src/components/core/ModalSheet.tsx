@@ -5,6 +5,8 @@ import { useCopy } from '../../i18n'
 import { useModalBackdropBands } from '../../hooks/useModalBackdropBands'
 import {
   armDashboardKeyboardPrediction,
+  DASHBOARD_KEYBOARD_STATE_EVENT,
+  type DashboardKeyboardStateDetail,
   isDashboardKeyboardInput,
 } from '../../hooks/useDashboardViewport'
 import {
@@ -245,6 +247,7 @@ export function ModalSheet({
   const [inputShielded, setInputShielded] = useState(false)
   const inputShieldFrameRef = useRef<number | null>(null)
   const keyboardLiftPendingRef = useRef(false)
+  const keyboardLiftResetTimeoutRef = useRef<number | null>(null)
   const currentPresentation = useModalSheetPresentation()
   const [measuredBodyTier, setMeasuredBodyTier] = useState<ModalBodyTier>('compact')
   const currentBodyTier = currentPresentation === 'sheet' ? 'compact' : measuredBodyTier
@@ -335,6 +338,7 @@ export function ModalSheet({
   }, [bodyElementRef])
   const requestClose = () => {
     keyboardLiftPendingRef.current = false
+    if (keyboardLiftResetTimeoutRef.current !== null) window.clearTimeout(keyboardLiftResetTimeoutRef.current)
     if (inputShieldFrameRef.current !== null) window.cancelAnimationFrame(inputShieldFrameRef.current)
     setInputShielded(true)
     inputShieldFrameRef.current = window.requestAnimationFrame(() => {
@@ -389,8 +393,14 @@ export function ModalSheet({
   }, [open, rapidReopen])
 
   useEffect(() => {
+    const clearKeyboardLiftReset = () => {
+      if (keyboardLiftResetTimeoutRef.current === null) return
+      window.clearTimeout(keyboardLiftResetTimeoutRef.current)
+      keyboardLiftResetTimeoutRef.current = null
+    }
     const releaseKeyboardLift = () => {
       if (!keyboardLiftPendingRef.current) return
+      clearKeyboardLiftReset()
       keyboardLiftPendingRef.current = false
       setKeyboardLiftReady(true)
     }
@@ -398,16 +408,28 @@ export function ModalSheet({
       keyboardLiftPendingRef.current = false
       setKeyboardLiftReady(false)
     }
+    const handleKeyboardState = (event: Event) => {
+      const { open: keyboardOpen } = (event as CustomEvent<DashboardKeyboardStateDetail>).detail
+      clearKeyboardLiftReset()
+      if (keyboardOpen) return
+      keyboardLiftResetTimeoutRef.current = window.setTimeout(() => {
+        keyboardLiftResetTimeoutRef.current = null
+        setKeyboardLiftReady(false)
+      }, 340)
+    }
     window.addEventListener('pointerup', releaseKeyboardLift, true)
     window.addEventListener('touchend', releaseKeyboardLift, true)
     window.addEventListener('pointercancel', resetKeyboardLift, true)
     window.addEventListener('touchcancel', resetKeyboardLift, true)
+    window.addEventListener(DASHBOARD_KEYBOARD_STATE_EVENT, handleKeyboardState)
     return () => {
       if (inputShieldFrameRef.current !== null) window.cancelAnimationFrame(inputShieldFrameRef.current)
+      clearKeyboardLiftReset()
       window.removeEventListener('pointerup', releaseKeyboardLift, true)
       window.removeEventListener('touchend', releaseKeyboardLift, true)
       window.removeEventListener('pointercancel', resetKeyboardLift, true)
       window.removeEventListener('touchcancel', resetKeyboardLift, true)
+      window.removeEventListener(DASHBOARD_KEYBOARD_STATE_EVENT, handleKeyboardState)
     }
   }, [])
 
@@ -540,6 +562,10 @@ export function ModalSheet({
               initialFocus={false}
               onPointerDownCapture={(event) => {
                 if (isDashboardKeyboardInput(event.target)) {
+                  if (keyboardLiftResetTimeoutRef.current !== null) {
+                    window.clearTimeout(keyboardLiftResetTimeoutRef.current)
+                    keyboardLiftResetTimeoutRef.current = null
+                  }
                   event.currentTarget.removeAttribute('data-keyboard-lift-ready')
                   setKeyboardLiftReady(false)
                   keyboardLiftPendingRef.current = true

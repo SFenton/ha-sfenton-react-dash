@@ -514,13 +514,19 @@
 .footer {
   flex: 0 0 auto;
   box-sizing: border-box;
-  transition: padding-bottom 320ms cubic-bezier(.32, .72, 0, 1);
   padding:
     10px
     max(16px, var(--rd-safe-right))
     calc(18px + var(--rd-safe-bottom))
     max(16px, var(--rd-safe-left));
   background: linear-gradient(to top, var(--color-modal-footer) 72%, var(--color-modal-footer-transparent));
+}
+
+.content[data-keyboard-lift-ready='true'] .navigation,
+.content[data-keyboard-lift-ready='true'] .footer,
+:global(html[data-dashboard-keyboard='open']) .navigation,
+:global(html[data-dashboard-keyboard='open']) .footer {
+  transition: padding-bottom 320ms cubic-bezier(.32, .72, 0, 1);
 }
 
 @media (forced-colors: active) {
