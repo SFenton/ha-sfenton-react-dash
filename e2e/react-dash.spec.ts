@@ -4613,6 +4613,10 @@ test('vacuum mode dropdown keeps source option labels while optimistic', async (
   }))
   await expect(dialog).toHaveAttribute('data-state', 'open')
   await expect(page.getByRole('combobox', { name: /Mode Mop/i })).toBeVisible()
+  await expect.poll(() => dialog.evaluate((element) => {
+    const transform = getComputedStyle(element).transform
+    return Math.abs(transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42)
+  })).toBeLessThanOrEqual(1)
 
   const modeOptions = await page.getByRole('combobox', { name: /Mode Mop/i }).evaluate((select) => {
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
