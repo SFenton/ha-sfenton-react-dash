@@ -65,19 +65,20 @@ operator-authorized release path.
 7. Merge with a merge commit through `gh`, fetch `origin/master`, and prove the
    release commit is an ancestor of the merged branch. Do not force-push,
    amend, or delete a checked-out branch that still carries unrelated work.
-8. Wait for the post-merge `master` workflow to complete with
-   `gh run watch <run-id> --exit-status`, then inspect its `layout-automation`
-   artifact with `gh run download <run-id> --name layout-automation` before
-   building or deploying. For a layout-sensitive release, view its requested
-   unnormalized screenshots with an image-capable tool, perform the listed
-   interactions against an owned preview of the exact merged head, and record
-   truthful observations tied to the artifact checkpoints and hashes. This
-   manual visual review is a required pre-deployment release acceptance gate,
-   not a pre-push local gate. A `non-layout` Action classification or a
-   zero-item manual worklist requires no manual layout review.
+8. Start the merged build and deployment after proving the merge; do not insert
+   a post-merge layout wait. Post-merge layout automation is asynchronous
+   regression detection. Do not wait for its completion or artifact before
+   building, deploying, or completing a release. A failed run automatically
+   files one deduplicated investigation issue for the merged commit; the run,
+   artifact, and any manual review are follow-up evidence, not release gates.
+   If its status is already available without delaying the release, report it;
+   otherwise report it as pending. Do not use `gh run watch` or download the
+   `layout-automation` artifact as a prerequisite to the remaining release
+   steps.
 
-`master` is protected for administrators and requires the strict
-`Playwright gate`. Force-push and branch deletion remain disabled.
+`master` is protected for administrators and requires the strict pull-request
+`Playwright gate`. The post-merge layout result is monitoring only. Force-push
+and branch deletion remain disabled.
 
 ## Build the merged commit
 
@@ -157,6 +158,8 @@ without explicit deletion authorization.
 
 Report the branch, commit, pull request, merge commit, production bundle,
 deployment method, all three verified host URLs, whether Home Assistant was
-restarted, the CI and manual layout evidence used, and any intentionally
-preserved local changes. If a required step fails, state the blocker and do not
-claim the release completed.
+restarted, protected pull-request CI, the post-merge layout status if already
+known (`pending` is valid), any auto-filed layout issue, and any intentionally
+preserved local changes. Do not wait solely to replace a pending layout status.
+If another required step fails, state the blocker and do not claim the release
+completed.
