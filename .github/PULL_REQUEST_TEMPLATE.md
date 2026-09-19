@@ -8,10 +8,10 @@
 
 - Changed-test policy result and same-stem/`@covers` ownership:
 - `Quality checks` and `Playwright gate` results:
-- Layout classification, affected owners/states, and post-merge `layout-automation` artifact plan:
+- Post-merge layout automation is non-blocking; pending is valid. Classification, affected owners/states, run, and auto-filed issue if any:
 - Automated plan/run/source/build fingerprints and assessment path:
 - Selected/executed/passed/failed/skipped/not-run counts:
-- Post-push manual interaction and inspected screenshot/checkpoint references:
+- Manual interaction and inspected screenshot/checkpoint references, if separately performed:
 - Coarse legacy coverage, device-only gaps, and blocked/access-unavailable evidence:
 
 <!-- Non-layout changes explain the classification. Captures and schema completion

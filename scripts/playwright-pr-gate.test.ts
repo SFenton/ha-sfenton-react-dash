@@ -1,5 +1,10 @@
 // @covers .github/workflows/playwright.yml
+// @covers .github/copilot-instructions.md
+// @covers .github/PULL_REQUEST_TEMPLATE.md
+// @covers .github/reference/dashboard-contract.md
 // @covers .github/skills/release-dashboard/SKILL.md
+// @covers docs/ux/layouts.md
+// @covers docs/ux/validation-matrix.md
 // @covers scripts/layout/plan.ts
 // @covers vitest.config.ts
 import { readFileSync } from 'node:fs'
@@ -7,6 +12,10 @@ import { resolve } from 'node:path'
 
 const read = (path: string) => readFileSync(resolve(path), 'utf8')
 const readJson = <T>(path: string) => JSON.parse(read(path)) as T
+const normalize = (value: string) => value.replace(/\s+/g, ' ').trim()
+
+const NON_BLOCKING_LAYOUT_CONTRACT =
+  'Post-merge layout automation is asynchronous regression detection. Do not wait for its completion or artifact before building, deploying, or completing a release. A failed run automatically files one deduplicated investigation issue for the merged commit; the run, artifact, and any manual review are follow-up evidence, not release gates.'
 
 type ReleaseMachine = {
   version: number
@@ -99,15 +108,20 @@ describe('dashboard Playwright workflow policy', () => {
     expect(workflow).not.toContain('--label')
   })
 
-  it('keeps release machine v3 shadow-only without blocking the manual release', () => {
+  it('keeps post-merge layout monitoring and release machine v3 from blocking the manual release', () => {
+    const rootInstructions = read('.github/copilot-instructions.md')
+    const pullRequestTemplate = read('.github/PULL_REQUEST_TEMPLATE.md')
+    const dashboardContract = read('.github/reference/dashboard-contract.md')
     const releaseSkill = read('.github/skills/release-dashboard/SKILL.md')
+    const layoutsDoc = read('docs/ux/layouts.md')
+    const validationMatrix = read('docs/ux/validation-matrix.md')
     const machine = readJson<ReleaseMachine>('.github/release-machine.json')
     const toolRegistry = readJson<AgentToolRegistry>('.github/agent-tools.json')
     const mergeProofIndex = releaseSkill.indexOf(
       'Merge with a merge commit through `gh`, fetch `origin/master`, and prove',
     )
-    const postMergeEvidenceIndex = releaseSkill.indexOf(
-      'Wait for the post-merge `master` workflow to complete',
+    const postMergeNonBlockingIndex = releaseSkill.indexOf(
+      'Start the merged build and deployment after proving the merge',
     )
     const buildIndex = releaseSkill.indexOf('## Build the merged commit')
     const tools = new Map(toolRegistry.tools.map((tool) => [tool.id, tool]))
@@ -161,14 +175,27 @@ describe('dashboard Playwright workflow policy', () => {
     expect(releaseSkill).toContain('does not replace or block')
     expect(releaseSkill).toContain('Do not make `npm run check`')
     expect(releaseSkill).toContain('layout-automation')
-    expect(releaseSkill).toContain('zero-item manual worklist')
+    expect(layoutsDoc).toContain('zero-item manual worklist')
     expect(releaseSkill).toContain('gh pr checks --watch --fail-fast')
     expect(mergeProofIndex).toBeGreaterThan(-1)
-    expect(postMergeEvidenceIndex).toBeGreaterThan(mergeProofIndex)
-    expect(buildIndex).toBeGreaterThan(postMergeEvidenceIndex)
-    expect(releaseSkill).toContain('gh run watch <run-id> --exit-status')
-    expect(releaseSkill).toContain('gh run download <run-id> --name layout-automation')
-    expect(releaseSkill).toContain('manual visual review is a required pre-deployment release acceptance gate')
+    expect(postMergeNonBlockingIndex).toBeGreaterThan(mergeProofIndex)
+    expect(buildIndex).toBeGreaterThan(postMergeNonBlockingIndex)
+    expect(releaseSkill).not.toContain('Wait for the post-merge `master` workflow')
+    expect(releaseSkill).not.toContain('gh run watch <run-id> --exit-status')
+    expect(releaseSkill).not.toContain('gh run download <run-id> --name layout-automation')
+    expect(releaseSkill).not.toContain('required pre-deployment release acceptance gate')
+    expect(releaseSkill).toContain('Do not use `gh run watch`')
+    expect(releaseSkill).toContain('otherwise report it as pending')
+    expect(pullRequestTemplate).toContain('Post-merge layout automation is non-blocking; pending is valid.')
+    for (const contract of [
+      rootInstructions,
+      dashboardContract,
+      releaseSkill,
+      layoutsDoc,
+      validationMatrix,
+    ]) {
+      expect(normalize(contract)).toContain(NON_BLOCKING_LAYOUT_CONTRACT)
+    }
     expect(releaseSkill).toContain('/sfenton-react-dash/home')
     expect(releaseSkill).toContain('/sfenton-react-panel')
     expect(releaseSkill).toContain('model: gpt-5.6-luna')
