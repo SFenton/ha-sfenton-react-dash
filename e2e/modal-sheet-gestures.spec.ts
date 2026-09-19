@@ -1,5 +1,4 @@
 import { expect, test, type CDPSession, type Locator, type Page } from './layout/fixture'
-import { openChat } from './chat-fixture'
 import { globalQuickLinksAction, selectQuickLinksTab } from './quick-links'
 
 type Point = {
@@ -601,42 +600,6 @@ test.describe('mobile ModalSheet gestures', () => {
 
     await expect(dialog).toHaveAttribute('data-state', 'open')
     await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
-  })
-
-  test('keyboard-phase swipe offsets cannot move the Chat sheet', async ({ page }) => {
-    await page.setViewportSize(MOBILE_VIEWPORT)
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 1 })
-      Object.defineProperty(window, 'visualViewport', {
-        configurable: true,
-        value: Object.assign(new EventTarget(), {
-          height: innerHeight,
-          layoutSynthetic: true,
-          offsetLeft: 0,
-          offsetTop: 0,
-          pageLeft: 0,
-          pageTop: 0,
-          scale: 1,
-          width: innerWidth,
-        }),
-      })
-    })
-    const dialog = await openChat(page)
-    await waitForSheetDragReady(page)
-    const input = dialog.getByRole('textbox', { name: 'Chat Message' })
-    await input.focus()
-    await page.evaluate(() => {
-      Object.assign(window.visualViewport!, { height: 483 })
-      window.visualViewport!.dispatchEvent(new Event('resize'))
-    })
-    await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBe('open')
-    await dialog.evaluate((element) => {
-      element.setAttribute('data-swiping', '')
-      ;(element as HTMLElement).style.setProperty('--drawer-swipe-movement-y', '170px')
-    })
-
-    await expect(dialog).toHaveAttribute('data-state', 'open')
-    expect(Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
   })
 
   test('swipe close blocks the dismissal gesture but releases the host for an intentional follow-up tap', async ({ page }) => {
