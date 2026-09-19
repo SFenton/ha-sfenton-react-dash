@@ -36,7 +36,7 @@ services. Keep entity IDs in constants and pages declarative.
 | Modal code, layout, keyboard behavior | `.github/instructions/modal-layouts.instructions.md` and `docs/ux/modal-layout-inventory.md` |
 | Port from Lovelace | `dashboard-ux-authoring` / HASS Porting; source config and real browser parity remain required |
 | Release explicitly requested | `release-dashboard`; explicit authorization gates remain unchanged and the coordinating profile is `gpt-5.6-luna` medium/default |
-| Generic research/implementation/testing | `.github/agent-budget.json` and `ha-budget-workflow` |
+| Generic research/implementation/testing | Native project rules, direct tools, and bounded non-Claude evidence delegation when useful |
 
 Local layout validation is mock-only and provenance-bound. It does not
 authorize live HA probes or certify production parity. Actual image inspection
@@ -45,8 +45,15 @@ and manual interaction remain necessary for plan review items.
 Start narrow: symbol lookup, exact source ranges, and targeted existing commands.
 Do not invoke tandem, the simulated user panel, or the autonomous admin
 executor unless explicitly requested. Unknown or consequential architectural
-questions need frontier evidence, not a cheap summary. A model route never
-changes repository safety or release requirements.
+questions need strong evidence, not a cheap summary. The current main model
+owns task meaning and final intent coverage; delegates gather bounded evidence
+without rewriting the task. Use no Claude models.
+
+For a named recurring household system, integration, feature, or entity, search
+relevant Copilot session history with the operator's original nouns before
+diagnosing it. Preserve the operator's exact wording until evidence establishes
+the owning layer. Load `dashboard-ux-authoring` only after confirming the issue
+belongs to React UX rather than Home Assistant or a physical device.
 
 Behavior-bearing implementation changes must include a changed or added test
 in the same change set. Application behavior accepts a changed `src/**/*.test`
@@ -61,15 +68,6 @@ The test must either share the implementation file's repository-relative stem
 coverage must use `@covers`; the declaration is an auditable ownership claim,
 not permission to cite an unrelated assertion.
 
-The version 3 budget route is deterministic first. The interactive model may be
-Sol, HydraFusion, or another model; identity never bypasses the exact
-opportunity pin. A matching qualified model may fill the resolved role,
-otherwise the router dispatches the project medium coordinator/reviewer.
-Unqualified models may orchestrate and read evidence but gain no semantic,
-repository-apply, Home Assistant, production, or release authority. Sol
-max/long is conditional on a named trigger receipt, never routine residency.
-
-The installed continuous-improvement observer is governed by
-`.github/agent-learning.json`. It silently no-ops when no repeated reusable
-pattern qualifies and grants no visual, HA, repository-apply or release
-authority.
+Opportunity, packet, receipt, staged-worker, and learning-policy files are
+optional tooling only. They do not route ordinary work or grant authority.
+Repository prompt hooks are session-end observability only.
