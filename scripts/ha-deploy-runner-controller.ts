@@ -85,6 +85,16 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof AggregateError) {
+    return [
+      error.message,
+      ...error.errors.map((nested) => errorMessage(nested)),
+    ].join('\n')
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
 function sha256(value: string | Buffer) {
   return createHash('sha256').update(value).digest('hex')
 }
@@ -654,28 +664,21 @@ async function authorizeRunner(
   candidate: ControllerCandidate,
   runner: JitRunner,
 ) {
-  const temporary = await mkdtemp(`${tmpdir()}/ha-runner-auth-`)
-  const path = `${temporary}/authorization.json`
-  await writeFile(
-    path,
-    `${JSON.stringify({
+  const authorization = `${JSON.stringify({
       mode: candidate.kind,
       runId: String(candidate.run.id),
       runAttempt: candidate.run.run_attempt,
       runnerId: runner.id,
       runnerName: runner.name,
-    })}\n`,
-    { mode: 0o644 },
-  )
-  try {
-    await docker([
-      'cp',
-      path,
-      `${runnerContainer}:/run/ha-dashboard/authorization.json`,
-    ])
-  } finally {
-    await rm(temporary, { recursive: true, force: true })
-  }
+    })}\n`
+  await docker([
+    'exec',
+    runnerContainer,
+    'node',
+    '-e',
+    "require('node:fs').writeFileSync('/run/ha-dashboard/authorization.json',process.argv[1],{mode:0o400})",
+    authorization,
+  ])
 }
 
 async function waitForAssignment(
@@ -851,7 +854,7 @@ async function runController(configPath: string) {
       const candidate = await findCandidate(config)
       if (candidate) await runCandidate(config, candidate)
     } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error))
+      console.error(errorMessage(error))
     }
     await new Promise((resolveDelay) =>
       setTimeout(resolveDelay, config.pollSeconds * 1_000),
@@ -880,7 +883,7 @@ const entryPath = process.argv[1]
   : undefined
 if (entryPath === import.meta.url) {
   main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error))
+    console.error(errorMessage(error))
     process.exitCode = 1
   })
 }
