@@ -241,8 +241,10 @@ export function ModalSheet({
   const [rapidReopenPending, setRapidReopenPending] = useState(false)
   const [closingKeyboardInset, setClosingKeyboardInset] = useState<string | null>(null)
   const [keyboardSurfaceBlockSize, setKeyboardSurfaceBlockSize] = useState<string | null>(null)
+  const [keyboardLiftReady, setKeyboardLiftReady] = useState(false)
   const [inputShielded, setInputShielded] = useState(false)
   const inputShieldFrameRef = useRef<number | null>(null)
+  const keyboardLiftPendingRef = useRef(false)
   const currentPresentation = useModalSheetPresentation()
   const [measuredBodyTier, setMeasuredBodyTier] = useState<ModalBodyTier>('compact')
   const currentBodyTier = currentPresentation === 'sheet' ? 'compact' : measuredBodyTier
@@ -271,6 +273,7 @@ export function ModalSheet({
       setRapidReopenPending(false)
       setClosingKeyboardInset(null)
       setKeyboardSurfaceBlockSize(null)
+      setKeyboardLiftReady(false)
     } else {
       setClosingKeyboardInset(
         getComputedStyle(document.documentElement)
@@ -331,6 +334,7 @@ export function ModalSheet({
     assignRef(bodyElementRef, node)
   }, [bodyElementRef])
   const requestClose = () => {
+    keyboardLiftPendingRef.current = false
     if (inputShieldFrameRef.current !== null) window.cancelAnimationFrame(inputShieldFrameRef.current)
     setInputShielded(true)
     inputShieldFrameRef.current = window.requestAnimationFrame(() => {
@@ -339,6 +343,7 @@ export function ModalSheet({
     })
     setRapidReopen(false)
     setRapidReopenPending(true)
+    setKeyboardLiftReady(false)
     setClosingKeyboardInset(
       getComputedStyle(document.documentElement)
         .getPropertyValue('--dashboard-keyboard-overlay-inset')
@@ -350,8 +355,19 @@ export function ModalSheet({
     onClose()
   }
 
-  const handleOpenChange: NonNullable<Drawer.Root.Props['onOpenChange']> = (nextOpen) => {
+  const handleOpenChange: NonNullable<Drawer.Root.Props['onOpenChange']> = (nextOpen, eventDetails) => {
     if (nextOpen) return
+    const root = document.documentElement
+    if (
+      eventDetails.reason === 'swipe'
+      && (
+        root.getAttribute('data-dashboard-keyboard') === 'open'
+        || root.getAttribute('data-dashboard-kb-arming') === 'true'
+      )
+    ) {
+      eventDetails.cancel()
+      return
+    }
     if (open) requestClose()
   }
 
@@ -368,19 +384,30 @@ export function ModalSheet({
 
   useLayoutEffect(() => {
     if (!open || !rapidReopen) return undefined
-    let resetFrame = 0
-    const settleFrame = window.requestAnimationFrame(() => {
-      resetFrame = window.requestAnimationFrame(() => setRapidReopen(false))
-    })
-    return () => {
-      window.cancelAnimationFrame(settleFrame)
-      if (resetFrame) window.cancelAnimationFrame(resetFrame)
-    }
+    const timeout = window.setTimeout(() => setRapidReopen(false), MODAL_SHEET_EXIT_ANIMATION_MS)
+    return () => window.clearTimeout(timeout)
   }, [open, rapidReopen])
 
   useEffect(() => {
+    const releaseKeyboardLift = () => {
+      if (!keyboardLiftPendingRef.current) return
+      keyboardLiftPendingRef.current = false
+      setKeyboardLiftReady(true)
+    }
+    const resetKeyboardLift = () => {
+      keyboardLiftPendingRef.current = false
+      setKeyboardLiftReady(false)
+    }
+    window.addEventListener('pointerup', releaseKeyboardLift, true)
+    window.addEventListener('touchend', releaseKeyboardLift, true)
+    window.addEventListener('pointercancel', resetKeyboardLift, true)
+    window.addEventListener('touchcancel', resetKeyboardLift, true)
     return () => {
       if (inputShieldFrameRef.current !== null) window.cancelAnimationFrame(inputShieldFrameRef.current)
+      window.removeEventListener('pointerup', releaseKeyboardLift, true)
+      window.removeEventListener('touchend', releaseKeyboardLift, true)
+      window.removeEventListener('pointercancel', resetKeyboardLift, true)
+      window.removeEventListener('touchcancel', resetKeyboardLift, true)
     }
   }, [])
 
@@ -438,7 +465,13 @@ export function ModalSheet({
   }, [bodyRefVersion, open, rendered.contentStyle, rendered.contentWidth, rendered.landscapeDensity, rendered.scrollMode, renderedCenteredGeometry?.id, renderedHasFooter, renderedHasNavigation, renderedHasSubtitle, renderedPresentation, renderedSize])
 
   return (
-    <Drawer.Root disablePointerDismissal modal="trap-focus" open={open} onOpenChange={handleOpenChange} swipeDirection="down">
+    <Drawer.Root
+      disablePointerDismissal
+      modal="trap-focus"
+      onOpenChange={handleOpenChange}
+      open={open}
+      swipeDirection="down"
+    >
       {shouldRender && (
         <Drawer.Portal keepMounted>
           <Drawer.Backdrop
@@ -490,6 +523,7 @@ export function ModalSheet({
               data-has-subtitle={renderedHasSubtitle ? 'true' : 'false'}
               data-has-surface-decoration={rendered.surfaceDecoration ? 'true' : 'false'}
               data-initial-starting-style={initialStarting ? 'true' : undefined}
+              data-keyboard-lift-ready={keyboardLiftReady ? 'true' : undefined}
               data-landscape-density={rendered.landscapeDensity}
               data-modal-block-policy={renderedCenteredGeometry?.blockPolicy}
               data-rapid-reopen={rapidReopen ? 'true' : 'false'}
@@ -506,6 +540,9 @@ export function ModalSheet({
               initialFocus={false}
               onPointerDownCapture={(event) => {
                 if (isDashboardKeyboardInput(event.target)) {
+                  event.currentTarget.removeAttribute('data-keyboard-lift-ready')
+                  setKeyboardLiftReady(false)
+                  keyboardLiftPendingRef.current = true
                   const blockSize = event.currentTarget.getBoundingClientRect().height
                   if (blockSize && blockSize > 0) {
                     setKeyboardSurfaceBlockSize(`${blockSize}px`)

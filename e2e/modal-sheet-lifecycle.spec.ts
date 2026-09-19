@@ -154,6 +154,35 @@ test.describe('thermostat modal close lifecycle', () => {
     await expect(dialog).toHaveCount(0)
   })
 
+  test('reverses a rapid close and reopen without teleporting or replaying a full entrance', async ({ page }) => {
+    const { dialog } = await openThermostatAdvancedControls(page)
+    await startModalLifecycleProbe(page)
+
+    await dialog.getByRole('button', { name: 'Close' }).click()
+    await page.waitForTimeout(120)
+    await page.evaluate(() => {
+      document.querySelector<HTMLButtonElement>('button[data-tone]')?.click()
+    })
+    await waitForModalOpenSettled(page)
+
+    const trace = await readModalLifecycleProbe(page)
+    const firstClosingFrame = trace.frames.findIndex((frame) => frame.popupPresent && frame.state === 'closed')
+    expect(firstClosingFrame).toBeGreaterThanOrEqual(0)
+    const closingFrames = trace.frames.slice(firstClosingFrame).filter((frame) => frame.popupPresent && frame.state === 'closed')
+    const reopenedFrames = trace.frames.slice(firstClosingFrame).filter((frame) => frame.popupPresent && frame.state === 'open')
+    expect(closingFrames.length).toBeGreaterThan(1)
+    expect(reopenedFrames.length).toBeGreaterThan(1)
+    expect(reopenedFrames.some((frame) => frame.rapidReopen === 'true')).toBe(true)
+    expect(reopenedFrames.every((frame) => !frame.transition?.startsWith('none'))).toBe(true)
+    const closingPeak = Math.max(...closingFrames.map((frame) => frame.translateY ?? 0))
+    expect(closingPeak).toBeGreaterThan(20)
+    expect(Math.max(...reopenedFrames.map((frame) => frame.translateY ?? 0))).toBeLessThanOrEqual(closingPeak + 2)
+    for (let index = 1; index < reopenedFrames.length; index += 1) {
+      expect(reopenedFrames[index].translateY ?? 0).toBeLessThanOrEqual((reopenedFrames[index - 1].translateY ?? 0) + 1)
+    }
+    expect(Math.abs(reopenedFrames.at(-1)?.translateY ?? Number.POSITIVE_INFINITY)).toBeLessThanOrEqual(1)
+  })
+
   test('keeps a synthetic WebKit top-edge swipe terminal through the mounted exit window', async ({ browserName }) => {
     test.skip(browserName !== 'webkit', 'Constructed TouchEvent coverage targets the WebKit project')
     test.skip(

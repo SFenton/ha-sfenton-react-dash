@@ -1,4 +1,6 @@
 // @covers src/components/core/ModalSheet.module.css
+// @covers src/components/hass/chat/Chat.module.css
+// @covers src/components/shell/GlobalQuickLinksAction.tsx
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { test, expect, devices, type Locator, type Page } from './layout/fixture'
@@ -77,6 +79,115 @@ async function expectReachableChatActions(dialog: Locator, history = false) {
     expect(placement.width + placement.hitInset * 2).toBeGreaterThanOrEqual(44)
   }
 }
+
+test('cached keyboard geometry starts the modal lift early and dismissal reverses it smoothly', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await installSyntheticKeyboard(page)
+  const dialog = await openChat(page)
+  const input = dialog.getByRole('textbox', { name: 'Chat Message' })
+  const layout = dialog.locator('[data-modal-sheet-content-layout="true"]')
+  const navigation = dialog.locator('[data-modal-sheet-navigation="true"]')
+  await expect.poll(() => dialog.evaluate((element) => (
+    element.getAnimations()
+      .some((animation) => (animation as CSSTransition).transitionProperty === 'transform')
+  ))).toBe(false)
+  await page.evaluate(() => {
+    Object.assign(window.visualViewport!, { height: window.innerHeight, width: window.innerWidth })
+    window.dispatchEvent(new Event('orientationchange'))
+  })
+  await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-viewport-height'))).toBe('852px')
+  await page.evaluate(() => {
+    const height = window.visualViewport?.height ?? window.innerHeight
+    const width = window.visualViewport?.width ?? window.innerWidth
+    const orientation = width > height ? 'landscape' : 'portrait'
+    const bucket = Math.round(height / 25) * 25
+    window.localStorage.setItem(`react-dash-keyboard-v1:${orientation}:${bucket}`, '369')
+  })
+  const restingTop = (await navigation.boundingBox())!.y
+
+  await input.dispatchEvent('pointerdown', { bubbles: true, pointerType: 'touch' })
+  await expect(input).toBeFocused()
+  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-kb-arming'))).toBe('true')
+  await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-kb-masked'))).toBe(null)
+  await page.waitForTimeout(32)
+  expect(await layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom))).toBe(0)
+  await input.dispatchEvent('pointerup', { bubbles: true, pointerType: 'touch' })
+  await expect(dialog).toHaveAttribute('data-keyboard-lift-ready', 'true')
+  await expect.poll(() => layout.evaluate((element) => (
+    element.getAnimations({ subtree: true })
+      .filter((animation) => (animation as CSSTransition).transitionProperty === 'padding-bottom')
+      .length
+  ))).toBeGreaterThanOrEqual(2)
+  const openingMidpoint = await layout.evaluate((element) => {
+    const animations = element.getAnimations({ subtree: true })
+      .filter((animation) => (animation as CSSTransition).transitionProperty === 'padding-bottom')
+    for (const animation of animations) {
+      const endTime = Number(animation.effect?.getComputedTiming().endTime)
+      animation.pause()
+      animation.currentTime = endTime / 2
+    }
+    const navigationElement = element.querySelector('[data-modal-sheet-navigation="true"]')
+    return {
+      padding: Number.parseFloat(getComputedStyle(element).paddingBottom),
+      top: navigationElement?.getBoundingClientRect().top ?? Number.NaN,
+    }
+  })
+  expect(openingMidpoint.padding).toBeGreaterThan(0)
+  expect(openingMidpoint.padding).toBeLessThan(369)
+  expect(openingMidpoint.top).toBeLessThan(restingTop)
+  await layout.evaluate((element) => {
+    for (const animation of element.getAnimations({ subtree: true })) {
+      if ((animation as CSSTransition).transitionProperty === 'padding-bottom') animation.finish()
+    }
+  })
+
+  await page.evaluate(() => {
+    Object.assign(window.visualViewport!, { height: 483 })
+    window.visualViewport!.dispatchEvent(new Event('resize'))
+  })
+  await expect.poll(() => layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom))).toBeCloseTo(369, 0)
+  const liftedTop = (await navigation.boundingBox())!.y
+
+  await input.evaluate((element) => element.blur())
+  await page.evaluate(() => {
+    Object.assign(window.visualViewport!, { height: 852 })
+    window.visualViewport!.dispatchEvent(new Event('resize'))
+  })
+  await expect.poll(() => layout.evaluate((element) => (
+    element.getAnimations({ subtree: true })
+      .filter((animation) => (animation as CSSTransition).transitionProperty === 'padding-bottom')
+      .length
+  ))).toBeGreaterThanOrEqual(2)
+  const dismissalMidpoint = await layout.evaluate((element) => {
+    const animations = element.getAnimations({ subtree: true })
+      .filter((animation) => (animation as CSSTransition).transitionProperty === 'padding-bottom')
+    for (const animation of animations) {
+      const endTime = Number(animation.effect?.getComputedTiming().endTime)
+      animation.pause()
+      animation.currentTime = endTime / 2
+    }
+    const navigationElement = element.querySelector('[data-modal-sheet-navigation="true"]')
+    return {
+      padding: Number.parseFloat(getComputedStyle(element).paddingBottom),
+      top: navigationElement?.getBoundingClientRect().top ?? Number.NaN,
+    }
+  })
+  expect(dismissalMidpoint.padding).toBeGreaterThan(0)
+  expect(dismissalMidpoint.padding).toBeLessThan(369)
+  expect(dismissalMidpoint.top).toBeGreaterThan(liftedTop)
+  expect(dismissalMidpoint.top).toBeLessThan(restingTop)
+  await layout.evaluate((element) => {
+    for (const animation of element.getAnimations({ subtree: true })) {
+      if ((animation as CSSTransition).transitionProperty === 'padding-bottom') animation.finish()
+    }
+  })
+  await expect.poll(() => layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom))).toBeCloseTo(0, 0)
+
+  await input.dispatchEvent('pointerdown', { bubbles: true, pointerType: 'touch' })
+  await expect(input).toBeFocused()
+  await expect(dialog).not.toHaveAttribute('data-keyboard-lift-ready')
+  expect(await layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom))).toBeCloseTo(0, 0)
+})
 
 test('chat history survives its first browser and remains scoped to one authenticated account', async ({ browser, baseURL }, testInfo) => {
   const server = new MockChatServer()

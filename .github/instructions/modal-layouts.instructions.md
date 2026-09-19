@@ -35,6 +35,16 @@ declared as shared-generic in `docs/ux/modal-layout-inventory.md`.
 - Keyboard dismissal must preserve the captured lift until the popup exit
   completes. Close, backdrop, swipe, route/hash clear, and submit success still
   render `open={false}` through the same mounted exit.
+- Keep the shared keyboard-lift transition declared in both directions.
+  Learned keyboard geometry may begin a transitioned lift during focus arming;
+  uncached estimates must wait for measured geometry. Do not remove the
+  transition while dismissing the keyboard.
+- While the keyboard is open or arming, touch drags must not drive or dismiss
+  the outer sheet. Keyboard dismissal gestures and input selection belong to
+  the focused control; modal dismissal remains available through its controls.
+- Rapid close/reopen must reverse Base UI's in-flight CSS transition from its
+  current position. Do not suppress transitions, force a settled transform, or
+  replay a second full entrance.
 - Fixed search/actions outside modals stay at rest until keyboard opening
   begins, then use the shared keyboard inset and curve. Do not pre-jump to the
   cached predicted inset or hide the control to conceal the jump.

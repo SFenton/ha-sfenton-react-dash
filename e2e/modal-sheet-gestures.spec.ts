@@ -1,4 +1,5 @@
 import { expect, test, type CDPSession, type Locator, type Page } from './layout/fixture'
+import { openChat } from './chat-fixture'
 import { globalQuickLinksAction, selectQuickLinksTab } from './quick-links'
 
 type Point = {
@@ -602,6 +603,46 @@ test.describe('mobile ModalSheet gestures', () => {
     await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
   })
 
+  test('keyboard-phase drags do not move or dismiss the Chat sheet', async ({ page }) => {
+    await page.setViewportSize(MOBILE_VIEWPORT)
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 1 })
+      Object.defineProperty(window, 'visualViewport', {
+        configurable: true,
+        value: Object.assign(new EventTarget(), {
+          height: innerHeight,
+          layoutSynthetic: true,
+          offsetLeft: 0,
+          offsetTop: 0,
+          pageLeft: 0,
+          pageTop: 0,
+          scale: 1,
+          width: innerWidth,
+        }),
+      })
+    })
+    const dialog = await openChat(page)
+    await waitForSheetDragReady(page)
+    const input = dialog.getByRole('textbox', { name: 'Chat Message' })
+    await input.focus()
+    await page.evaluate(() => {
+      Object.assign(window.visualViewport!, { height: 483 })
+      window.visualViewport!.dispatchEvent(new Event('resize'))
+    })
+    await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBe('open')
+    const start = await locatorPoint(input)
+    const session = await beginTouch(page, start)
+    const sheetOffsets: number[] = []
+    await moveTouch(session, { x: start.x, y: start.y + 170 }, 12, 24, async () => {
+      sheetOffsets.push(await translateY(dialog))
+    })
+    await finishTouch(session)
+
+    await expect(dialog).toHaveAttribute('data-state', 'open')
+    for (const offset of sheetOffsets) expect(Math.abs(offset)).toBeLessThanOrEqual(1)
+    await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
+  })
+
   test('swipe close blocks the dismissal gesture but releases the host for an intentional follow-up tap', async ({ page }) => {
     const { dialog } = await openRoomsModal(page)
     await waitForSheetDragReady(page)
@@ -619,10 +660,16 @@ test.describe('mobile ModalSheet gestures', () => {
     const quickLinksBox = await quickLinks.boundingBox()
     if (!quickLinksBox) throw new Error('Quick Links opener was not measurable during modal exit')
     await page.mouse.click(quickLinksBox.x + quickLinksBox.width / 2, quickLinksBox.y + quickLinksBox.height / 2)
+    const quickLinksTab = page.getByRole('tab', { name: 'Quick Links', exact: true })
+    await expect.poll(() => quickLinksTab.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
+      return hit === element || element.contains(hit)
+    })).toBe(true)
+    expect(Date.now() - closeStartedAt).toBeLessThan(700)
     await selectQuickLinksTab(page)
     const quickLinksDialog = page.getByRole('dialog', { name: 'Quick Links' })
     await expect(quickLinksDialog).toBeVisible()
-    expect(Date.now() - closeStartedAt).toBeLessThan(700)
     await quickLinksDialog.getByRole('button', { name: 'Rooms' }).click()
     await expect(dialog).toHaveAttribute('data-state', 'open')
     await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
