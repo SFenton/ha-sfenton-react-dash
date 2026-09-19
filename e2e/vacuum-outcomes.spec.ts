@@ -1,9 +1,19 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { expect, test, type Locator, type Page } from './layout/fixture'
-import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
+import {
+  EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD,
+  EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD,
+  FUTURE_VACUUM_OUTCOME_PAYLOAD,
+  INCOMPLETE_V2_VACUUM_OUTCOME_PAYLOAD,
+  LEGACY_VACUUM_OUTCOMES,
+  MALFORMED_V2_VACUUM_OUTCOME_PAYLOAD,
+  MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+  NINE_ROOM_VACUUM_OUTCOME_CONTRACT,
+} from '../src/test/fixtures/vacuumOutcomes'
 import { setSafeAreaInsets } from './safe-area'
 
 // @covers src/hooks/useModalDetailPageScroll.ts
+// @covers src/components/hass/VacuumOutcomes.module.css
 const SESSION_ENTITY_ID = 'sensor.main_floor_vacuum_coordinator_session_state'
 const EVIDENCE_DIRECTORY = 'artifacts/vacuum-outcomes'
 
@@ -183,21 +193,139 @@ test('typed vacuum outcomes preserve narrow touch targets and wrapping at 320x56
   })
 })
 
-test('incomplete typed data stays on the whole legacy branch', async ({ page }) => {
+test('v2 uncertainty overrides legacy issues and exposes qualified evidence', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/vacuums')
-  await setOutcomeAttributes(page, {
-    ...structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
-    complete: false,
-  }, LEGACY_VACUUM_OUTCOMES)
+  await setOutcomeAttributes(
+    page,
+    structuredClone(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD),
+    MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+  )
+  const dialog = await openVacuum(page)
+  const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Sep 18, 2026' })
+
+  await expect(summary).toContainText('2 Rooms Unverified • 3 Rooms Need Attention')
+  await expect(dialog.getByText(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])).toHaveCount(0)
+  await summary.click()
+
+  expect(await dialog.locator('[data-group]').evaluateAll((groups) => groups.map((group) => group.getAttribute('data-group')))).toEqual([
+    'unverified',
+    'stillDue',
+  ])
+  const gym = dialog.locator('[data-room-id="gym"]')
+  await expect(gym).toContainText('Completion Unverified')
+  await expect(gym).toContainText('Vacuuming completion could not be verified.')
+  await expect(gym).toContainText('Observed 1 of 2 requested iterations.')
+  await expect(gym).toContainText('Physical Work')
+  await expect(gym).toContainText('Substantial')
+  await expect(gym).not.toContainText('Failed')
+
+  const gymEvidence = gym.getByRole('button', { name: 'Show Gym Cleaning Evidence' })
+  const gymEvidenceBox = await gymEvidence.boundingBox()
+  expect(Math.round(gymEvidenceBox?.height ?? 0)).toBeGreaterThanOrEqual(44)
+  await gymEvidence.click()
+  await expect(gym.getByText('Duration').locator('xpath=following-sibling::dd')).toContainText(
+    'Passed • Observed: 1,500 seconds • Minimum: 120 seconds • Reset Count: 1',
+  )
+  await expect(gym.getByText('Iterations').locator('xpath=following-sibling::dd')).toContainText(
+    'Unverified • Observed: 1 • Requested: 2',
+  )
+
+  const office = dialog.locator('[data-room-id="office"]')
+  await office.getByRole('button', { name: 'Show Office Cleaning Evidence' }).click()
+  await expect(office.getByText('Duration', { exact: true }).locator('xpath=following-sibling::dd')).toContainText(
+    'Passed Lower Bound • Lower Bound: 1,440 seconds • Minimum: 120 seconds • Reset Count: 1 • Attribution Uncertain',
+  )
+  await expect(office.getByText('Telemetry').locator('xpath=following-sibling::dd')).toHaveText('Unresolved')
+  await expect(office.getByText('Source Outage Duration').locator('xpath=following-sibling::dd')).toHaveText('258 seconds')
+
+  const livingRoom = dialog.locator('[data-room-id="living_room"]')
+  await expect(livingRoom).toContainText('Partially Complete')
+  await expect(livingRoom).toContainText('Home Assistant credited vacuuming; work may remain.')
+  await expect(livingRoom).toContainText('Mopping remains due.')
+  await expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
+  expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
+  expect(await vacuumActionCalls(page)).toEqual([])
+  await saveEvidence(page, dialog, 'vacuum-outcomes-v2-evidence-detail', {
+    dialogHorizontalOverflow: await horizontalOverflow(dialog),
+    gymEvidenceTarget: gymEvidenceBox,
+    viewport: { height: 852, width: 393 },
+  })
+})
+
+test('retained evidence-free v2 outcomes stay unverified without legacy failure wording', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/vacuums')
+  await setOutcomeAttributes(
+    page,
+    structuredClone(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD),
+    MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+  )
+  const dialog = await openVacuum(page)
+  const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Sep 17, 2026' })
+
+  await expect(summary).toContainText('1 Room Unverified • 1 Room Needs Attention')
+  await expect(dialog.getByText(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])).toHaveCount(0)
+  await summary.click()
+
+  const office = dialog.locator('[data-room-id="office"]')
+  await expect(office).toContainText('Completion Unverified')
+  await expect(office).toContainText('Vacuuming completion could not be verified.')
+  await expect(office).toContainText('Vacuuming remains due.')
+  await expect(office).not.toContainText('Could not clean')
+  await expect(office.getByRole('button', { name: /Cleaning Evidence/ })).toHaveCount(0)
+  await expect(office.getByText('Floor completion time was unavailable during dock servicing after error sensor is unavailable')).toBeHidden()
+  expect(await vacuumActionCalls(page)).toEqual([])
+  await saveEvidence(page, dialog, 'vacuum-outcomes-v2-evidence-free')
+})
+
+test('incomplete typed data shows a preparing state instead of authoritative legacy results', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/vacuums')
+  await setOutcomeAttributes(page, structuredClone(INCOMPLETE_V2_VACUUM_OUTCOME_PAYLOAD), LEGACY_VACUUM_OUTCOMES)
   const dialog = await openVacuum(page)
 
   await expect(dialog.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeVisible()
-  await expect(dialog.getByRole('note', { name: 'Cleaned' })).toContainText('Cleaned Gym')
-  await expect(dialog.getByRole('note', { name: 'Issues' })).toContainText('Could not clean Dining Room because the clean water tank is empty')
+  await expect(dialog.getByText('Report Still Being Prepared')).toBeVisible()
+  await expect(dialog.getByText('Final counts are not available.')).toBeVisible()
+  await expect(dialog.getByText('Cleaned Gym')).toBeHidden()
+  await expect(dialog.getByText('Could not clean Dining Room because the clean water tank is empty')).toBeHidden()
+  await expect(dialog.getByRole('button', { name: /Automatic Cleaning Report for/ })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Show Main Floor Unstructured Report Details' }).click()
+  await expect(dialog.getByText('Cleaned Gym')).toBeVisible()
+  await expect(dialog.getByText('Could not clean Dining Room because the clean water tank is empty')).toBeVisible()
+  expect(await vacuumActionCalls(page)).toEqual([])
+  await saveEvidence(page, dialog, 'vacuum-outcomes-incomplete')
+})
+
+test('malformed typed data shows an unreadable state without legacy substitution', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/vacuums')
+  await setOutcomeAttributes(page, structuredClone(MALFORMED_V2_VACUUM_OUTCOME_PAYLOAD), LEGACY_VACUUM_OUTCOMES)
+  const dialog = await openVacuum(page)
+
+  await expect(dialog.getByText('Report Could Not Be Read')).toBeVisible()
+  await expect(dialog.getByText('Structured cleaning results are unavailable.')).toBeVisible()
+  await expect(dialog.getByText('Cleaned Gym')).toBeHidden()
+  await expect(dialog.getByText('Could not clean Dining Room because the clean water tank is empty')).toBeHidden()
   await expect(dialog.getByRole('button', { name: /Automatic Cleaning Report for/ })).toHaveCount(0)
   expect(await vacuumActionCalls(page)).toEqual([])
-  await saveEvidence(page, dialog, 'vacuum-outcomes-legacy')
+  await saveEvidence(page, dialog, 'vacuum-outcomes-malformed')
+})
+
+test('future outcome versions show the update-required state without legacy substitution', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/vacuums')
+  await setOutcomeAttributes(page, structuredClone(FUTURE_VACUUM_OUTCOME_PAYLOAD), LEGACY_VACUUM_OUTCOMES)
+  const dialog = await openVacuum(page)
+
+  await expect(dialog.getByText('Dashboard Update Required')).toBeVisible()
+  await expect(dialog.getByText('This cleaning report uses an unsupported version.')).toBeVisible()
+  await expect(dialog.getByText('Cleaned Gym')).toBeHidden()
+  await expect(dialog.getByText('Could not clean Dining Room because the clean water tank is empty')).toBeHidden()
+  await expect(dialog.getByRole('button', { name: /Automatic Cleaning Report for/ })).toHaveCount(0)
+  expect(await vacuumActionCalls(page)).toEqual([])
+  await saveEvidence(page, dialog, 'vacuum-outcomes-incompatible')
 })
 
 test.describe('fine-pointer outcome details', () => {

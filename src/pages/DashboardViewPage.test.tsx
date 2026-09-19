@@ -10,7 +10,12 @@ import { CONTACT_GROUPS } from '../constants/atAGlance'
 import { MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID } from '../constants/mediaRemotes'
 import { VACUUMS } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
-import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../test/fixtures/vacuumOutcomes'
+import {
+  EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD,
+  LEGACY_VACUUM_OUTCOMES,
+  MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+  NINE_ROOM_VACUUM_OUTCOME_CONTRACT,
+} from '../test/fixtures/vacuumOutcomes'
 import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState } from '../test/mocks/hakitCoreState'
 
 // @covers src/constants/portedDashboard.ts
@@ -8525,9 +8530,48 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([])
   })
 
-  it('keeps legacy while-away content in room-source modal content when typed detail has no opener', () => {
+  it('opens retained v2 uncertainty instead of the misleading legacy issue fallback', async () => {
     mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
-      ...LEGACY_VACUUM_OUTCOMES,
+      ...MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: structuredClone(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD),
+    }
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+    const summary = within(dialog).getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Sep 17, 2026' })
+    expect(summary).toHaveTextContent('1 Room Unverified • 1 Room Needs Attention')
+    expect(dialog).not.toHaveTextContent(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])
+
+    fireEvent.click(summary)
+
+    const office = within(dialog).getByLabelText('Office Completion Unverified')
+    expect(office).toHaveTextContent('Vacuuming completion could not be verified.')
+    expect(office).toHaveTextContent('Vacuuming remains due.')
+    expect(office).not.toHaveTextContent('Could not clean')
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps typed outcomes authoritative in room-source content when detail has no opener', () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
+      ...MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: structuredClone(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD),
+    }
+    const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.coordinatorSessionEntityId)
+    if (!mainFloorVacuum) throw new Error('Expected Main Floor vacuum fixture')
+
+    render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
+
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
+    expect(document.querySelector('[data-action-kind="state"][data-icon="mdi:help-circle-outline"]')).toHaveTextContent(
+      /Sep 17, 2026\s*1 Room Unverified • 1 Room Needs Attention/,
+    )
+    expect(screen.queryByText(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
+  })
+
+  it('renders a noninteractive typed summary for room-source content without legacy arrays', () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
       while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
     }
     const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.coordinatorSessionEntityId)
@@ -8536,21 +8580,9 @@ describe('DashboardViewPage', () => {
     render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
 
     expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
-    expect(screen.getByRole('note', { name: 'Cleaned' })).toHaveTextContent('Cleaned Gym')
-    expect(screen.getByRole('note', { name: 'Issues' })).toHaveTextContent('Could not clean Dining Room because the clean water tank is empty')
-    expect(screen.queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
-  })
-
-  it('renders no dead outcome surface for room-source content when typed data has no legacy arrays', () => {
-    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
-      while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
-    }
-    const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.coordinatorSessionEntityId)
-    if (!mainFloorVacuum) throw new Error('Expected Main Floor vacuum fixture')
-
-    render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
-
-    expect(screen.queryByRole('heading', { name: 'Main Floor Cleaning Report' })).not.toBeInTheDocument()
+    expect(document.querySelector('[data-action-kind="state"][data-icon="mdi:alert-circle"]')).toHaveTextContent(
+      /Aug 19, 2026\s*4 Rooms Completed • 4 Rooms Need Attention • 1 Error/,
+    )
     expect(screen.queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
   })
 
@@ -8607,7 +8639,7 @@ describe('DashboardViewPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('uses the complete legacy InfoBox branch when typed vacuum outcomes are incomplete', async () => {
+  it('shows an incomplete report state while keeping legacy details secondary', async () => {
     mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
       ...LEGACY_VACUUM_OUTCOMES,
       while_away_outcomes: {
@@ -8620,9 +8652,14 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
 
     expect(within(dialog).getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('note', { name: 'Cleaned' })).toHaveTextContent('Cleaned Gym')
-    expect(within(dialog).getByRole('note', { name: 'Issues' })).toHaveTextContent('Could not clean Dining Room because the clean water tank is empty')
+    expect(within(dialog).getByText('Report Still Being Prepared')).toBeInTheDocument()
+    expect(within(dialog).getByText('Final counts are not available.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Cleaned Gym')).not.toBeVisible()
+    expect(within(dialog).getByText('Could not clean Dining Room because the clean water tank is empty')).not.toBeVisible()
     expect(within(dialog).queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Main Floor Unstructured Report Details' }))
+    expect(within(dialog).getByText('Cleaned Gym')).toBeVisible()
+    expect(within(dialog).getByText('Could not clean Dining Room because the clean water tank is empty')).toBeVisible()
   })
 
   it.each([
