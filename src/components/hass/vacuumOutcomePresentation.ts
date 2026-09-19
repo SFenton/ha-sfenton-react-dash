@@ -10,10 +10,11 @@ export function countVacuumOutcomes(contract: VacuumOutcomeContract) {
   const due = contract.rooms.filter((room) => room.outstanding !== null).length
   const attention = contract.rooms.filter((room) => room.status === 'failed').length
   const interrupted = contract.rooms.filter((room) => room.status === 'interrupted').length
+  const unverified = contract.rooms.filter((room) => room.status === 'uncertain').length
   const needsAttention = contract.rooms.filter(
     (room) => room.outstanding !== null && room.status !== 'interrupted',
   ).length
-  return { attention, completed, due, interrupted, needsAttention }
+  return { attention, completed, due, interrupted, needsAttention, unverified }
 }
 
 export function vacuumOutcomeDayValue(day: string) {
@@ -25,7 +26,12 @@ function finiteReasonNumber(reason: VacuumOutcomeReason, key: string) {
   return typeof value === 'number' && Number.isFinite(value) ? formatNumber(value) : null
 }
 
-export function vacuumOutcomeReasonValue(copy: VacuumCopy, reason: VacuumOutcomeReason, roomNames: Record<string, string>) {
+export function vacuumOutcomeReasonValue(
+  copy: VacuumCopy,
+  reason: VacuumOutcomeReason,
+  roomNames: Record<string, string>,
+  context: 'default' | 'uncertain' = 'default',
+) {
   if (reason.code === 'mop.fresh_water_unavailable') {
     const state = reason.data.state
     if (state === 'missing') return copy(OUTCOME_COPY_KEYS.reasons.freshWaterMissing)
@@ -48,6 +54,33 @@ export function vacuumOutcomeReasonValue(copy: VacuumCopy, reason: VacuumOutcome
   if (reason.code === 'mop.dirty_water_unavailable') return copy(OUTCOME_COPY_KEYS.reasons.dirtyWaterUnavailable)
   if (reason.code === 'mop.detergent_unavailable') return copy(OUTCOME_COPY_KEYS.reasons.cleaningLiquidUnavailable)
   if (reason.code === 'mop.hardware_unavailable') return copy(OUTCOME_COPY_KEYS.reasons.mopHardwareUnavailable)
+  if (reason.code === 'telemetry.counter_attribution_ambiguous') {
+    if (reason.data.measurement === 'time') return copy(OUTCOME_COPY_KEYS.reasons.counterAttributionDuration)
+    if (reason.data.measurement === 'area') return copy(OUTCOME_COPY_KEYS.reasons.counterAttributionArea)
+    return copy(OUTCOME_COPY_KEYS.reasons.counterAttributionUnknown)
+  }
+  if (reason.code === 'telemetry.task_identity_conflict') return copy(OUTCOME_COPY_KEYS.reasons.taskIdentityConflict)
+  if (reason.code === 'verification.iterations_uncertain') return copy(OUTCOME_COPY_KEYS.reasons.iterationsUncertain)
+  if (reason.code === 'verification.measurement_unavailable') {
+    if (reason.data.measurement === 'time') return copy(OUTCOME_COPY_KEYS.reasons.measurementUnavailableDuration)
+    if (reason.data.measurement === 'area') return copy(OUTCOME_COPY_KEYS.reasons.measurementUnavailableArea)
+    return copy(OUTCOME_COPY_KEYS.reasons.measurementUnavailableUnknown)
+  }
+
+  if (reason.code === 'telemetry.source_outage_unresolved') {
+    const seconds = finiteReasonNumber(reason, 'timeout_seconds')
+    return seconds
+      ? copy(OUTCOME_COPY_KEYS.reasons.sourceOutageUnresolved, { seconds })
+      : copy(OUTCOME_COPY_KEYS.reasons.sourceOutageUnresolvedWithoutDuration)
+  }
+
+  if (reason.code === 'verification.iterations_incomplete') {
+    const observed = finiteReasonNumber(reason, 'observed_iterations')
+    const requested = finiteReasonNumber(reason, 'requested_iterations')
+    return observed && requested
+      ? copy(OUTCOME_COPY_KEYS.reasons.iterationsIncomplete, { observed, requested })
+      : copy(OUTCOME_COPY_KEYS.reasons.iterationsIncompleteWithoutValues)
+  }
 
   if (reason.code === 'dispatch.timeout' || reason.code === 'recovery.native_resume_timeout') {
     const seconds = finiteReasonNumber(reason, 'timeout_seconds')
@@ -102,5 +135,9 @@ export function vacuumOutcomeReasonValue(copy: VacuumCopy, reason: VacuumOutcome
       : copy(OUTCOME_COPY_KEYS.reasons.wrongRoomWithoutNames, { commandedSeconds, dominantSeconds })
   }
 
-  return copy(OUTCOME_COPY_KEYS.reasons.unknown)
+  return copy(
+    context === 'uncertain'
+      ? OUTCOME_COPY_KEYS.reasons.completionUnverified
+      : OUTCOME_COPY_KEYS.reasons.unknown,
+  )
 }
