@@ -14,8 +14,16 @@ import { setSafeAreaInsets } from './safe-area'
 
 // @covers src/hooks/useModalDetailPageScroll.ts
 // @covers src/components/hass/VacuumOutcomes.module.css
+// @covers src/components/hass/VacuumCard.module.css
 const SESSION_ENTITY_ID = 'sensor.main_floor_vacuum_coordinator_session_state'
 const EVIDENCE_DIRECTORY = 'artifacts/vacuum-outcomes'
+const LOADING_CENTER_LANDSCAPE_PROFILES = [
+  { name: '568x320 zero inset', viewport: { height: 320, width: 568 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { name: '667x375 zero inset', viewport: { height: 375, width: 667 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { name: '734x343 zero inset', viewport: { height: 343, width: 734 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { name: '852x393 left inset', viewport: { height: 393, width: 852 }, insets: { top: 0, right: 44, bottom: 21, left: 59 } },
+  { name: '852x393 right inset', viewport: { height: 393, width: 852 }, insets: { top: 0, right: 59, bottom: 21, left: 44 } },
+] as const
 
 type MockHassApi = {
   calls: Record<string, unknown>[]
@@ -60,6 +68,28 @@ async function saveEvidence(page: Page, dialog: Locator, name: string, measureme
 
 async function horizontalOverflow(dialog: Locator) {
   return dialog.evaluate((element) => element.scrollWidth - element.clientWidth)
+}
+
+async function expectVacuumLoadingCentered(dialog: Locator) {
+  const loading = dialog.getByRole('status', { name: 'Loading vacuum controls' })
+  await expect(loading).toBeVisible()
+  const loadingGeometry = await dialog.evaluate((element) => {
+    const body = element.querySelector<HTMLElement>('[data-modal-sheet-body="true"]')
+    const navigation = element.querySelector<HTMLElement>('[data-modal-sheet-navigation="true"]')
+    const arc = element.querySelector<HTMLElement>('[role="status"][aria-label="Loading vacuum controls"] > span')
+    if (!body || !navigation || !arc) throw new Error('Expected vacuum loading geometry')
+    const bodyBox = body.getBoundingClientRect()
+    const navigationBox = navigation.getBoundingClientRect()
+    const arcBox = arc.getBoundingClientRect()
+    return {
+      arcCenter: arcBox.top + arcBox.height / 2,
+      availableCenter: bodyBox.top + (navigationBox.top - bodyBox.top) / 2,
+      bodyBottom: bodyBox.bottom,
+      navigationTop: navigationBox.top,
+    }
+  })
+  expect(Math.abs(loadingGeometry.bodyBottom - loadingGeometry.navigationTop)).toBeLessThanOrEqual(1)
+  expect(Math.abs(loadingGeometry.arcCenter - loadingGeometry.availableCenter)).toBeLessThanOrEqual(1)
 }
 
 test('typed vacuum outcomes stay compact and use one same-sheet detail at 393x852', async ({ page }) => {
@@ -149,11 +179,28 @@ test('typed vacuum outcomes stay compact and use one same-sheet detail at 393x85
   })
 
   await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
+  await expectVacuumLoadingCentered(dialog)
   await expect(dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })).toBeFocused()
   await expect(dialog).toHaveAttribute('data-scroll-mode', 'panes')
   await expect(dialog.getByRole('tablist', { name: 'Main Floor modal sections' })).toBeVisible()
   expect(await vacuumActionCalls(page)).toEqual([])
 })
+
+for (const profile of LOADING_CENTER_LANDSCAPE_PROFILES) {
+  test(`vacuum loading arc stays centered after outcome Back at ${profile.name}`, async ({ page }) => {
+    await page.setViewportSize(profile.viewport)
+    await page.goto('/at-a-glance/vacuums')
+    await setSafeAreaInsets(page, profile.insets)
+    await setOutcomeAttributes(page, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
+    const dialog = await openVacuum(page)
+
+    await dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' }).click()
+    await expect(dialog.locator('[data-vacuum-outcome-detail="true"]')).toBeVisible()
+    await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
+
+    await expectVacuumLoadingCentered(dialog)
+  })
+}
 
 test('typed vacuum outcomes preserve narrow touch targets and wrapping at 320x568', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 })
@@ -413,6 +460,7 @@ test.describe('fine-pointer outcome details', () => {
       expect(Math.abs((detailFrame?.height ?? 0) - (initialFrame?.height ?? 0))).toBeLessThanOrEqual(1)
       await saveEvidence(page, dialog, `vacuum-outcomes-desktop-${viewport.name}-expanded-detail`)
       await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
+      await expectVacuumLoadingCentered(dialog)
       await expect(summary).toBeFocused()
       await expect(dialog).toHaveAttribute('data-outcome-flow-node', 'original')
       expect(await vacuumActionCalls(page)).toEqual([])
