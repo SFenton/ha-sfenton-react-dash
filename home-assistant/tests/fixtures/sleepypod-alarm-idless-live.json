@@ -1,0 +1,93 @@
+{
+  "left": {
+    "sunday": {
+      "alarms": []
+    },
+    "monday": {
+      "alarms": []
+    },
+    "tuesday": {
+      "alarms": []
+    },
+    "wednesday": {
+      "alarms": []
+    },
+    "thursday": {
+      "alarms": []
+    },
+    "friday": {
+      "alarms": []
+    },
+    "saturday": {
+      "alarms": []
+    }
+  },
+  "right": {
+    "sunday": {
+      "alarms": [
+        {
+          "alarmTemperature": 82,
+          "duration": 300,
+          "enabled": true,
+          "time": "07:00",
+          "vibrationIntensity": 100,
+          "vibrationPattern": "rise"
+        }
+      ]
+    },
+    "monday": {
+      "alarms": [
+        {
+          "alarmTemperature": 82,
+          "duration": 300,
+          "enabled": true,
+          "time": "07:00",
+          "vibrationIntensity": 100,
+          "vibrationPattern": "rise"
+        }
+      ]
+    },
+    "tuesday": {
+      "alarms": [
+        {
+          "alarmTemperature": 82,
+          "duration": 300,
+          "enabled": true,
+          "time": "06:00",
+          "vibrationIntensity": 100,
+          "vibrationPattern": "rise"
+        }
+      ]
+    },
+    "wednesday": {
+      "alarms": [
+        {
+          "alarmTemperature": 82,
+          "duration": 300,
+          "enabled": true,
+          "time": "07:00",
+          "vibrationIntensity": 100,
+          "vibrationPattern": "rise"
+        }
+      ]
+    },
+    "thursday": {
+      "alarms": [
+        {
+          "alarmTemperature": 82,
+          "duration": 300,
+          "enabled": true,
+          "time": "07:00",
+          "vibrationIntensity": 100,
+          "vibrationPattern": "rise"
+        }
+      ]
+    },
+    "friday": {
+      "alarms": []
+    },
+    "saturday": {
+      "alarms": []
+    }
+  }
+}

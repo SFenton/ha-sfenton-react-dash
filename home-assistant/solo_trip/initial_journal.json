@@ -1,0 +1,21 @@
+{
+  "baseline_fingerprint": null,
+  "canonicalization_version": 1,
+  "generation": 0,
+  "last_confirmed_overlay_fingerprint": null,
+  "payload_checksum": "0a8918334943f068f214471721d578cbda42ee969c6ab0d2c0a05095cdca0c18",
+  "pending_request": null,
+  "presence_evidence": {},
+  "release_token": "bootstrap-v1",
+  "request_results": [],
+  "restore_record": null,
+  "revision": 0,
+  "runtime_plan": null,
+  "schema_version": 1,
+  "sleepypod_baseline": null,
+  "solo_phase": "idle",
+  "wake_owner_ref": null,
+  "wake_prior_state": null,
+  "wake_source_ref": null,
+  "writer_owner": null
+}

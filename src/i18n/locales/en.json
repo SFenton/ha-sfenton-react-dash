@@ -23,6 +23,17 @@
     "sendingClose": "Sending Close…",
     "sendingOpen": "Sending Open…"
   },
+  "household": {
+    "residentPc": "{{resident}}'s PC",
+    "residentNightstand": "{{resident}} Nightstand",
+    "residentSide": "{{resident}}'s Side",
+    "residentSummary": "{{resident}}'s Summary",
+    "you": "You",
+    "yourPc": "Your PC",
+    "yourNightstand": "Your Nightstand",
+    "yourSide": "Your Side",
+    "yourSummary": "Your Summary"
+  },
   "states": {
     "active": "Active",
     "armedAway": "Armed Away",

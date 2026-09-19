@@ -36,6 +36,7 @@ command:
             - dismiss
             - cancel_occurrence
             - end_episode
+            - set_source_suspension
     alarm:
       name: Alarm
       description: >
@@ -71,6 +72,30 @@ command:
         object: {}
     occurrence_id:
       name: Occurrence ID
+      required: false
+      selector:
+        text: {}
+    source_ref:
+      name: Source reference
+      description: >-
+        Source side to suspend/resume, such as sleepypod:right, for use with
+        set_source_suspension.
+      required: false
+      selector:
+        text: {}
+    suspended:
+      name: Suspended
+      description: >-
+        Whether the given source_ref should stop driving this Wake Light
+        profile, for use with set_source_suspension.
+      required: false
+      selector:
+        boolean: {}
+    owner_ref:
+      name: Owner reference
+      description: >-
+        Opaque token identifying the caller that owns this suspension, used
+        to prevent a stale caller from clearing a newer suspension.
       required: false
       selector:
         text: {}

@@ -13,11 +13,13 @@ from .const import (
     COMMAND_OPERATIONS,
     MAX_ALARM_LINKS,
     MAX_NATIVE_ALARMS,
+    MAX_SOURCE_SUSPENSIONS,
     OP_CANCEL_OCCURRENCE,
     OP_DELETE_ALARM,
     OP_DISMISS,
     OP_END_EPISODE,
     OP_LINK_ALARM,
+    OP_SET_SOURCE_SUSPENSION,
     OP_UPDATE_DEFAULTS,
     OP_UPSERT_ALARM,
     RAMP_MINUTE_OPTIONS,
@@ -27,6 +29,7 @@ from .const import (
     OUTCOME_NO_ACTIVE_OCCURRENCE,
     OUTCOME_NO_CHANGE,
     OUTCOME_NOT_FOUND,
+    OUTCOME_OWNER_MISMATCH,
     OUTCOME_READ_ONLY_SOURCE,
     OUTCOME_REQUEST_ID_CONFLICT,
     OUTCOME_REVISION_CONFLICT,
@@ -38,6 +41,7 @@ from .model import (
     alarm_link_key,
     parse_alarm_link_key,
     ProfileState,
+    SourceSuspension,
     WakeLightAlarm,
     WakeLightProfile,
     payload_fingerprint,
@@ -79,6 +83,7 @@ _OPERATION_FIELDS = {
     OP_DISMISS: {"occurrence_id", "episode_ref"},
     OP_CANCEL_OCCURRENCE: {"occurrence_id", "episode_ref"},
     OP_END_EPISODE: {"episode_ref"},
+    OP_SET_SOURCE_SUSPENSION: {"source_ref", "suspended", "owner_ref"},
 }
 _ALARM_FIELDS = {
     "bed_sides",
@@ -561,6 +566,76 @@ def apply_command(
                 previous_run=previous_run,
                 occurrence_ids=previous_run.occurrence_ids,
             )
+
+    elif operation == OP_SET_SOURCE_SUSPENSION:
+        source_ref = command.get("source_ref")
+        suspended = command.get("suspended")
+        owner_ref = command.get("owner_ref")
+        if source_ref not in profile.source_refs:
+            return _invalid(state, request_id, payload, "source_not_configured")
+        if not isinstance(suspended, bool):
+            return _invalid(state, request_id, payload, "invalid_suspended")
+        if not isinstance(owner_ref, str) or not _OPAQUE_ID_RE.fullmatch(owner_ref):
+            return _invalid(state, request_id, payload, "invalid_owner_ref")
+        current = state.source_suspensions.get(source_ref)
+        if not suspended and (current is None or not current.suspended):
+            error = OUTCOME_NO_CHANGE
+        elif not suspended and current.owner_ref != owner_ref:
+            response = _response(state, request_id, OUTCOME_OWNER_MISMATCH)
+            return CommandDecision(
+                _remember(state, request_id, payload, response),
+                response,
+            )
+        elif suspended and current is not None and current.suspended and current.owner_ref == owner_ref:
+            error = OUTCOME_NO_CHANGE
+        else:
+            suspensions = dict(state.source_suspensions)
+            if suspended and len(suspensions) >= MAX_SOURCE_SUSPENSIONS and source_ref not in suspensions:
+                return _invalid(
+                    state,
+                    request_id,
+                    payload,
+                    "source_suspension_limit_exceeded",
+                )
+            suspensions[source_ref] = SourceSuspension(
+                source_ref=source_ref,
+                suspended=suspended,
+                owner_ref=owner_ref,
+                updated_at=effective_now,
+            )
+            next_state = replace(state, source_suspensions=suspensions)
+            changed = True
+            if suspended and next_state.active_run is not None:
+                previous_run = next_state.active_run
+                removed = tuple(
+                    item.schedule.occurrence_id
+                    for item in previous_run.occurrences
+                    if item.schedule.source_ref == source_ref
+                )
+                remaining = tuple(
+                    item
+                    for item in previous_run.occurrences
+                    if item.schedule.occurrence_id not in removed
+                )
+                if removed:
+                    next_state = replace(
+                        next_state,
+                        active_run=(
+                            replace(previous_run, occurrences=remaining)
+                            if remaining
+                            else None
+                        ),
+                    )
+                    next_state = next_state.remember_terminal_occurrences(removed)
+                    effect = CommandEffect(
+                        (
+                            "update_lease"
+                            if remaining
+                            else "release_cancelled"
+                        ),
+                        previous_run=previous_run,
+                        occurrence_ids=removed,
+                    )
 
     validates_schedule = operation in {OP_UPSERT_ALARM, OP_UPDATE_DEFAULTS} or (
         operation == OP_LINK_ALARM and command.get("enabled") is True

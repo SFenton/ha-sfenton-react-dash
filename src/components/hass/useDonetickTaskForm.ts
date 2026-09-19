@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { useHass } from '@hakit/core'
+import { useHass, useUser } from '@hakit/core'
 import {
   donetickRepeatEveryValue,
   donetickTaskFormServiceData,
@@ -11,6 +11,8 @@ import {
   type DonetickTaskFormRecord,
   type DonetickTaskFormState,
 } from './donetickTaskForm'
+import { COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS, copy } from '../../i18n'
+import { HOUSEHOLD_RESIDENT, householdResidentForHaUserId, householdResidentName } from '../../constants/householdResidents'
 
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
 
@@ -47,11 +49,9 @@ export interface DonetickTaskFormController {
   updateRepeatEvery: (value: string) => void
 }
 
-const DEFAULT_ASSIGNEE_OPTIONS = [
-  { label: 'Anyone', value: '' },
-  { label: 'Stephen', value: '1' },
-  { label: 'Steph', value: '2' },
-  { label: 'Home Improvement', value: '3' },
+const DEFAULT_HOUSEHOLD_ASSIGNEES = [
+  { resident: HOUSEHOLD_RESIDENT.STEPHEN, value: '1' },
+  { resident: HOUSEHOLD_RESIDENT.STEPH, value: '2' },
 ] as const
 
 const RECURRENCE_OPTIONS = [
@@ -81,6 +81,7 @@ export function useDonetickTaskForm({
 }: UseDonetickTaskFormOptions): DonetickTaskFormController {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const timeZone = useHass((state) => (state.config as { time_zone?: string }).time_zone)
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
   const [form, setForm] = useState(() => initialDonetickTaskFormState(defaultAssignee))
   const [initialForm, setInitialForm] = useState(() => initialDonetickTaskFormState(defaultAssignee))
   const [task, setTask] = useState<DonetickTaskFormRecord | null>(null)
@@ -100,10 +101,19 @@ export function useDonetickTaskForm({
   const availableAssignees = useMemo(() => {
     const configured = assigneeOptions?.length
       ? [{ label: 'Anyone', value: '' }, ...assigneeOptions.filter((option) => option.value)]
-      : [...DEFAULT_ASSIGNEE_OPTIONS]
+      : [
+          { label: 'Anyone', value: '' },
+          ...DEFAULT_HOUSEHOLD_ASSIGNEES.map(({ resident, value }) => ({
+            label: resident === viewerResident
+              ? copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.you)
+              : householdResidentName(resident),
+            value,
+          })),
+          { label: 'Home Improvement', value: '3' },
+        ]
     if (!form.assignee || configured.some((option) => option.value === form.assignee)) return configured
     return [...configured, { label: `User ${form.assignee}`, value: form.assignee }]
-  }, [assigneeOptions, form.assignee])
+  }, [assigneeOptions, form.assignee, viewerResident])
 
   if (appliedFormSessionKey !== formSessionKey) {
     const nextForm = initialDonetickTaskFormState(editTarget ? '' : defaultAssignee)

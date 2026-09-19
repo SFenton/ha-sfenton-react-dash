@@ -26,6 +26,8 @@ from .bed_schedule import (
     add_temporary_alarm_payload,
     bind_temporary_alarm_id,
     execution_weekday,
+    matching_alarm_count,
+    matching_alarm_ids,
     remove_temporary_alarm_payload,
 )
 from .commands import CommandEffect, apply_command
@@ -719,13 +721,23 @@ class WakeLightCoordinator(DataUpdateCoordinator[SensorReadModel]):
     ) -> None:
         if not alarm.enabled or not alarm.bed_sides or alarm.date is None:
             return
-        if self._bed_schedule_attributes_locked() is None:
+        attributes = self._bed_schedule_attributes_locked()
+        if attributes is None:
             raise ValueError("bed_schedule_unavailable")
         if any(
             side not in self.profile.sleepypod_source_sides
             for side in alarm.bed_sides
         ):
             raise ValueError("bed_side_unavailable")
+        weekday = execution_weekday(alarm.date)
+        for side in alarm.bed_sides:
+            total = matching_alarm_count(attributes, side, weekday, alarm.local_time)
+            identified = matching_alarm_ids(attributes, side, weekday, alarm.local_time)
+            if total != len(identified):
+                # An existing alarm at this exact time already lacks a
+                # resolvable provider ID; a newly-created row could not be
+                # told apart from it later, so fail closed.
+                raise ValueError("source_identity_unavailable")
 
     async def _cleanup_temporary_bed_alarms_locked(
         self,
@@ -1026,7 +1038,9 @@ class WakeLightCoordinator(DataUpdateCoordinator[SensorReadModel]):
             return
         if any(
             item.schedule.source_ref is not None
-            and item.schedule.source_schedule_id is None
+            and not self.state.source_cache.get(
+                item.schedule.source_ref, SourceSnapshot()
+            ).schedule_available
             for item in run.occurrences
         ):
             await self._fail_recovery_locked(run, "source_identity_unavailable")
@@ -2517,7 +2531,7 @@ class WakeLightCoordinator(DataUpdateCoordinator[SensorReadModel]):
         snapshot = self.state.source_cache.get(occurrence.source_ref)
         lifecycle_entity = self.profile.source_state_entity_ids.get(occurrence.source_ref)
         return bool(
-            snapshot and snapshot.available and lifecycle_entity
+            snapshot and snapshot.schedule_available and lifecycle_entity
             and self._entity_state(lifecycle_entity) not in {*UNAVAILABLE_STATES, "missing"}
         )
 

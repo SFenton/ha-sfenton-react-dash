@@ -22,6 +22,8 @@ export const HOME_SPICE_RACK_ROUTE_PATH = 'spice-rack'
 export const HOME_CABINET_ROUTE_PATH = 'cabinet'
 export const HOME_SPRINKLERS_ROUTE_PATH = 'sprinklers'
 export const THERMOSTAT_ROUTE_PATH = 'thermostat'
+export const VACATION_MODE_ROUTE_PATH = 'vacation-mode'
+export const SOLO_TRIP_ROUTE_PATH = 'solo-trip'
 const specialDeviceModesRouteName = copy('pageSettings', 'items.specialDeviceModes.title')
 const sprinklersRouteName = copy('pageSprinklers', 'title')
 const controlShowcaseRouteName = copy('pageControlShowcase', 'title')
@@ -132,9 +134,16 @@ const SETTINGS_SUB_ROUTE_PATHS = new Set([
   'admin',
   'guests-staying-over',
   'mach-e',
+  SOLO_TRIP_ROUTE_PATH,
   'special-device-modes',
   'to-do',
   'vacation',
+  VACATION_MODE_ROUTE_PATH,
+])
+
+const AUXILIARY_ROUTE_PATHS = new Set([
+  SOLO_TRIP_ROUTE_PATH,
+  VACATION_MODE_ROUTE_PATH,
 ])
 
 const CHORES_SUB_ROUTE_PATHS = new Set([
@@ -175,7 +184,7 @@ function parseRouteUrl(url: string) {
 }
 
 function isKnownRoute(path: string | undefined) {
-  return Boolean(path && DASHBOARD_ROUTES.some((route) => route.path === path))
+  return Boolean(path && (AUXILIARY_ROUTE_PATHS.has(path) || DASHBOARD_ROUTES.some((route) => route.path === path)))
 }
 
 function routeSegment(segment: string | undefined) {

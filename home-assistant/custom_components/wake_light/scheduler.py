@@ -447,6 +447,7 @@ def refresh_source_snapshot(
         return replace(
             previous,
             available=False,
+            schedule_available=False,
             last_observed_at=observed_at,
             failure_code="source_unavailable",
         )
@@ -454,6 +455,7 @@ def refresh_source_snapshot(
         return replace(
             previous,
             available=False,
+            schedule_available=False,
             last_observed_at=observed_at,
             failure_code="invalid_source_ref",
         )
@@ -464,6 +466,7 @@ def refresh_source_snapshot(
         return replace(
             previous,
             available=False,
+            schedule_available=False,
             last_observed_at=observed_at,
             failure_code=str(err),
         )
@@ -474,6 +477,7 @@ def refresh_source_snapshot(
     return SourceSnapshot(
         alarms=alarms,
         available=identified,
+        schedule_available=True,
         last_success_at=observed_at,
         last_observed_at=observed_at,
         failure_code=None if identified else "source_identity_unavailable",

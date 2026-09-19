@@ -53,6 +53,7 @@ let mockHassRevision = 0
 let mockDonetickTaskLoadDelayMs = 0
 let mockRecipeQueryDelayMs = 0
 const pendingWakeCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
+const pendingHouseholdAwayCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
 let mockWakeEpisodeSequence = 0
 // Generic deferred queue for any domain/service held with a 'pending' outcome so a test can
 // deterministically hold a request (e.g. todo.remove_item) and resolve it on its own schedule,
@@ -78,12 +79,80 @@ function finishMockWakeCommand(request: Record<string, unknown>) {
   return { response: result }
 }
 
+/** Minimal mock of script.household_away_command for React-side state reconciliation.
+ * Native package behavior is validated separately and this does not certify live HA effects. */
+function finishMockHouseholdAwayCommand(request: Record<string, unknown>) {
+  const target = mockEntities['sensor.household_away_status']
+  const serviceData = isRecord(request.serviceData) ? request.serviceData : {}
+  const nextRevision = Number(target.attributes.revision ?? 0) + 1
+  const operation = serviceData.operation
+  if (operation === 'schedule' && serviceData.mode === 'solo_trip') {
+    target.state = 'scheduled'
+    target.attributes = {
+      ...target.attributes,
+      mode: 'solo_trip',
+      traveler: serviceData.traveler,
+      home_resident: serviceData.traveler === 'stephen' ? 'steph' : 'stephen',
+      starts_at: `${serviceData.start_date}T${serviceData.start_time}:00`,
+      ends_at: `${serviceData.end_date}T${serviceData.end_time}:00`,
+      revision: nextRevision,
+    }
+  } else if (operation === 'schedule' && serviceData.mode === 'vacation') {
+    target.state = 'active'
+    target.attributes = {
+      ...target.attributes,
+      mode: 'vacation',
+      starts_at: `${serviceData.start_date}T${serviceData.start_time}:00`,
+      ends_at: `${serviceData.end_date}T${serviceData.end_time}:00`,
+      revision: nextRevision,
+    }
+    mockEntities['input_boolean.vacation_mode'].state = 'on'
+  } else if (operation === 'cancel' || operation === 'end_now') {
+    target.state = 'idle'
+    target.attributes = { ...mockHouseholdAwayAttributes(), revision: nextRevision }
+    if (operation === 'cancel') mockEntities['input_boolean.vacation_mode'].state = 'off'
+  } else if (operation === 'update_end' && isRecord(target.attributes)) {
+    target.attributes = {
+      ...target.attributes,
+      ends_at: `${serviceData.end_date}T${serviceData.end_time}:00`,
+      revision: nextRevision,
+    }
+  } else if (operation === 'resolve_restore') {
+    target.state = target.attributes.mode === 'solo_trip' ? 'active' : 'idle'
+    target.attributes = { ...target.attributes, blockers: [], revision: nextRevision }
+  }
+  target.last_updated = new Date().toISOString()
+  notifyMockHass()
+  return { response: { outcome: 'accepted', revision: nextRevision } }
+}
+
+function acknowledgeMockHouseholdAwayCommand() {
+  return {
+    response: {
+      outcome: 'accepted',
+      revision: Number(mockEntities['sensor.household_away_status'].attributes.revision ?? 0) + 1,
+    },
+  }
+}
+
 export function resolvePendingMockWakeCommands() {
   for (const pending of pendingWakeCommands.splice(0)) pending.resolve(finishMockWakeCommand(pending.request))
 }
 
 export function rejectPendingMockWakeCommands() {
   for (const pending of pendingWakeCommands.splice(0)) pending.reject(new Error('Mock wake rejection'))
+}
+
+export function resolvePendingMockHouseholdAwayCommands() {
+  for (const pending of pendingHouseholdAwayCommands.splice(0)) pending.resolve(finishMockHouseholdAwayCommand(pending.request))
+}
+
+export function acknowledgePendingMockHouseholdAwayCommands() {
+  for (const pending of pendingHouseholdAwayCommands.splice(0)) pending.resolve(acknowledgeMockHouseholdAwayCommand())
+}
+
+export function rejectPendingMockHouseholdAwayCommands() {
+  for (const pending of pendingHouseholdAwayCommands.splice(0)) pending.reject(new Error('Mock native command rejection'))
 }
 
 export function getMockHassRevision() {
@@ -1258,6 +1327,21 @@ function nonLiveReferenceMockEntities() {
   }
 }
 
+function mockHouseholdAwayAttributes() {
+  return {
+    blockers: [],
+    command_available: true,
+    contract_version: 1,
+    effects: { sleepypod_live_follow: false, sleepypod_schedule: false, wake_light_source: false },
+    ends_at: null,
+    home_resident: 'none',
+    mode: 'none',
+    revision: 0,
+    starts_at: null,
+    traveler: 'none',
+  }
+}
+
 export const explicitMockEntities: Record<string, MockEntity> = {
   ...nonLiveReferenceMockEntities(),
   'alarm_control_panel.aqara_hub_m3_0056_security_system_2': entity('alarm_control_panel.aqara_hub_m3_0056_security_system_2', 'armed_home'),
@@ -1285,6 +1369,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'number.master_bedroom_sleepypod_eight_pod_left_target_level': entity('number.master_bedroom_sleepypod_eight_pod_left_target_level', 'unavailable', { max: 10, min: -10, step: 1 }),
   'number.master_bedroom_sleepypod_eight_pod_right_target_level': entity('number.master_bedroom_sleepypod_eight_pod_right_target_level', 'unavailable', { max: 10, min: -10, step: 1 }),
   'sensor.master_bedroom_wake_light': entity('sensor.master_bedroom_wake_light', 'scheduled', mockWakeLightAttributes()),
+  'sensor.household_away_status': entity('sensor.household_away_status', 'idle', mockHouseholdAwayAttributes()),
   'number.nightcanvasrestful_left_target_temperature': entity('number.nightcanvasrestful_left_target_temperature', '-1', { ...freeSleepLevelAttributes }),
   'number.nightcanvasrestful_right_target_temperature': entity('number.nightcanvasrestful_right_target_temperature', '0', { ...freeSleepLevelAttributes }),
   'number.nightcanvasrestful_left_bedtime_temperature': entity('number.nightcanvasrestful_left_bedtime_temperature', '0', { ...freeSleepLevelAttributes }),
@@ -1812,6 +1897,7 @@ export function resetMockHass() {
   mockChatServer.reset()
   rejectPendingMockWakeCommands()
   resetMockWakeCommands()
+  rejectPendingMockHouseholdAwayCommands()
   mockCallServiceOutcomes.clear()
   pendingGenericCallServices.length = 0
   mockScheduleMessages.length = 0
@@ -1871,6 +1957,8 @@ export function resetMockHass() {
   mockEntities['sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state'].attributes.snoozed_until = null
   mockEntities['sensor.master_bedroom_wake_light'].state = 'scheduled'
   mockEntities['sensor.master_bedroom_wake_light'].attributes = mockWakeLightAttributes()
+  mockEntities['sensor.household_away_status'].state = 'idle'
+  mockEntities['sensor.household_away_status'].attributes = mockHouseholdAwayAttributes()
   for (const room of thermostatRoomMockData) {
     mockEntities[`switch.living_room_thermostat_contact_sensors_${room.key}_track_only_when_occupied`].state = 'trackOnlyWhenOccupied' in room ? room.trackOnlyWhenOccupied : 'off'
     mockEntities[room.climate].attributes.away_mode_active = false
@@ -2052,6 +2140,12 @@ export const mockState: MockHassState = {
         if (outcome === 'reject') return Promise.reject(new Error('Mock wake rejection'))
         if (outcome === 'pending') return new Promise((resolve, reject) => pendingWakeCommands.push({ request: params, resolve, reject }))
         return Promise.resolve(finishMockWakeCommand(params))
+      }
+      if (params.domain === 'script' && params.service === 'household_away_command' && params.returnResponse === true) {
+        const outcome = mockCallServiceOutcomes.get(mockCallServiceOutcomeKey('script', 'household_away_command')) ?? 'resolve'
+        if (outcome === 'reject') return Promise.reject(new Error('Mock native command rejection'))
+        if (outcome === 'pending') return new Promise((resolve, reject) => pendingHouseholdAwayCommands.push({ request: params, resolve, reject }))
+        return Promise.resolve(finishMockHouseholdAwayCommand(params))
       }
       const outcome = typeof params.domain === 'string' && typeof params.service === 'string'
         ? mockCallServiceOutcomes.get(mockCallServiceOutcomeKey(params.domain, params.service))

@@ -277,6 +277,45 @@ The Pod accepts commands only as non-retained MQTT messages. Retained **state**
 remains supported; retained **commands** are discarded so reconnect cannot
 reapply an old stop/snooze/configuration command to a later occurrence.
 
+### Schedule-only operation without provider IDs
+
+A SleepyPod source snapshot separates two independent capabilities:
+
+- `schedule_available` — the source side parsed successfully (its rows have
+  valid weekday/time groupings), regardless of whether the provider assigned
+  per-row IDs. Scheduling, recovery, and lease execution use this flag, so a
+  source with parseable but ID-less rows still drives Wake Light on schedule.
+- `available` — every included weekday additionally has a positive provider
+  ID. Only this narrower identity capability gates stop/snooze event matching
+  (`source_event_matches`) and HA-owned temporary bed-alarm provisioning and
+  cleanup, which must be able to tell a newly-created row apart from existing
+  ones later. When `available` is false but `schedule_available` is true, the
+  source stays scheduled and the read model surfaces a non-blocking
+  `source_capability_warnings` entry (for example
+  `source_identity_unavailable`) instead of degrading the whole source.
+
+### Source suspension
+
+`set_source_suspension` lets an external coordinator (for example a
+household-away integration) stop one SleepyPod source side from driving this
+Wake Light profile without rewriting the user's `alarm_links`:
+
+- Keyed by `source_ref` (`sleepypod:left` or `sleepypod:right`), `suspended`,
+  and an opaque `owner_ref`.
+- Setting `suspended: true` always takes/refreshes ownership for that
+  `source_ref` and immediately removes only that source's active occurrences
+  from any in-progress run, leaving unrelated occurrences and lease state
+  intact.
+- Setting `suspended: false` (clearing) only succeeds when the caller's
+  `owner_ref` matches the suspension's current owner; a stale owner's clear
+  is rejected with `owner_mismatch` so an old caller cannot clear a newer
+  suspension acquired by someone else.
+- While suspended, the source's alarms are excluded from scheduling
+  entirely (`ProfileState.source_alarm_linked` returns `False`), independent
+  of any per-weekday `alarm_links` opt-outs, which are left untouched.
+- Suspensions persist across restarts in the profile Store and are exposed
+  read-only in the summary sensor's `source_suspensions` attribute.
+
 ## `wake_light.command`
 
 Every call requires:
@@ -307,6 +346,7 @@ Supported operations:
 | `dismiss` | `occurrence_id` |
 | `cancel_occurrence` | `occurrence_id` |
 | `end_episode` | None |
+| `set_source_suspension` | `source_ref`, `suspended`, `owner_ref` |
 
 An alarm uses:
 
@@ -561,3 +601,24 @@ are not implemented. Existing SleepyPod HomeKit power/temperature/snooze/stop
 controls remain intact. A future HA-owned adapter could obtain command
 revisions and request IDs; absence of that adapter is not a platform
 impossibility claim. No REM or deep-sleep scheduling is inferred from occupancy.
+
+A "Solo Trip" native package owns the away-side alarm baseline, calls
+`set_source_suspension` on the traveler's Wake Light source, and drives
+HA-owned SleepyPod schedule/alarm mirroring for the remaining resident. It
+reuses this prerequisite directly: schedule-only Wake Light execution without
+provider IDs lets the native command script suspend the traveler's own alarm
+source for the trip duration, and the first-class `set_source_suspension`
+command (keyed by `source_ref`/`suspended`/`owner_ref`) is what activation and
+restoration paths must call, with response checking on every call. The
+reviewable artifact is `home-assistant/packages/solo_trip.yaml`; it remains
+fail-closed until the documented native journal, broker, echo, and restore
+gates are satisfied.
+
+See `docs/household-away-integration.md` for the coordinator's state machine,
+SleepyPod alarm-mirroring/echo-confirmation design, Vacation precondition/yield
+behavior, and the React Solo Trip UX (chooser, editor, and
+scheduled/active/ending/degraded/restore-required status surfaces). Deployment
+staging exists so the integration can be installed later; it is not deployed
+or activated against live Home Assistant by this change, and the SleepyPod
+device round-trip (schedule echo, restore-safe-boundary) remains verified only
+through runtime-stub tests pending a live device pass.

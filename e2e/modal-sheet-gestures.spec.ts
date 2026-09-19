@@ -59,7 +59,7 @@ async function openSleepypodScopePrompt(page: Page) {
     mock.setEntityState('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2')
     mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
   })
-  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  await page.getByRole('button', { name: /Your Side Cooling/i }).click()
   const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
   const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
   await targetSlider.press('ArrowLeft')

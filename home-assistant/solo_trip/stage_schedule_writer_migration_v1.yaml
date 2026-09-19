@@ -1,0 +1,23 @@
+version: 1
+source_automation: automation.sleepypod_bed_stage_schedules_to_mqtt
+source_action:
+  action: mqtt.publish
+  data:
+    topic: sleepypod/eight-pod/cmd/set-schedules
+    payload: "{{ schedule_payload }}"
+    qos: 1
+    retain: false
+target_action:
+  action: script.household_away_command
+  data:
+    operation: sleepypod_command
+    internal_bypass: true
+    action: set_schedule
+    schedule: "{{ schedule_payload | from_json }}"
+    request_id: >-
+      stage-writer-{{ trigger.entity_id | default('manual', true) | replace('.', '-') }}-{{ trigger.to_state.context.id | default('no-context', true) }}-{{ now().strftime('%Y%m%d%H%M%S%f') }}
+preserve:
+  - schedule_payload
+notes:
+  - Replace only the writer boundary; do not alter the original schedule_payload template.
+  - Internal stage-writer requests bypass external revision/replay ledger requirements but still obey transition locks and active whole-bed mirroring.

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   DAILY_REPORT_AUTO_TAB,
+  DAILY_REPORT_USERS,
   DAILY_REPORT_HASH,
   DAILY_REPORT_TABS,
-  DAILY_REPORT_USERS,
   dailyReportAutoTab,
   dailyReportRouteUrl,
   dailyReportTabRequestFromUrl,
@@ -13,6 +13,7 @@ import {
   dailyReportUserConfigForHaUserId,
   dailyReportUserKeyFromUrl,
 } from './dailyReport'
+import { HOUSEHOLD_RESIDENTS } from './householdResidents'
 
 describe('dailyReport constants', () => {
   it('resolves users by key, alias, and display name', () => {
@@ -31,9 +32,26 @@ describe('dailyReport constants', () => {
     expect(dailyReportUserConfigForHaUserId('unknown-user')).toBeUndefined()
   })
 
+  it('uses the shared household resident identities', () => {
+    expect(DAILY_REPORT_USERS.map(({ haUserId, key, name }) => ({ haUserId, key, name }))).toEqual([
+      {
+        haUserId: HOUSEHOLD_RESIDENTS.stephen.haUserId,
+        key: 'stephen',
+        name: HOUSEHOLD_RESIDENTS.stephen.name,
+      },
+      {
+        haUserId: HOUSEHOLD_RESIDENTS.steph.haUserId,
+        key: 'steph',
+        name: HOUSEHOLD_RESIDENTS.steph.name,
+      },
+    ])
+  })
+
   it('titles the summary per user', () => {
     expect(dailyReportTitle(dailyReportUserConfig('stephen'))).toBe("Stephen's Summary")
     expect(dailyReportTitle(dailyReportUserConfig('steph'))).toBe("Steph's Summary")
+    expect(dailyReportTitle(dailyReportUserConfig('stephen'), 'stephen')).toBe('Your Summary')
+    expect(dailyReportTitle(dailyReportUserConfig('steph'), 'stephen')).toBe("Steph's Summary")
     expect(dailyReportTitle(undefined)).toBe('Summary')
   })
 

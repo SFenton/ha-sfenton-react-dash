@@ -6,6 +6,7 @@ import {
   acquireProductionLease,
   assertProductionLease,
   captureReleaseConfiguration,
+  ciProductionOptionsFromEnvironment,
   readHomeAssistantProductionMetadata,
   reconcileAssetSwap,
   RELEASE_CONFIGURATION_PATHS,
@@ -101,6 +102,54 @@ function scp(initialFiles: Record<string, string> = {}) {
 }
 
 describe('Home Assistant production metadata adapter', () => {
+  it('builds CI deployment options only from non-Vite deployment variables', () => {
+    const options = ciProductionOptionsFromEnvironment(
+      {
+        HA_DEPLOY_FOLDER_NAME: 'ha-sfenton-react-dash',
+        HA_DEPLOY_SSH_HOST: 'ha-ssh-proxy',
+        HA_DEPLOY_SSH_HOST_KEY_SHA256: 'a'.repeat(64),
+        HA_DEPLOY_SSH_PORT: '2222',
+        HA_DEPLOY_SSH_PRIVATE_KEY: 'private-key',
+        HA_DEPLOY_SSH_USERNAME: 'root',
+        HA_DEPLOY_TOKEN: 'token',
+        HA_DEPLOY_URL: 'http://ha-api-proxy:8123',
+        VITE_HA_TOKEN: 'must-not-be-used',
+      },
+      '/tmp/verify',
+      'run-1',
+      'b'.repeat(64),
+    )
+
+    expect(options).toMatchObject({
+      authorizationHash: 'b'.repeat(64),
+      haToken: 'token',
+      haUrl: 'http://ha-api-proxy:8123',
+      host: 'ha-ssh-proxy',
+      port: 2222,
+      remoteFolderName: 'ha-sfenton-react-dash',
+      scopePaths: [],
+      username: 'root',
+      verificationDirectory: '/tmp/verify',
+      workflowId: 'run-1',
+    })
+    expect(options.privateKey?.toString()).toBe('private-key')
+  })
+
+  it('rejects an unpinned CI SSH connection', () => {
+    expect(() =>
+      ciProductionOptionsFromEnvironment(
+        {
+          HA_DEPLOY_SSH_PRIVATE_KEY: 'private-key',
+          HA_DEPLOY_TOKEN: 'token',
+          HA_DEPLOY_URL: 'http://ha-api-proxy:8123',
+        },
+        '/tmp/verify',
+        'run-1',
+        'b'.repeat(64),
+      ),
+    ).toThrow('HA_DEPLOY_SSH_HOST_KEY_SHA256')
+  })
+
   it('captures the exact wrapper, card resource, panel, and restore payload', async () => {
     const fake = connection()
     await expect(

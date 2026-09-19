@@ -478,6 +478,8 @@ class WakeLightContractTests(unittest.TestCase):
                 "failures",
                 "safety",
                 "alarm_links",
+                "source_capability_warnings",
+                "source_suspensions",
             },
         )
         self.assertEqual(

@@ -1,0 +1,16 @@
+[Unit]
+Description=Home Assistant dashboard GitHub Actions JIT runner controller
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node %h/.local/share/ha-dashboard-runner/controller.mjs run --config %h/.config/ha-dashboard-runner/controller.json
+Restart=always
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

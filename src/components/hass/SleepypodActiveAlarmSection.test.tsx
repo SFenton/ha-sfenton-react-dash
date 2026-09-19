@@ -4,6 +4,7 @@ import { mockCallServiceCalls, mockEntities, resetMockHass } from "../../test/mo
 import { materialIconPath } from "../core/iconPaths"
 import { SleepypodActiveAlarmSection } from "./SleepypodActiveAlarmSection"
 
+// @covers src/components/hass/SleepypodActiveAlarmSection.tsx
 const SIDES = {
   left: {
     side: "left" as const,
@@ -138,5 +139,26 @@ describe("SleepypodActiveAlarmSection", () => {
       vi.clearAllTimers()
       vi.useRealTimers()
     }
+  })
+
+  it("uses the HA-owned command path and keeps read-only controls inert", () => {
+    setAlarmState("right", "ringing")
+    const command = vi.fn()
+    const { unmount } = render(
+      <SleepypodActiveAlarmSection {...SIDES.right} command={command} />,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop Alarm" }))
+    expect(command).toHaveBeenCalledWith("stop_alarm")
+    expect(mockCallServiceCalls).toEqual([])
+    unmount()
+
+    setAlarmState("right", "ringing")
+    render(
+      <SleepypodActiveAlarmSection {...SIDES.right} command={command} readOnly />,
+    )
+    expect(screen.getByRole("button", { name: "Snooze" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: "Stop Alarm" })).toBeDisabled()
+    expect(command).toHaveBeenCalledTimes(1)
   })
 })

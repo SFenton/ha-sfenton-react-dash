@@ -1,0 +1,9 @@
+{
+  "personal": {
+    "emptySelf": "You have no chores due- nice job!"
+  },
+  "quickLinks": {
+    "residentChores": "{{resident}}'s Chores",
+    "yourChores": "Your Chores"
+  }
+}

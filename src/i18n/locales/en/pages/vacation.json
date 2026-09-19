@@ -9,5 +9,8 @@
   "mode": {
     "description": "Enable or disable vacation mode for the house",
     "preChecklistError": "All pre-vacation tasks must be checked off before Vacation Mode can be enabled."
+  },
+  "chooser": {
+    "ariaLabel": "Away modes"
   }
 }

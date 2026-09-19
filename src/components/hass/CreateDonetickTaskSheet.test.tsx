@@ -1,7 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockCallServiceCalls, mockDonetickTasksById, resetMockHass } from '../../test/mocks/hakitCoreState'
+import { mockCallServiceCalls, mockDonetickTasksById, resetMockHass, setMockUser } from '../../test/mocks/hakitCoreState'
+import { HOUSEHOLD_RESIDENTS } from '../../constants/householdResidents'
 import { CreateDonetickTaskSheet } from './CreateDonetickTaskSheet'
+
+// @covers src/components/hass/useDonetickTaskForm.ts
 
 const HIDE_TITLE = 'Hide While On Vacation'
 const HIDE_SUBTITLE = 'This task will not show up in your chores lists while Vacation Mode is active.'
@@ -41,6 +44,24 @@ function renderEditSheet(onClose = vi.fn(), onDeleted = vi.fn(), onSaved = vi.fn
 
 describe('CreateDonetickTaskSheet Hide On Vacation metadata', () => {
   beforeEach(() => resetMockHass())
+
+  it('personalizes default household assignees and preserves unknown-user fallbacks', () => {
+    const stephenView = renderSheet()
+    expect(screen.getByRole('option', { name: 'You' })).toHaveValue('1')
+    expect(screen.getByRole('option', { name: 'Steph' })).toHaveValue('2')
+
+    stephenView.unmount()
+    setMockUser({ id: HOUSEHOLD_RESIDENTS.steph.haUserId, name: 'Steph' })
+    const stephView = renderSheet()
+    expect(screen.getByRole('option', { name: 'Stephen' })).toHaveValue('1')
+    expect(screen.getByRole('option', { name: 'You' })).toHaveValue('2')
+
+    stephView.unmount()
+    setMockUser({ id: 'unknown-user', name: 'Unknown' })
+    renderSheet()
+    expect(screen.getByRole('option', { name: 'Stephen' })).toHaveValue('1')
+    expect(screen.getByRole('option', { name: 'Steph' })).toHaveValue('2')
+  })
 
   it('defaults checked with the exact fieldset heading, title, and subtitle', () => {
     renderSheet()

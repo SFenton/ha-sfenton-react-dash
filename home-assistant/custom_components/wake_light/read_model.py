@@ -129,7 +129,7 @@ def build_sensor_read_model(
         if not state.has_linked_alarms(source_ref):
             continue
         snapshot = state.source_cache.get(source_ref)
-        if snapshot is None or not snapshot.available:
+        if snapshot is None or not snapshot.schedule_available:
             current_blockers.append(
                 snapshot.failure_code if snapshot and snapshot.failure_code else "source_unavailable"
             )
@@ -257,5 +257,23 @@ def build_sensor_read_model(
                 "light_target_name": light_target_name,
             },
             "alarm_links": dict(state.alarm_links),
+            "source_capability_warnings": {
+                source_ref: snapshot.failure_code
+                for source_ref in profile.source_refs
+                if (
+                    (snapshot := state.source_cache.get(source_ref)) is not None
+                    and snapshot.schedule_available
+                    and not snapshot.available
+                    and snapshot.failure_code
+                )
+            },
+            "source_suspensions": {
+                source_ref: {
+                    "suspended": suspension.suspended,
+                    "owner_ref": suspension.owner_ref,
+                }
+                for source_ref, suspension in state.source_suspensions.items()
+                if suspension.suspended
+            },
         },
     )
