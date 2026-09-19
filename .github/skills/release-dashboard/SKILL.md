@@ -28,24 +28,28 @@ operator-authorized release path.
    release-owned files.
 2. Inspect `git status`, the complete diff, the current branch, `origin/master`,
    GitHub CLI authentication, and open pull requests.
-3. Identify the exact release-owned files and hunks. Preserve all unrelated
+3. Confirm the change was implemented in its own branch-backed worktree created
+   from `master` before the first code edit. Do not release from the primary
+   checkout or an unrelated reused worktree; reconstruct the change in a clean
+   compliant worktree first if necessary.
+4. Identify the exact release-owned files and hunks. Preserve all unrelated
    staged, unstaged, and untracked work. When a file contains mixed changes,
    stage an exact patch rather than the whole file.
-4. Before pushing, run `npm run test:change-policy` for the exact release scope
+5. Before pushing, run `npm run test:change-policy` for the exact release scope
    and run every changed or added test file after its final edit using exact
    paths. Use `npm run test:run -- <paths>` for Vitest files and
    `npm run test:e2e -- <paths>` for Playwright files.
-5. Do not make `npm run check`, unchanged tests, full Playwright, production
+6. Do not make `npm run check`, unchanged tests, full Playwright, production
    builds, or layout automation local pre-push gates. The protected pull-request
    workflow owns broad deterministic validation. Task-specific development
    evidence may already include additional focused checks; do not rerun it
    merely because release started.
-6. Never print tokens, passwords, private keys, or environment-file contents.
+7. Never print tokens, passwords, private keys, or environment-file contents.
 
 ## Git, pull request, and CI
 
-1. Create a descriptive `copilot/<topic>-release-<date>` branch without
-   discarding local changes.
+1. Confirm the implementation worktree is on a descriptive
+   `copilot/<topic>-release-<date>` branch without discarding local changes.
 2. Stage only the approved release scope. Review both `git diff --cached` and
    `git diff --cached --check`.
 3. Commit with a concise message and this trailer:
@@ -152,14 +156,21 @@ without explicit deletion authorization.
    deliver non-obscured controls in both rotations. Record the outer document,
    bridge document, and React document safe-area variables without changing
    Home Assistant state.
-6. Remove the exact temporary worktree and local-only links after verification.
+6. Remove the exact temporary build worktree and local-only links after
+   verification.
+7. From another registered worktree, remove the implementation worktree unless
+   the user explicitly asked to keep it. Never force-remove uncommitted work,
+   and do not delete the implementation branch without separate authorization.
+   Report any blocked cleanup instead of claiming the release is complete.
 
 ## Completion report
 
 Report the branch, commit, pull request, merge commit, production bundle,
 deployment method, all three verified host URLs, whether Home Assistant was
 restarted, protected pull-request CI, the post-merge layout status if already
-known (`pending` is valid), any auto-filed layout issue, and any intentionally
-preserved local changes. Do not wait solely to replace a pending layout status.
+known (`pending` is valid), any auto-filed layout issue, implementation and
+temporary worktree cleanup status, and any intentionally preserved local
+changes. If the user requested that the implementation worktree be retained,
+report its exact path. Do not wait solely to replace a pending layout status.
 If another required step fails, state the blocker and do not claim the release
 completed.

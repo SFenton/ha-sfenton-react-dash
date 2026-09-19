@@ -15,16 +15,26 @@ Every UX change must satisfy the canonical viewport, resize, state, modal,
 fine-pointer desktop, preload-I/O, and mobile-baseline gates in
 `docs/ux/validation-matrix.md`.
 
-Start with `docs/ux/layouts.md` and the executable layout plan. Resolve a clean
-base commit and an explicit working tree; never substitute a stale/dirty checkout
-or an already-running unowned server. The post-merge `master` workflow runs `layout:check`, `layout:plan`,
-`layout:run`, and automated-only `layout:verify` as documented. Pull requests
-retain quality and full Playwright checks, while automated layout is intentionally
-skipped until after merge. Do not duplicate that broad automated corpus as a
-local pre-push gate. The plan selects affected scenarios or a conservative
+Start with `docs/ux/layouts.md` and the executable layout plan. Before the first
+repository code edit for each task, create a new branch-backed Git worktree from
+`master` and perform implementation, tests, and review there. Never substitute
+the primary checkout, a stale/dirty checkout, an unrelated existing worktree,
+or an already-running unowned server. The post-merge `master` workflow runs
+`layout:check`, `layout:plan`, `layout:run`, and automated-only
+`layout:verify` as documented. Pull requests retain quality and full Playwright
+checks, while automated layout is intentionally skipped until after merge. Do
+not duplicate that broad automated corpus as a local pre-push gate. The plan
+selects affected scenarios or a conservative
 full-known-mock fallback; it does not require every test for every non-layout
 change. Changed copy is layout-sensitive even when its character/word counts
 are unchanged.
+
+Worktree cleanup is part of release completion. After successful deployment and
+production verification, remove the task's implementation worktree and every
+release-only temporary worktree unless the user explicitly asks to keep the
+implementation worktree. Do not force-remove a worktree that contains
+uncommitted changes, and do not delete its branch without separate
+authorization; report blocked cleanup explicitly.
 
 Post-merge layout automation is asynchronous regression detection. Do not wait
 for its completion or artifact before building, deploying, or completing a
