@@ -109,6 +109,11 @@ function expectedEvent(kind: CandidateKind) {
   return kind === 'production' ? 'push' : 'workflow_dispatch'
 }
 
+export function isUnassignedJob(job: WorkflowJob) {
+  return (job.runner_id === null || job.runner_id === 0) &&
+    (job.runner_name === null || job.runner_name === '')
+}
+
 export function selectControllerCandidate(
   runs: readonly WorkflowRun[],
   jobsByRun: ReadonlyMap<number, readonly WorkflowJob[]>,
@@ -151,7 +156,7 @@ export function selectControllerCandidate(
           candidate.name === expectedJob(kind) &&
           candidate.status === 'queued' &&
           candidate.conclusion === null &&
-          candidate.runner_id === null &&
+          isUnassignedJob(candidate) &&
           candidate.labels.length === 1 &&
           candidate.labels[0] === label,
       )
@@ -673,7 +678,7 @@ async function waitForAssignment(
     Date.now() + config.assignmentTimeoutSeconds * 1_000
   while (Date.now() < deadline) {
     const job = await workflowJob(config.repository, candidate.job.id)
-    if (job.runner_id !== null) {
+    if (!isUnassignedJob(job)) {
       assertExpectedJobBinding(job, runner)
       return job
     }

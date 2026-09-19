@@ -2,6 +2,7 @@ import {
   assertExpectedJobBinding,
   assertJitRunnerLabels,
   expectedRunnerLabel,
+  isUnassignedJob,
   jitConfigurationRequest,
   selectControllerCandidate,
   type WorkflowJob,
@@ -142,6 +143,18 @@ describe('HA deploy runner controller', () => {
         },
       ),
     ).toBeUndefined()
+  })
+
+  it('accepts both GitHub representations of an unassigned job', () => {
+    expect(isUnassignedJob(job())).toBe(true)
+    expect(isUnassignedJob(job({
+      runner_id: 0,
+      runner_name: '',
+    }))).toBe(true)
+    expect(isUnassignedJob(job({
+      runner_id: 42,
+      runner_name: 'runner-42',
+    }))).toBe(false)
   })
 
   it('requires a JIT runner to expose only its per-run label', () => {
