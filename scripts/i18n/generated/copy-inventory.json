@@ -1034,6 +1034,30 @@
       "words": 11
     },
     {
+      "characters": 74,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "bed06175bd9d691b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "A floor completion measurement became ambiguous during a telemetry outage.",
+      "words": 10
+    },
+    {
+      "characters": 69,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "4d317ab7cfa6f652",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "A floor completion measurement was unavailable during dock servicing.",
+      "words": 9
+    },
+    {
       "characters": 23,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -1454,6 +1478,18 @@
       "words": 1
     },
     {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "cf966369cd2bbe79",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Area",
+      "words": 1
+    },
+    {
       "characters": 15,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -1501,6 +1537,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Attempt Reason",
+      "words": 2
+    },
+    {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "c08167cc7b1f347a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Attribution Uncertain",
       "words": 2
     },
     {
@@ -2087,13 +2135,49 @@
       "characters": 9,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
-      "id": "1edd37ec58ac3fa7",
+      "id": "0084c1f635604a2a",
       "lines": [],
-      "occurrences": 2,
+      "occurrences": 3,
       "origin": "catalog",
       "placeholders": [],
       "value": "Completed",
       "words": 1
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "6b12f39967fb181b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Completion",
+      "words": 1
+    },
+    {
+      "characters": 64,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "e2b7d8797a44f3f9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Completion could not be verified from the available vacuum data.",
+      "words": 10
+    },
+    {
+      "characters": 21,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "9a6b1716b7f1c80b",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Completion Unverified",
+      "words": 2
     },
     {
       "characters": 70,
@@ -2279,6 +2363,18 @@
       "words": 2
     },
     {
+      "characters": 25,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "8b143a3b933d89ed",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Dashboard Update Required",
+      "words": 3
+    },
+    {
       "characters": 4,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en.json",
@@ -2426,6 +2522,18 @@
       "words": 1
     },
     {
+      "characters": 8,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "196f21f731a5dce3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Duration",
+      "words": 1
+    },
+    {
       "characters": 4,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -2565,6 +2673,18 @@
       "words": 2
     },
     {
+      "characters": 20,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "0cb76ebd3613e775",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Evidence Unavailable",
+      "words": 2
+    },
+    {
       "characters": 11,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -2673,9 +2793,9 @@
       "characters": 6,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
-      "id": "b8e342e05cbeff24",
+      "id": "2967edfad85d53d0",
       "lines": [],
-      "occurrences": 1,
+      "occurrences": 2,
       "origin": "catalog",
       "placeholders": [],
       "value": "Failed",
@@ -2694,6 +2814,18 @@
       "words": 10
     },
     {
+      "characters": 52,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "86716066e265df38",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Fallback vacuuming completion could not be verified.",
+      "words": 7
+    },
+    {
       "characters": 3,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/bathroomFan.json",
@@ -2704,6 +2836,78 @@
       "placeholders": [],
       "value": "Fan",
       "words": 1
+    },
+    {
+      "characters": 31,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "57d911c4805f8a62",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Final counts are not available.",
+      "words": 5
+    },
+    {
+      "characters": 65,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "1dd0fcf7afae0cb3",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Floor completion area became ambiguous during a telemetry outage.",
+      "words": 9
+    },
+    {
+      "characters": 60,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "f9524e83e6fbdc38",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Floor completion area was unavailable during dock servicing.",
+      "words": 8
+    },
+    {
+      "characters": 65,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "f5517ffb4dea7884",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Floor completion time became ambiguous during a telemetry outage.",
+      "words": 9
+    },
+    {
+      "characters": 60,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "62ca5020d57fc37d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Floor completion time was unavailable during dock servicing.",
+      "words": 8
+    },
+    {
+      "characters": 102,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3dae0c0dc3d7729b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Floor thresholds were met, but the requested iterations did not reach a coherent completed task state.",
+      "words": 16
     },
     {
       "characters": 3,
@@ -3098,6 +3302,20 @@
       "words": 2
     },
     {
+      "characters": 31,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "5cd850f214af8ce4",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "room"
+      ],
+      "value": "Hide {{room}} Cleaning Evidence",
+      "words": 4
+    },
+    {
       "characters": 21,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -3123,6 +3341,20 @@
         "room"
       ],
       "value": "Hide {{room}} Technical Vacuum Diagnostics",
+      "words": 5
+    },
+    {
+      "characters": 41,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "c7f9c6e771cefb9e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "room"
+      ],
+      "value": "Hide {{room}} Unstructured Report Details",
       "words": 5
     },
     {
@@ -3567,6 +3799,18 @@
       "words": 2
     },
     {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "76deefa00f36536d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Incomplete",
+      "words": 1
+    },
+    {
       "characters": 17,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -3660,6 +3904,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Issues",
+      "words": 1
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "db06428151a49d86",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Iterations",
       "words": 1
     },
     {
@@ -3866,6 +4122,18 @@
       "words": 2
     },
     {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "dfe65458a8888c72",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Lower Bound",
+      "words": 2
+    },
+    {
       "characters": 153,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/chat.json",
@@ -3912,6 +4180,18 @@
       "placeholders": [],
       "value": "Messages overlapped with messages from another device. Both are kept, but this chat cannot safely continue. Start a new chat.",
       "words": 20
+    },
+    {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3246efa86519042d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Minimum",
+      "words": 1
     },
     {
       "characters": 7,
@@ -4259,6 +4539,30 @@
       "words": 2
     },
     {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "406162585abbce09",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Not Observed",
+      "words": 2
+    },
+    {
+      "characters": 12,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "867c18af1124a706",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Not Required",
+      "words": 2
+    },
+    {
       "characters": 21,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/chat.json",
@@ -4281,6 +4585,33 @@
       "placeholders": [],
       "value": "Now",
       "words": 1
+    },
+    {
+      "characters": 8,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3855b81cb91b7ae7",
+      "lines": [],
+      "occurrences": 2,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Observed",
+      "words": 1
+    },
+    {
+      "characters": 60,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3d0927733383bc00",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "observed",
+        "requested"
+      ],
+      "value": "Observed {{observed}} of {{requested}} requested iterations.",
+      "words": 6
     },
     {
       "characters": 139,
@@ -4590,6 +4921,30 @@
       "words": 2
     },
     {
+      "characters": 6,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "0ac417f04d39883d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Passed",
+      "words": 1
+    },
+    {
+      "characters": 18,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "359e345d868165e6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Passed Lower Bound",
+      "words": 3
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/media.json",
@@ -4600,6 +4955,18 @@
       "placeholders": [],
       "value": "Pause",
       "words": 1
+    },
+    {
+      "characters": 13,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "c72edd2b4dc8e9d5",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Physical Work",
+      "words": 2
     },
     {
       "characters": 4,
@@ -4820,6 +5187,18 @@
       "words": 6
     },
     {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "aab8ef7dceb6d97a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Recovered",
+      "words": 1
+    },
+    {
       "characters": 6,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/media.json",
@@ -4872,6 +5251,54 @@
       "words": 4
     },
     {
+      "characters": 24,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "e708447dcfc2af9b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Report Could Not Be Read",
+      "words": 5
+    },
+    {
+      "characters": 27,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "0eb49fad30c9262e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Report Still Being Prepared",
+      "words": 4
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "47f3f08f9ffd102d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Requested",
+      "words": 1
+    },
+    {
+      "characters": 47,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "81eb7b04cdd1a27c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Requested iterations could not all be verified.",
+      "words": 7
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/core.json",
@@ -4882,6 +5309,18 @@
       "placeholders": [],
       "value": "Reset",
       "words": 1
+    },
+    {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "061717704257f1c6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Reset Count",
+      "words": 2
     },
     {
       "characters": 18,
@@ -5173,6 +5612,18 @@
       "words": 3
     },
     {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "c7eb12e52952f851",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "seconds",
+      "words": 1
+    },
+    {
       "characters": 22,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/pages/security.json",
@@ -5405,6 +5856,20 @@
       "words": 2
     },
     {
+      "characters": 31,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "354c809a34e5646b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "room"
+      ],
+      "value": "Show {{room}} Cleaning Evidence",
+      "words": 4
+    },
+    {
       "characters": 21,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -5430,6 +5895,20 @@
         "room"
       ],
       "value": "Show {{room}} Technical Vacuum Diagnostics",
+      "words": 5
+    },
+    {
+      "characters": 41,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "333ad85ba1f30f30",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "room"
+      ],
+      "value": "Show {{room}} Unstructured Report Details",
       "words": 5
     },
     {
@@ -5593,6 +6072,30 @@
       "words": 3
     },
     {
+      "characters": 22,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "bbe439c877186b5e",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Source Outage Duration",
+      "words": 3
+    },
+    {
+      "characters": 14,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ba0e6f4a2cdbed6a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Source Outages",
+      "words": 2
+    },
+    {
       "characters": 5,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -5627,6 +6130,18 @@
       "placeholders": [],
       "value": "southwest",
       "words": 1
+    },
+    {
+      "characters": 5,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "0bf850017b648369",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "sq in",
+      "words": 2
     },
     {
       "characters": 16,
@@ -5724,6 +6239,30 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Storms",
+      "words": 1
+    },
+    {
+      "characters": 44,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "4e85bc75e775f474",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Structured cleaning results are unavailable.",
+      "words": 5
+    },
+    {
+      "characters": 11,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "bacc6b6650547dc9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Substantial",
       "words": 1
     },
     {
@@ -5916,6 +6455,18 @@
       "words": 5
     },
     {
+      "characters": 17,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "5eebb6a8ab152666",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Target Room Dwell",
+      "words": 3
+    },
+    {
       "characters": 9,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/core.json",
@@ -5926,6 +6477,56 @@
       "placeholders": [],
       "value": "Task Name",
       "words": 2
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "bb02776a3fb7cb37",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Telemetry",
+      "words": 1
+    },
+    {
+      "characters": 51,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "843802142485433f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Telemetry recovered with conflicting room evidence.",
+      "words": 6
+    },
+    {
+      "characters": 63,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "5b6baed6a2d05fc8",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "seconds"
+      ],
+      "value": "Telemetry recovery was not coherent within {{seconds}} seconds.",
+      "words": 8
+    },
+    {
+      "characters": 36,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "41bf7c4e11985d3c",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Telemetry recovery was not coherent.",
+      "words": 5
     },
     {
       "characters": 62,
@@ -6124,6 +6725,18 @@
       "placeholders": [],
       "value": "The fallback vacuum-only attempt was interrupted before completion.",
       "words": 8
+    },
+    {
+      "characters": 57,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ef5dfaee5d5b85cd",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The fallback vacuum-only attempt was partially completed.",
+      "words": 7
     },
     {
       "characters": 85,
@@ -6358,6 +6971,18 @@
       "words": 7
     },
     {
+      "characters": 48,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "ca717f3daff00917",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuum-only attempt was partially completed.",
+      "words": 6
+    },
+    {
       "characters": 66,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -6382,6 +7007,18 @@
       "words": 9
     },
     {
+      "characters": 58,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "4b12fea0157b3a0a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "The vacuuming and mopping attempt was partially completed.",
+      "words": 8
+    },
+    {
       "characters": 72,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/wakeLight.json",
@@ -6404,6 +7041,18 @@
       "placeholders": [],
       "value": "Theater Room Remote",
       "words": 3
+    },
+    {
+      "characters": 56,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "6dddf52debd1fc83",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "These details may be inconsistent with the typed status.",
+      "words": 9
     },
     {
       "characters": 123,
@@ -6440,6 +7089,18 @@
       "placeholders": [],
       "value": "This chat history has reached its storage limit. Existing chats are kept, but sending new messages is disabled. Try again when storage is available.",
       "words": 24
+    },
+    {
+      "characters": 49,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "bb8c0be8232cf708",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This cleaning report uses an unsupported version.",
+      "words": 7
     },
     {
       "characters": 228,
@@ -6892,6 +7553,18 @@
     {
       "characters": 9,
       "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "fe2084a41f9ddf2b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Uncertain",
+      "words": 1
+    },
+    {
+      "characters": 9,
+      "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
       "id": "454f1c8aa99c8bef",
       "lines": [],
@@ -6914,6 +7587,30 @@
       "words": 4
     },
     {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "1e089a0277044662",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unknown",
+      "words": 1
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "a94d863d2fa195fb",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unresolved",
+      "words": 1
+    },
+    {
       "characters": 20,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -6924,6 +7621,30 @@
       "placeholders": [],
       "value": "unsettled conditions",
       "words": 2
+    },
+    {
+      "characters": 27,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "87cdf72f756437d2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unstructured Report Details",
+      "words": 3
+    },
+    {
+      "characters": 10,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "c053653a048bf44f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unverified",
+      "words": 1
     },
     {
       "characters": 2,
@@ -7072,6 +7793,18 @@
       "words": 7
     },
     {
+      "characters": 55,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "997c8e3e8055f12d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming and mopping completion could not be verified.",
+      "words": 8
+    },
+    {
       "characters": 29,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -7120,6 +7853,18 @@
       "words": 5
     },
     {
+      "characters": 43,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "77041d5a5c724b30",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Vacuuming completion could not be verified.",
+      "words": 6
+    },
+    {
       "characters": 39,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -7166,6 +7911,18 @@
       "placeholders": [],
       "value": "Vacuuming was deferred before any attempt.",
       "words": 6
+    },
+    {
+      "characters": 8,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "5a228878c34c4331",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Verified",
+      "words": 1
     },
     {
       "characters": 9,
@@ -7705,6 +8462,20 @@
       "characters": 25,
       "context": "description",
       "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "325da2e1fe39a0d2",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Room Unverified",
+      "words": 3
+    },
+    {
+      "characters": 25,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
       "id": "1b8a33dc484575cf",
       "lines": [],
       "occurrences": 1,
@@ -7728,6 +8499,20 @@
       ],
       "value": "{{count}} Rooms Need Attention",
       "words": 4
+    },
+    {
+      "characters": 26,
+      "context": "description",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "5ddfbfd5004037c6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "count"
+      ],
+      "value": "{{count}} Rooms Unverified",
+      "words": 3
     },
     {
       "characters": 20,
@@ -9553,6 +10338,18 @@
       "words": 1
     },
     {
+      "characters": 17,
+      "context": "title",
+      "file": "src/i18n/locales/en/modals/vacuum.json",
+      "id": "3b7323cc52b30b27",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Cleaning Evidence",
+      "words": 2
+    },
+    {
       "characters": 11,
       "context": "title",
       "file": "src/i18n/locales/en/pages/sprinklers.json",
@@ -11179,7 +11976,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "7971dde7cc3b4ff2",
       "lines": [
-        1949
+        1952
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11211,7 +12008,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "318a739189324689",
       "lines": [
-        2190
+        2193
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12989,7 +13786,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3dfaf5ac43b7a70d",
       "lines": [
-        2619
+        2622
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13685,7 +14482,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "30dc860a8ba498c3",
       "lines": [
-        2432
+        2435
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13713,7 +14510,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3f7c009d32246ed9",
       "lines": [
-        2431
+        2434
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14056,7 +14853,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "6ab15f42b484c3eb",
       "lines": [
-        2265
+        2268
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14253,7 +15050,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "d8466de28eb1263c",
       "lines": [
-        2424
+        2427
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14506,7 +15303,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0e09df4bf046aeee",
       "lines": [
-        2226
+        2229
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14618,7 +15415,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "80e1cc8d85583e3f",
       "lines": [
-        2424
+        2427
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14632,7 +15429,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "0afdee0c9228d6fd",
       "lines": [
-        2424
+        2427
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14660,7 +15457,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "605daaf013c8e261",
       "lines": [
-        2432
+        2435
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15144,7 +15941,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "13455b3f1e7072d8",
       "lines": [
-        2275
+        2278
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15453,7 +16250,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "a6d6c4c0e0c37c42",
       "lines": [
-        2266
+        2269
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15481,7 +16278,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "beeca8d55b7688f9",
       "lines": [
-        2431
+        2434
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16940,7 +17737,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5f0778b4b7fdc74c",
       "lines": [
-        2264
+        2267
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17123,7 +17920,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "1f89bcf5d13c7fc3",
       "lines": [
-        2390
+        2393
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17238,7 +18035,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "b2e6ceccffb95353",
       "lines": [
-        2382
+        2385
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17477,7 +18274,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "4be64edb2c675700",
       "lines": [
-        2382
+        2385
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17533,7 +18330,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "c0c59dfdfc506a2d",
       "lines": [
-        2386
+        2389
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -24464,7 +25261,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "5cc3c776063e9d88",
       "lines": [
-        2440
+        2443
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -26480,7 +27277,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "72bdcf7e55855edc",
       "lines": [
-        2440
+        2443
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27250,7 +28047,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "64261a0575242950",
       "lines": [
-        1845
+        1848
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37695,7 +38492,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "3467ef97660ab0a5",
       "lines": [
-        1949
+        1952
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39192,7 +39989,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "2884d06ef7f4ad71",
       "lines": [
-        2556
+        2559
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39208,7 +40005,7 @@
       "file": "src/components/hass/VacuumCard.tsx",
       "id": "10cb26ba12827f19",
       "lines": [
-        2559
+        2562
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39490,11 +40287,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 793,
+    "catalogRecords": 858,
     "documentRecords": 1,
     "legacyOccurrences": 2478,
     "legacyRecords": 2048,
-    "totalRecords": 2842
+    "totalRecords": 2907
   },
   "version": 1
 }

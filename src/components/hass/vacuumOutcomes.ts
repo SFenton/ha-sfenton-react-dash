@@ -1,9 +1,62 @@
 export type VacuumOutcomeAttemptMode = 'fallback_vacuum' | 'vacuum' | 'vacuum_mop'
-export type VacuumOutcomeAttemptResult = 'completed' | 'failed' | 'interrupted'
+export type VacuumOutcomeAttemptResult = 'completed' | 'failed' | 'interrupted' | 'partial' | 'uncertain'
 export type VacuumOutcomeCreditStatus = 'full' | 'none' | 'partial'
 export type VacuumOutcomeEventType = 'attempt' | 'deferral'
 export type VacuumOutcomeOperation = 'mop' | 'vacuum' | 'vacuum_mop'
-export type VacuumOutcomeStatus = 'completed' | 'deferred' | 'failed' | 'interrupted' | 'partial'
+export type VacuumOutcomeStatus = 'completed' | 'deferred' | 'failed' | 'interrupted' | 'partial' | 'uncertain'
+export type VacuumOutcomeContractVersion = 1 | 2
+export type VacuumOutcomePhysicalWorkStatus = 'not_observed' | 'observed' | 'substantial'
+export type VacuumOutcomeMeasurementStatus = 'not_required' | 'passed_lower_bound' | 'unknown' | 'passed' | 'failed'
+export type VacuumOutcomeIterationStatus = 'verified' | 'unverified'
+export type VacuumOutcomeCompletionStatus = 'completed' | 'incomplete' | 'uncertain'
+export type VacuumOutcomeTelemetryStatus = 'recovered' | 'unresolved'
+
+export interface VacuumOutcomePhysicalWorkEvidence {
+  cleaning_observed: boolean
+  segment_cleaning_observed: boolean
+  status: VacuumOutcomePhysicalWorkStatus
+  target_room_dwell_seconds: number
+}
+
+export interface VacuumOutcomeMeasurementEvidence {
+  attribution_uncertain: boolean
+  lower_bound?: number
+  minimum: number
+  observed: number | null
+  reset_count: number
+  status: VacuumOutcomeMeasurementStatus
+  unit: 'seconds' | 'square_inches'
+}
+
+export interface VacuumOutcomeIterationEvidence {
+  observed: number
+  requested: number
+  status: VacuumOutcomeIterationStatus
+}
+
+export interface VacuumOutcomeCompletionEvidence {
+  reason: string | null
+  status: VacuumOutcomeCompletionStatus
+}
+
+export interface VacuumOutcomeTelemetryEvidence {
+  source_outage_count: number
+  source_outage_seconds: number
+  status: VacuumOutcomeTelemetryStatus
+}
+
+export interface VacuumOutcomeEvidence {
+  area: VacuumOutcomeMeasurementEvidence
+  completion: VacuumOutcomeCompletionEvidence
+  duration: VacuumOutcomeMeasurementEvidence
+  iterations: VacuumOutcomeIterationEvidence
+  physical_work: VacuumOutcomePhysicalWorkEvidence
+  telemetry?: VacuumOutcomeTelemetryEvidence
+}
+
+export type VacuumOutcomeEvidenceResult =
+  | { data: VacuumOutcomeEvidence; kind: 'available' }
+  | { kind: 'malformed' }
 
 export interface VacuumOutcomeReason {
   category: string
@@ -13,6 +66,7 @@ export interface VacuumOutcomeReason {
 }
 
 export interface VacuumOutcomeAttempt {
+  evidence?: VacuumOutcomeEvidenceResult
   event_id: string
   mode: VacuumOutcomeAttemptMode
   reason: VacuumOutcomeReason | null
@@ -60,6 +114,7 @@ interface VacuumOutcomeEventBase {
 export interface VacuumOutcomeAttemptEvent extends VacuumOutcomeEventBase {
   attempt_mode: VacuumOutcomeAttemptMode
   attempt_result: VacuumOutcomeAttemptResult
+  evidence?: VacuumOutcomeEvidenceResult
   type: 'attempt'
 }
 
@@ -76,21 +131,43 @@ export interface VacuumOutcomeContract {
   day: string
   events: VacuumOutcomeEvent[]
   rooms: VacuumOutcomeRoom[]
-  version: 1
+  version: VacuumOutcomeContractVersion
 }
 
+export interface VacuumOutcomeLegacyData {
+  cleaned: string[]
+  issues: string[]
+}
+
+export type VacuumOutcomeParseResult =
+  | { kind: 'absent' }
+  | { contract: VacuumOutcomeContract; kind: 'valid' }
+  | { kind: 'incomplete'; version: VacuumOutcomeContractVersion }
+  | { kind: 'malformed'; version?: VacuumOutcomeContractVersion }
+  | { kind: 'unsupported'; version: number }
+
 export type VacuumWhileAwayPresentation =
-  | { cleaned: string[]; contract: VacuumOutcomeContract; issues: string[]; kind: 'typed' }
-  | { cleaned: string[]; issues: string[]; kind: 'legacy' }
+  | { contract: VacuumOutcomeContract; kind: 'typed' }
+  | ({ kind: 'legacy' } & VacuumOutcomeLegacyData)
+  | ({ kind: 'incomplete'; version: VacuumOutcomeContractVersion } & VacuumOutcomeLegacyData)
+  | ({ kind: 'malformed'; version?: VacuumOutcomeContractVersion } & VacuumOutcomeLegacyData)
+  | ({ kind: 'incompatible'; version: number } & VacuumOutcomeLegacyData)
   | { kind: 'empty' }
 
 const ATTEMPT_MODES = new Set<VacuumOutcomeAttemptMode>(['fallback_vacuum', 'vacuum', 'vacuum_mop'])
-const ATTEMPT_RESULTS = new Set<VacuumOutcomeAttemptResult>(['completed', 'failed', 'interrupted'])
+const V1_ATTEMPT_RESULTS = new Set<VacuumOutcomeAttemptResult>(['completed', 'failed', 'interrupted'])
+const V2_ATTEMPT_RESULTS = new Set<VacuumOutcomeAttemptResult>(['completed', 'failed', 'interrupted', 'partial', 'uncertain'])
 const CREDIT_STATUSES = new Set<VacuumOutcomeCreditStatus>(['full', 'none', 'partial'])
 const OPERATIONS = new Set<VacuumOutcomeOperation>(['mop', 'vacuum', 'vacuum_mop'])
 const REQUIRED_OPERATIONS = new Set<VacuumOutcomeRoom['required_operation']>(['vacuum', 'vacuum_mop'])
-const STATUSES = new Set<VacuumOutcomeStatus>(['completed', 'deferred', 'failed', 'interrupted', 'partial'])
+const V1_STATUSES = new Set<VacuumOutcomeStatus>(['completed', 'deferred', 'failed', 'interrupted', 'partial'])
+const V2_STATUSES = new Set<VacuumOutcomeStatus>(['completed', 'deferred', 'failed', 'interrupted', 'partial', 'uncertain'])
 const KINDS = new Set(['cleaned', 'failed', 'fallback', 'skipped'])
+const PHYSICAL_WORK_STATUSES = new Set<VacuumOutcomePhysicalWorkStatus>(['not_observed', 'observed', 'substantial'])
+const MEASUREMENT_STATUSES = new Set<VacuumOutcomeMeasurementStatus>(['not_required', 'passed_lower_bound', 'unknown', 'passed', 'failed'])
+const ITERATION_STATUSES = new Set<VacuumOutcomeIterationStatus>(['verified', 'unverified'])
+const COMPLETION_STATUSES = new Set<VacuumOutcomeCompletionStatus>(['completed', 'incomplete', 'uncertain'])
+const TELEMETRY_STATUSES = new Set<VacuumOutcomeTelemetryStatus>(['recovered', 'unresolved'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -110,6 +187,10 @@ function isPositiveInteger(value: unknown): value is number {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
 function isValidTimestamp(value: unknown): value is string {
@@ -141,11 +222,19 @@ function isNullableReason(value: unknown): value is VacuumOutcomeReason | null {
   return value === null || isReason(value)
 }
 
-function isAttempt(value: unknown): value is VacuumOutcomeAttempt {
+function attemptResults(version: VacuumOutcomeContractVersion) {
+  return version === 1 ? V1_ATTEMPT_RESULTS : V2_ATTEMPT_RESULTS
+}
+
+function roomStatuses(version: VacuumOutcomeContractVersion) {
+  return version === 1 ? V1_STATUSES : V2_STATUSES
+}
+
+function isAttemptCore(value: unknown, version: VacuumOutcomeContractVersion): value is Record<string, unknown> {
   return isRecord(value)
     && isNonEmptyString(value.event_id)
     && ATTEMPT_MODES.has(value.mode as VacuumOutcomeAttemptMode)
-    && ATTEMPT_RESULTS.has(value.result as VacuumOutcomeAttemptResult)
+    && attemptResults(version).has(value.result as VacuumOutcomeAttemptResult)
     && isNullableReason(value.reason)
 }
 
@@ -162,13 +251,13 @@ function isOutstanding(value: unknown): value is VacuumOutcomeOutstanding {
     && isNullableReason(value.reason)
 }
 
-function isRoom(value: unknown): value is VacuumOutcomeRoom {
+function isRoomCore(value: unknown, version: VacuumOutcomeContractVersion): value is Record<string, unknown> {
   return isRecord(value)
     && isNonEmptyString(value.room_id)
     && isNonEmptyString(value.room_name)
     && REQUIRED_OPERATIONS.has(value.required_operation as VacuumOutcomeRoom['required_operation'])
-    && STATUSES.has(value.status as VacuumOutcomeStatus)
-    && (value.latest_attempt === null || isAttempt(value.latest_attempt))
+    && roomStatuses(version).has(value.status as VacuumOutcomeStatus)
+    && (value.latest_attempt === null || isAttemptCore(value.latest_attempt, version))
     && isCredit(value.credit)
     && (value.outstanding === null || isOutstanding(value.outstanding))
     && typeof value.reasons_coincide === 'boolean'
@@ -182,7 +271,11 @@ function isRoom(value: unknown): value is VacuumOutcomeRoom {
     && new Set(value.event_ids).size === value.event_ids.length
 }
 
-function isEvent(value: unknown, contractDay: string): value is VacuumOutcomeEvent {
+function isEventCore(
+  value: unknown,
+  contractDay: string,
+  version: VacuumOutcomeContractVersion,
+): value is Record<string, unknown> {
   if (
     !isRecord(value)
     || !isNonEmptyString(value.id)
@@ -200,7 +293,7 @@ function isEvent(value: unknown, contractDay: string): value is VacuumOutcomeEve
 
   if (value.type === 'attempt') {
     return ATTEMPT_MODES.has(value.attempt_mode as VacuumOutcomeAttemptMode)
-      && ATTEMPT_RESULTS.has(value.attempt_result as VacuumOutcomeAttemptResult)
+      && attemptResults(version).has(value.attempt_result as VacuumOutcomeAttemptResult)
   }
 
   return value.type === 'deferral'
@@ -208,22 +301,222 @@ function isEvent(value: unknown, contractDay: string): value is VacuumOutcomeEve
     && isReason(value.reason)
 }
 
-export function parseVacuumOutcomeContract(value: unknown): VacuumOutcomeContract | null {
+function parsePhysicalWorkEvidence(value: unknown): VacuumOutcomePhysicalWorkEvidence | null {
   if (
     !isRecord(value)
-    || value.version !== 1
-    || value.complete !== true
-    || !isValidDay(value.day)
-    || !Array.isArray(value.rooms)
-    || !Array.isArray(value.events)
-    || !value.rooms.every(isRoom)
-    || !value.events.every((event) => isEvent(event, value.day as string))
+    || !PHYSICAL_WORK_STATUSES.has(value.status as VacuumOutcomePhysicalWorkStatus)
+    || typeof value.cleaning_observed !== 'boolean'
+    || typeof value.segment_cleaning_observed !== 'boolean'
+    || !isNonNegativeNumber(value.target_room_dwell_seconds)
   ) {
     return null
   }
 
-  const rooms = value.rooms as VacuumOutcomeRoom[]
-  const events = value.events as VacuumOutcomeEvent[]
+  return {
+    cleaning_observed: value.cleaning_observed,
+    segment_cleaning_observed: value.segment_cleaning_observed,
+    status: value.status as VacuumOutcomePhysicalWorkStatus,
+    target_room_dwell_seconds: value.target_room_dwell_seconds,
+  }
+}
+
+function parseMeasurementEvidence(
+  value: unknown,
+  unit: VacuumOutcomeMeasurementEvidence['unit'],
+): VacuumOutcomeMeasurementEvidence | null {
+  if (
+    !isRecord(value)
+    || !MEASUREMENT_STATUSES.has(value.status as VacuumOutcomeMeasurementStatus)
+    || (value.observed !== null && !isNonNegativeNumber(value.observed))
+    || !isNonNegativeNumber(value.minimum)
+    || value.unit !== unit
+    || !isNonNegativeInteger(value.reset_count)
+    || typeof value.attribution_uncertain !== 'boolean'
+    || (value.lower_bound !== undefined && !isNonNegativeNumber(value.lower_bound))
+  ) {
+    return null
+  }
+
+  return {
+    attribution_uncertain: value.attribution_uncertain,
+    ...(value.lower_bound === undefined ? {} : { lower_bound: value.lower_bound }),
+    minimum: value.minimum,
+    observed: value.observed as number | null,
+    reset_count: value.reset_count,
+    status: value.status as VacuumOutcomeMeasurementStatus,
+    unit,
+  }
+}
+
+function parseIterationEvidence(value: unknown): VacuumOutcomeIterationEvidence | null {
+  if (
+    !isRecord(value)
+    || !ITERATION_STATUSES.has(value.status as VacuumOutcomeIterationStatus)
+    || !isPositiveInteger(value.requested)
+    || !isNonNegativeInteger(value.observed)
+  ) {
+    return null
+  }
+
+  return {
+    observed: value.observed,
+    requested: value.requested,
+    status: value.status as VacuumOutcomeIterationStatus,
+  }
+}
+
+function parseCompletionEvidence(value: unknown): VacuumOutcomeCompletionEvidence | null {
+  if (
+    !isRecord(value)
+    || !COMPLETION_STATUSES.has(value.status as VacuumOutcomeCompletionStatus)
+    || !isNullableString(value.reason)
+  ) {
+    return null
+  }
+
+  return {
+    reason: value.reason,
+    status: value.status as VacuumOutcomeCompletionStatus,
+  }
+}
+
+function parseTelemetryEvidence(value: unknown): VacuumOutcomeTelemetryEvidence | null {
+  if (
+    !isRecord(value)
+    || !TELEMETRY_STATUSES.has(value.status as VacuumOutcomeTelemetryStatus)
+    || !isNonNegativeInteger(value.source_outage_count)
+    || !isNonNegativeNumber(value.source_outage_seconds)
+  ) {
+    return null
+  }
+
+  return {
+    source_outage_count: value.source_outage_count,
+    source_outage_seconds: value.source_outage_seconds,
+    status: value.status as VacuumOutcomeTelemetryStatus,
+  }
+}
+
+function parseEvidence(value: unknown): VacuumOutcomeEvidence | null {
+  if (!isRecord(value)) return null
+  const physicalWork = parsePhysicalWorkEvidence(value.physical_work)
+  const duration = parseMeasurementEvidence(value.duration, 'seconds')
+  const area = parseMeasurementEvidence(value.area, 'square_inches')
+  const iterations = parseIterationEvidence(value.iterations)
+  const completion = parseCompletionEvidence(value.completion)
+  const telemetry = value.telemetry === undefined ? undefined : parseTelemetryEvidence(value.telemetry)
+  if (!physicalWork || !duration || !area || !iterations || !completion || (value.telemetry !== undefined && !telemetry)) {
+    return null
+  }
+
+  return {
+    area,
+    completion,
+    duration,
+    iterations,
+    physical_work: physicalWork,
+    ...(telemetry ? { telemetry } : {}),
+  }
+}
+
+function parseEvidenceResult(
+  value: Record<string, unknown>,
+  version: VacuumOutcomeContractVersion,
+): VacuumOutcomeEvidenceResult | undefined {
+  if (version !== 2 || !Object.prototype.hasOwnProperty.call(value, 'evidence')) return undefined
+  const evidence = parseEvidence(value.evidence)
+  return evidence
+    ? { data: evidence, kind: 'available' }
+    : { kind: 'malformed' }
+}
+
+function normalizeAttempt(
+  value: Record<string, unknown>,
+  version: VacuumOutcomeContractVersion,
+): VacuumOutcomeAttempt {
+  const evidence = parseEvidenceResult(value, version)
+  return {
+    ...(evidence ? { evidence } : {}),
+    event_id: value.event_id as string,
+    mode: value.mode as VacuumOutcomeAttemptMode,
+    reason: value.reason as VacuumOutcomeReason | null,
+    result: value.result as VacuumOutcomeAttemptResult,
+  }
+}
+
+function normalizeRoom(
+  value: Record<string, unknown>,
+  version: VacuumOutcomeContractVersion,
+): VacuumOutcomeRoom {
+  return {
+    credit: value.credit as VacuumOutcomeCredit,
+    event_ids: [...value.event_ids as string[]],
+    first_occurred_at: value.first_occurred_at as string,
+    last_occurred_at: value.last_occurred_at as string,
+    last_sequence: value.last_sequence as number,
+    latest_attempt: value.latest_attempt === null
+      ? null
+      : normalizeAttempt(value.latest_attempt as Record<string, unknown>, version),
+    occurrence_count: value.occurrence_count as number,
+    outstanding: value.outstanding as VacuumOutcomeOutstanding | null,
+    reasons_coincide: value.reasons_coincide as boolean,
+    required_operation: value.required_operation as VacuumOutcomeRoom['required_operation'],
+    room_id: value.room_id as string,
+    room_name: value.room_name as string,
+    status: value.status as VacuumOutcomeStatus,
+  }
+}
+
+function normalizeEvent(
+  value: Record<string, unknown>,
+  version: VacuumOutcomeContractVersion,
+): VacuumOutcomeEvent {
+  const base = {
+    day: value.day as string,
+    id: value.id as string,
+    kind: value.kind as VacuumOutcomeEvent['kind'],
+    occurred_at: value.occurred_at as string,
+    reason: value.reason as VacuumOutcomeReason | null,
+    room_id: value.room_id as string,
+    room_name: value.room_name as string | null,
+    sequence: value.sequence as number,
+    session_id: value.session_id as string,
+  }
+  if (value.type === 'attempt') {
+    const evidence = parseEvidenceResult(value, version)
+    return {
+      ...base,
+      attempt_mode: value.attempt_mode as VacuumOutcomeAttemptMode,
+      attempt_result: value.attempt_result as VacuumOutcomeAttemptResult,
+      ...(evidence ? { evidence } : {}),
+      type: 'attempt',
+    }
+  }
+  return {
+    ...base,
+    outstanding_operation: value.outstanding_operation as VacuumOutcomeOperation,
+    reason: value.reason as VacuumOutcomeReason,
+    type: 'deferral',
+  }
+}
+
+function parseSupportedContract(
+  value: Record<string, unknown>,
+  version: VacuumOutcomeContractVersion,
+): VacuumOutcomeContract | null {
+  if (
+    value.complete !== true
+    || !isValidDay(value.day)
+    || !Array.isArray(value.rooms)
+    || !Array.isArray(value.events)
+    || !value.rooms.every((room) => isRoomCore(room, version))
+    || !value.events.every((event) => isEventCore(event, value.day as string, version))
+  ) {
+    return null
+  }
+
+  const rooms = value.rooms.map((room) => normalizeRoom(room as Record<string, unknown>, version))
+  const events = value.events.map((event) => normalizeEvent(event as Record<string, unknown>, version))
   if (new Set(rooms.map((room) => room.room_id)).size !== rooms.length) return null
   if (new Set(events.map((event) => event.id)).size !== events.length) return null
 
@@ -250,7 +543,34 @@ export function parseVacuumOutcomeContract(value: unknown): VacuumOutcomeContrac
   }
   if (referencedEventIds.size !== events.length) return null
 
-  return value as unknown as VacuumOutcomeContract
+  return {
+    complete: true,
+    day: value.day as string,
+    events,
+    rooms,
+    version,
+  }
+}
+
+export function parseVacuumOutcomeReport(value: unknown): VacuumOutcomeParseResult {
+  if (value === null || value === undefined) return { kind: 'absent' }
+  if (!isRecord(value)) return { kind: 'malformed' }
+  if (!isPositiveInteger(value.version)) return { kind: 'malformed' }
+  if (value.version !== 1 && value.version !== 2) {
+    return { kind: 'unsupported', version: value.version }
+  }
+  const version = value.version
+  if (value.complete === false) return { kind: 'incomplete', version }
+  if (value.complete !== true) return { kind: 'malformed', version }
+  const contract = parseSupportedContract(value, version)
+  return contract
+    ? { contract, kind: 'valid' }
+    : { kind: 'malformed', version }
+}
+
+export function parseVacuumOutcomeContract(value: unknown): VacuumOutcomeContract | null {
+  const parsed = parseVacuumOutcomeReport(value)
+  return parsed.kind === 'valid' ? parsed.contract : null
 }
 
 function stringListAttribute(attributes: Record<string, unknown>, name: string) {
@@ -264,12 +584,17 @@ export function vacuumWhileAwayPresentation(attributes: Record<string, unknown> 
   if (!attributes) return { kind: 'empty' }
   const cleaned = stringListAttribute(attributes, 'while_away_cleaned')
   const issues = stringListAttribute(attributes, 'while_away_issues')
-  const typed = parseVacuumOutcomeContract(attributes.while_away_outcomes)
-  if (typed) return typed.rooms.length > 0 ? { cleaned, contract: typed, issues, kind: 'typed' } : { kind: 'empty' }
-
-  return cleaned.length || issues.length
-    ? { cleaned, issues, kind: 'legacy' }
-    : { kind: 'empty' }
+  const legacy = { cleaned, issues }
+  const parsed = parseVacuumOutcomeReport(attributes.while_away_outcomes)
+  if (parsed.kind === 'valid') {
+    return parsed.contract.rooms.length > 0
+      ? { contract: parsed.contract, kind: 'typed' }
+      : { kind: 'empty' }
+  }
+  if (parsed.kind === 'incomplete') return { ...legacy, kind: 'incomplete', version: parsed.version }
+  if (parsed.kind === 'malformed') return { ...legacy, kind: 'malformed', ...(parsed.version ? { version: parsed.version } : {}) }
+  if (parsed.kind === 'unsupported') return { ...legacy, kind: 'incompatible', version: parsed.version }
+  return cleaned.length || issues.length ? { ...legacy, kind: 'legacy' } : { kind: 'empty' }
 }
 
 export function vacuumOutcomeEventsForRoom(contract: VacuumOutcomeContract, room: VacuumOutcomeRoom) {
