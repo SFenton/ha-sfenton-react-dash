@@ -2322,7 +2322,7 @@ function SoloTripPage() {
   const [returnEditing, setReturnEditing] = useState(false)
   const [returnAwaitingState, setReturnAwaitingState] = useState<SoloTripReturnAwaitingState | null>(null)
   const [restoreAwaitingSnapshot, setRestoreAwaitingSnapshot] = useState(false)
-  const previousModeRef = useRef(snapshot.mode)
+  const [previousMode, setPreviousMode] = useState(snapshot.mode)
   const engaged = householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.SOLO_TRIP)
   const vacationEngaged = householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.VACATION)
   const setupError = householdAwaySetupError(copy, snapshot)
@@ -2345,11 +2345,10 @@ function SoloTripPage() {
     && snapshot.available
     && snapshot.commandAvailable
 
-  useEffect(() => {
-    if (snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP && snapshot.traveler !== 'none') {
-      setSelectedTraveler(snapshot.traveler)
-    } else if (
-      previousModeRef.current === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+  if (previousMode !== snapshot.mode) {
+    setPreviousMode(snapshot.mode)
+    if (
+      previousMode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
       && snapshot.mode !== HOUSEHOLD_AWAY_MODE.SOLO_TRIP
       && !editorOpen
       && scheduleAwaitingState === null
@@ -2357,61 +2356,53 @@ function SoloTripPage() {
       setSelectedTraveler(null)
       setReturnEditing(false)
     }
-    previousModeRef.current = snapshot.mode
-  }, [editorOpen, scheduleAwaitingState, snapshot.mode, snapshot.traveler])
+  }
 
-  useEffect(() => {
-    if (scheduleAwaitingState === null) return
-    const scheduleConfirmed = snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
-      && snapshot.traveler === scheduleAwaitingState.traveler
-      && authoritativeStart?.date === scheduleAwaitingState.startDate
-      && authoritativeStart?.time === scheduleAwaitingState.startTime
-      && authoritativeEndDate === scheduleAwaitingState.endDate
-      && authoritativeEndTime === scheduleAwaitingState.endTime
-    if (scheduleConfirmed) {
-      setScheduleAwaitingState(null)
-      setEditorOpen(false)
-      setScheduleDraft(defaultSoloTripDraft())
-    }
-  }, [
-    authoritativeEndDate,
-    authoritativeEndTime,
-    authoritativeStart?.date,
-    authoritativeStart?.time,
-    scheduleAwaitingState,
-    snapshot.mode,
-    snapshot.traveler,
-  ])
+  if (
+    snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+    && snapshot.traveler !== 'none'
+    && selectedTraveler !== snapshot.traveler
+  ) {
+    setSelectedTraveler(snapshot.traveler)
+  }
 
-  useEffect(() => {
-    if (!toggleAwaitingSnapshot) return
-    const toggleConfirmed = snapshot.mode !== HOUSEHOLD_AWAY_MODE.SOLO_TRIP || snapshot.state === HOUSEHOLD_AWAY_STATE.IDLE
-    if (toggleConfirmed) setToggleAwaitingSnapshot(false)
-  }, [snapshot.mode, snapshot.state, toggleAwaitingSnapshot])
+  const scheduleConfirmed = scheduleAwaitingState !== null
+    && snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+    && snapshot.traveler === scheduleAwaitingState.traveler
+    && authoritativeStart?.date === scheduleAwaitingState.startDate
+    && authoritativeStart?.time === scheduleAwaitingState.startTime
+    && authoritativeEndDate === scheduleAwaitingState.endDate
+    && authoritativeEndTime === scheduleAwaitingState.endTime
+  if (scheduleConfirmed) {
+    setScheduleAwaitingState(null)
+    setEditorOpen(false)
+    setScheduleDraft(defaultSoloTripDraft())
+  }
 
-  useEffect(() => {
-    if (returnAwaitingState === null) return
-    const returnConfirmed = authoritativeEndDate === returnAwaitingState.endDate && authoritativeEndTime === returnAwaitingState.endTime
-    if (returnConfirmed) {
-      setReturnAwaitingState(null)
-      setReturnEditing(false)
-    }
-  }, [authoritativeEndDate, authoritativeEndTime, returnAwaitingState])
+  const toggleConfirmed = toggleAwaitingSnapshot
+    && (snapshot.mode !== HOUSEHOLD_AWAY_MODE.SOLO_TRIP || snapshot.state === HOUSEHOLD_AWAY_STATE.IDLE)
+  if (toggleConfirmed) setToggleAwaitingSnapshot(false)
 
-  useEffect(() => {
-    if (restoreAwaitingSnapshot && snapshot.state !== HOUSEHOLD_AWAY_STATE.RESTORE_REQUIRED) {
-      setRestoreAwaitingSnapshot(false)
-    }
-  }, [restoreAwaitingSnapshot, snapshot.state])
+  const returnConfirmed = returnAwaitingState !== null
+    && authoritativeEndDate === returnAwaitingState.endDate
+    && authoritativeEndTime === returnAwaitingState.endTime
+  if (returnConfirmed) {
+    setReturnAwaitingState(null)
+    setReturnEditing(false)
+  }
 
-  useEffect(() => {
-    if (returnEditing || !authoritativeEndDate || !authoritativeEndTime) return
-    setReturnDraft((current) => (
-      current.endDate === authoritativeEndDate && current.endTime === authoritativeEndTime
-        ? current
-        : { endDate: authoritativeEndDate, endTime: authoritativeEndTime }
-    ))
-  }, [authoritativeEndDate, authoritativeEndTime, returnEditing])
+  if (restoreAwaitingSnapshot && snapshot.state !== HOUSEHOLD_AWAY_STATE.RESTORE_REQUIRED) {
+    setRestoreAwaitingSnapshot(false)
+  }
+
+  if (
+    !returnEditing
+    && authoritativeEndDate
+    && authoritativeEndTime
+    && (returnDraft.endDate !== authoritativeEndDate || returnDraft.endTime !== authoritativeEndTime)
+  ) {
+    setReturnDraft({ endDate: authoritativeEndDate, endTime: authoritativeEndTime })
+  }
 
   const openEditor = () => {
     if (!selectedTraveler || setupError || controller.pending || awaitingCommand) return
@@ -5088,7 +5079,7 @@ function useEightSleepAlarmsController({
         topic: scheduleSetTopic,
       },
     })
-  }, [alarmDaySemantics, callService, legacyAlarmAvailable, schedule, scheduleEntityId, scheduleSetTopic, scheduleSideAvailable, sendSoloTripCommand, side, soloTripScope.controlsWholeBed, soloTripScope.engaged])
+  }, [alarmDaySemantics, callService, legacyAlarmAvailable, schedule, scheduleSetTopic, scheduleSideAvailable, sendSoloTripCommand, side, soloTripScope.controlsWholeBed, soloTripScope.engaged])
 
   useLayoutEffect(() => {
     syncAlarmRecordsRef.current = syncAlarmRecords
