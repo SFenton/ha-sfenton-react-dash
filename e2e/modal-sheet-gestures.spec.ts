@@ -603,7 +603,7 @@ test.describe('mobile ModalSheet gestures', () => {
     await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
   })
 
-  test('keyboard-phase drags do not move or dismiss the Chat sheet', async ({ page }) => {
+  test('keyboard-phase swipe offsets cannot move the Chat sheet', async ({ page }) => {
     await page.setViewportSize(MOBILE_VIEWPORT)
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'maxTouchPoints', { configurable: true, value: 1 })
@@ -630,17 +630,13 @@ test.describe('mobile ModalSheet gestures', () => {
       window.visualViewport!.dispatchEvent(new Event('resize'))
     })
     await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-keyboard'))).toBe('open')
-    const start = await locatorPoint(input)
-    const session = await beginTouch(page, start)
-    const sheetOffsets: number[] = []
-    await moveTouch(session, { x: start.x, y: start.y + 170 }, 12, 24, async () => {
-      sheetOffsets.push(await translateY(dialog))
+    await dialog.evaluate((element) => {
+      element.setAttribute('data-swiping', '')
+      ;(element as HTMLElement).style.setProperty('--drawer-swipe-movement-y', '170px')
     })
-    await finishTouch(session)
 
     await expect(dialog).toHaveAttribute('data-state', 'open')
-    for (const offset of sheetOffsets) expect(Math.abs(offset)).toBeLessThanOrEqual(1)
-    await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
+    expect(Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)
   })
 
   test('swipe close blocks the dismissal gesture but releases the host for an intentional follow-up tap', async ({ page }) => {

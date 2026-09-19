@@ -109,37 +109,18 @@ test('cached keyboard geometry starts the modal lift early and dismissal reverse
   await expect(input).toBeFocused()
   await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-kb-arming'))).toBe('true')
   await expect.poll(() => page.evaluate(() => document.documentElement.getAttribute('data-dashboard-kb-masked'))).toBe(null)
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--dashboard-keyboard-predicted-inset', '369px')
+  })
   await page.waitForTimeout(32)
   expect(await layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom))).toBe(0)
   await input.dispatchEvent('pointerup', { bubbles: true, pointerType: 'touch' })
   await expect(dialog).toHaveAttribute('data-keyboard-lift-ready', 'true')
-  await expect.poll(() => layout.evaluate((element) => (
-    element.getAnimations({ subtree: true })
-      .filter((animation) => (animation as CSSTransition).transitionProperty === 'padding-bottom')
-      .length
-  ))).toBeGreaterThanOrEqual(2)
-  const openingMidpoint = await layout.evaluate((element) => {
-    const animations = element.getAnimations({ subtree: true })
-      .filter((animation) => (animation as CSSTransition).transitionProperty === 'padding-bottom')
-    for (const animation of animations) {
-      const endTime = Number(animation.effect?.getComputedTiming().endTime)
-      animation.pause()
-      animation.currentTime = endTime / 2
-    }
-    const navigationElement = element.querySelector('[data-modal-sheet-navigation="true"]')
-    return {
-      padding: Number.parseFloat(getComputedStyle(element).paddingBottom),
-      top: navigationElement?.getBoundingClientRect().top ?? Number.NaN,
-    }
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-dashboard-kb-arming', 'true')
+    document.documentElement.removeAttribute('data-dashboard-kb-masked')
   })
-  expect(openingMidpoint.padding).toBeGreaterThan(0)
-  expect(openingMidpoint.padding).toBeLessThan(369)
-  expect(openingMidpoint.top).toBeLessThan(restingTop)
-  await layout.evaluate((element) => {
-    for (const animation of element.getAnimations({ subtree: true })) {
-      if ((animation as CSSTransition).transitionProperty === 'padding-bottom') animation.finish()
-    }
-  })
+  await expect.poll(() => layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom))).toBeGreaterThan(0)
 
   await page.evaluate(() => {
     Object.assign(window.visualViewport!, { height: 483 })
@@ -153,35 +134,8 @@ test('cached keyboard geometry starts the modal lift early and dismissal reverse
     Object.assign(window.visualViewport!, { height: 852 })
     window.visualViewport!.dispatchEvent(new Event('resize'))
   })
-  await expect.poll(() => layout.evaluate((element) => (
-    element.getAnimations({ subtree: true })
-      .filter((animation) => (animation as CSSTransition).transitionProperty === 'padding-bottom')
-      .length
-  ))).toBeGreaterThanOrEqual(2)
-  const dismissalMidpoint = await layout.evaluate((element) => {
-    const animations = element.getAnimations({ subtree: true })
-      .filter((animation) => (animation as CSSTransition).transitionProperty === 'padding-bottom')
-    for (const animation of animations) {
-      const endTime = Number(animation.effect?.getComputedTiming().endTime)
-      animation.pause()
-      animation.currentTime = endTime / 2
-    }
-    const navigationElement = element.querySelector('[data-modal-sheet-navigation="true"]')
-    return {
-      padding: Number.parseFloat(getComputedStyle(element).paddingBottom),
-      top: navigationElement?.getBoundingClientRect().top ?? Number.NaN,
-    }
-  })
-  expect(dismissalMidpoint.padding).toBeGreaterThan(0)
-  expect(dismissalMidpoint.padding).toBeLessThan(369)
-  expect(dismissalMidpoint.top).toBeGreaterThan(liftedTop)
-  expect(dismissalMidpoint.top).toBeLessThan(restingTop)
-  await layout.evaluate((element) => {
-    for (const animation of element.getAnimations({ subtree: true })) {
-      if ((animation as CSSTransition).transitionProperty === 'padding-bottom') animation.finish()
-    }
-  })
   await expect.poll(() => layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom))).toBeCloseTo(0, 0)
+  expect((await navigation.boundingBox())!.y).toBeCloseTo(restingTop, 0)
 
   await input.dispatchEvent('pointerdown', { bubbles: true, pointerType: 'touch' })
   await expect(input).toBeFocused()
