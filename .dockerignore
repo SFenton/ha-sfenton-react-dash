@@ -7,3 +7,15 @@ home-mcp/.data/
 !scripts/
 !scripts/lib/
 !scripts/lib/runtimeEnv.ts
+!scripts/lib/dashboardDeployment.ts
+!scripts/release-machine/
+!scripts/release-machine/production.ts
+!scripts/release-machine/productionHomeAssistant.ts
+!scripts/deploy-dashboard-ci.ts
+!scripts/sync-dashboard-deployment.ts
+!src/
+!src/constants/
+!src/constants/dashboardHosts.ts
+!ops/
+!ops/ha-deploy-runner/
+!ops/ha-deploy-runner/**
