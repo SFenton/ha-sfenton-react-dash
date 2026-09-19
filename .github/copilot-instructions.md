@@ -10,6 +10,13 @@ services. Keep entity IDs in constants and pages declarative.
 - Preserve unrelated work and secrets. Never print HA tokens or embed them in
   production. Do not commit, push, release, deploy, or mutate live HA unless
   explicitly authorized. Default branch: `master`.
+- Before changing repository code, create a new branch-backed Git worktree from
+  `master` and perform the task there. Do not implement in the primary checkout
+  or reuse an unrelated worktree. After the work is deployed and production
+  verification succeeds, remove the implementation worktree and release-only
+  temporary worktrees unless the user explicitly asks to keep the implementation
+  worktree. Never force removal over uncommitted work or delete its branch
+  without separate authorization.
 - Keep both `/sfenton-react-dash/home` and `/sfenton-react-panel` maintained.
   Do not retire a host or change its ownership without explicit approval.
 - Preserve `base: './'`, inherited HA authentication, and one HA behavior layer.
