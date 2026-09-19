@@ -44,6 +44,7 @@ services. Keep entity IDs in constants and pages declarative.
 | Dashboard code, HA services, ports, cameras, lifecycle, release | [.github/reference/dashboard-contract.md](reference/dashboard-contract.md), in full |
 | UX, styling, visible copy, responsive behavior | Matching `.github/instructions/` files, `docs/ux/layouts.md`, and its executable plan |
 | UI or copy that directly references a household user | [.github/reference/household-user-personalization.md](reference/household-user-personalization.md), in full |
+| DynamicGrid, responsive card grids, row packing, width fill | [.github/instructions/dynamic-grid.instructions.md](instructions/dynamic-grid.instructions.md), plus the matching UX/layout instructions |
 | Modal code, layout, keyboard behavior | `.github/instructions/modal-layouts.instructions.md` and `docs/ux/modal-layout-inventory.md` |
 | Port from Lovelace | `dashboard-ux-authoring` / HASS Porting; source config and real browser parity remain required |
 | Release explicitly requested | `release-dashboard`; explicit authorization gates remain unchanged and the coordinating profile is `gpt-5.6-luna` medium/default |

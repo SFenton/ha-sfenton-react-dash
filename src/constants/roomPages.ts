@@ -227,7 +227,7 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: "Steph's Bed", entityId: 'climate.sleepypod_eight_pod_right_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', resident: HOUSEHOLD_RESIDENT.STEPH, residentLabel: 'bed-side', showState: true, stateTone: 'climate-action' },
       ] },
       { title: 'Media', cards: [{ title: 'Apple TV', entityId: 'media_player.master_bedroom_apple_tv', icon: 'mdi:apple', kind: 'media', hash: '#master-bedroom-apple-tv', showState: true, span: 'full', activeStates: ['idle', 'paused', 'playing'] }] },
-      { title: 'Climate', cards: [
+      { title: 'Climate', layout: 'two-column-fill', cards: [
         { title: 'Vents', entityId: 'cover.master_bedroom_vents', icon: 'mdi:air-filter', kind: 'vent', hash: '#vents', showState: true, modalItems: [{ title: 'Vent 1', entityId: 'cover.master_bedroom_vent_2_vent', icon: 'mdi:air-filter' }, { title: 'Vent 2', entityId: 'cover.master_bedroom_vent_3_vent', icon: 'mdi:air-filter' }] },
         { title: 'Air Purifier', entityId: 'select.master_bedroom_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.master_bedroom_air_purifier_pm2_5', subtitleEntityIds: ['select.master_bedroom_air_purifier_fan_mode', 'fan.master_bedroom_air_purifier_levoit_purifier'] },
         {

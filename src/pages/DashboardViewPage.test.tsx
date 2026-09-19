@@ -464,6 +464,25 @@ describe('DashboardViewPage', () => {
     }
   })
 
+  it('keeps three-plus-card room sections within two columns and fills the Master Bedroom Climate rows', () => {
+    const implicitlyExpandableSections = ROOM_PAGE_ORDER.flatMap((path) =>
+      ROOM_PAGE_CONFIGS[path].sourceSections
+        .filter((section) => section.showOnRoomPage !== false)
+        .filter((section) => section.layout !== 'app-launch' && section.layout !== 'two-column-fill')
+        .filter((section) => (section.layout === 'lead-row' ? section.cards.length - 1 : section.cards.length) > 2)
+        .map((section) => `${path}:${section.title}`),
+    )
+    expect(implicitlyExpandableSections).toEqual([])
+
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    const climateGrid = screen.getByRole('group', { name: 'Master Bedroom Climate' })
+    expect(climateGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+    expect(climateGrid).toHaveAttribute('data-dynamic-grid-last-row', 'fill')
+    expect(climateGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(Array.from(climateGrid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '2'])
+  })
+
   it('separates room remotes, device controls, and quick app launch grids', () => {
     const theaterView = render(<DashboardViewPage activePath="theater-room" onNavigate={() => undefined} path="theater-room" />)
 
