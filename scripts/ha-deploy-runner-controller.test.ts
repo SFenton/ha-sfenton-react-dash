@@ -1,6 +1,7 @@
 import {
   assertExpectedJobBinding,
   assertJitRunnerLabels,
+  dockerInspectIsMissing,
   expectedRunnerLabel,
   isUnassignedJob,
   jitConfigurationRequest,
@@ -155,6 +156,12 @@ describe('HA deploy runner controller', () => {
       runner_id: 42,
       runner_name: 'runner-42',
     }))).toBe(false)
+  })
+
+  it('recognizes Docker inspect output for removed resources', () => {
+    expect(dockerInspectIsMissing('')).toBe(true)
+    expect(dockerInspectIsMissing('[]')).toBe(true)
+    expect(dockerInspectIsMissing('[{"Id":"still-present"}]')).toBe(false)
   })
 
   it('requires a JIT runner to expose only its per-run label', () => {

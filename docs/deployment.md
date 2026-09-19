@@ -17,6 +17,8 @@ The workflow separates build and deployment:
 - The runner initially has only an allowlisted GitHub proxy. The controller
   grants access to HA-specific SSH and API proxies only after GitHub reports
   that the expected job is bound to the generated runner ID and name.
+- The read-only runner uses an anonymous Docker volume for its runtime files;
+  the controller removes that volume with the one-job container.
 - Production credentials live in the GitHub `production` environment, which is
   restricted to `master`. They are not stored on the runner host or mounted
   into the runner container.

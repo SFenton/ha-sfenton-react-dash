@@ -256,6 +256,10 @@ async function docker(args: string[], allowFailure = false) {
   return command('docker', args, { allowFailure })
 }
 
+export function dockerInspectIsMissing(stdout: string) {
+  return stdout === '' || stdout === '[]'
+}
+
 async function retryProbe(description: string, probe: () => Promise<void>) {
   let lastError: unknown
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -271,9 +275,12 @@ async function retryProbe(description: string, probe: () => Promise<void>) {
 }
 
 async function removeContainer(name: string) {
-  await docker(['rm', '--force', name], true)
+  await docker(['rm', '--force', '--volumes', name], true)
   const remaining = await docker(['container', 'inspect', name], true)
-  assert(!remaining.stdout, `Runner container cleanup failed for ${name}`)
+  assert(
+    dockerInspectIsMissing(remaining.stdout),
+    `Runner container cleanup failed for ${name}`,
+  )
 }
 
 async function workflowSource(
@@ -546,6 +553,8 @@ async function startRunner(
       '2g',
       '--cpus',
       '2',
+      '--mount',
+      'type=volume,destination=/home/runner/actions-runner',
       '--tmpfs',
       '/tmp:rw,noexec,nosuid,nodev',
       '--tmpfs',
@@ -730,7 +739,10 @@ async function cleanup(
   }
   await docker(['network', 'rm', network], true)
   const remaining = await docker(['network', 'inspect', network], true)
-  assert(!remaining.stdout, `Runner network cleanup failed for ${network}`)
+  assert(
+    dockerInspectIsMissing(remaining.stdout),
+    `Runner network cleanup failed for ${network}`,
+  )
 }
 
 async function runCandidate(
