@@ -44,8 +44,53 @@
     "detailTitle": "{{room}} · Automatic Cleaning Report",
     "backToControls": "Back to Vacuum Controls",
     "openDetail": "Open {{room}} Automatic Cleaning Report for {{date}}",
+    "evidence": {
+      "title": "Cleaning Evidence",
+      "show": "Show {{room}} Cleaning Evidence",
+      "hide": "Hide {{room}} Cleaning Evidence",
+      "unavailable": "Evidence Unavailable",
+      "attributionUncertain": "Attribution Uncertain",
+      "labels": {
+        "physicalWork": "Physical Work",
+        "targetRoomDwell": "Target Room Dwell",
+        "duration": "Duration",
+        "area": "Area",
+        "iterations": "Iterations",
+        "completion": "Completion",
+        "telemetry": "Telemetry",
+        "observed": "Observed",
+        "requested": "Requested",
+        "minimum": "Minimum",
+        "lowerBound": "Lower Bound",
+        "resetCount": "Reset Count",
+        "sourceOutages": "Source Outages",
+        "sourceOutageDuration": "Source Outage Duration"
+      },
+      "statuses": {
+        "notObserved": "Not Observed",
+        "observed": "Observed",
+        "substantial": "Substantial",
+        "notRequired": "Not Required",
+        "passedLowerBound": "Passed Lower Bound",
+        "unknown": "Unknown",
+        "passed": "Passed",
+        "failed": "Failed",
+        "verified": "Verified",
+        "unverified": "Unverified",
+        "completed": "Completed",
+        "incomplete": "Incomplete",
+        "uncertain": "Uncertain",
+        "recovered": "Recovered",
+        "unresolved": "Unresolved"
+      },
+      "units": {
+        "seconds": "seconds",
+        "squareInches": "sq in"
+      }
+    },
     "groups": {
       "needsAttention": "Error",
+      "unverified": "Completion Unverified",
       "interrupted": "Interrupted",
       "stillDue": "Work Still Due",
       "done": "Completed"
@@ -54,6 +99,7 @@
       "failed": "Failed",
       "interrupted": "Interrupted",
       "partial": "Partially Complete",
+      "uncertain": "Completion Unverified",
       "deferred": "Not Attempted",
       "completed": "Completed"
     },
@@ -63,7 +109,9 @@
       "roomsNeedAttention_one": "{{count}} Room Needs Attention",
       "roomsNeedAttention_other": "{{count}} Rooms Need Attention",
       "errors_one": "{{count}} Error",
-      "errors_other": "{{count}} Errors"
+      "errors_other": "{{count}} Errors",
+      "unverifiedRooms_one": "{{count}} Room Unverified",
+      "unverifiedRooms_other": "{{count}} Rooms Unverified"
     },
     "attempts_one": "{{count}} Clean Attempt",
     "attempts_other": "{{count}} Clean Attempts",
@@ -95,6 +143,16 @@
         "vacuumMop": "The vacuuming and mopping attempt was interrupted before completion.",
         "fallbackVacuum": "The fallback vacuum-only attempt was interrupted before completion."
       },
+      "partial": {
+        "vacuum": "The vacuum-only attempt was partially completed.",
+        "vacuumMop": "The vacuuming and mopping attempt was partially completed.",
+        "fallbackVacuum": "The fallback vacuum-only attempt was partially completed."
+      },
+      "uncertain": {
+        "vacuum": "Vacuuming completion could not be verified.",
+        "vacuumMop": "Vacuuming and mopping completion could not be verified.",
+        "fallbackVacuum": "Fallback vacuuming completion could not be verified."
+      },
       "deferred": {
         "vacuum": "Vacuuming was deferred before any attempt.",
         "vacuumMop": "Vacuuming and mopping were deferred before any attempt.",
@@ -110,6 +168,18 @@
     "errorProgress": {
       "vacuumCompleteMoppingRemaining": "Vacuuming is complete; mopping remains.",
       "vacuumingAndMoppingRemaining": "Vacuuming and mopping remain."
+    },
+    "protocol": {
+      "incompleteTitle": "Report Still Being Prepared",
+      "incompleteDescription": "Final counts are not available.",
+      "malformedTitle": "Report Could Not Be Read",
+      "malformedDescription": "Structured cleaning results are unavailable.",
+      "incompatibleTitle": "Dashboard Update Required",
+      "incompatibleDescription": "This cleaning report uses an unsupported version.",
+      "legacyDetailsTitle": "Unstructured Report Details",
+      "showLegacyDetails": "Show {{room}} Unstructured Report Details",
+      "hideLegacyDetails": "Hide {{room}} Unstructured Report Details",
+      "legacyWarning": "These details may be inconsistent with the typed status."
     },
     "reasons": {
       "freshWaterMissing": "Fresh-water status is missing.",
@@ -136,6 +206,19 @@
       "areaBelowMinimumWithoutValues": "The cleaned area of the room was below the required minimum.",
       "estimatedRoomTimeBelowMinimum": "Estimated time in the requested room was {{observed}} seconds, below the required minimum of {{minimum}} seconds.",
       "estimatedRoomTimeBelowMinimumWithoutValues": "Estimated time in the requested room was below the required minimum; reliable values were unavailable.",
+      "counterAttributionDuration": "Floor completion time became ambiguous during a telemetry outage.",
+      "counterAttributionArea": "Floor completion area became ambiguous during a telemetry outage.",
+      "counterAttributionUnknown": "A floor completion measurement became ambiguous during a telemetry outage.",
+      "sourceOutageUnresolved": "Telemetry recovery was not coherent within {{seconds}} seconds.",
+      "sourceOutageUnresolvedWithoutDuration": "Telemetry recovery was not coherent.",
+      "taskIdentityConflict": "Telemetry recovered with conflicting room evidence.",
+      "iterationsIncomplete": "Observed {{observed}} of {{requested}} requested iterations.",
+      "iterationsIncompleteWithoutValues": "Requested iterations could not all be verified.",
+      "iterationsUncertain": "Floor thresholds were met, but the requested iterations did not reach a coherent completed task state.",
+      "measurementUnavailableDuration": "Floor completion time was unavailable during dock servicing.",
+      "measurementUnavailableArea": "Floor completion area was unavailable during dock servicing.",
+      "measurementUnavailableUnknown": "A floor completion measurement was unavailable during dock servicing.",
+      "completionUnverified": "Completion could not be verified from the available vacuum data.",
       "wrongRoom": "Observed cleaning was dominated by {{dominantRoom}} for {{dominantSeconds}} seconds instead of the requested {{commandedRoom}} for {{commandedSeconds}} seconds.",
       "wrongRoomWithoutNames": "Observed cleaning time was dominated elsewhere, with {{dominantSeconds}} seconds versus {{commandedSeconds}} seconds in the requested room.",
       "stuck": "The vacuum became stuck while trying to clean the room.",
