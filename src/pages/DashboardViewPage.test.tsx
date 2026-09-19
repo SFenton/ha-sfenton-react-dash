@@ -7738,7 +7738,8 @@ describe('DashboardViewPage', () => {
     await waitFor(() => expect(screen.queryByLabelText(/todo list$/)).not.toBeInTheDocument())
     expect(screen.getByRole('heading', { name: 'No Chores Due' }).parentElement).toHaveAttribute('data-empty-layout', 'centered')
     expect(screen.getByRole('heading', { name: 'No Chores Due' }).parentElement).toHaveAttribute('data-empty-typography', 'festival')
-    expect(Array.from(screen.getByRole('main').children)[1]).toHaveAttribute('data-scroll-lock', 'true')
+    const scroller = screen.getByRole('main').querySelector('[data-page-scroller="true"]')
+    await waitFor(() => expect(scroller).toHaveAttribute('data-scroll-lock', 'true'))
     expect(screen.getByText('Steph has no chores due- nice job!')).toBeInTheDocument()
   })
 
