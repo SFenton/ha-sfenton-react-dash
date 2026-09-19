@@ -2,6 +2,7 @@
   "version": 1,
   "repository": "SFenton/ha-sfenton-react-dash",
   "repositoryId": 0,
+  "runnerGroupId": 1,
   "workflowPath": ".github/workflows/deploy-dashboard.yml",
   "workflowSha256": "replace-with-workflow-sha256",
   "runnerImage": "ha-sfenton-dashboard-runner:20260919",

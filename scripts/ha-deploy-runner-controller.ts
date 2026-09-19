@@ -26,6 +26,7 @@ type ControllerConfig = {
   version: 1
   repository: string
   repositoryId: number
+  runnerGroupId: number
   workflowPath: string
   workflowSha256: string
   runnerImage: string
@@ -84,6 +85,16 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof AggregateError) {
+    return [
+      error.message,
+      ...error.errors.map((nested) => errorMessage(nested)),
+    ].join('\n')
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
 function sha256(value: string | Buffer) {
   return createHash('sha256').update(value).digest('hex')
 }
@@ -106,6 +117,11 @@ function expectedJob(kind: CandidateKind) {
 
 function expectedEvent(kind: CandidateKind) {
   return kind === 'production' ? 'push' : 'workflow_dispatch'
+}
+
+export function isUnassignedJob(job: WorkflowJob) {
+  return (job.runner_id === null || job.runner_id === 0) &&
+    (job.runner_name === null || job.runner_name === '')
 }
 
 export function selectControllerCandidate(
@@ -150,7 +166,7 @@ export function selectControllerCandidate(
           candidate.name === expectedJob(kind) &&
           candidate.status === 'queued' &&
           candidate.conclusion === null &&
-          candidate.runner_id === null &&
+          isUnassignedJob(candidate) &&
           candidate.labels.length === 1 &&
           candidate.labels[0] === label,
       )
@@ -181,6 +197,20 @@ export function assertExpectedJobBinding(
     job.runner_id === runner.id && job.runner_name === runner.name,
     `Workflow job is not bound to JIT runner ${runner.name}`,
   )
+}
+
+export function jitConfigurationRequest(
+  name: string,
+  label: string,
+  runnerGroupId: number,
+) {
+  assert(runnerGroupId > 0, 'JIT runner group ID is invalid')
+  return {
+    name,
+    runner_group_id: runnerGroupId,
+    labels: [label],
+    work_folder: '_work',
+  }
 }
 
 async function command(
@@ -236,6 +266,10 @@ async function docker(args: string[], allowFailure = false) {
   return command('docker', args, { allowFailure })
 }
 
+export function dockerInspectIsMissing(stdout: string) {
+  return stdout === '' || stdout === '[]'
+}
+
 async function retryProbe(description: string, probe: () => Promise<void>) {
   let lastError: unknown
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -251,9 +285,12 @@ async function retryProbe(description: string, probe: () => Promise<void>) {
 }
 
 async function removeContainer(name: string) {
-  await docker(['rm', '--force', name], true)
+  await docker(['rm', '--force', '--volumes', name], true)
   const remaining = await docker(['container', 'inspect', name], true)
-  assert(!remaining.stdout, `Runner container cleanup failed for ${name}`)
+  assert(
+    dockerInspectIsMissing(remaining.stdout),
+    `Runner container cleanup failed for ${name}`,
+  )
 }
 
 async function workflowSource(
@@ -305,6 +342,7 @@ async function workflowJob(repository: string, jobId: number) {
 
 async function generateJitConfiguration(
   repository: string,
+  runnerGroupId: number,
   candidate: ControllerCandidate,
 ) {
   const runnerName = safeIdentifier(
@@ -314,11 +352,11 @@ async function generateJitConfiguration(
     `repos/${repository}/actions/runners/generate-jitconfig`,
     {
       method: 'POST',
-      body: {
-        name: runnerName,
-        labels: [candidate.label],
-        work_folder: '_work',
-      },
+      body: jitConfigurationRequest(
+        runnerName,
+        candidate.label,
+        runnerGroupId,
+      ),
     },
   )
   assertJitRunnerLabels(configuration.runner, candidate.label)
@@ -345,6 +383,7 @@ async function loadConfig(path: string) {
   const config = JSON.parse(await readFile(resolve(path), 'utf8')) as ControllerConfig
   assert(config.version === 1, 'Controller config version is invalid')
   assert(config.repositoryId > 0, 'Controller repository ID is invalid')
+  assert(config.runnerGroupId > 0, 'Controller runner group ID is invalid')
   assert(/^[a-f0-9]{64}$/.test(config.workflowSha256), 'Workflow SHA-256 is invalid')
   assert(config.runnerImage.length > 0, 'Runner image is required')
   assert(/^sha256:[a-f0-9]{64}$/.test(config.runnerImageId), 'Runner image ID is invalid')
@@ -524,6 +563,8 @@ async function startRunner(
       '2g',
       '--cpus',
       '2',
+      '--mount',
+      'type=volume,destination=/home/runner/actions-runner',
       '--tmpfs',
       '/tmp:rw,noexec,nosuid,nodev',
       '--tmpfs',
@@ -623,28 +664,21 @@ async function authorizeRunner(
   candidate: ControllerCandidate,
   runner: JitRunner,
 ) {
-  const temporary = await mkdtemp(`${tmpdir()}/ha-runner-auth-`)
-  const path = `${temporary}/authorization.json`
-  await writeFile(
-    path,
-    `${JSON.stringify({
+  const authorization = `${JSON.stringify({
       mode: candidate.kind,
       runId: String(candidate.run.id),
       runAttempt: candidate.run.run_attempt,
       runnerId: runner.id,
       runnerName: runner.name,
-    })}\n`,
-    { mode: 0o644 },
-  )
-  try {
-    await docker([
-      'cp',
-      path,
-      `${runnerContainer}:/run/ha-dashboard/authorization.json`,
-    ])
-  } finally {
-    await rm(temporary, { recursive: true, force: true })
-  }
+    })}\n`
+  await docker([
+    'exec',
+    runnerContainer,
+    'node',
+    '-e',
+    "require('node:fs').writeFileSync('/run/ha-dashboard/authorization.json',process.argv[1],{mode:0o400})",
+    authorization,
+  ])
 }
 
 async function waitForAssignment(
@@ -656,7 +690,7 @@ async function waitForAssignment(
     Date.now() + config.assignmentTimeoutSeconds * 1_000
   while (Date.now() < deadline) {
     const job = await workflowJob(config.repository, candidate.job.id)
-    if (job.runner_id !== null) {
+    if (!isUnassignedJob(job)) {
       assertExpectedJobBinding(job, runner)
       return job
     }
@@ -708,7 +742,10 @@ async function cleanup(
   }
   await docker(['network', 'rm', network], true)
   const remaining = await docker(['network', 'inspect', network], true)
-  assert(!remaining.stdout, `Runner network cleanup failed for ${network}`)
+  assert(
+    dockerInspectIsMissing(remaining.stdout),
+    `Runner network cleanup failed for ${network}`,
+  )
 }
 
 async function runCandidate(
@@ -716,7 +753,11 @@ async function runCandidate(
   candidate: ControllerCandidate,
 ) {
   await validateControlPlane(config, candidate)
-  const jit = await generateJitConfiguration(config.repository, candidate)
+  const jit = await generateJitConfiguration(
+    config.repository,
+    config.runnerGroupId,
+    candidate,
+  )
   const prefix = safeIdentifier(
     `ha-jit-${candidate.run.id}-${candidate.run.run_attempt}`,
   )
@@ -813,7 +854,7 @@ async function runController(configPath: string) {
       const candidate = await findCandidate(config)
       if (candidate) await runCandidate(config, candidate)
     } catch (error) {
-      console.error(error instanceof Error ? error.message : String(error))
+      console.error(errorMessage(error))
     }
     await new Promise((resolveDelay) =>
       setTimeout(resolveDelay, config.pollSeconds * 1_000),
@@ -842,7 +883,7 @@ const entryPath = process.argv[1]
   : undefined
 if (entryPath === import.meta.url) {
   main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error))
+    console.error(errorMessage(error))
     process.exitCode = 1
   })
 }

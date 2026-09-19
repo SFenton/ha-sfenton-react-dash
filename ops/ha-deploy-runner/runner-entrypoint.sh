@@ -6,4 +6,4 @@ if [ -z "${ACTIONS_RUNNER_JIT_CONFIG:-}" ]; then
   exit 1
 fi
 
-exec ./run.sh --jitconfig "$ACTIONS_RUNNER_JIT_CONFIG"
+exec ./bin/Runner.Listener run --jitconfig "$ACTIONS_RUNNER_JIT_CONFIG"

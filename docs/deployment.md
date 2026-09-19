@@ -17,6 +17,8 @@ The workflow separates build and deployment:
 - The runner initially has only an allowlisted GitHub proxy. The controller
   grants access to HA-specific SSH and API proxies only after GitHub reports
   that the expected job is bound to the generated runner ID and name.
+- The read-only runner uses an anonymous Docker volume for its runtime files;
+  the controller removes that volume with the one-job container.
 - Production credentials live in the GitHub `production` environment, which is
   restricted to `master`. They are not stored on the runner host or mounted
   into the runner container.
@@ -71,11 +73,12 @@ Install the controller bundle, example config, and user service under:
 ~/.config/systemd/user/ha-dashboard-runner-controller.service
 ```
 
-Populate the config with the GitHub repository ID, the SHA-256 of the merged
-workflow file, and the exact local Docker image ID. Start with
-`"mode": "smoke-only"`. The service runs as the operator's lingering user and
-uses that user's authenticated `gh` and Docker clients; its GitHub credential
-must never be copied into a workflow secret or runner container.
+Populate the config with the GitHub repository ID, repository runner-group ID
+(`1` for this personal repository's default group), the SHA-256 of the merged
+workflow file, and the exact local Docker image ID. Start with `"mode":
+"smoke-only"`. The service runs as the operator's lingering user and uses that
+user's authenticated `gh` and Docker clients; its GitHub credential must never
+be copied into a workflow secret or runner container.
 
 The smoke dispatch must prove:
 

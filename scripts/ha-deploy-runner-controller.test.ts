@@ -1,7 +1,10 @@
 import {
   assertExpectedJobBinding,
   assertJitRunnerLabels,
+  dockerInspectIsMissing,
   expectedRunnerLabel,
+  isUnassignedJob,
+  jitConfigurationRequest,
   selectControllerCandidate,
   type WorkflowJob,
   type WorkflowRun,
@@ -143,6 +146,24 @@ describe('HA deploy runner controller', () => {
     ).toBeUndefined()
   })
 
+  it('accepts both GitHub representations of an unassigned job', () => {
+    expect(isUnassignedJob(job())).toBe(true)
+    expect(isUnassignedJob(job({
+      runner_id: 0,
+      runner_name: '',
+    }))).toBe(true)
+    expect(isUnassignedJob(job({
+      runner_id: 42,
+      runner_name: 'runner-42',
+    }))).toBe(false)
+  })
+
+  it('recognizes Docker inspect output for removed resources', () => {
+    expect(dockerInspectIsMissing('')).toBe(true)
+    expect(dockerInspectIsMissing('[]')).toBe(true)
+    expect(dockerInspectIsMissing('[{"Id":"still-present"}]')).toBe(false)
+  })
+
   it('requires a JIT runner to expose only its per-run label', () => {
     const runner = {
       id: 42,
@@ -158,6 +179,24 @@ describe('HA deploy runner controller', () => {
         labels: [{ name: 'self-hosted' }, ...runner.labels],
       }, 'ha-deploy-production-123-2'),
     ).toThrow('not exclusive')
+  })
+
+  it('binds JIT registration to the configured runner group', () => {
+    expect(
+      jitConfigurationRequest(
+        'runner-42',
+        'ha-deploy-production-123-2',
+        1,
+      ),
+    ).toEqual({
+      name: 'runner-42',
+      runner_group_id: 1,
+      labels: ['ha-deploy-production-123-2'],
+      work_folder: '_work',
+    })
+    expect(() =>
+      jitConfigurationRequest('runner-42', 'label', 0),
+    ).toThrow('runner group ID')
   })
 
   it('binds authorization to the exact GitHub runner identity', () => {
