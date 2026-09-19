@@ -6,7 +6,6 @@ import {
   HOT_FLASH_TARGET_WRAPPERS,
   HOT_FLASH_TRANSITION_CONTRACT,
   hotFlashBroker,
-  hotFlashFeedbackScript,
   hotFlashHelpers,
   hotFlashRecoveryAutomations,
   hotFlashRecoveryConfig,
@@ -111,10 +110,7 @@ describe('emitted SleepyPod Hot Flash recovery graph', () => {
       originalWrapper(wrapper.id),
     ]))
     const scripts = hotFlashRecoveryScripts(originals)
-    expect(Object.keys(scripts)).toEqual([
-      HOT_FLASH.feedbackId,
-      ...HOT_FLASH_TARGET_WRAPPERS.map((wrapper) => wrapper.id),
-    ])
+    expect(Object.keys(scripts)).toEqual(HOT_FLASH_TARGET_WRAPPERS.map((wrapper) => wrapper.id))
     for (const wrapper of HOT_FLASH_TARGET_WRAPPERS) {
       const original = originals[`script.${wrapper.id}`]
       const transformed = scripts[wrapper.id]
@@ -196,15 +192,11 @@ describe('emitted SleepyPod Hot Flash recovery graph', () => {
     expect(JSON.stringify(automations)).not.toContain('sleepypod_target_report')
   })
 
-  it('uses an alarm-state-gated ten-second physical feedback command with no browser haptics or alarm clear', () => {
-    const feedback = hotFlashFeedbackScript()
-    const serialized = JSON.stringify(feedback)
-    expect(feedback.mode).toBe('queued')
-    expect(serialized).toContain('sleepypod/eight-pod/cmd/set-alarm')
-    expect(serialized).toContain('"duration\\":10')
-    expect(serialized).toContain(HOT_FLASH.sides.left.alarmState)
-    expect(serialized).toContain(HOT_FLASH.sides.right.alarmState)
-    expect(serialized).not.toContain('clear-alarm')
+  it('leaves accepted-target haptics to SleepyPod without emitting an HA alarm command', () => {
+    const serialized = JSON.stringify(hotFlashRecoveryConfig(REQUESTERS))
+    expect(serialized).not.toContain('sleepypod_temperature_feedback')
+    expect(serialized).not.toContain('sleepypod/eight-pod/cmd/set-alarm')
+    expect(serialized).not.toContain('mqtt.publish')
     expect(serialized).not.toContain('navigator.vibrate')
   })
 

@@ -11,11 +11,8 @@ export interface HotFlashRequestedBy {
 export const HOT_FLASH = {
   brokerId: 'sleepypod_hot_flash_broker',
   broker: 'script.sleepypod_hot_flash_broker',
-  feedbackId: 'sleepypod_temperature_feedback',
-  feedback: 'script.sleepypod_temperature_feedback',
   sides: {
     left: {
-      alarmState: 'sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state',
       climate: 'climate.sleepypod_eight_pod_left_side',
       currentTemperature: 'sensor.nightcanvasrestful_left_current_temperature',
       target: 'number.master_bedroom_sleepypod_eight_pod_left_target_level',
@@ -24,7 +21,6 @@ export const HOT_FLASH = {
       schedulePhase: 'sensor.sleepypod_stephen_schedule_phase',
     },
     right: {
-      alarmState: 'sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state',
       climate: 'climate.sleepypod_eight_pod_right_side',
       currentTemperature: 'sensor.nightcanvasrestful_right_current_temperature',
       target: 'number.master_bedroom_sleepypod_eight_pod_right_target_level',
@@ -155,12 +151,11 @@ function logDeferred(message: string) {
   })
 }
 
-function tryTargetCommand(which: HotFlashSide, value: string | number, feedback = false) {
+function tryTargetCommand(which: HotFlashSide, value: string | number) {
   return {
     if: [targetAvailable(which)],
     then: [
       service('number.set_value', side(which).target, { value }),
-      ...(feedback ? [service(HOT_FLASH.feedback, undefined, { side: which })] : []),
     ],
     else: [logDeferred(`${which} target delivery remains pending because the target entity is unavailable.`)],
   }
@@ -440,7 +435,7 @@ function setTargetIntent(which: HotFlashSide) {
       option: `{{ 'leased' if ${activeMemberExpression(other)} else 'restore_pending' }}`,
     }),
     persist(),
-    tryTargetCommand(which, '{{ requested_level }}', true),
+    tryTargetCommand(which, '{{ requested_level }}'),
     ...reconcileShared(),
   ]
 }
@@ -584,51 +579,6 @@ export function hotFlashBroker(): HaRecord {
   }
 }
 
-export function hotFlashFeedbackScript(): HaRecord {
-  const publish = (which: HotFlashSide) => service('mqtt.publish', undefined, {
-    topic: 'sleepypod/eight-pod/cmd/set-alarm',
-    qos: 1,
-    retain: false,
-    payload: `{"side":"${which}","vibrationIntensity":100,"vibrationPattern":"double","duration":10}`,
-  })
-  return {
-    alias: 'SleepyPod temperature command feedback',
-    description: 'Acknowledges an accepted manual target command with the minimum supported per-side physical bed vibration when no alarm is active.',
-    mode: 'queued',
-    max: 20,
-    max_exceeded: 'error',
-    fields: {
-      side: { required: true, selector: { text: {} } },
-    },
-    sequence: [
-      {
-        variables: {
-          which: "{{ side | default('') }}",
-        },
-      },
-      {
-        choose: [
-          {
-            conditions: [
-              template("which == 'left'"),
-              state(HOT_FLASH.sides.left.alarmState, 'idle'),
-            ],
-            sequence: [publish('left')],
-          },
-          {
-            conditions: [
-              template("which == 'right'"),
-              state(HOT_FLASH.sides.right.alarmState, 'idle'),
-            ],
-            sequence: [publish('right')],
-          },
-        ],
-        default: [logDeferred('Physical target feedback was skipped because the selected side is invalid or an alarm is active.')],
-      },
-    ],
-  }
-}
-
 interface TargetWrapper {
   id: string
   owner: 'steph' | 'stephen'
@@ -754,13 +704,10 @@ function transformTargetScript(wrapper: TargetWrapper, original?: HaRecord | nul
 }
 
 export function hotFlashRecoveryScripts(originals: Record<string, HaRecord | null> = {}): Record<string, HaRecord> {
-  return {
-    [HOT_FLASH.feedbackId]: hotFlashFeedbackScript(),
-    ...Object.fromEntries(HOT_FLASH_TARGET_WRAPPERS.map((wrapper) => [
-      wrapper.id,
-      transformTargetScript(wrapper, originals[`script.${wrapper.id}`]),
-    ])),
-  }
+  return Object.fromEntries(HOT_FLASH_TARGET_WRAPPERS.map((wrapper) => [
+    wrapper.id,
+    transformTargetScript(wrapper, originals[`script.${wrapper.id}`]),
+  ]))
 }
 
 function sideOwnerAutomation(which: HotFlashSide, requestedBy: string, configId?: string, alias?: string) {
