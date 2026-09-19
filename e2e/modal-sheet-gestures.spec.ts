@@ -1,3 +1,4 @@
+// @covers src/components/core/ModalSheet.module.css
 import { expect, test, type CDPSession, type Locator, type Page } from './layout/fixture'
 import { globalQuickLinksAction, selectQuickLinksTab } from './quick-links'
 
