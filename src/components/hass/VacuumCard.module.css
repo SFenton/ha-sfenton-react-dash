@@ -21,13 +21,20 @@
   transition: opacity 170ms ease-out;
 }
 
+.modalBody:has(> .vacuumLayoutLoading) {
+  padding-top: 0;
+}
+
 .vacuumLayoutLoading {
-  position: absolute;
-  inset: 0 0 auto;
+  position: sticky;
+  top: 0;
   z-index: 4;
   width: 100%;
-  height: calc(var(--modal-body-visible-height, 100%) + 12px);
+  height: var(--modal-body-visible-height, 100%);
+  grid-column: 1 / -1;
   min-height: 0;
+  margin-bottom: calc(-1 * var(--modal-body-visible-height, 100%));
+  order: -1;
   pointer-events: none;
 }
 
