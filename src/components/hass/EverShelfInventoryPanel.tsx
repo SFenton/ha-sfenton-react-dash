@@ -1266,7 +1266,13 @@ function InventorySearchAction({ controls, onExpandedChange }: { controls: EverS
   )
 }
 
-export function EverShelfInventoryFloatingActions({ controls }: { controls: EverShelfInventoryControls }) {
+export function EverShelfInventoryFloatingActions({
+  controls,
+  showSecondaryActions = true,
+}: {
+  controls: EverShelfInventoryControls
+  showSecondaryActions?: boolean
+}) {
   const [searchExpanded, setSearchExpanded] = useState(false)
   if (controls.inventoryLoadPhase !== 'content' || (controls.inventoryItemCount === 0 && !controls.searchActive && !searchExpanded)) return null
   const actionsCollapsed = searchExpanded
@@ -1274,12 +1280,16 @@ export function EverShelfInventoryFloatingActions({ controls }: { controls: Ever
   return (
     <>
       <InventorySearchAction controls={controls} onExpandedChange={setSearchExpanded} />
-      <FloatingActionSlot collapsed={actionsCollapsed}>
-        <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
-      </FloatingActionSlot>
-      <FloatingActionSlot collapsed={actionsCollapsed}>
-        <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
-      </FloatingActionSlot>
+      {showSecondaryActions && (
+        <>
+          <FloatingActionSlot collapsed={actionsCollapsed}>
+            <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
+          </FloatingActionSlot>
+          <FloatingActionSlot collapsed={actionsCollapsed}>
+            <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? SORT_FILTER_ACTIVE_COLOR : SORT_FILTER_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
+          </FloatingActionSlot>
+        </>
+      )}
       <InventorySortSheet
         draftDirection={controls.sortDraftDirection}
         draftMode={controls.sortDraftMode}

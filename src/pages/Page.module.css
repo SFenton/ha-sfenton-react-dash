@@ -46,6 +46,16 @@
   will-change: opacity, transform;
 }
 
+:global([data-navigation-layout='duo']) .headerQuickLinks {
+  height: 0;
+  margin-top: 0;
+}
+
+:global([data-navigation-layout='duo']) .headerDock,
+:global([data-navigation-layout='duo']) .headerQuickLinks {
+  will-change: auto;
+}
+
 .scroller {
   flex: 1 1 auto;
   min-height: 0;
@@ -154,6 +164,11 @@
 .page[data-content-transition-state='entering'] .scroller {
   opacity: 1;
   transform: translate3d(0, 0, 0);
+}
+
+:global([data-navigation-layout='duo']) .page .headerDock {
+  transform: none;
+  transition-property: opacity;
 }
 
 @media (prefers-reduced-motion: reduce) {

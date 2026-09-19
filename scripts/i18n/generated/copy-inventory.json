@@ -77,6 +77,18 @@
       "words": 1
     },
     {
+      "characters": 6,
+      "context": "button-action",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "f3d195ce3c09c62b",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Filter",
+      "words": 1
+    },
+    {
       "characters": 7,
       "context": "button-action",
       "file": "src/i18n/locales/en.json",
@@ -187,6 +199,18 @@
       "words": 1
     },
     {
+      "characters": 9,
+      "context": "button-action",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "61d3fc5946230d08",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Scan Item",
+      "words": 2
+    },
+    {
       "characters": 6,
       "context": "button-action",
       "file": "src/i18n/locales/en.json",
@@ -220,6 +244,18 @@
       "origin": "catalog",
       "placeholders": [],
       "value": "Snapshot",
+      "words": 1
+    },
+    {
+      "characters": 4,
+      "context": "button-action",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "e772654937a3ae94",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Sort",
       "words": 1
     },
     {
@@ -8416,6 +8452,18 @@
       "words": 2
     },
     {
+      "characters": 17,
+      "context": "navigation",
+      "file": "src/i18n/locales/en/shell.json",
+      "id": "620af08ec2dbaed0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "More page actions",
+      "words": 3
+    },
+    {
       "characters": 10,
       "context": "navigation",
       "file": "src/i18n/locales/en/shell.json",
@@ -8486,6 +8534,30 @@
       "placeholders": [],
       "value": "Settings",
       "words": 1
+    },
+    {
+      "characters": 19,
+      "context": "navigation",
+      "file": "src/i18n/locales/en/shell.json",
+      "id": "4335e7e00af17ea9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Show all navigation",
+      "words": 3
+    },
+    {
+      "characters": 17,
+      "context": "navigation",
+      "file": "src/i18n/locales/en/shell.json",
+      "id": "bd1fd586fcdf5c23",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Show page actions",
+      "words": 3
     },
     {
       "characters": 11,
@@ -8562,6 +8634,21 @@
       ],
       "value": "{{status}}. Home Assistant does not have the vacuum's current status.",
       "words": 10
+    },
+    {
+      "characters": 20,
+      "context": "status-value",
+      "file": "src/i18n/locales/en/shell.json",
+      "id": "522ece1c07ec0703",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [
+        "state",
+        "title"
+      ],
+      "value": "{{title}}: {{state}}",
+      "words": 2
     },
     {
       "characters": 6,
@@ -8658,6 +8745,18 @@
       "placeholders": [],
       "value": "Clear",
       "words": 1
+    },
+    {
+      "characters": 17,
+      "context": "status-value",
+      "file": "src/i18n/locales/en/shell.json",
+      "id": "b5e085f9389beb88",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Close page status",
+      "words": 3
     },
     {
       "characters": 6,
@@ -9116,6 +9215,18 @@
       "words": 1
     },
     {
+      "characters": 16,
+      "context": "status-value",
+      "file": "src/i18n/locales/en/shell.json",
+      "id": "be0144e0c63eed83",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Open page status",
+      "words": 3
+    },
+    {
       "characters": 7,
       "context": "status-value",
       "file": "src/i18n/locales/en.json",
@@ -9126,6 +9237,18 @@
       "placeholders": [],
       "value": "Opening",
       "words": 1
+    },
+    {
+      "characters": 11,
+      "context": "status-value",
+      "file": "src/i18n/locales/en/shell.json",
+      "id": "3928a6c5085d631d",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Page Status",
+      "words": 2
     },
     {
       "characters": 6,
@@ -10937,7 +11060,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "36da0d10512b3b68",
       "lines": [
-        1528
+        1538
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11712,7 +11835,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "e63fa4e9611ee02a",
       "lines": [
-        1281
+        1289
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11726,7 +11849,7 @@
       "file": "src/components/hass/recipes/RecipeFloatingActions.tsx",
       "id": "d4c2adec75dd6970",
       "lines": [
-        189
+        197
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11982,7 +12105,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "3849ebb80beeb8a7",
       "lines": [
-        260
+        266
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11996,7 +12119,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "8a3086a5da9ca0a9",
       "lines": [
-        248
+        254
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12010,7 +12133,7 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "898c12cd5c68c182",
       "lines": [
-        273
+        279
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12347,7 +12470,7 @@
       "file": "src/components/shell/DashboardFloatingAction.tsx",
       "id": "63cf3fc37bc5e957",
       "lines": [
-        67
+        69
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12407,7 +12530,7 @@
       "file": "src/components/hass/recipes/RecipeFloatingActions.tsx",
       "id": "2fd6631ab4d189d2",
       "lines": [
-        179
+        185
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12421,7 +12544,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "ee910ab7fd6d7b3d",
       "lines": [
-        1560
+        1570
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12582,7 +12705,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "a93c750ec1917d73",
       "lines": [
-        1278
+        1286
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12596,7 +12719,7 @@
       "file": "src/components/hass/recipes/RecipeFloatingActions.tsx",
       "id": "7aac460e949ec59d",
       "lines": [
-        186
+        194
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14450,7 +14573,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "f913b0534a6f5926",
       "lines": [
-        1529
+        1539
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15523,7 +15646,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "c4a82ae1bc9beb21",
       "lines": [
-        1538
+        1548
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15537,9 +15660,9 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "bcfca18e55044265",
       "lines": [
-        1538,
-        1540,
-        1541
+        1548,
+        1550,
+        1551
       ],
       "occurrences": 3,
       "origin": "legacy",
@@ -16091,7 +16214,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "b6678f4df8f701ab",
       "lines": [
-        1538
+        1548
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16189,8 +16312,8 @@
       "file": "src/components/shell/AppHeader.tsx",
       "id": "74cc037a7ed08608",
       "lines": [
-        199,
-        218
+        201,
+        220
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -16699,7 +16822,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "1b984f8f36986081",
       "lines": [
-        1541
+        1551
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16968,7 +17091,7 @@
       "file": "src/components/shell/DashboardFloatingAction.tsx",
       "id": "85217a1345e5dcfd",
       "lines": [
-        38
+        40
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16982,8 +17105,8 @@
       "file": "src/components/shell/DashboardFloatingAction.tsx",
       "id": "6bf5ea98744e0212",
       "lines": [
-        27,
-        49
+        29,
+        51
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -17604,7 +17727,7 @@
       "file": "src/components/shell/DashboardFloatingAction.tsx",
       "id": "bd184a0838924975",
       "lines": [
-        68
+        70
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25148,7 +25271,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "d308725feeae65e1",
       "lines": [
-        1530
+        1540
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27009,7 +27132,7 @@
       "file": "src/components/hass/recipes/RecipeFloatingActions.tsx",
       "id": "420b5a5675caa3e4",
       "lines": [
-        182
+        188
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -35126,7 +35249,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "4dda2ec93f310bc2",
       "lines": [
-        1536
+        1546
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -37539,7 +37662,7 @@
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
       "id": "32eef58d73d713d4",
       "lines": [
-        1463
+        1473
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38665,7 +38788,7 @@
       "file": "src/components/hass/StatusRail.tsx",
       "id": "123b2f3b5a8b7253",
       "lines": [
-        40
+        56
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39490,11 +39613,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 793,
+    "catalogRecords": 803,
     "documentRecords": 1,
     "legacyOccurrences": 2478,
     "legacyRecords": 2048,
-    "totalRecords": 2842
+    "totalRecords": 2852
   },
   "version": 1
 }

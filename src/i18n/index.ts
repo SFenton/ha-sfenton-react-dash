@@ -6,6 +6,11 @@ export { useCopy } from './useCopy'
 export const COMMON_COPY_NAMESPACE = 'common' as const
 export const PAGE_FOOD_COPY_NAMESPACE = 'pageFood' as const
 export const PAGE_FOOD_COPY_KEYS = {
+  actions: {
+    filter: 'actions.filter',
+    scanItem: 'actions.scanItem',
+    sort: 'actions.sort',
+  },
   groceries: {
     emptyDescription: 'groceries.emptyDescription',
   },
@@ -14,6 +19,15 @@ export const PAGE_FOOD_COPY_KEYS = {
     itemWithQualifier: 'delete.itemWithQualifier',
     multipleDescription: 'delete.multipleDescription',
     quantityError: 'delete.quantityError',
+  },
+} as const
+export const SHELL_COPY_NAMESPACE = 'shell' as const
+export const SHELL_COPY_KEYS = {
+  navigation: {
+    expandDuo: 'navigation.expandDuo',
+    morePageActions: 'navigation.morePageActions',
+    pageActions: 'navigation.pageActions',
+    showPageActions: 'navigation.showPageActions',
   },
 } as const
 export const CHAT_COPY_NAMESPACE = 'modalChat' as const

@@ -168,7 +168,13 @@ function RecipeFilterSheet({ controls, onApplied }: { controls: RecipeControls; 
   )
 }
 
-export function RecipeFloatingActions({ controls }: { controls: RecipeControls }) {
+export function RecipeFloatingActions({
+  controls,
+  showSecondaryActions = true,
+}: {
+  controls: RecipeControls
+  showSecondaryActions?: boolean
+}) {
   const [searchExpanded, setSearchExpanded] = useState(false)
   const sortSlotRef = useRef<HTMLSpanElement>(null)
   const filterSlotRef = useRef<HTMLSpanElement>(null)
@@ -182,12 +188,16 @@ export function RecipeFloatingActions({ controls }: { controls: RecipeControls }
         placeholder="Search titles and ingredients..."
         query={controls.searchQuery}
       />
-      <FloatingActionSlot collapsed={searchExpanded} ref={sortSlotRef}>
-        <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? ACTIVE_ACTION_COLOR : ACTION_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
-      </FloatingActionSlot>
-      <FloatingActionSlot collapsed={searchExpanded} ref={filterSlotRef}>
-        <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? ACTIVE_ACTION_COLOR : ACTION_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
-      </FloatingActionSlot>
+      {showSecondaryActions && (
+        <>
+          <FloatingActionSlot collapsed={searchExpanded} ref={sortSlotRef}>
+            <FloatingActionButton ariaLabel="Sort" color={controls.sortActive ? ACTIVE_ACTION_COLOR : ACTION_COLOR} icon="mdi:swap-vertical" onClick={controls.openSortSheet} />
+          </FloatingActionSlot>
+          <FloatingActionSlot collapsed={searchExpanded} ref={filterSlotRef}>
+            <FloatingActionButton ariaLabel="Filter" color={controls.filterActive ? ACTIVE_ACTION_COLOR : ACTION_COLOR} icon="mdi:tune-vertical" onClick={controls.openFilterSheet} />
+          </FloatingActionSlot>
+        </>
+      )}
       <RecipeSortSheet controls={controls} onApplied={() => focusSlotButton(sortSlotRef.current)} />
       <RecipeFilterSheet controls={controls} onApplied={() => focusSlotButton(filterSlotRef.current)} />
     </>

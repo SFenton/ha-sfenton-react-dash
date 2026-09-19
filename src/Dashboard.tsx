@@ -52,6 +52,12 @@ function floatingActionForPath(path: string, inventoryControls: EverShelfInvento
   return hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} key={path} path={path} recipeControls={recipeControls} /> : undefined
 }
 
+function floatingActionReadyForPath(path: string, inventoryControls: EverShelfInventoryControls, recipeControls: RecipeControls) {
+  if (FOOD_SPACE_ROUTE_PATHS.has(path)) return inventoryControls.inventoryLoadPhase === 'content'
+  if (path === HOME_RECIPES_ROUTE_PATH) return Boolean(recipeControls)
+  return true
+}
+
 function routeUsesMenuChrome(path: string) {
   return PRIMARY_NAV_ROUTES.some((route) => route.path === path)
 }
@@ -165,7 +171,7 @@ function Dashboard() {
   if (modalAcceptanceHarness) return <ModalAcceptanceHarness />
 
   return (
-    <AppShell activePath={path} bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} floatingAction={floatingActionForPath(displayedPath, inventoryControls, recipeControls)} onNavigate={navigateToPath} pageMeasure={displayedPath === 'overview' ? 'dashboard' : pageMeasureForPath(displayedPath)}>
+    <AppShell activePath={path} bottomNav={<BottomNav activePath={path} onNavigate={navigateToPath} />} chromeHidden={Boolean(routeLoadingPhase)} displayedPath={displayedPath} floatingAction={floatingActionForPath(displayedPath, inventoryControls, recipeControls)} onNavigate={navigateToPath} pageMeasure={displayedPath === 'overview' ? 'dashboard' : pageMeasureForPath(displayedPath)} routeActionsReady={floatingActionReadyForPath(displayedPath, inventoryControls, recipeControls)} routeTransitionState={transitionState}>
       <SmoothRouteOutlet leadingChromeTransition={leadingChromeTransition} routePath={displayedPath} transitionState={transitionState}>
         <OptimisticActionStateBoundary entityIds={MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS} liveChangeEntityIds={MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS}>
           {pageForPath(displayedPath, path, navigateToPath, navigateBack, transitionState, inventoryControls, recipeControls, usesInitialDataAppGate, handleRecipesInitialResolved, waitsForInitialRecipes, pageLoadingPhase, pageInitialContentTransitionState)}

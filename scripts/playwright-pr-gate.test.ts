@@ -1,3 +1,4 @@
+// @covers playwright.config.ts
 // @covers .github/workflows/playwright.yml
 // @covers .github/copilot-instructions.md
 // @covers .github/PULL_REQUEST_TEMPLATE.md
@@ -269,5 +270,20 @@ describe('dashboard Playwright workflow policy', () => {
     const config = read('playwright.config.ts')
 
     expect(config).toContain('retries: process.env.CI ? 1 : 0')
+  })
+
+  it('keeps iPhone Duo preview coverage on phone-navigation only', () => {
+    const config = read('playwright.config.ts')
+    const project = (name: string) =>
+      config.match(new RegExp(`name: '${name}',[\\s\\S]*?(?=\\n    \\},)`))?.[0] ?? ''
+
+    expect(config).toContain('const duoPreviewTitle = /iPhone Duo preview/')
+    for (const name of ['passport-foldable', 'square-foldable', 'tablet', 'desktop']) {
+      expect(project(name)).toContain('grepInvert: duoPreviewTitle')
+    }
+    expect(project('phone-navigation')).toMatch(
+      /testMatch: adaptiveNavigationSpec,[\s\S]*?use:/,
+    )
+    expect(project('phone-navigation')).not.toContain('grepInvert: duoPreviewTitle')
   })
 })

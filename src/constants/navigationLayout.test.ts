@@ -39,10 +39,16 @@ describe('navigationLayoutForViewport', () => {
   )
 
   it('uses the same precedence for media-query matches', () => {
+    expect(navigationLayoutFromMatches({ duo: true, rail: true, shortLandscape: true, wide: true })).toBe('duo')
     expect(navigationLayoutFromMatches({ rail: true, shortLandscape: true, wide: true })).toBe('rail')
     expect(navigationLayoutFromMatches({ rail: false, shortLandscape: false, wide: true })).toBe('drawer-only')
     expect(navigationLayoutFromMatches({ rail: false, shortLandscape: true, wide: false })).toBe('drawer-only')
     expect(navigationLayoutFromMatches({ rail: false, shortLandscape: false, wide: false })).toBe('bottom')
+  })
+
+  it('lets a verified Duo profile override ordinary viewport breakpoints', () => {
+    expect(navigationLayoutForViewport({ height: 626, width: 890 }, true)).toBe('duo')
+    expect(navigationLayoutForViewport({ height: 678, width: 466 }, true)).toBe('duo')
   })
 
   it('exports the exact media queries used by the viewport store', () => {

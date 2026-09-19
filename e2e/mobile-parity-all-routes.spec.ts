@@ -26,6 +26,7 @@ type ElementSignature = {
 }
 
 type RouteParityResult = {
+  approvedBottomDockRegion?: PixelRegion
   differentPixels: number
   differentPixelRatio: number
   geometryMatches: boolean
@@ -62,6 +63,7 @@ const RUN = process.env.LAYOUT_RUN_DIR
   ? JSON.parse(fs.readFileSync(path.resolve(process.env.LAYOUT_RUN_DIR, 'run.json'), 'utf8')) as RunIdentity
   : null
 const APPROVED_RENDER_MIGRATION = RUN?.source.base === APPROVED_WEATHER_RENDER_MIGRATION_BASE
+const APPROVED_BOTTOM_DOCK_MIGRATION = RUN?.source.base === '3446335e0d9ddac79fa464c82f884f6378f866b3'
 const PHONE_PARITY_VIEWPORTS = [
   { height: 852, name: 'phone-portrait', width: 393 },
   { height: 393, name: 'phone-landscape', width: 852 },
@@ -408,6 +410,23 @@ function parityScreenshotMasks(page: Page, route: ResponsiveRoute) {
   return masks
 }
 
+function canonicalizePageSignature(signature: ElementSignature[]): ElementSignature[] {
+  const identityFor = (key: string) => key.match(/^(.*):\d+$/)?.[1] ?? key
+  const compare = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0
+  const sorted = [...signature].sort((left, right) => {
+    const identityDifference = compare(identityFor(left.key), identityFor(right.key))
+    if (identityDifference !== 0) return identityDifference
+    return compare(JSON.stringify({ ...left, key: '' }), JSON.stringify({ ...right, key: '' }))
+  })
+  const occurrences = new Map<string, number>()
+  return sorted.map((entry) => {
+    const identity = identityFor(entry.key)
+    const occurrence = occurrences.get(identity) ?? 0
+    occurrences.set(identity, occurrence + 1)
+    return { ...entry, key: entry.key.match(/:\d+$/) ? `${identity}:${occurrence}` : identity }
+  })
+}
+
 async function comparePngs(page: Page, baseline: Buffer, candidate: Buffer, ignoredRegions: PixelRegion[] = []) {
   return page.evaluate(async ({ baselineBase64, candidateBase64, ignoredRegions }) => {
     const load = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
@@ -496,6 +515,84 @@ async function approvedHeroRailRegion(baseline: Page, candidate: Page): Promise<
   const viewport = candidate.viewportSize()!
   expect(region.width * region.height / (viewport.width * viewport.height)).toBeLessThan(0.08)
   return region
+}
+
+async function approvedBottomDockRegion(
+  baseline: Page,
+  candidate: Page,
+  viewport: { height: number; width: number },
+): Promise<PixelRegion | undefined> {
+  if (!APPROVED_BOTTOM_DOCK_MIGRATION) return undefined
+  const candidateNavigation = candidate.locator('[data-adaptive-navigation="bottom"]:visible')
+  if (await candidateNavigation.count() === 0) return undefined
+
+  const baselineDock = baseline.locator('[data-floating-action-dock="true"]:visible')
+  const candidateDock = candidate.locator('[data-floating-action-dock="true"]:visible')
+  await expect(baselineDock).toHaveCount(1)
+  await expect(candidateDock).toHaveCount(1)
+  await expect(candidateNavigation).toHaveCount(1)
+
+  const [baselineDockBox, candidateDockBox, candidateNavigationBox] = await Promise.all([
+    baselineDock.boundingBox(),
+    candidateDock.boundingBox(),
+    candidateNavigation.boundingBox(),
+  ])
+  if (!baselineDockBox || !candidateDockBox || !candidateNavigationBox) {
+    throw new Error('Approved bottom-dock migration requires measurable geometry')
+  }
+
+  expect(Math.abs(candidateDockBox.x - candidateNavigationBox.x)).toBeLessThanOrEqual(1)
+  expect(Math.abs(candidateDockBox.x + candidateDockBox.width - candidateNavigationBox.x - candidateNavigationBox.width)).toBeLessThanOrEqual(1)
+  expect(Math.abs(candidateDockBox.y - baselineDockBox.y)).toBeLessThanOrEqual(1)
+  expect(Math.abs(candidateDockBox.height - baselineDockBox.height)).toBeLessThanOrEqual(1)
+  if (viewport.width < 560) {
+    expect(Math.abs(candidateDockBox.x - 14)).toBeLessThanOrEqual(1)
+    expect(Math.abs(candidateDockBox.x + candidateDockBox.width - viewport.width + 14)).toBeLessThanOrEqual(1)
+  } else {
+    expect(Math.abs(candidateDockBox.width - 560)).toBeLessThanOrEqual(1)
+  }
+
+  const containment = await candidateDock.evaluate((element, navigationBounds) => {
+    const buttons = Array.from(element.querySelectorAll<HTMLButtonElement>('button')).filter((button) => {
+      const rect = button.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    })
+    const quickLinks = element.querySelector<HTMLButtonElement>(
+      'button[aria-label="Quick Links"], button[aria-label="Open Chat and Quick Links"]',
+    )
+    const quickLinksRect = quickLinks?.getBoundingClientRect()
+    return {
+      allButtonsContained: buttons.every((button) => {
+        const rect = button.getBoundingClientRect()
+        return rect.left >= navigationBounds.left - 1 && rect.right <= navigationBounds.right + 1
+      }),
+      lastVisibleIsQuickLinks: buttons.at(-1) === quickLinks,
+      noOverflow: element.scrollWidth <= element.clientWidth + 1,
+      quickLinksRight: quickLinksRect?.right,
+    }
+  }, {
+    left: candidateNavigationBox.x,
+    right: candidateNavigationBox.x + candidateNavigationBox.width,
+  })
+  expect(containment).toEqual({
+    allButtonsContained: true,
+    lastVisibleIsQuickLinks: true,
+    noOverflow: true,
+    quickLinksRight: candidateDockBox.x + candidateDockBox.width,
+  })
+
+  const padding = 8
+  const left = Math.max(0, Math.floor(Math.min(baselineDockBox.x, candidateDockBox.x) - padding))
+  const top = Math.max(0, Math.floor(Math.min(baselineDockBox.y, candidateDockBox.y) - padding))
+  const right = Math.min(viewport.width, Math.ceil(Math.max(
+    baselineDockBox.x + baselineDockBox.width,
+    candidateDockBox.x + candidateDockBox.width,
+  ) + padding))
+  const bottom = Math.min(viewport.height, Math.ceil(Math.max(
+    baselineDockBox.y + baselineDockBox.height,
+    candidateDockBox.y + candidateDockBox.height,
+  ) + padding))
+  return { x: left, y: top, width: right - left, height: bottom - top }
 }
 
 for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
@@ -595,6 +692,16 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
               facts,
             }
           }
+          const bottomDockRegion = await approvedBottomDockRegion(baseline.page, candidate.page, parityViewport)
+          if (bottomDockRegion) {
+            const unchangedPageSignature = (entry: ElementSignature) =>
+              entry.key !== 'root:floating-dock'
+              && entry.key !== 'BUTTON::global-quick-links-action:0'
+            baselineSignature = baselineSignature.filter(unchangedPageSignature)
+            candidateSignature = candidateSignature.filter(unchangedPageSignature)
+          }
+          baselineSignature = canonicalizePageSignature(baselineSignature)
+          candidateSignature = canonicalizePageSignature(candidateSignature)
           const geometryMatches = JSON.stringify(candidateSignature) === JSON.stringify(baselineSignature)
           const geometryDifferences = Array.from(
             { length: Math.max(baselineSignature.length, candidateSignature.length) },
@@ -615,9 +722,15 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           }
           const rawDifference = await comparePngs(comparisonPage, rawBaselineScreenshot, candidateScreenshot)
           const railRegion = route === 'overview' ? await approvedHeroRailRegion(baseline.page, candidate.page) : undefined
-          const difference = await comparePngs(comparisonPage, baselineScreenshot, candidateScreenshot, railRegion ? [railRegion] : [])
+          const difference = await comparePngs(
+            comparisonPage,
+            baselineScreenshot,
+            candidateScreenshot,
+            [railRegion, bottomDockRegion].filter((region): region is PixelRegion => region !== undefined),
+          )
           results.push({
             route,
+            approvedBottomDockRegion: bottomDockRegion,
             differentPixelRatio: difference.differentPixels / (parityViewport.width * parityViewport.height),
             geometryMatches,
             geometryDifferences,
@@ -646,7 +759,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           baselineURL: BASELINE_URL,
           candidateURL: CANDIDATE_URL,
           generatedAt: new Date().toISOString(),
-          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. On routes changed by the DynamicGrid migration, each baseline/candidate grid is normalized to the same one-column geometry and only those exact grid rectangles are masked; the rest of each route remains in geometry, perceptual, and maximum-channel comparison. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. A registry-declared added section is hidden only after its exact geometry/semantics and every inherited section are asserted; its visible layout is captured separately. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
+          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. On routes changed by the DynamicGrid migration, each baseline/candidate grid is normalized to the same one-column geometry and only those exact grid rectangles are masked; the rest of each route remains in geometry, perceptual, and maximum-channel comparison. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. Only for the attested 3446335 bottom-dock migration, the dock and global Quick Links signatures and their bounded pixels are excluded after the candidate dock is proven to exactly match the bottom navigation, contain every visible action without overflow, retain vertical geometry, and preserve Quick Links as the rightmost action. A registry-declared added section is hidden only after its exact geometry/semantics and every inherited section are asserted; its visible layout is captured separately. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
           baselineFilterRepairs: baseline.filterRepairs,
           routeCount: SELECTED_ROUTES.length,
           intentionalDynamicGridRoutes: [...INTENTIONAL_DYNAMIC_GRID_ROUTES],

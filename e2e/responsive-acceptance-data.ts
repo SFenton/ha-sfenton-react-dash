@@ -20,6 +20,8 @@ export const VIEWPORTS = {
   'passport-foldable-landscape': { height: 741, name: 'passport-foldable-landscape', width: 1152 },
   'square-foldable-landscape': { height: 836, name: 'square-foldable-landscape', width: 842 },
   'passport-foldable-portrait': { height: 1152, name: 'passport-foldable-portrait', width: 741 },
+  'iphone-duo-outer': { height: 678, name: 'iphone-duo-outer', width: 466 },
+  'iphone-duo-inner': { height: 626, name: 'iphone-duo-inner', width: 890 },
 } as const
 
 export const CANONICAL_VIEWPORT_NAMES = [

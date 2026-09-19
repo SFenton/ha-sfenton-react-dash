@@ -2,6 +2,14 @@
   flex: 0 0 auto;
 }
 
+:global([data-navigation-layout='duo']) .globalAction {
+  box-shadow: none;
+}
+
+:global([data-navigation-layout='duo']) .globalAction:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-text-muted);
+}
+
 :global(html[data-dashboard-search-expanded='true']) .globalAction {
   display: none;
 }

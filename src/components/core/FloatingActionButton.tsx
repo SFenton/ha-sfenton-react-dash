@@ -28,9 +28,10 @@ export function FloatingActionButton({ ariaExpanded, ariaHasPopup, ariaLabel, cl
     <button
       aria-expanded={ariaExpanded}
       aria-haspopup={ariaHasPopup}
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? label}
       className={resolvedClassName}
       data-action-kind={semantics?.kind}
+      data-floating-action-button="true"
       data-modal-opener-exception={semantics?.kind === 'modal' ? 'floating-action' : undefined}
       onClick={onClick}
       style={style}
@@ -38,7 +39,7 @@ export function FloatingActionButton({ ariaExpanded, ariaHasPopup, ariaLabel, cl
       type="button"
     >
       <MaterialIcon name={icon} size={32} />
-      {label && <span className={styles.label}>{label}</span>}
+      {label && <span className={styles.label} data-floating-action-label="true">{label}</span>}
     </button>
   )
 }

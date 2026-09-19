@@ -10,6 +10,7 @@
   --floating-action-content-gap: 20px;
   --page-scroll-bottom-inset: calc(var(--bottom-nav-height) - 12px + var(--rd-bottom-nav-offset));
   --page-bottom-extra-padding: 22px;
+  --duo-control-lane-width: calc(72px + var(--rd-safe-right));
 }
 
 .hasFloatingAction {
@@ -84,7 +85,30 @@
   pointer-events: auto;
 }
 
-:global(html[data-dashboard-search-expanded='true']) .floatingAction > button[aria-label='Scan Item'] {
+.shell[data-navigation-layout='bottom'] .floatingAction {
+  left: max(14px, var(--rd-safe-left));
+  right: max(14px, var(--rd-safe-right));
+}
+
+.duoLane {
+  display: contents;
+}
+
+.duoStatusSlot {
+  display: none;
+}
+
+.duoAuxiliaryActions,
+.duoRouteActions,
+.duoQuickLinksSlot {
+  display: contents;
+}
+
+.duoActionsToggle {
+  display: none;
+}
+
+:global(html[data-dashboard-search-expanded='true']) .floatingAction button[aria-label='Scan Item'] {
   width: 0;
   min-width: 0;
   overflow: hidden;
@@ -100,12 +124,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .floatingAction {
+  .floatingAction,
+  .duoAuxiliaryActions,
+  .duoActionsToggle {
     animation-duration: 1ms;
+    transition: none;
   }
 }
 
 .shell[data-navigation-layout='rail'],
+.shell[data-navigation-layout='duo'],
 .shell[data-navigation-layout='drawer-only'] {
   --page-scroll-bottom-inset: 0px;
 }
@@ -124,8 +152,246 @@
   bottom: max(20px, var(--rd-safe-bottom));
 }
 
+.shell[data-navigation-layout='duo'] .content {
+  width: calc(100% - var(--duo-control-lane-width));
+}
+
+.shell[data-navigation-layout='duo'] .duoLane {
+  position: fixed;
+  top: max(14px, var(--rd-safe-top));
+  right: max(8px, var(--rd-safe-right));
+  bottom: auto;
+  z-index: 35;
+  display: block;
+  width: 56px;
+  height: max(
+    0px,
+    calc(
+      var(--dashboard-viewport-height, 100dvh)
+      - max(14px, var(--rd-safe-top))
+      - max(10px, var(--rd-safe-bottom))
+    )
+  );
+  pointer-events: none;
+  transition: height var(--duration-med) cubic-bezier(.2, .9, .2, 1);
+  will-change: height;
+  --duo-navigation-compact-height: 238px;
+  --duo-navigation-current-height: var(--duo-navigation-compact-height);
+  --duo-action-gap: 12px;
+}
+
+.shell[data-navigation-layout='duo'] .duoLane[data-duo-action-gap='tight'][data-duo-navigation-routes='1'] {
+  --duo-action-gap: 0px;
+}
+
+.shell[data-navigation-layout='duo'] .duoLane[data-duo-navigation-routes='3'] {
+  --duo-navigation-current-height: 192px;
+}
+
+.shell[data-navigation-layout='duo'] .duoLane[data-duo-navigation-routes='2'] {
+  --duo-navigation-current-height: 146px;
+}
+
+.shell[data-navigation-layout='duo'] .duoLane[data-duo-navigation-routes='1'] {
+  --duo-navigation-current-height: 100px;
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction {
+  --floating-action-size: 48px;
+  position: absolute;
+  top: auto;
+  right: 0;
+  bottom: calc(var(--duo-navigation-current-height) + var(--duo-action-gap, 12px));
+  left: auto;
+  width: 56px;
+  max-width: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+  transition:
+    bottom var(--duration-med) cubic-bezier(.2, .9, .2, 1),
+    transform 150ms ease;
+}
+
+.shell[data-navigation-layout='duo'] .duoAuxiliaryActions {
+  display: flex;
+  width: 56px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--floating-action-gap);
+}
+
+.shell[data-navigation-layout='duo'] .duoRouteActions {
+  display: flex;
+  width: 56px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--floating-action-gap);
+  opacity: 1;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.shell[data-navigation-layout='duo'] .duoRouteActions[data-duo-route-action-phase='exiting'] {
+  opacity: 0;
+  pointer-events: none;
+  transition-duration: 100ms;
+}
+
+.shell[data-navigation-layout='duo'] .duoRouteActions[data-duo-route-action-phase='resizing'] {
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+}
+
+.shell[data-navigation-layout='duo'] .duoRouteActions[data-duo-route-action-phase='entering'] {
+  opacity: 1;
+  pointer-events: none;
+}
+
+.shell[data-navigation-layout='duo'] .duoQuickLinksSlot {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+}
+
+.shell[data-navigation-layout='duo'] .duoRouteActions > *,
+.shell[data-navigation-layout='duo'] .duoQuickLinksSlot {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center;
+  transition:
+    opacity var(--duration-fast) ease,
+    transform var(--duration-med) cubic-bezier(.2, .9, .2, 1);
+}
+
+.shell[data-navigation-layout='duo'] .duoActionsToggle {
+  position: absolute;
+  right: 4px;
+  bottom: 0;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+  color: var(--color-text);
+  background: var(--color-glass-strong);
+  box-shadow: var(--shadow-soft);
+  font: inherit;
+  pointer-events: none;
+  transform: scale(0.76);
+  transition:
+    opacity var(--duration-fast) ease,
+    transform var(--duration-med) cubic-bezier(.2, .9, .2, 1);
+}
+
+.shell[data-navigation-layout='duo'] .duoActionsToggle:focus {
+  outline: none;
+}
+
+.shell[data-navigation-layout='duo'] .duoActionsToggle:focus-visible {
+  outline: 2px solid var(--color-text-muted);
+  outline-offset: 2px;
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction[data-duo-actions-compressed='true'] .duoAuxiliaryActions {
+  pointer-events: none;
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction[data-duo-actions-compressed='true'] .duoRouteActions > *,
+.shell[data-navigation-layout='duo'] .floatingAction[data-duo-actions-compressed='true'] .duoQuickLinksSlot {
+  opacity: 0;
+  transform: translate3d(0, var(--duo-collapse-y, 0), 0) scale(0.76);
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction[data-duo-actions-compressed='true'] .duoActionsToggle {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.shell[data-navigation-layout='duo'] .duoStatusSlot {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+}
+
+.shell[data-navigation-layout='duo'] .duoStatusSlot:empty {
+  display: none;
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction [data-floating-action-button='true'] {
+  width: var(--floating-action-size);
+  min-width: var(--floating-action-size);
+  padding: 0;
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction [data-floating-action-label='true'] {
+  display: none;
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction [data-expanded='false'] {
+  width: var(--floating-action-size);
+  flex: 0 0 var(--floating-action-size);
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction [data-expanded='false'] > button {
+  justify-content: center;
+  padding: 0;
+}
+
+.shell[data-navigation-layout='duo'] .floatingAction [data-expanded='false'] > button > span {
+  display: none;
+}
+
+:global(html[data-dashboard-search-expanded='true']) .shell[data-navigation-layout='duo'] .floatingAction {
+  --floating-action-bottom: max(12px, var(--rd-safe-bottom));
+  position: fixed;
+  right: calc(var(--duo-control-lane-width) + 12px);
+  top: auto;
+  bottom: var(--floating-action-bottom);
+  left: max(16px, var(--rd-safe-left));
+  width: auto;
+  align-items: stretch;
+}
+
+:global(html[data-dashboard-search-expanded='true']) .shell[data-navigation-layout='duo'] .duoRouteActions > :not([data-expanded='true']),
+:global(html[data-dashboard-search-expanded='true']) .shell[data-navigation-layout='duo'] .duoQuickLinksSlot {
+  display: none;
+}
+
+:global(html[data-dashboard-search-expanded='true']) .shell[data-navigation-layout='duo'] .duoAuxiliaryActions {
+  width: 100%;
+  align-items: stretch;
+}
+
+:global(html[data-dashboard-search-expanded='true']) .shell[data-navigation-layout='duo'] .duoRouteActions {
+  width: 100%;
+  align-items: stretch;
+}
+
+:global(html[data-dashboard-search-expanded='true']) .shell[data-navigation-layout='duo'] .duoActionsToggle {
+  display: none;
+}
+
+:global(html[data-dashboard-search-expanded='true']) .shell[data-navigation-layout='duo'] .floatingAction [data-expanded='true'] {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
 @media (min-width: 560px) {
-  .shell[data-navigation-layout='bottom'] .floatingAction,
+  .shell[data-navigation-layout='bottom'] .floatingAction {
+    left: max(14px, var(--rd-safe-left), calc((100vw - 560px) / 2));
+    right: max(14px, var(--rd-safe-right), calc((100vw - 560px) / 2));
+  }
+
   .shell[data-navigation-layout='drawer-only'] .floatingAction {
     left: auto;
     width: min(
@@ -137,4 +403,15 @@
 
 .shell[data-navigation-layout='drawer-only'] .floatingAction {
   bottom: max(12px, var(--rd-safe-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell[data-navigation-layout='duo'] .duoLane,
+  .shell[data-navigation-layout='duo'] .floatingAction,
+  .shell[data-navigation-layout='duo'] .duoRouteActions,
+  .shell[data-navigation-layout='duo'] .duoRouteActions > *,
+  .shell[data-navigation-layout='duo'] .duoQuickLinksSlot,
+  .shell[data-navigation-layout='duo'] .duoActionsToggle {
+    transition: none;
+  }
 }

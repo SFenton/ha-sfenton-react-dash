@@ -443,7 +443,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   navigation: {
     family: 'page-shell-grid', states: ['home', 'back-page'],
-    owners: ['src/pages/Page.', 'src/pages/ControlShowcasePage', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/navigationLayout'],
+    owners: ['src/pages/Page.', 'src/pages/ControlShowcasePage', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/components/shell/AppShell', 'src/components/shell/DashboardFloatingAction', 'src/components/shell/DuoControlLaneContext', 'src/components/shell/DuoPageActionHub', 'src/constants/duoLayout', 'src/constants/navigationLayout'],
     legacy: ['adaptive-navigation.spec.ts', 'responsive-pages-all.spec.ts', 'desktop-responsive.spec.ts', 'safe-area-responsive.spec.ts'],
     question: 'Do content, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey?',
   },

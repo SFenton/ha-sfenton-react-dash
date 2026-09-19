@@ -1125,38 +1125,50 @@ test('global Quick Links opens from a non-Home route and preserves one-sheet det
 })
 
 test('global Quick Links stays rightmost without overflowing representative mobile FAB rows', async ({ page }) => {
-  await page.setViewportSize({ width: 393, height: 852 })
+  for (const viewport of [{ width: 393, height: 852 }, { width: 626, height: 890 }]) {
+    await page.setViewportSize(viewport)
 
-  for (const route of ['overview', 'security', 'settings', 'chores', 'kitchen', 'fridge', 'recipes']) {
-    await page.goto(`/at-a-glance/${route}`)
-    await waitForRoute(page, route)
-    const trigger = globalQuickLinksAction(page)
-    const dock = page.locator('[data-floating-action-dock="true"]')
-    const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
-    await expect(trigger).toBeVisible()
+    for (const route of ['overview', 'security', 'settings', 'chores', 'kitchen', 'fridge', 'recipes']) {
+      await page.goto(`/at-a-glance/${route}`)
+      await waitForRoute(page, route)
+      const trigger = globalQuickLinksAction(page)
+      const dock = page.locator('[data-floating-action-dock="true"]')
+      const nav = page.getByRole('navigation', { name: 'Dashboard sections' })
+      await expect(trigger).toBeVisible()
 
-    const geometry = await dock.evaluate((element) => {
-      const dockRect = element.getBoundingClientRect()
-      const quickLinks = element.querySelector<HTMLButtonElement>('button[aria-label="Quick Links"], button[aria-label="Open Chat and Quick Links"]')
-      const quickLinksRect = quickLinks?.getBoundingClientRect()
-      const visibleChildren = Array.from(element.children).filter((child) => {
-        const rect = child.getBoundingClientRect()
-        return rect.width > 0 && rect.height > 0
+      const geometry = await dock.evaluate((element) => {
+        const dockRect = element.getBoundingClientRect()
+        const quickLinks = element.querySelector<HTMLButtonElement>('button[aria-label="Quick Links"], button[aria-label="Open Chat and Quick Links"]')
+        const quickLinksRect = quickLinks?.getBoundingClientRect()
+        const visibleButtons = Array.from(element.querySelectorAll('button')).filter((button) => {
+          const rect = button.getBoundingClientRect()
+          return rect.width > 0 && rect.height > 0
+        })
+        return {
+          buttonBounds: visibleButtons.map((button) => {
+            const rect = button.getBoundingClientRect()
+            return { left: Math.round(rect.left), right: Math.round(rect.right) }
+          }),
+          lastVisibleIsQuickLinks: visibleButtons.at(-1) === quickLinks,
+          overflows: element.scrollWidth > element.clientWidth + 1,
+          quickLinksRight: Math.round(quickLinksRect?.right ?? 0),
+          dockLeft: Math.round(dockRect.left),
+          dockRight: Math.round(dockRect.right),
+        }
       })
-      return {
-        lastVisibleIsQuickLinks: visibleChildren.at(-1) === quickLinks,
-        overflows: element.scrollWidth > element.clientWidth + 1,
-        quickLinksRight: Math.round(quickLinksRect?.right ?? 0),
-        dockRight: Math.round(dockRect.right),
-      }
-    })
-    const triggerBox = await trigger.boundingBox()
-    const navBox = await nav.boundingBox()
+      const triggerBox = await trigger.boundingBox()
+      const navBox = await nav.boundingBox()
+      const navLeft = Math.round(navBox?.x ?? 0)
+      const navRight = Math.round((navBox?.x ?? 0) + (navBox?.width ?? 0))
 
-    expect(geometry.lastVisibleIsQuickLinks).toBe(true)
-    expect(geometry.overflows).toBe(false)
-    expect(geometry.quickLinksRight).toBe(geometry.dockRight)
-    expect((triggerBox?.y ?? Number.POSITIVE_INFINITY) + (triggerBox?.height ?? 0)).toBeLessThanOrEqual(navBox?.y ?? Number.NEGATIVE_INFINITY)
+      expect(geometry.lastVisibleIsQuickLinks).toBe(true)
+      expect(geometry.overflows).toBe(false)
+      expect(geometry.quickLinksRight).toBe(geometry.dockRight)
+      expect(geometry.dockLeft).toBe(navLeft)
+      expect(geometry.dockRight).toBe(navRight)
+      expect(geometry.buttonBounds.every(({ left, right }) => left >= navLeft && right <= navRight)).toBe(true)
+      expect((triggerBox?.y ?? Number.POSITIVE_INFINITY) + (triggerBox?.height ?? 0)).toBeLessThanOrEqual(navBox?.y ?? Number.NEGATIVE_INFINITY)
+    }
   }
 })
 

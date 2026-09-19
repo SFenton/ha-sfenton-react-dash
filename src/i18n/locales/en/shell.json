@@ -4,6 +4,7 @@
   },
   "navigation": {
     "dashboardSections": "Dashboard sections",
+    "expandDuo": "Show all navigation",
     "heading": "Navigation",
     "items": {
       "chores": "Chores",
@@ -14,8 +15,10 @@
     },
     "menu": "Navigation menu",
     "moreActions": "More actions",
+    "morePageActions": "More page actions",
     "openMenu": "Open navigation menu",
-    "pageActions": "Page actions"
+    "pageActions": "Page actions",
+    "showPageActions": "Show page actions"
   },
   "profile": {
     "open": "Open {{title}}",
@@ -25,6 +28,12 @@
   "quickLinks": {
     "rooms": "Rooms",
     "title": "Quick Links"
+  },
+  "status": {
+    "close": "Close page status",
+    "open": "Open page status",
+    "preview": "{{title}}: {{state}}",
+    "title": "Page Status"
   },
   "tabs": {
     "overdue": "{{label}}, {{count}} overdue"

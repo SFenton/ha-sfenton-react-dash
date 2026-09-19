@@ -38,7 +38,7 @@
   padding: 0;
   margin-left: -6px;
   color: var(--color-text);
-  background: transparent;
+  background: var(--rd-transparent);
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -88,6 +88,11 @@
   white-space: nowrap;
 }
 
+.duoBackTitle {
+  display: none;
+  min-width: 0;
+}
+
 .leading,
 .trailing {
   display: grid;
@@ -97,6 +102,7 @@
 
 .trailing {
   display: flex;
+  height: 48px;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
@@ -322,6 +328,20 @@
   animation-timing-function: cubic-bezier(.4, 0, .2, 1);
 }
 
+.sidebar[data-side='right'] {
+  margin-left: auto;
+  border-right: 0;
+  border-left: 1px solid var(--color-line);
+  padding-right: max(14px, var(--rd-safe-right));
+  padding-left: 14px;
+  box-shadow: var(--shadow-duo-drawer-left);
+  animation-name: sidebarInFromRight;
+}
+
+.sidebar[data-side='right'][data-state='closed'] {
+  animation-name: sidebarOutToRight;
+}
+
 .sidebarHeader {
   display: flex;
   min-height: 44px;
@@ -458,5 +478,157 @@
 
   to {
     transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes sidebarInFromRight {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes sidebarOutToRight {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+
+:global([data-navigation-layout='duo']) .header,
+:global([data-navigation-layout='duo']) .headerWithMenu,
+:global([data-navigation-layout='duo']) .headerWithBack {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+:global([data-navigation-layout='duo']) .headerWithMenu .titleWrap {
+  margin-left: 0;
+}
+
+:global([data-navigation-layout='duo']) .leading,
+:global([data-navigation-layout='duo']) .backButton {
+  position: fixed;
+  top: max(20px, var(--rd-safe-top));
+  right: max(12px, var(--rd-safe-right));
+  z-index: 46;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+}
+
+:global([data-navigation-layout='duo']) .backButton {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: top var(--duration-med) cubic-bezier(.2, .9, .2, 1);
+  will-change: top;
+}
+
+:global([data-navigation-layout='duo']) .backButton::before,
+:global([data-navigation-layout='duo']) .menuButton::before {
+  display: none;
+}
+
+:global([data-navigation-layout='duo']) .backTitle {
+  display: none;
+}
+
+:global([data-navigation-layout='duo']) .duoBackTitle {
+  display: block;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  :global([data-navigation-layout='duo']) .backButton {
+    top: max(8px, var(--rd-safe-top));
+  }
+}
+
+:global([data-navigation-layout='duo']) .profileButton {
+  position: fixed;
+  right: calc(max(8px, var(--rd-safe-right)) + 4px);
+  z-index: 46;
+  width: 48px;
+  height: 48px;
+  flex-basis: 48px;
+  --duo-profile-top-root: max(14px, var(--rd-safe-top));
+  --duo-profile-top-back: calc(max(20px, var(--rd-safe-top)) + 51px);
+  transition: top 170ms ease-out;
+  will-change: top;
+}
+
+:global([data-navigation-layout='duo']) .profileBadge {
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 0.78rem;
+}
+
+:global([data-navigation-layout='duo']) .header:not(.headerWithBack) .profileButton {
+  top: var(--duo-profile-top-root);
+}
+
+:global([data-navigation-layout='duo']) .headerWithBack .profileButton {
+  top: var(--duo-profile-top-back);
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  :global([data-navigation-layout='duo']) .profileButton {
+    --duo-profile-top-back: calc(max(8px, var(--rd-safe-top)) + 51px);
+  }
+}
+
+/* Move the outgoing profile before the route-owned AppHeader is replaced. */
+:global([data-navigation-layout='duo'] [data-route-leading-chrome-transition='changing'][data-route-transition-state='exiting']) .header:not(.headerWithBack) .profileButton {
+  animation: duoProfileRootToBack 130ms ease both;
+}
+
+:global([data-navigation-layout='duo'] [data-route-leading-chrome-transition='changing'][data-route-transition-state='exiting']) .headerWithBack .profileButton {
+  animation: duoProfileBackToRoot 130ms ease both;
+}
+
+@keyframes duoProfileRootToBack {
+  from {
+    top: var(--duo-profile-top-root);
+  }
+
+  to {
+    top: var(--duo-profile-top-back);
+  }
+}
+
+@keyframes duoProfileBackToRoot {
+  from {
+    top: var(--duo-profile-top-back);
+  }
+
+  to {
+    top: var(--duo-profile-top-root);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global([data-navigation-layout='duo']) .backButton,
+  :global([data-navigation-layout='duo']) .profileButton {
+    transition: none;
+  }
+
+  :global([data-navigation-layout='duo'] [data-route-leading-chrome-transition='changing'][data-route-transition-state='exiting']) .header:not(.headerWithBack) .profileButton,
+  :global([data-navigation-layout='duo'] [data-route-leading-chrome-transition='changing'][data-route-transition-state='exiting']) .headerWithBack .profileButton {
+    animation: none;
   }
 }

@@ -9,6 +9,7 @@ const serverUrl = `http://127.0.0.1:${serverPort}`
 const webkitExecutablePath = process.env.PLAYWRIGHT_WEBKIT_EXECUTABLE
 const enableWebkit = process.env.PLAYWRIGHT_WEBKIT === '1' || Boolean(webkitExecutablePath)
 const adaptiveNavigationSpec = /adaptive-navigation\.spec\.ts/
+const duoPreviewTitle = /iPhone Duo preview/
 const managedRun = process.env.LAYOUT_RUN_DIR
 const mobileTestIgnore = managedRun
   ? /(?:^|[/\\])(?:(?:adaptive-navigation|battery-title-desktop-responsive|desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts$|emulator[/\\])/
@@ -52,6 +53,7 @@ export default defineConfig({
     {
       name: 'passport-foldable',
       testMatch: adaptiveNavigationSpec,
+      grepInvert: duoPreviewTitle,
       use: {
         ...devices['Pixel 5'],
         browserName: 'chromium',
@@ -65,6 +67,7 @@ export default defineConfig({
     {
       name: 'square-foldable',
       testMatch: adaptiveNavigationSpec,
+      grepInvert: duoPreviewTitle,
       use: {
         ...devices['Pixel 5'],
         browserName: 'chromium',
@@ -78,6 +81,7 @@ export default defineConfig({
     {
       name: 'tablet',
       testMatch: adaptiveNavigationSpec,
+      grepInvert: duoPreviewTitle,
       use: {
         ...devices['iPad Pro 11 landscape'],
         browserName: 'chromium',
@@ -86,6 +90,7 @@ export default defineConfig({
     {
       name: 'desktop',
       testMatch: desktopTestMatch,
+      grepInvert: duoPreviewTitle,
       use: {
         ...devices['Desktop Chrome'],
         browserName: 'chromium',

@@ -66,8 +66,9 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
     : shellCopy('profile.open', { title: profileTitle })
   const resolvedBackLabel = backLabel ?? commonCopy('actions.goBack')
   const showBack = Boolean(backPath)
-  const showMenu = Boolean(!showBack && onNavigate && navigationLayout !== 'rail')
+  const showMenu = Boolean(!showBack && onNavigate && navigationLayout !== 'rail' && navigationLayout !== 'duo')
   const showActions = actions.length > 0
+  const duo = navigationLayout === 'duo'
   const menuOpen = sidebarState === 'open'
   const sidebarMounted = sidebarState !== 'closed'
   const sidebarDataState = sidebarState === 'closing' ? 'closed' : 'open'
@@ -186,11 +187,12 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
   const sidebar = sidebarMounted && navigationLayout !== 'rail' ? (
     <div
       className={styles.sidebarScrim}
+      data-side={navigationLayout === 'duo' ? 'right' : 'left'}
       data-state={sidebarDataState}
       onAnimationEnd={finishSidebarClose}
       onClick={() => closeMenus(true)}
     >
-      <aside aria-label={shellCopy(SHELL_NAVIGATION_MENU_COPY_KEY)} className={styles.sidebar} data-adaptive-navigation="drawer" data-state={sidebarDataState} id="dashboard-navigation-drawer" onClick={(event) => event.stopPropagation()} ref={sidebarRef}>
+      <aside aria-label={shellCopy(SHELL_NAVIGATION_MENU_COPY_KEY)} className={styles.sidebar} data-adaptive-navigation="drawer" data-side={navigationLayout === 'duo' ? 'right' : 'left'} data-state={sidebarDataState} id="dashboard-navigation-drawer" onClick={(event) => event.stopPropagation()} ref={sidebarRef}>
         <div className={styles.sidebarHeader}>
           <span>{shellCopy(SHELL_NAVIGATION_HEADING_COPY_KEY)}</span>
         </div>
@@ -239,7 +241,11 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
             <span className={styles.backIconSlot}><BackChevron /></span>
             <span className={styles.backTitle}>{title}</span>
           </button>
-          {typeof title === 'string' && <h1 className={styles.visuallyHidden}>{title}</h1>}
+          {duo ? (
+            <div className={styles.duoBackTitle}>{typeof title === 'string' ? <h1 className={styles.title}>{title}</h1> : title}</div>
+          ) : (
+            typeof title === 'string' && <h1 className={styles.visuallyHidden}>{title}</h1>
+          )}
         </>
       ) : (
         <>
@@ -261,8 +267,8 @@ export function AppHeader({ activePath, actions = [], backLabel, backPath, onBac
             <MaterialIcon name="mdi:dots-horizontal" size={28} />
           </button>
         )}
-        <button aria-label={profileLabel} className={styles.profileButton} onClick={openProfile} type="button">
-          <MaterialIcon name="mdi:account" size={22} />
+        <button aria-label={profileLabel} className={styles.profileButton} data-app-header-profile="true" onClick={openProfile} type="button">
+          <MaterialIcon name="mdi:account" size={duo ? 32 : 22} />
           <CountBadge className={styles.profileBadge} count={badgeCount} />
         </button>
       </div>

@@ -1,0 +1,36 @@
+.triggerVisual {
+  align-items: center;
+  background:
+    linear-gradient(180deg, var(--rd-duo-action-highlight), var(--rd-duo-action-highlight-soft)),
+    var(--rd-duo-action-surface);
+  border: 1px solid var(--rd-duo-action-border);
+  border-radius: 50%;
+  box-shadow:
+    0 12px 30px var(--rd-duo-action-shadow),
+    inset 0 1px 0 var(--rd-duo-action-highlight);
+  color: var(--color-text);
+  display: inline-flex;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.actionTile {
+  min-width: 0;
+  width: 100%;
+}
+
+.actionTile > * {
+  height: 68px;
+  width: 100%;
+}
+
+.actionTile[data-active='true'] {
+  filter: saturate(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .triggerVisual {
+    transition: none;
+  }
+}
