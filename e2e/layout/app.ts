@@ -5,12 +5,108 @@ import type { ScenarioId } from './contracts'
 import { applyProfile, waitForModalReady, waitForRoute } from './evidence'
 import { openQuickLinksTab } from '../quick-links'
 import { enterWakeState, isWakeScenario } from './wakeLight'
+import { HOUSEHOLD_RESIDENTS } from '../../src/constants/householdResidents'
+
+const HOUSEHOLD_AWAY_STATUS_ENTITY_ID = 'sensor.household_away_status'
+
+async function seedSoloTripState(page: Page, state: string, viewer: 'steph' | 'stephen' | 'unknown' = 'stephen') {
+  await page.evaluate(({ state, statusEntityId, user }) => {
+    const api = window.__mockHass
+    if (!api) throw new Error('Mock preflight failed')
+    api.setUser(user)
+    const engaged = ['scheduled', 'activating', 'active', 'degraded', 'ending', 'restore-required'].includes(state)
+    const residentState = state === 'restore-required' ? 'restore_required' : state === 'unavailable' ? 'unavailable' : engaged ? state : 'idle'
+    api.setEntityState(statusEntityId, residentState)
+    api.setEntityAttribute(statusEntityId, 'command_available', state !== 'unavailable')
+    api.setEntityAttribute(statusEntityId, 'mode', engaged ? 'solo_trip' : 'none')
+    api.setEntityAttribute(statusEntityId, 'traveler', engaged ? 'stephen' : 'none')
+    api.setEntityAttribute(statusEntityId, 'home_resident', engaged ? 'steph' : 'none')
+    api.setEntityAttribute(statusEntityId, 'starts_at', engaged ? '2099-01-01T09:00:00' : null)
+    api.setEntityAttribute(statusEntityId, 'ends_at', engaged ? '2099-01-03T17:00:00' : null)
+    api.setEntityAttribute(statusEntityId, 'effects', {
+      sleepypod_live_follow: state === 'active',
+      sleepypod_schedule: state === 'active',
+      wake_light_source: state === 'active',
+    })
+    api.setEntityAttribute(statusEntityId, 'blockers', state === 'restore-required' ? ['sleepypod_schedule_diverged'] : [])
+  }, {
+    state,
+    statusEntityId: HOUSEHOLD_AWAY_STATUS_ENTITY_ID,
+    user: viewer === 'unknown'
+      ? { id: 'unknown-user', name: 'Unknown' }
+      : { id: HOUSEHOLD_RESIDENTS[viewer].haUserId, name: HOUSEHOLD_RESIDENTS[viewer].name },
+  })
+}
+
+async function seedSoloTripBed(page: Page, viewer: 'steph' | 'stephen' = 'stephen') {
+  await seedSoloTripState(page, 'active', viewer)
+  await page.evaluate(() => {
+    const api = window.__mockHass
+    if (!api) throw new Error('Mock preflight failed')
+    for (const side of ['left', 'right']) {
+      api.setEntityState(`climate.sleepypod_eight_pod_${side}_side`, 'heat')
+      api.setEntityAttribute(`climate.sleepypod_eight_pod_${side}_side`, 'current_temperature', side === 'left' ? 81 : 77)
+      api.setEntityAttribute(`climate.sleepypod_eight_pod_${side}_side`, 'temperature', 77)
+      api.setEntityAttribute(`climate.sleepypod_eight_pod_${side}_side`, 'min_temp', 55)
+      api.setEntityAttribute(`climate.sleepypod_eight_pod_${side}_side`, 'max_temp', 110)
+      api.setEntityAttribute(`climate.sleepypod_eight_pod_${side}_side`, 'target_temp_step', 1)
+    }
+    api.setEntityState('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2')
+    api.setEntityState('number.master_bedroom_sleepypod_eight_pod_right_target_level', '0')
+  })
+}
 
 export async function openSurface(page: Page, scenario: ScenarioId, state?: string): Promise<Locator> {
-  const route = isWakeScenario(scenario) ? 'master-bedroom' : scenario === 'filters' || scenario === 'recipe-grocery' ? 'recipes' : scenario === 'form' ? 'to-do' : scenario === 'remote' ? 'music-room' : scenario === 'vacuum' ? 'vacuums' : 'overview'
+  const route = isWakeScenario(scenario) || (scenario === 'solo-trip-bed' && !state?.startsWith('editor'))
+    ? 'master-bedroom'
+    : scenario === 'solo-trip-settings' || (scenario === 'solo-trip-bed' && state?.startsWith('editor'))
+      ? 'solo-trip'
+      : scenario === 'filters' || scenario === 'recipe-grocery'
+        ? 'recipes'
+        : scenario === 'form'
+          ? 'to-do'
+          : scenario === 'remote'
+            ? 'music-room'
+            : scenario === 'vacuum'
+              ? 'vacuums'
+              : 'overview'
   const recipeDelay = scenario === 'recipe-grocery' ? `&__mockRecipeGroceryDelayMs=${state === 'loading' ? 60000 : 300}` : ''
   await page.goto(`/index.html?path=${route}${recipeDelay}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
+  if (scenario === 'solo-trip-settings') {
+    const fixtureState = state === 'active-home-viewer' || state === 'active-unknown-viewer' ? 'active' : state ?? 'idle'
+    const viewer = state === 'active-home-viewer' ? 'steph' : state === 'active-unknown-viewer' ? 'unknown' : 'stephen'
+    await seedSoloTripState(page, fixtureState, viewer)
+    const pageRoot = page.locator(`[data-route-path="${route}"]:not([aria-hidden="true"]) main`)
+    await expect(pageRoot).toBeVisible()
+    if (state === 'idle-selected' || state === 'modal') {
+      await pageRoot.getByRole('button', { name: 'You', exact: true }).click()
+    }
+    if (state === 'modal') {
+      await pageRoot.locator('button[role="switch"][aria-label^="Solo Trip"]').click()
+      await expect(page.getByRole('dialog', { name: 'Schedule Solo Trip' })).toBeVisible()
+    }
+    return pageRoot
+  }
+  if (scenario === 'solo-trip-bed') {
+    if (state?.startsWith('editor')) {
+      if (state === 'editor-unavailable') await seedSoloTripState(page, 'unavailable')
+      await page.getByRole('button', { name: 'Solo Trip', exact: true }).click()
+    } else {
+      const homeViewer = state?.startsWith('home-viewer-') ?? false
+      await seedSoloTripBed(page, homeViewer ? 'steph' : 'stephen')
+      const awaySide = state?.endsWith('away-side') ?? false
+      await page.getByRole('button', {
+        name: homeViewer
+          ? awaySide ? /Stephen's Side Away · Read Only/ : /Your Side Whole Bed/
+          : awaySide ? /Your Side Away · Read Only/ : /Steph's Side Whole Bed/,
+      }).click()
+    }
+    const dialog = page.getByRole('dialog')
+    await waitForModalReady(dialog)
+    await dialog.evaluate((element) => { element.setAttribute('data-layout-mounted', 'original') })
+    return dialog
+  }
   if (isWakeScenario(scenario)) await page.getByRole('button', { name: /Wake-Light Alarms/ }).click()
   if (scenario === 'quick-links') await openQuickLinksTab(page)
   if (scenario === 'weather') await page.getByRole('button', { name: /Open seven-day weather forecast/ }).click()

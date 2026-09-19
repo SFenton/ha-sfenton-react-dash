@@ -62,7 +62,7 @@ const CASES: AdaptiveModalCase[] = [
   },
   {
     id: 'eight-sleep',
-    open: (page) => openButtonModal(page, 'master-bedroom', /Steph.s Bed Off/i),
+    open: (page) => openButtonModal(page, 'master-bedroom', /Steph's Side Off/i),
     splitPair: ['[data-scroll-region="eight-sleep-hero-column"]', '[data-scroll-region="eight-sleep-panel"]'],
     splitTiers: ['standard', 'wide'],
   },

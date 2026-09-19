@@ -9,6 +9,7 @@ import {
   dailyReportUserKeyFromUrl,
   type DailyReportUserConfig,
 } from '../../constants/dailyReport'
+import { householdResidentForHaUserId } from '../../constants/householdResidents'
 import { countLocallyExpired } from './expiryDate'
 import { VACATION_MODE_ENTITY_ID } from '../../constants/portedDashboard'
 import { useDashboardUrl } from '../../hooks/useDashboardUrl'
@@ -80,7 +81,7 @@ export function useDailyReportContext(): DailyReportContext {
     badgeCount: scopedOverdueCount + scopedExpiredFoodCount,
     expiredFoodCount: scopedExpiredFoodCount,
     overdueCount: scopedOverdueCount,
-    title: dailyReportTitle(user),
+    title: dailyReportTitle(user, householdResidentForHaUserId(haUser?.id)),
     upcomingCount: user ? upcomingCount : 0,
     user,
     vacationMode,

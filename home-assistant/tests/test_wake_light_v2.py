@@ -54,13 +54,14 @@ class WakeLightSourceContractTests(unittest.TestCase):
         self.assertEqual([item.wake_at for item in occurrences], [wake, wake])
         self.assertEqual({item.source_schedule_id for item in occurrences}, {101, 102})
 
-    def test_unidentified_source_stays_visible_but_cannot_execute(self):
+    def test_unidentified_source_stays_visible_and_can_execute_on_schedule(self):
         payload = {"right": {"sunday": {"alarms": [{"time": "07:00", "enabled": True}]}}}
         snapshot = refresh_source_snapshot(
             SourceSnapshot(), "sleepypod:right", attributes=payload, available=True,
             now=datetime(2026, 9, 6, 13, tzinfo=UTC), defaults=WakeLightDefaults(),
         )
         self.assertFalse(snapshot.available)
+        self.assertTrue(snapshot.schedule_available)
         self.assertEqual(snapshot.failure_code, "source_identity_unavailable")
         self.assertEqual(len(snapshot.alarms), 1)
 

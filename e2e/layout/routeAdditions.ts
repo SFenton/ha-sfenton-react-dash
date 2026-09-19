@@ -2,9 +2,11 @@ import { expect, type Page } from './fixture'
 import { INTENTIONAL_ROUTE_ADDITIONS } from './contracts'
 
 async function sections(page: Page) {
-  return page.locator('main section[id]').evaluateAll(elements => elements.map(element => {
+  return page.locator('main [data-responsive-section-item="true"] > section').evaluateAll(elements => elements.map(element => {
     const round = (value: number) => Math.round(value * 10) / 10
     const box = element.getBoundingClientRect()
+    const heading = element.querySelector('h2')?.textContent?.trim() ?? ''
+    const fallbackId = `section-${heading.toLowerCase().replaceAll(/\s+/g, '-')}`
     const describe = (node: HTMLElement) => {
       const style = getComputedStyle(node)
       const rect = node.getBoundingClientRect()
@@ -18,9 +20,9 @@ async function sections(page: Page) {
       }
     }
     return {
-      id: element.id, x: round(box.x), y: round(box.y),
+      id: element.id || fallbackId, x: round(box.x), y: round(box.y),
       width: round(box.width), height: round(box.height),
-      content: [...element.querySelectorAll<HTMLElement>('h2, button[data-variant="card"], button[data-variant="card"] span, button[data-variant="card"] svg')]
+      content: [...element.querySelectorAll<HTMLElement>('h2, button[data-action-kind], button[data-action-kind] span, button[data-action-kind] svg')]
         .map(describe),
     }
   }))
@@ -35,11 +37,14 @@ export async function inspectRouteAddition(baseline: Page, candidate: Page, rout
   const before = await sections(baseline)
   const after = await sections(candidate)
   expect(before.map(section => section.id)).toEqual(contract.inherited)
-  expect(after.map(section => section.id)).toEqual([contract.section, ...contract.inherited])
+  const expectedSections = [...contract.inherited]
+  expectedSections.splice(contract.insertionIndex, 0, contract.section)
+  expect(after.map(section => section.id)).toEqual(expectedSections)
   const expected = contract.viewports[viewport]
   if (!expected) throw new Error(`Unclassified route-addition viewport: ${route}/${viewport}`)
-  const addition = after[0]
-  expect(addition.y).toBe(before[0].y)
+  const addition = after[contract.insertionIndex]
+  expect(addition.x).toBe(before[contract.insertionIndex].x)
+  expect(addition.y).toBe(before[contract.insertionIndex].y)
   expect(addition.height).toBe(expected.height)
   expect(addition.width).toBe(expected.width)
   for (const previous of before) {
@@ -50,13 +55,16 @@ export async function inspectRouteAddition(baseline: Page, candidate: Page, rout
     expect(Math.abs(current.y - previous.y - shift.y), `${previous.id} y`).toBeLessThanOrEqual(1)
     expect({ ...current, x: previous.x, y: previous.y }, previous.id).toEqual(previous)
   }
-  const tile = candidate.locator(selector).getByRole('button')
+  const section = candidate.locator(selector)
+  await expect(section.getByRole('heading', { level: 2, name: contract.heading })).toHaveCount(1)
+  if (contract.description) await expect(section.getByText(contract.description, { exact: true })).toHaveCount(1)
+  const tile = section.getByRole('button', { name: contract.tile.name })
   await expect(tile).toHaveCount(1)
-  await expect(tile).toHaveAttribute('data-variant', 'card')
-  await expect(tile).toHaveAttribute('data-action-kind', 'modal')
-  expect((await tile.boundingBox())!.height).toBeCloseTo(120, 3)
+  if (contract.tile.variant) await expect(tile).toHaveAttribute('data-variant', contract.tile.variant)
+  await expect(tile).toHaveAttribute('data-action-kind', contract.tile.actionKind)
+  expect((await tile.boundingBox())!.height).toBeCloseTo(expected.tileHeight, 3)
   expect((await tile.boundingBox())!.width).toBeCloseTo(expected.tileWidth, 3)
-  expect(await tile.evaluate(node => getComputedStyle(node).borderRadius)).toBe('32px')
+  expect(await tile.evaluate(node => getComputedStyle(node).borderRadius)).toBe(contract.tile.radius)
   return { owner: contract.owner, selector, before, after, expected }
 }
 

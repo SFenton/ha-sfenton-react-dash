@@ -1,4 +1,6 @@
 import { DAILY_REPORT_HASH, DAILY_REPORT_TAB_QUERY_KEY, DAILY_REPORT_USER_QUERY_KEY, routeUrl } from './routes'
+import { COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS, copy } from '../i18n'
+import { HOUSEHOLD_RESIDENT, HOUSEHOLD_RESIDENTS, type HouseholdResident } from './householdResidents'
 
 export { DAILY_REPORT_HASH, DAILY_REPORT_QUERY_KEYS, DAILY_REPORT_TAB_QUERY_KEY, DAILY_REPORT_USER_QUERY_KEY } from './routes'
 
@@ -42,12 +44,12 @@ export const DAILY_REPORT_TABS: DailyReportTabConfig[] = [
 
 export const DAILY_REPORT_USERS: DailyReportUserConfig[] = [
   {
-    aliases: ['stephen', 'stephen-fenton', 'sfenton'],
+    aliases: [...HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPHEN].aliases],
     choresPath: 'stephens-chores',
     color: { b: 120, g: 96, r: 0 },
-    haUserId: '64089b5683944c39b4f944c8f76830b0',
-    key: 'stephen',
-    name: 'Stephen',
+    haUserId: HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPHEN].haUserId,
+    key: HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPHEN].key,
+    name: HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPHEN].name,
     todoEntityIds: {
       noDueDate: 'todo.stephen_s_no_due_date_with_unassigned',
       overdue: 'todo.stephen_s_past_due_with_unassigned',
@@ -55,12 +57,12 @@ export const DAILY_REPORT_USERS: DailyReportUserConfig[] = [
     },
   },
   {
-    aliases: ['steph', 'stephanie'],
+    aliases: [...HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPH].aliases],
     choresPath: 'stephs-chores',
     color: { b: 0, g: 108, r: 212 },
-    haUserId: '43cb71bbd1cb4860b2a7de4c829020f0',
-    key: 'steph',
-    name: 'Steph',
+    haUserId: HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPH].haUserId,
+    key: HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPH].key,
+    name: HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPH].name,
     todoEntityIds: {
       noDueDate: 'todo.steph_s_no_due_date_with_unassigned',
       overdue: 'todo.steph_s_past_due_with_unassigned',
@@ -91,8 +93,11 @@ export function dailyReportUserConfigForHaUserId(haUserId: string | null | undef
   return DAILY_REPORT_USERS.find((user) => user.haUserId === normalized)
 }
 
-export function dailyReportTitle(user: DailyReportUserConfig | undefined) {
-  return user ? `${user.name}'s ${DAILY_REPORT_FALLBACK_TITLE}` : DAILY_REPORT_FALLBACK_TITLE
+export function dailyReportTitle(user: DailyReportUserConfig | undefined, viewer?: HouseholdResident) {
+  if (!user) return DAILY_REPORT_FALLBACK_TITLE
+  return user.key === viewer
+    ? copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.yourSummary)
+    : copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.residentSummary, { resident: user.name })
 }
 
 export function dailyReportTabLabel(tab: DailyReportTab) {

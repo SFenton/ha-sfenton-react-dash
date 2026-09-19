@@ -10,6 +10,7 @@ import modalVacuum from './locales/en/modals/vacuum.json' with { type: 'json' }
 import modalWakeLight from './locales/en/modals/wakeLight.json' with { type: 'json' }
 import modalWeather from './locales/en/modals/weather.json' with { type: 'json' }
 import pageAdmin from './locales/en/pages/admin.json' with { type: 'json' }
+import pageChores from './locales/en/pages/chores.json' with { type: 'json' }
 import pageCustomLights from './locales/en/pages/customLights.json' with { type: 'json' }
 import pageControlShowcase from './locales/en/pages/controlShowcase.json' with { type: 'json' }
 import pageFood from './locales/en/pages/food.json' with { type: 'json' }
@@ -18,6 +19,7 @@ import pageMedia from './locales/en/pages/media.json' with { type: 'json' }
 import pageSecurity from './locales/en/pages/security.json' with { type: 'json' }
 import pageSettings from './locales/en/pages/settings.json' with { type: 'json' }
 import pageSprinklers from './locales/en/pages/sprinklers.json' with { type: 'json' }
+import pageSoloTrip from './locales/en/pages/soloTrip.json' with { type: 'json' }
 import pageSpecialDeviceModes from './locales/en/pages/specialDeviceModes.json' with { type: 'json' }
 import pageVacation from './locales/en/pages/vacation.json' with { type: 'json' }
 import shell from './locales/en/shell.json' with { type: 'json' }
@@ -36,6 +38,7 @@ export const resources = {
     modalWakeLight,
     modalWeather,
     pageAdmin,
+    pageChores,
     pageControlShowcase,
     pageCustomLights,
     pageFood,
@@ -44,6 +47,7 @@ export const resources = {
     pageSecurity,
     pageSettings,
     pageSprinklers,
+    pageSoloTrip,
     pageSpecialDeviceModes,
     pageVacation,
     shell,

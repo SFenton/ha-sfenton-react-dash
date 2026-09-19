@@ -18,6 +18,7 @@ import {
   type MediaRemoteAction,
 } from './mediaRemotes'
 import { MEDIA_COPY_KEYS, MEDIA_COPY_NAMESPACE, copy } from '../i18n'
+import { HOUSEHOLD_RESIDENT, type HouseholdResident } from './householdResidents'
 
 export type RoomSourceKind = 'air' | 'appliance' | 'climate' | 'contact' | 'fan' | 'grill' | 'humidifier' | 'laundry' | 'light' | 'media' | 'occupancy' | 'power' | 'vacuum' | 'vent' | 'wake-light'
 type RoomSourceBaseAction = Exclude<EntityBasicAction, { type: 'navigate' }>
@@ -46,6 +47,8 @@ export interface RoomSourceCardConfig {
   modalTitle?: string
   presentation?: 'app'
   presenceEntityId?: string
+  resident?: HouseholdResident
+  residentLabel?: 'bed-side' | 'pc'
   semantics?: ControlSemanticsResolver
   showState?: boolean
   span?: 'full'
@@ -220,8 +223,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         },
       ] },
       { title: 'SleepyPod', layout: 'two-column-fill', cards: [
-        { title: "Stephen's Bed", entityId: 'climate.sleepypod_eight_pod_left_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', showState: true, stateTone: 'climate-action' },
-        { title: "Steph's Bed", entityId: 'climate.sleepypod_eight_pod_right_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', showState: true, stateTone: 'climate-action' },
+        { title: "Stephen's Bed", entityId: 'climate.sleepypod_eight_pod_left_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephens-bed', resident: HOUSEHOLD_RESIDENT.STEPHEN, residentLabel: 'bed-side', showState: true, stateTone: 'climate-action' },
+        { title: "Steph's Bed", entityId: 'climate.sleepypod_eight_pod_right_side', icon: 'mdi:bed', kind: 'climate', hash: '#stephs-bed', resident: HOUSEHOLD_RESIDENT.STEPH, residentLabel: 'bed-side', showState: true, stateTone: 'climate-action' },
       ] },
       { title: 'Media', cards: [{ title: 'Apple TV', entityId: 'media_player.master_bedroom_apple_tv', icon: 'mdi:apple', kind: 'media', hash: '#master-bedroom-apple-tv', showState: true, span: 'full', activeStates: ['idle', 'paused', 'playing'] }] },
       { title: 'Climate', cards: [
@@ -279,8 +282,8 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
         { title: 'Air Purifier', entityId: 'select.office_air_purifier_fan_mode', icon: 'mdi:fan', kind: 'air', hash: '#air-purifier', modalEntityId: 'sensor.office_air_purifier_pm2_5', subtitleEntityIds: ['select.office_air_purifier_fan_mode', 'fan.office_air_purifier_levoit_purifier'] },
       ] },
       { title: 'Office PCs', cards: [
-        { title: "Stephen's PC", entityId: 'input_boolean.stephen_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.stephen_s_pc_power_state'], action: pcPowerAction('input_button.stephen_s_pc_on', 'input_button.stephen_s_pc_off') },
-        { title: "Steph's PC", entityId: 'input_boolean.steph_s_pc_power', icon: 'mdi:controller', kind: 'power', subtitleEntityIds: ['input_text.steph_s_pc_power_state'], action: pcPowerAction('input_button.steph_s_pc_on', 'input_button.steph_s_pc_off') },
+        { title: "Stephen's PC", entityId: 'input_boolean.stephen_s_pc_power', icon: 'mdi:controller', kind: 'power', resident: HOUSEHOLD_RESIDENT.STEPHEN, residentLabel: 'pc', subtitleEntityIds: ['input_text.stephen_s_pc_power_state'], action: pcPowerAction('input_button.stephen_s_pc_on', 'input_button.stephen_s_pc_off') },
+        { title: "Steph's PC", entityId: 'input_boolean.steph_s_pc_power', icon: 'mdi:controller', kind: 'power', resident: HOUSEHOLD_RESIDENT.STEPH, residentLabel: 'pc', subtitleEntityIds: ['input_text.steph_s_pc_power_state'], action: pcPowerAction('input_button.steph_s_pc_on', 'input_button.steph_s_pc_off') },
       ] },
     ],
     popupTemplates: ['light-popup-single', 'window-popup-2', 'vent-popup-single', 'climate-popup-3', 'air-purifier-popup', 'occupancy-popup-2'],

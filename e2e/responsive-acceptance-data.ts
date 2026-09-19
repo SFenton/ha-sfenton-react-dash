@@ -1,13 +1,26 @@
-import { DASHBOARD_ROUTES } from '../src/constants/routes'
+import { DASHBOARD_ROUTES, SOLO_TRIP_ROUTE_PATH, VACATION_MODE_ROUTE_PATH } from '../src/constants/routes'
 
-export const RESPONSIVE_ROUTES = DASHBOARD_ROUTES.map((route) => route.path)
-export const RESPONSIVE_ROUTE_TITLES = new Map(DASHBOARD_ROUTES.map((route) => [
+const AUXILIARY_RESPONSIVE_ROUTES = [
+  { path: SOLO_TRIP_ROUTE_PATH, title: 'Solo Trip' },
+  { path: VACATION_MODE_ROUTE_PATH, title: 'Vacation Mode' },
+] as const
+
+const RESPONSIVE_ROUTE_ENTRIES = [
+  ...DASHBOARD_ROUTES.map((route) => ({
+    path: route.path,
+    title: route.path === 'overview'
+      ? 'Home'
+      : route.path === 'guests-staying-over'
+        ? 'Guest Controls'
+        : route.title,
+  })),
+  ...AUXILIARY_RESPONSIVE_ROUTES,
+] as const
+
+export const RESPONSIVE_ROUTES = RESPONSIVE_ROUTE_ENTRIES.map((route) => route.path)
+export const RESPONSIVE_ROUTE_TITLES = new Map(RESPONSIVE_ROUTE_ENTRIES.map((route) => [
   route.path,
-  route.path === 'overview'
-    ? 'Home'
-    : route.path === 'guests-staying-over'
-      ? 'Guest Controls'
-      : route.title,
+  route.path === 'stephens-chores' ? 'Your Chores' : route.title,
 ]))
 
 export const VIEWPORTS = {

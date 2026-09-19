@@ -1,0 +1,218 @@
+{% macro journal_unsigned(payload) -%}
+  {{ {
+    'schema_version': payload.get('schema_version'),
+    'canonicalization_version': payload.get('canonicalization_version'),
+    'generation': payload.get('generation'),
+    'revision': payload.get('revision'),
+    'solo_phase': payload.get('solo_phase'),
+    'writer_owner': payload.get('writer_owner'),
+    'release_token': payload.get('release_token'),
+    'runtime_plan': payload.get('runtime_plan'),
+    'sleepypod_baseline': payload.get('sleepypod_baseline'),
+    'baseline_fingerprint': payload.get('baseline_fingerprint'),
+    'last_confirmed_overlay_fingerprint': payload.get('last_confirmed_overlay_fingerprint'),
+    'wake_source_ref': payload.get('wake_source_ref'),
+    'wake_owner_ref': payload.get('wake_owner_ref'),
+    'wake_prior_state': payload.get('wake_prior_state'),
+    'presence_evidence': payload.get('presence_evidence'),
+    'pending_request': payload.get('pending_request'),
+    'restore_record': payload.get('restore_record'),
+    'request_results': payload.get('request_results')
+  } | to_json(sort_keys=true) }}
+{%- endmacro %}
+
+{% macro journal_checksum(payload) -%}
+  {{ journal_unsigned(payload) | sha256 }}
+{%- endmacro %}
+
+{% macro signed_journal(payload) -%}
+  {% set unsigned = {
+    'schema_version': payload.get('schema_version'),
+    'canonicalization_version': payload.get('canonicalization_version'),
+    'generation': payload.get('generation'),
+    'revision': payload.get('revision'),
+    'solo_phase': payload.get('solo_phase'),
+    'writer_owner': payload.get('writer_owner'),
+    'release_token': payload.get('release_token'),
+    'runtime_plan': payload.get('runtime_plan'),
+    'sleepypod_baseline': payload.get('sleepypod_baseline'),
+    'baseline_fingerprint': payload.get('baseline_fingerprint'),
+    'last_confirmed_overlay_fingerprint': payload.get('last_confirmed_overlay_fingerprint'),
+    'wake_source_ref': payload.get('wake_source_ref'),
+    'wake_owner_ref': payload.get('wake_owner_ref'),
+    'wake_prior_state': payload.get('wake_prior_state'),
+    'presence_evidence': payload.get('presence_evidence'),
+    'pending_request': payload.get('pending_request'),
+    'restore_record': payload.get('restore_record'),
+    'request_results': payload.get('request_results')
+  } %}
+  {{ dict(
+    unsigned,
+    payload_checksum=(journal_unsigned(unsigned) | sha256)
+  ) | to_json(sort_keys=true) }}
+{%- endmacro %}
+
+{% macro journal_valid(payload) -%}
+  {{ (
+    payload is mapping
+    and payload.get('schema_version') == 1
+    and payload.get('canonicalization_version') == 1
+    and payload.get('generation') is number
+    and payload.get('revision') is number
+    and payload.get('solo_phase') in ['idle', 'scheduled', 'activating', 'active', 'degraded', 'ending', 'restore_required']
+    and payload.get('release_token') is string
+    and payload.get('request_results') is iterable
+    and payload.get('payload_checksum') is string
+    and payload.get('payload_checksum') == (journal_unsigned(payload) | sha256)
+  ) | to_json }}
+{%- endmacro %}
+
+{% macro request_hash(payload) -%}
+  {% set ns = namespace(request={}) %}
+  {% if payload is mapping %}
+    {% for key, value in payload.items() %}
+      {% if key != 'expected_revision' %}
+        {% set ns.request = dict(ns.request, **{key: value}) %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  {{ ns.request | to_json(sort_keys=true) | sha256 }}
+{%- endmacro %}
+
+{% macro pending_request_record(request_id, request_hash_value, operation, revision, release_token, state, response) -%}
+  {{ {
+    'request_id': request_id,
+    'request_hash': request_hash_value,
+    'operation': operation,
+    'revision': revision,
+    'release_token': release_token,
+    'state': state,
+    'response': response,
+    'terminal': false
+  } | to_json(sort_keys=true) }}
+{%- endmacro %}
+
+{% macro append_terminal_result(existing_results, request_id, request_hash_value, response) -%}
+  {% set ns = namespace(items=[]) %}
+  {% for item in existing_results if item is mapping and item.get('request_id') != request_id and item.get('terminal', true) %}
+    {% set ns.items = ns.items + [item] %}
+  {% endfor %}
+  {% set ns.items = ns.items + [{
+    'request_id': request_id,
+    'request_hash': request_hash_value,
+    'response': response,
+    'terminal': true
+  }] %}
+  {% if ns.items | count > 64 %}
+    {% set ns.items = ns.items[-64:] %}
+  {% endif %}
+  {{ ns.items | to_json(sort_keys=true) }}
+{%- endmacro %}
+
+{% macro observable_side(side_schedule) -%}
+  {%- set days = namespace(items={}) -%}
+  {%- if side_schedule is mapping -%}
+    {%- for day, day_state in side_schedule.items() -%}
+      {%- set alarms = namespace(items=[]) -%}
+      {%- for alarm in day_state.get('alarms', []) if alarm is mapping -%}
+        {%- set normalized_alarm = namespace(value={}) -%}
+        {%- for key, value in alarm.items() -%}
+          {%- if key != 'id' -%}
+            {%- set normalized_alarm.value = dict(normalized_alarm.value, **{key: value}) -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- set alarms.items = alarms.items + [normalized_alarm.value] -%}
+      {%- endfor -%}
+      {%- set days.items = dict(days.items, **{
+        day: dict(day_state, alarms=alarms.items)
+      }) -%}
+    {%- endfor -%}
+  {%- endif -%}
+  {{- days.items | to_json(sort_keys=true) -}}
+{%- endmacro %}
+
+{% macro side_fingerprint(side_schedule) -%}
+  {{- observable_side(side_schedule) | trim | sha256 -}}
+{%- endmacro %}
+
+{% macro full_schedule_fingerprint(schedule) -%}
+  {%- set left = observable_side(schedule.get('left', {}) if schedule is mapping else {}) | trim | from_json -%}
+  {%- set right = observable_side(schedule.get('right', {}) if schedule is mapping else {}) | trim | from_json -%}
+  {{- {'left': left, 'right': right} | to_json(sort_keys=true) | sha256 -}}
+{%- endmacro %}
+
+{% macro merged_schedule(current, incoming, side, mirror, home_side, away_side) -%}
+  {% set current_left = current.get('left', {}) if current is mapping else {} %}
+  {% set current_right = current.get('right', {}) if current is mapping else {} %}
+  {% set incoming_left = incoming.get('left') if incoming is mapping else none %}
+  {% set incoming_right = incoming.get('right') if incoming is mapping else none %}
+  {% set left = incoming_left if incoming_left is mapping else current_left %}
+  {% set right = incoming_right if incoming_right is mapping else current_right %}
+  {% if side == 'left' and incoming is mapping and incoming_left is not mapping %}
+    {% set left = incoming %}
+  {% elif side == 'right' and incoming is mapping and incoming_right is not mapping %}
+    {% set right = incoming %}
+  {% endif %}
+  {% if mirror and home_side == 'left' and away_side == 'right' %}
+    {% set right = left %}
+  {% elif mirror and home_side == 'right' and away_side == 'left' %}
+    {% set left = right %}
+  {% endif %}
+  {{ {'left': left, 'right': right} | to_json(sort_keys=true) }}
+{%- endmacro %}
+
+{% macro restored_schedule(current, baseline, away_side) -%}
+  {% set left = current.get('left', {}) if current is mapping else {} %}
+  {% set right = current.get('right', {}) if current is mapping else {} %}
+  {% if away_side == 'left' %}
+    {% set left = baseline %}
+  {% elif away_side == 'right' %}
+    {% set right = baseline %}
+  {% endif %}
+  {{ {'left': left, 'right': right} | to_json(sort_keys=true) }}
+{%- endmacro %}
+
+{% macro replaced_alarms(current, side, alarm_rows, mirror, home_side, away_side) -%}
+  {% set weekdays = [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday'
+  ] %}
+  {% set current_left = current.get('left', {}) if current is mapping else {} %}
+  {% set current_right = current.get('right', {}) if current is mapping else {} %}
+  {% set selected = current_left if side == 'left' else current_right %}
+  {% set ns = namespace(days={}) %}
+  {% for day in weekdays %}
+    {% set day_state = selected.get(day, {}) if selected is mapping else {} %}
+    {% set day_rows = alarm_rows
+      | selectattr('day', 'defined')
+      | selectattr('day', 'eq', day)
+      | list %}
+    {% set alarms = namespace(items=[]) %}
+    {% for row in day_rows %}
+      {% set alarms.items = alarms.items + [{
+        'alarmTemperature': row.alarmTemperature,
+        'duration': row.duration,
+        'enabled': row.enabled,
+        'time': row.time,
+        'vibrationIntensity': row.vibrationIntensity,
+        'vibrationPattern': row.vibrationPattern
+      }] %}
+    {% endfor %}
+    {% set ns.days = dict(ns.days, **{
+      day: dict(day_state, alarms=alarms.items)
+    }) %}
+  {% endfor %}
+  {% set left = ns.days if side == 'left' else current_left %}
+  {% set right = ns.days if side == 'right' else current_right %}
+  {% if mirror and home_side == 'left' and away_side == 'right' %}
+    {% set right = left %}
+  {% elif mirror and home_side == 'right' and away_side == 'left' %}
+    {% set left = right %}
+  {% endif %}
+  {{ {'left': left, 'right': right} | to_json(sort_keys=true) }}
+{%- endmacro %}

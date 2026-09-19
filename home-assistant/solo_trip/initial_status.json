@@ -1,0 +1,19 @@
+{
+  "blockers": [],
+  "command_available": true,
+  "contract_version": 1,
+  "effects": {
+    "sleepypod_live_follow": false,
+    "sleepypod_schedule": false,
+    "wake_light_source": false
+  },
+  "ends_at": null,
+  "home_resident": "none",
+  "mode": "none",
+  "release_token": "bootstrap-v1",
+  "restore_required": false,
+  "revision": 0,
+  "starts_at": null,
+  "state": "idle",
+  "traveler": "none"
+}

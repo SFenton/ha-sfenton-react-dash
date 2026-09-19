@@ -1,3 +1,5 @@
+// @covers src/components/core/InfoBox.module.css
+// @covers src/i18n/locales/en/pages/chores.json
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Page } from './layout/fixture'
@@ -206,6 +208,108 @@ test.describe('all-route responsive acceptance', () => {
     if (output) {
       fs.writeFileSync(output, `${JSON.stringify(data, null, 2)}\n`)
     }
+  })
+
+  test('keeps the active Solo Trip traveler blue while locked', async ({ page }) => {
+    await page.setViewportSize(VIEWPORTS['phone-portrait'])
+    await page.goto('/index.html?path=solo-trip')
+    await waitForDashboard(page, 'solo-trip')
+    await page.evaluate(() => {
+      const api = window.__mockHass
+      if (!api) throw new Error('Mock preflight failed')
+      api.setEntityState('sensor.household_away_status', 'active')
+      api.setEntityAttribute('sensor.household_away_status', 'mode', 'solo_trip')
+      api.setEntityAttribute('sensor.household_away_status', 'traveler', 'stephen')
+      api.setEntityAttribute('sensor.household_away_status', 'home_resident', 'steph')
+      api.setEntityAttribute('sensor.household_away_status', 'starts_at', '2099-01-01T09:00:00')
+      api.setEntityAttribute('sensor.household_away_status', 'ends_at', '2099-01-03T17:00:00')
+      api.setEntityAttribute('sensor.household_away_status', 'effects', {
+        sleepypod_live_follow: true,
+        sleepypod_schedule: true,
+        wake_light_source: true,
+      })
+      api.setEntityAttribute('sensor.household_away_status', 'blockers', [])
+      api.calls.splice(0)
+    })
+
+    const root = page.locator('[data-route-path="solo-trip"]:not([aria-hidden="true"]) main')
+    const awayTraveler = root.locator('article[aria-label="You Away"]')
+    const homeResident = root.locator('article[aria-label="Steph Home"]')
+    const activeNotice = root.getByRole('note', { name: 'Stephen Away' })
+    const description = root.getByText('Enable or disable Solo Trip mode for the house.', { exact: true })
+    await expect(awayTraveler).toBeVisible()
+
+    for (const viewport of [VIEWPORTS['phone-portrait'], VIEWPORTS['phone-landscape']]) {
+      await page.setViewportSize(viewport)
+      await expect(activeNotice).toHaveCount(1)
+      await expect(activeNotice).toContainText("While you are away from home and the Solo Trip setting is enabled in settings, Steph's controls and alarms will control the entire bed.")
+      await expect.poll(() => activeNotice.getByRole('heading', { name: 'Stephen Away' }).evaluate((element) => getComputedStyle(element).color)).toBe('rgb(247, 251, 255)')
+      const noticeElement = await activeNotice.elementHandle()
+      if (!noticeElement) throw new Error('Active Solo Trip notice is missing')
+      await expect.poll(() => description.evaluate((descriptionElement, currentNotice) => ({
+        beforeDescription: Boolean(currentNotice.compareDocumentPosition(descriptionElement) & Node.DOCUMENT_POSITION_FOLLOWING),
+        sameSection: currentNotice.closest('section') === descriptionElement.closest('section'),
+      }), noticeElement)).toEqual({ beforeDescription: true, sameSection: true })
+      await expect(awayTraveler).toHaveAttribute('data-disabled', 'true')
+      await expect(awayTraveler).toHaveAttribute('data-muted', 'false')
+      await expect(awayTraveler).not.toHaveAttribute('aria-pressed')
+      await expect(homeResident).toHaveAttribute('data-disabled', 'true')
+      await expect(homeResident).toHaveAttribute('data-muted', 'true')
+      await expect(homeResident).not.toHaveAttribute('aria-pressed')
+      await expect(root.getByRole('button', { name: /^(Stephen|Steph)$/ })).toHaveCount(0)
+      await expect.poll(() => Promise.all([awayTraveler, homeResident].map((card) => card.evaluate((element) => ({
+        backgroundColor: getComputedStyle(element).backgroundColor,
+        filter: getComputedStyle(element).filter,
+      }))))).toEqual([
+        { backgroundColor: 'rgba(91, 141, 239, 0.6)', filter: 'saturate(0.45)' },
+        { backgroundColor: 'rgba(255, 255, 255, 0.1)', filter: 'saturate(0.45)' },
+      ])
+    }
+
+    await expect.poll(() => page.evaluate(() => window.__mockHass?.calls ?? [])).toEqual([])
+  })
+
+  test('personalizes household controls from the signed-in Home Assistant user', async ({ page }) => {
+    await page.setViewportSize(VIEWPORTS['phone-portrait'])
+    await page.goto('/index.html?path=master-bedroom')
+    await waitForDashboard(page, 'master-bedroom')
+
+    await expect(page.getByRole('button', { name: /Your Side/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Steph's Side/ })).toBeVisible()
+
+    await page.evaluate(() => window.__mockHass?.setUser({ id: '43cb71bbd1cb4860b2a7de4c829020f0', name: 'Steph' }))
+    await expect(page.getByRole('button', { name: /Stephen's Side/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Your Side/ })).toBeVisible()
+    await page.getByRole('button', { name: /^Lights / }).click()
+    const lightsDialog = page.getByRole('dialog', { name: /Master Bedroom Light/ })
+    await expect(lightsDialog.getByRole('button', { name: /Stephen Nightstand/ })).toBeVisible()
+    await expect(lightsDialog.getByRole('button', { name: /Your Nightstand/ })).toBeVisible()
+    await lightsDialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(lightsDialog).toHaveCount(0)
+
+    await setRoute(page, 'office')
+    await expect(page.getByRole('button', { name: /Stephen's PC/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Your PC/ })).toBeVisible()
+
+    await page.setViewportSize(VIEWPORTS['phone-landscape'])
+    await expect(page.getByRole('button', { name: /Stephen's PC/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Your PC/ })).toBeVisible()
+
+    await setRoute(page, 'chores')
+    await expect(page.getByRole('button', { name: /Stephen's Chores/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Your Chores/ })).toBeVisible()
+    await page.getByRole('button', { name: 'Add Task', exact: true }).click()
+    const taskDialog = page.getByRole('dialog', { name: 'Create Task' })
+    await expect(taskDialog.getByRole('option', { name: 'Stephen' })).toHaveAttribute('value', '1')
+    await expect(taskDialog.getByRole('option', { name: 'You' })).toHaveAttribute('value', '2')
+    await taskDialog.getByRole('button', { name: 'Close' }).click()
+    await expect(taskDialog).toHaveCount(0)
+
+    await page.evaluate(() => window.__mockHass?.setUser({ id: 'unknown-user', name: 'Unknown' }))
+    await expect(page.getByRole('button', { name: /Stephen's Tasks/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Steph's Tasks/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Your Chores/ })).toHaveCount(0)
+    await expect.poll(() => page.evaluate(() => window.__mockHass?.calls ?? [])).toEqual([])
   })
 
   for (const viewport of RESPONSIVE_VIEWPORTS) {

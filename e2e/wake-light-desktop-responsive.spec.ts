@@ -16,8 +16,8 @@ test('master-bedroom Sleep & Wake and SleepyPod fill matching two-column section
     sleepWake.boundingBox(),
     sleepypod.boundingBox(),
     sleepWake.getByRole('button').boundingBox(),
-    sleepypod.getByRole('button', { name: /Stephen's Bed/ }).boundingBox(),
-    sleepypod.getByRole('button', { name: /Steph's Bed/ }).boundingBox(),
+    sleepypod.getByRole('button', { name: /Your Side/ }).boundingBox(),
+    sleepypod.getByRole('button', { name: /Steph's Side/ }).boundingBox(),
   ])
   if (!sleepWakeBox || !sleepypodBox || !wakeBox || !stephenBox || !stephBox) {
     throw new Error('Master-bedroom section geometry was not measurable')

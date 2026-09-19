@@ -4,7 +4,43 @@ export { copyNamespaces, resources, type CopyNamespace, type CopyResources } fro
 export { useCopy } from './useCopy'
 
 export const COMMON_COPY_NAMESPACE = 'common' as const
+export const PAGE_CHORES_COPY_NAMESPACE = 'pageChores' as const
+export const PAGE_CHORES_COPY_KEYS = {
+  personal: {
+    emptySelf: 'personal.emptySelf',
+  },
+  quickLinks: {
+    residentChores: 'quickLinks.residentChores',
+    yourChores: 'quickLinks.yourChores',
+  },
+} as const
+export const HOUSEHOLD_COPY_KEYS = {
+  residentPc: 'household.residentPc',
+  residentNightstand: 'household.residentNightstand',
+  residentSide: 'household.residentSide',
+  residentSummary: 'household.residentSummary',
+  you: 'household.you',
+  yourPc: 'household.yourPc',
+  yourNightstand: 'household.yourNightstand',
+  yourSide: 'household.yourSide',
+  yourSummary: 'household.yourSummary',
+} as const
 export const PAGE_FOOD_COPY_NAMESPACE = 'pageFood' as const
+export const PAGE_SETTINGS_COPY_NAMESPACE = 'pageSettings' as const
+export const PAGE_SETTINGS_COPY_KEYS = {
+  items: {
+    vacation: {
+      subtitle: 'items.vacation.subtitle',
+      title: 'items.vacation.title',
+    },
+  },
+} as const
+export const PAGE_VACATION_COPY_NAMESPACE = 'pageVacation' as const
+export const PAGE_VACATION_COPY_KEYS = {
+  chooser: {
+    ariaLabel: 'chooser.ariaLabel',
+  },
+} as const
 export const PAGE_FOOD_COPY_KEYS = {
   groceries: {
     emptyDescription: 'groceries.emptyDescription',
@@ -231,6 +267,92 @@ export const WAKE_LIGHT_PHASE_COPY_KEYS = {
 export const GARAGE_DOOR_COPY_KEYS = {
   sendingClose: 'garageDoor.sendingClose',
   sendingOpen: 'garageDoor.sendingOpen',
+} as const
+export const SOLO_TRIP_COPY_NAMESPACE = 'pageSoloTrip' as const
+export const SOLO_TRIP_COPY_KEYS = {
+  bed: {
+    awayReadOnlyDescription: 'bed.awayReadOnlyDescription',
+    awayReadOnlyDescriptionHome: 'bed.awayReadOnlyDescriptionHome',
+    awayReadOnlyDescriptionTraveler: 'bed.awayReadOnlyDescriptionTraveler',
+    readOnlyPowerLabel: 'bed.readOnlyPowerLabel',
+    readOnlySubtitle: 'bed.readOnlySubtitle',
+    unavailablePowerLabel: 'bed.unavailablePowerLabel',
+    wholeBedDescription: 'bed.wholeBedDescription',
+    wholeBedDescriptionTraveler: 'bed.wholeBedDescriptionTraveler',
+    wholeBedState: 'bed.wholeBedState',
+    wholeBedTitle: 'bed.wholeBedTitle',
+  },
+  chooser: {
+    ariaLabel: 'chooser.ariaLabel',
+    soloTrip: 'chooser.soloTrip',
+    soloTripSubtitle: 'chooser.soloTripSubtitle',
+    setupRequiredSubtitle: 'chooser.setupRequiredSubtitle',
+    vacation: 'chooser.vacation',
+  },
+  editor: {
+    cancelReturn: 'editor.cancelReturn',
+    changeReturn: 'editor.changeReturn',
+    confirm: 'editor.confirm',
+    description: 'editor.description',
+    endDate: 'editor.endDate',
+    endTime: 'editor.endTime',
+    homeResident: 'editor.homeResident',
+    saveReturn: 'editor.saveReturn',
+    startDate: 'editor.startDate',
+    startTime: 'editor.startTime',
+    title: 'editor.title',
+    traveler: 'editor.traveler',
+    travelerSteph: 'editor.travelerSteph',
+    travelerStephen: 'editor.travelerStephen',
+    validation: {
+      endAfterStart: 'editor.validation.endAfterStart',
+      startInFuture: 'editor.validation.startInFuture',
+      travelerRequired: 'editor.validation.travelerRequired',
+    },
+  },
+  errors: {
+    commandFailed: 'errors.commandFailed',
+    setupRequired: 'errors.setupRequired',
+    travelerRequired: 'errors.travelerRequired',
+    unknownOutcome: 'errors.unknownOutcome',
+    vacationConflict: 'errors.vacationConflict',
+  },
+  page: {
+    awayFromHomeDescription: 'page.awayFromHomeDescription',
+    awayFromHomeTitle: 'page.awayFromHomeTitle',
+    memberAriaLabel: 'page.memberAriaLabel',
+    soloTripDescription: 'page.soloTripDescription',
+    toggleAriaLabel: 'page.toggleAriaLabel',
+    toggleDisabled: 'page.toggleDisabled',
+    toggleOff: 'page.toggleOff',
+    toggleOn: 'page.toggleOn',
+    travelerAway: 'page.travelerAway',
+    travelerHome: 'page.travelerHome',
+    travelerSelected: 'page.travelerSelected',
+    travelerSelectedLabel: 'page.travelerSelectedLabel',
+    valueAriaLabel: 'page.valueAriaLabel',
+  },
+  status: {
+    activeDescription: 'status.activeDescription',
+    activeDescriptionTraveler: 'status.activeDescriptionTraveler',
+    activeTitle: 'status.activeTitle',
+    activeUnconfirmedDescription: 'status.activeUnconfirmedDescription',
+    activatingDescription: 'status.activatingDescription',
+    activatingTitle: 'status.activatingTitle',
+    cancel: 'status.cancel',
+    degradedDescription: 'status.degradedDescription',
+    degradedTitle: 'status.degradedTitle',
+    endingDescription: 'status.endingDescription',
+    endingTitle: 'status.endingTitle',
+    endNow: 'status.endNow',
+    restoreKeepCurrent: 'status.restoreKeepCurrent',
+    restoreRequiredDescription: 'status.restoreRequiredDescription',
+    restoreRequiredTitle: 'status.restoreRequiredTitle',
+    restoreSaved: 'status.restoreSaved',
+    scheduledDescription: 'status.scheduledDescription',
+    scheduledTitle: 'status.scheduledTitle',
+    updateEnd: 'status.updateEnd',
+  },
 } as const
 
 export const BATHROOM_FAN_COPY_KEYS = {

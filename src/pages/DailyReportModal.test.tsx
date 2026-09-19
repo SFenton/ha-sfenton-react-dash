@@ -4,6 +4,8 @@ import { AtAGlancePage } from './AtAGlancePage'
 import { DashboardViewPage } from './DashboardViewPage'
 import { mockDonetickTasksById, mockEntities, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
 
+// @covers src/components/hass/dailyReportModal.ts
+
 const OVERDUE_ENTITY_ID = 'todo.stephen_s_past_due_with_unassigned'
 const UPCOMING_ENTITY_ID = 'todo.stephen_s_due_today_with_unassigned'
 const EXPIRED_ITEMS_ENTITY_ID = 'sensor.evershelf_expired_items'
@@ -89,7 +91,7 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText("Stephen's Summary")).toBeInTheDocument()
+    expect(within(dialog).getByText("Your Summary")).toBeInTheDocument()
     expect(dialog).toHaveAttribute('data-has-subtitle', 'false')
     expect(dialog).toHaveAttribute('data-modal-geometry-intent', 'daily-report')
     expect(dialog).toHaveAttribute('data-modal-block-policy', 'fixed')
@@ -109,6 +111,15 @@ describe('Daily summary modal', () => {
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { level: 2, name: "Steph's Summary" })).toBeInTheDocument()
+  })
+
+  it('titles the signed-in resident summary as Your Summary', async () => {
+    mockState.user = { id: '43cb71bbd1cb4860b2a7de4c829020f0', name: 'Steph' }
+    setDashboardUrl(summaryUrl('?path=overview&user=steph'))
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { level: 2, name: 'Your Summary' })).toBeInTheDocument()
   })
 
   it('uses shared tabs for overdue, upcoming, and expired food', async () => {
@@ -198,7 +209,7 @@ describe('Daily summary modal', () => {
   it('opens the shared task editor from overdue and upcoming chore rows', async () => {
     renderHome()
 
-    const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
+    const summaryDialog = await screen.findByRole('dialog', { name: "Your Summary" })
     const overdueRegion = within(summaryDialog).getByRole('region', { name: 'Overdue Chores' })
     fireEvent.click(within(overdueRegion).getByRole('button', { name: 'Edit Take out the trash' }))
 
@@ -211,7 +222,7 @@ describe('Daily summary modal', () => {
     expect(within(editPage).queryByRole('tablist', { name: 'Daily report sections' })).not.toBeInTheDocument()
 
     fireEvent.click(within(editPage).getByRole('button', { name: 'Back to daily summary' }))
-    await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Stephen's Summary" })).toBeInTheDocument())
+    await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Your Summary" })).toBeInTheDocument())
     expect(summaryDialog).toHaveAttribute('data-state', 'open')
 
     const nav = within(summaryDialog).getByRole('tablist', { name: 'Daily report sections' })
@@ -233,7 +244,7 @@ describe('Daily summary modal', () => {
     })
     renderHome()
 
-    const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
+    const summaryDialog = await screen.findByRole('dialog', { name: "Your Summary" })
     fireEvent.click(within(summaryDialog).getByRole('button', { name: 'Edit Take out the trash' }))
     const editPage = await screen.findByRole('dialog', { name: 'Edit Task' })
     await waitFor(() => expect(within(editPage).getByRole('button', { name: 'Save Task' })).toBeEnabled())
@@ -299,7 +310,7 @@ describe('Daily summary modal', () => {
   it('opens expired food details as a page in the same summary modal', async () => {
     renderHome()
 
-    const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
+    const summaryDialog = await screen.findByRole('dialog', { name: "Your Summary" })
     const nav = within(summaryDialog).getByRole('tablist', { name: 'Daily report sections' })
     fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
     const [expiredRow] = await within(summaryDialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
@@ -320,7 +331,7 @@ describe('Daily summary modal', () => {
     confirmSpy.mockRestore()
 
     fireEvent.click(within(inventoryPage).getByRole('button', { name: 'Back to expired food' }))
-    await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Stephen's Summary" })).toBeInTheDocument())
+    await waitFor(() => expect(within(summaryDialog).getByRole('heading', { name: "Your Summary" })).toBeInTheDocument())
     expect(await within(summaryDialog).findByLabelText('Expired Food inventory list')).toBeInTheDocument()
   })
 
@@ -337,7 +348,7 @@ describe('Daily summary modal', () => {
     })
     renderHome()
 
-    const summaryDialog = await screen.findByRole('dialog', { name: "Stephen's Summary" })
+    const summaryDialog = await screen.findByRole('dialog', { name: "Your Summary" })
     const nav = within(summaryDialog).getByRole('tablist', { name: 'Daily report sections' })
     fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
     const [expiredRow] = await within(summaryDialog).findAllByLabelText(/^Milk Expired on /, {}, { timeout: 3000 })
@@ -453,7 +464,7 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText("Stephen's Summary")).toBeInTheDocument()
+    expect(within(dialog).getByText("Your Summary")).toBeInTheDocument()
   })
 
   it('offers a user picker when the summary user cannot be resolved', async () => {
@@ -475,9 +486,9 @@ describe('Daily summary modal', () => {
     setExpiredFood(3)
     renderHome()
 
-    const profile = screen.getByRole('button', { name: /^Open Stephen's Summary/ })
+    const profile = screen.getByRole('button', { name: /^Open Your Summary/ })
     expect(within(profile).getByText('7')).toBeInTheDocument()
-    expect(profile).toHaveAccessibleName("Open Stephen's Summary, 7 items need attention")
+    expect(profile).toHaveAccessibleName("Open Your Summary, 7 items need attention")
   })
 
   it('excludes upcoming chores from the profile badge', async () => {
@@ -487,9 +498,9 @@ describe('Daily summary modal', () => {
     setExpiredFood(0)
     renderHome()
 
-    const profile = screen.getByRole('button', { name: /^Open Stephen's Summary/ })
+    const profile = screen.getByRole('button', { name: /^Open Your Summary/ })
     expect(within(profile).getByText('1')).toBeInTheDocument()
-    expect(profile).toHaveAccessibleName("Open Stephen's Summary, 1 item needs attention")
+    expect(profile).toHaveAccessibleName("Open Your Summary, 1 item needs attention")
   })
 
   it('caps the profile badge at 9+', async () => {
@@ -498,7 +509,7 @@ describe('Daily summary modal', () => {
     setExpiredFood(32)
     renderHome()
 
-    expect(within(screen.getByRole('button', { name: /^Open Stephen's Summary/ })).getByText('9+')).toBeInTheDocument()
+    expect(within(screen.getByRole('button', { name: /^Open Your Summary/ })).getByText('9+')).toBeInTheDocument()
   })
 
   it('drops the profile badge when nothing needs attention', async () => {
@@ -507,7 +518,7 @@ describe('Daily summary modal', () => {
     setExpiredFood(0)
     renderHome()
 
-    const profile = screen.getByRole('button', { name: "Open Stephen's Summary" })
+    const profile = screen.getByRole('button', { name: "Open Your Summary" })
     expect(profile.querySelector('[data-count]')).toBeNull()
   })
 
@@ -518,7 +529,7 @@ describe('Daily summary modal', () => {
     setExpiredFood(32)
     renderHome()
 
-    expect(within(screen.getByRole('button', { name: /^Open Stephen's Summary/ })).getByText('2')).toBeInTheDocument()
+    expect(within(screen.getByRole('button', { name: /^Open Your Summary/ })).getByText('2')).toBeInTheDocument()
   })
 
   it('opens on the overdue tab when a notification link asks for auto selection', async () => {
@@ -601,10 +612,10 @@ describe('Daily summary modal', () => {
     renderHome()
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /^Open Stephen's Summary/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Open Your Summary/ }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('heading', { level: 2, name: "Stephen's Summary" })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { level: 2, name: "Your Summary" })).toBeInTheDocument()
   })
 
   it('opens from the header profile button on a non-home page', async () => {
@@ -612,10 +623,10 @@ describe('Daily summary modal', () => {
     render(<DashboardViewPage activePath="vacuums" onNavigate={() => {}} path="vacuums" />)
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /^Open Stephen's Summary/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Open Your Summary/ }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('heading', { level: 2, name: "Stephen's Summary" })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { level: 2, name: "Your Summary" })).toBeInTheDocument()
     expect(within(dialog).getByRole('tablist', { name: 'Daily report sections' })).toBeInTheDocument()
   })
 
@@ -625,6 +636,6 @@ describe('Daily summary modal', () => {
 
     const dialogs = await screen.findAllByRole('dialog')
     expect(dialogs).toHaveLength(1)
-    expect(within(dialogs[0]).getByRole('heading', { level: 2, name: "Stephen's Summary" })).toBeInTheDocument()
+    expect(within(dialogs[0]).getByRole('heading', { level: 2, name: "Your Summary" })).toBeInTheDocument()
   })
 })

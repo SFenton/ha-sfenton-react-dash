@@ -1,4 +1,4 @@
-import { useEntity, useHass } from '@hakit/core'
+import { useEntity, useHass, useUser } from '@hakit/core'
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
@@ -49,6 +49,8 @@ import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet
 import { modalSquareGridCenteredGeometry, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../components/core/modalSquareGrid'
 import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
+import { COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS, PAGE_CHORES_COPY_KEYS, PAGE_CHORES_COPY_NAMESPACE, copy } from '../i18n'
+import { householdResidentForHaUserId, householdResidentName } from '../constants/householdResidents'
 
 declare global {
   interface Window {
@@ -366,9 +368,15 @@ function roomTitleFromLightGroup(group: EntityGroupConfig) {
 }
 
 function ChorePreviewTile({ closeHash, item, onNavigate }: { closeHash: () => void; item: ChoreQuickLinkConfig; onNavigate: (path: string) => void }) {
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
   const entities = useHass((state) => state.entities)
   const counts = choreQuickLinkCounts(item.path, entities)
   const subtitle = item.countType === 'groceries' ? groceryCountSubtitle(counts.total) : choreQuickLinkSubtitle(counts)
+  const title = item.resident && viewerResident
+    ? item.resident === viewerResident
+      ? copy(PAGE_CHORES_COPY_NAMESPACE, PAGE_CHORES_COPY_KEYS.quickLinks.yourChores)
+      : copy(PAGE_CHORES_COPY_NAMESPACE, PAGE_CHORES_COPY_KEYS.quickLinks.residentChores, { resident: householdResidentName(item.resident) })
+    : item.title
 
   const openPage = () => {
     closeHash()
@@ -381,7 +389,7 @@ function ChorePreviewTile({ closeHash, item, onNavigate }: { closeHash: () => vo
       icon={item.icon}
       onClick={openPage}
       subtitle={subtitle}
-      title={item.title}
+      title={title}
     />
   )
 }
@@ -635,12 +643,23 @@ function RoomLightDetailHeader({ group, hideTitleBlock = false, onBack, onToggle
 }
 
 function RoomLightDetailCards({ group, onToggle }: { group: EntityGroupConfig; onToggle: (entityId: string) => void }) {
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
   return (
     <section className={styles.roomLightDetail}>
       <div className={styles.roomLightGrid}>
         {group.items.map((item) => (
           <div className={styles.roomLightCardShell} key={item.entityId}>
-            <LightCard entityId={item.entityId} onClick={() => onToggle(item.entityId)} pressed size="compact" title={item.title} />
+            <LightCard
+              entityId={item.entityId}
+              onClick={() => onToggle(item.entityId)}
+              pressed
+              size="compact"
+              title={item.resident && viewerResident
+                ? item.resident === viewerResident
+                  ? copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.yourNightstand)
+                  : copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.residentNightstand, { resident: householdResidentName(item.resident) })
+                : item.title}
+            />
           </div>
         ))}
       </div>

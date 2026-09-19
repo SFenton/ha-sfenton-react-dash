@@ -1,9 +1,11 @@
 import { LAYOUT_JOURNEYS, RESPONSIVE_ROUTES } from '../responsive-acceptance-data'
+import { DASHBOARD_ROUTES } from '../../src/constants/routes'
 import { ROOM_PAGE_CONFIGS } from '../../src/constants/roomPages'
-import { CONTEXTS, INTENTIONAL_NEW_ROUTES, INTENTIONAL_ROUTE_ADDITIONS, SCENARIO_IDS, SURFACE_CONTRACTS, type ContextId, type ScenarioId } from './contracts'
+import { CONTEXTS, INTENTIONAL_NEW_ROUTES, INTENTIONAL_ROUTE_ADDITIONS, INTENTIONAL_ROUTE_REDESIGNS, SCENARIO_IDS, SURFACE_CONTRACTS, type ContextId, type ScenarioId } from './contracts'
 import type { Obligation } from './types'
 
 export const SOURCE_ROUTES = RESPONSIVE_ROUTES
+export const PRELOAD_ROUTES = DASHBOARD_ROUTES.map((route) => route.path)
 export const SOURCE_ROOM_OPENERS = Object.values(ROOM_PAGE_CONFIGS).flatMap((room) => {
   const cards = [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)]
   return [...new Set(cards.flatMap((card) => card.hash ? [card.hash] : []))]
@@ -11,6 +13,7 @@ export const SOURCE_ROOM_OPENERS = Object.values(ROOM_PAGE_CONFIGS).flatMap((roo
 })
 
 export function journey(scenario: ScenarioId, context: ContextId = 'touch-chromium'): readonly string[] {
+  const pageJourney = scenario === 'navigation' || scenario === 'wake-room' || scenario === 'solo-trip-settings'
   if (scenario === 'preload') return ['phone-portrait']
   if (scenario === 'wake-source') {
     const source = context === 'fine-chromium'
@@ -27,18 +30,18 @@ export function journey(scenario: ScenarioId, context: ContextId = 'touch-chromi
       : ['island-phone-portrait', 'island-phone-landscape-left', 'island-phone-portrait']
   }
   if (scenario === 'host') return ['desktop', 'island-phone-landscape-left', 'island-phone-landscape-right', 'desktop']
-  if (context === 'fine-chromium') return scenario === 'navigation' || scenario === 'wake-room'
+  if (context === 'fine-chromium') return pageJourney
     ? ['desktop', 'rail-below', 'rail-at', 'wide-desktop', 'desktop']
     : ['desktop', 'island-phone-portrait', 'island-phone-landscape-left', 'wide-desktop', 'desktop']
   if (context === 'touch-webkit') return ['island-phone-portrait', 'island-phone-landscape-left', 'island-phone-landscape-right', 'rectangular-phone-landscape', 'island-phone-portrait']
-  return scenario === 'navigation' || scenario === 'wake-room' ? LAYOUT_JOURNEYS.navigation : LAYOUT_JOURNEYS.modal
+  return pageJourney ? LAYOUT_JOURNEYS.navigation : LAYOUT_JOURNEYS.modal
 }
 
 export function obligationsFor(scenarios: readonly ScenarioId[], contexts: readonly ContextId[]): Obligation[] {
   return scenarios.flatMap((scenario) => contexts.flatMap((context) => SURFACE_CONTRACTS[scenario].states.flatMap((state) =>
     journey(scenario, context).map((profile, step, profiles) => {
       const review = context === 'touch-chromium'
-        ? (scenario === 'preload' || (scenario === 'wake-source' && profile === 'dialog-block-799') || (scenario === 'host' && profile === 'island-phone-landscape-right') || (scenario === 'navigation' || scenario === 'wake-room'
+        ? (scenario === 'preload' || (scenario === 'wake-source' && profile === 'dialog-block-799') || (scenario === 'host' && profile === 'island-phone-landscape-right') || (scenario === 'navigation' || scenario === 'wake-room' || scenario === 'solo-trip-settings'
             ? ['phone-portrait', 'phone-landscape', 'ipad-landscape', 'passport-foldable-landscape', 'square-foldable-landscape'].includes(profile) && profiles.indexOf(profile) === step
             : ['island-phone-portrait', 'island-phone-landscape-left'].includes(profile) && (state !== 'back' || step === profiles.length - 1)))
         : context === 'fine-chromium'
@@ -75,14 +78,24 @@ export function validateRegistry() {
       throw new Error(`Unbound intentional new route: ${route}`)
     }
   }
+  for (const [route, redesign] of Object.entries(INTENTIONAL_ROUTE_REDESIGNS)) {
+    if (!SOURCE_ROUTES.includes(route as typeof SOURCE_ROUTES[number])
+      || !SCENARIO_IDS.includes(redesign.owner)
+      || !redesign.heading.trim()
+      || !redesign.expectedButtons.length) {
+      throw new Error(`Unbound intentional route redesign: ${route}`)
+    }
+  }
   for (const [route, addition] of Object.entries(INTENTIONAL_ROUTE_ADDITIONS)) {
     if (!SOURCE_ROUTES.includes(route as typeof SOURCE_ROUTES[number]) || !SCENARIO_IDS.includes(addition.owner)
-      || !addition.section || !addition.inherited.length || new Set(addition.inherited).size !== addition.inherited.length) {
+      || !addition.section || !addition.inherited.length || new Set(addition.inherited).size !== addition.inherited.length
+      || !addition.heading.trim() || !addition.tile.actionKind.trim() || !addition.tile.radius.trim()
+      || !Number.isInteger(addition.insertionIndex) || addition.insertionIndex < 0 || addition.insertionIndex > addition.inherited.length) {
       throw new Error(`Unbound intentional route addition: ${route}`)
     }
     for (const [profile, expected] of Object.entries(addition.viewports)) {
       if (!['phone-portrait', 'phone-landscape'].includes(profile)
-        || [expected.height, expected.width, expected.tileWidth].some(value => !Number.isFinite(value) || value <= 0)
+        || [expected.height, expected.width, expected.tileHeight, expected.tileWidth].some(value => !Number.isFinite(value) || value <= 0)
         || Object.keys(expected.shifts).sort().join('\n') !== [...addition.inherited].sort().join('\n')
         || Object.values(expected.shifts).some(shift => !Number.isFinite(shift.x) || !Number.isFinite(shift.y))) {
         throw new Error(`Invalid route-addition oracle: ${route}/${profile}`)

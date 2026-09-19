@@ -10,6 +10,8 @@ import { isSleepypodAlarmActive, sleepypodAlarmState, sleepypodSnoozeRemainingTe
 import styles from "./SleepypodActiveAlarmSection.module.css"
 
 interface SleepypodActiveAlarmSectionProps {
+  command?: (action: "snooze_alarm" | "stop_alarm") => void
+  readOnly?: boolean
   side: "left" | "right"
   sideTitle: string
   snoozeButtonEntityId: string
@@ -24,7 +26,7 @@ const SNOOZING_COLOR: CardColor = { r: 122, g: 122, b: 128 }
 const STOP_COLOR: CardColor = { r: 229, g: 57, b: 53 }
 const SNOOZE_SECONDS = 5 * 60
 
-export function SleepypodActiveAlarmSection({ side, sideTitle, snoozeButtonEntityId, stateEntityId, stopButtonEntityId }: SleepypodActiveAlarmSectionProps) {
+export function SleepypodActiveAlarmSection({ command, readOnly = false, side, sideTitle, snoozeButtonEntityId, stateEntityId, stopButtonEntityId }: SleepypodActiveAlarmSectionProps) {
   const entity = useEntity(asEntityName(stateEntityId), { returnNullIfNotFound: true })
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const liveState = sleepypodAlarmState(entity?.state)
@@ -40,9 +42,11 @@ export function SleepypodActiveAlarmSection({ side, sideTitle, snoozeButtonEntit
 
   if (!isSleepypodAlarmActive(displayState)) return null
 
-  const press = (target: string, optimisticState: SleepypodAlarmState) => {
+  const press = (action: "snooze_alarm" | "stop_alarm", target: string, optimisticState: SleepypodAlarmState) => {
+    if (readOnly) return
     commitDisplayState(optimisticState)
-    callService({ domain: "button", service: "press", target })
+    if (command) command(action)
+    else callService({ domain: "button", service: "press", target })
   }
 
   const snoozing = displayState === "snoozed"
@@ -57,12 +61,12 @@ export function SleepypodActiveAlarmSection({ side, sideTitle, snoozeButtonEntit
     const now = Date.now()
     setNowMs(now)
     setOptimisticSnoozedUntil((now + SNOOZE_SECONDS * 1000) / 1000)
-    press(snoozeButtonEntityId, "snoozed")
+    press("snooze_alarm", snoozeButtonEntityId, "snoozed")
   }
 
   const stop = () => {
     setOptimisticSnoozedUntil(null)
-    press(stopButtonEntityId, "idle")
+    press("stop_alarm", stopButtonEntityId, "idle")
   }
 
   return (
@@ -77,7 +81,7 @@ export function SleepypodActiveAlarmSection({ side, sideTitle, snoozeButtonEntit
         <Card
           ariaLabel={snoozing ? `Snoozing, ${snoozeRemainingText}` : "Snooze"}
           color={snoozing ? SNOOZING_COLOR : SNOOZE_COLOR}
-          disabled={snoozing}
+          disabled={readOnly || snoozing}
           icon={<MaterialIcon name="mdi:sleep" size={30} />}
           onClick={snooze}
           size="compact"
@@ -86,6 +90,7 @@ export function SleepypodActiveAlarmSection({ side, sideTitle, snoozeButtonEntit
         />
         <Card
           color={STOP_COLOR}
+          disabled={readOnly}
           icon={<MaterialIcon name="mdi:power" size={30} />}
           onClick={stop}
           size="compact"

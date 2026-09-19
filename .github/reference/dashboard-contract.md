@@ -144,11 +144,11 @@ For the preferred SMB flow:
 1. Run `npm run build`.
 2. Copy `dist/` to `\\192.168.1.22\config\www\ha-sfenton-react-dash`.
 3. Copy `home-assistant/packages/sfenton_react_panel.yaml` to `\\192.168.1.22\config\packages\sfenton_react_panel.yaml` if it changed.
-4. Back up and copy changed `home-assistant/custom_components/sfenton_react_chat/` files and `home-assistant/packages/sfenton_react_chat.yaml`, plus `home-assistant/custom_components/sfenton_home_mcp_proxy/` and `home-assistant/packages/sfenton_home_mcp_proxy.yaml`.
+4. Back up and copy changed `home-assistant/custom_components/sfenton_react_chat/` files and `home-assistant/packages/sfenton_react_chat.yaml`, plus `home-assistant/custom_components/sfenton_home_mcp_proxy/`, `home-assistant/packages/sfenton_home_mcp_proxy.yaml`, and `home-assistant/packages/solo_trip.yaml`.
 5. Configuration-check HA after staging package/component changes. On failure, restore prior files and remove only newly introduced files; do not restart invalid configuration.
-6. Restart Home Assistant only with explicit approval when the panel package/bridge, chat history, or Home MCP proxy changed.
-7. Verify the prior daily chat purge automation is absent, and verify authenticated `/api/sfenton_home_mcp` requests reach the pinned-TLS MCP container. The manual purge service may remain registered, but never invoke it during release verification without explicit deletion authorization.
-8. Build with `VITE_HOME_MCP_ENABLED=true` only after that proxy check passes, copy `dist/`, then run `npm run deploy:sync`.
+6. Restart Home Assistant only with explicit approval when the panel package/bridge, chat history, Home MCP proxy, or Household Away integration changed.
+7. Verify the prior daily chat purge automation is absent, verify authenticated `/api/sfenton_home_mcp` requests reach the pinned-TLS MCP container, and verify `sensor.household_away_status` plus `script.household_away_command` only after the native Solo Trip package passes its broker, journal, presence, and single-writer gates. The manual purge service may remain registered, but never invoke it during release verification without explicit deletion authorization.
+8. Install or update the separately owned Wake Light integration before Household Away when its source-suspension contract changed. Build with `VITE_HOME_MCP_ENABLED=true` only after the proxy check passes, copy `dist/`, then run `npm run deploy:sync`.
 
 React assets, `deploy:sync`, and HMR do not remove a previously loaded purge automation or activate a newly installed proxy. Do not enable production Home MCP routing until the pinned-TLS container and authenticated HA proxy are both healthy. See `docs/chat.md`, `home-mcp/README.md`, and the chat component README for the complete rollout and rollback contracts.
 

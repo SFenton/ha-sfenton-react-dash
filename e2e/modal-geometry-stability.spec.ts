@@ -103,7 +103,7 @@ test.describe('centered modal geometry stability', () => {
   test('keeps Daily Summary stable through tabs and both detail types', async ({ page }) => {
     for (const viewport of CENTERED_VIEWPORTS) {
       await gotoPath(page, 'overview&user=stephen#daily-report', viewport)
-      let dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+      let dialog = page.getByRole('dialog', { name: "Your Summary" })
       const baseline = await markGeometry(dialog, `daily-${viewport.name}`)
 
       await dialog.getByRole('tab', { name: 'Upcoming Chores' }).click()
@@ -117,7 +117,7 @@ test.describe('centered modal geometry stability', () => {
       dialog = page.getByRole('dialog', { name: 'Milk' })
       await expectStableGeometry(dialog, baseline, `${viewport.name} inventory detail`)
       await dialog.getByRole('button', { name: 'Back to expired food' }).click()
-      dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+      dialog = page.getByRole('dialog', { name: "Your Summary" })
       await expectStableGeometry(dialog, baseline, `${viewport.name} inventory Back`)
 
       await dialog.getByRole('tab', { name: /^Overdue Chores/ }).click()
@@ -139,7 +139,7 @@ test.describe('centered modal geometry stability', () => {
       await expectStableGeometry(dialog, humidifierBaseline, `${viewport.name} Humidifier editor`)
 
       await gotoPath(page, 'master-bedroom', viewport)
-      await page.getByRole('button', { name: /Steph.s Bed Off/i }).click()
+      await page.getByRole('button', { name: /Steph's Side Off/i }).click()
       dialog = page.getByRole('dialog')
       const sleepBaseline = await markGeometry(dialog, `eight-sleep-${viewport.name}`)
       await dialog.getByRole('tab', { exact: true, name: 'Alarms' }).click()

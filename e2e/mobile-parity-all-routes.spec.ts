@@ -5,7 +5,7 @@ import { expect, test, type Browser, type Page } from './layout/fixture'
 import { RESPONSIVE_ROUTES, type ResponsiveRoute } from './responsive-acceptance-data'
 import { APPROVED_WEATHER_RENDER_MIGRATION_BASE, restoreSourceDeclaredBackdropFilters, selectedParityRoutes } from '../scripts/required-mobile-parity'
 import type { RunIdentity } from './layout/types'
-import { INTENTIONAL_NEW_ROUTES } from './layout/contracts'
+import { INTENTIONAL_NEW_ROUTES, INTENTIONAL_ROUTE_REDESIGNS } from './layout/contracts'
 import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
 
 type PixelRegion = { x: number; y: number; width: number; height: number }
@@ -50,6 +50,11 @@ type RouteParityResult = {
       sectionHeadings: string[]
       temperaturePickers: number
     }
+  }
+  intentionalRouteRedesign: null | {
+    buttons: string[]
+    heading: string
+    owner: string
   }
 }
 
@@ -474,6 +479,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
       for (const route of SELECTED_ROUTES) {
         await test.step(route, async () => {
           const newRouteContract = INTENTIONAL_NEW_ROUTES[route]
+          const redesignContract = INTENTIONAL_ROUTE_REDESIGNS[route]
           const baselineRoute = (newRouteContract?.referenceRoute ?? route) as ResponsiveRoute
           if (rawBaseline) {
             await openBaselineRoute(rawBaseline.page, baselineRoute)
@@ -509,6 +515,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             pageSignature(candidate.page),
           ])
           let intentionalNewRoute: RouteParityResult['intentionalNewRoute'] = null
+          let intentionalRouteRedesign: RouteParityResult['intentionalRouteRedesign'] = null
           let baselineSignature = rawBaselineSignature
           let candidateSignature = rawCandidateSignature
           if (newRouteContract) {
@@ -533,6 +540,21 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
               owner: newRouteContract.owner,
               referenceRoute: newRouteContract.referenceRoute,
               facts,
+            }
+          }
+          if (redesignContract) {
+            await expect(candidate.page.getByRole('heading', { level: 1, name: redesignContract.heading })).toHaveCount(1)
+            const buttonNames = await candidate.page.getByRole('button')
+              .evaluateAll((elements) => elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))
+            const matchedButtons = redesignContract.expectedButtons.map((pattern) => {
+              const match = buttonNames.find((name) => pattern.test(name))
+              if (!match) throw new Error(`Missing intentional redesign button for ${route}: ${pattern}`)
+              return match
+            })
+            intentionalRouteRedesign = {
+              buttons: matchedButtons,
+              heading: redesignContract.heading,
+              owner: redesignContract.owner,
             }
           }
           const geometryMatches = JSON.stringify(candidateSignature) === JSON.stringify(baselineSignature)
@@ -569,6 +591,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             rawMaxChannelDelta: rawDifference.maxChannelDelta,
             approvedHeroRailRegion: railRegion,
             intentionalNewRoute,
+            intentionalRouteRedesign,
             ...difference,
           })
           } finally {
@@ -597,8 +620,8 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
       expect(baseline.errors).toEqual([])
       if (rawBaseline) expect(rawBaseline.errors).toEqual([])
       expect(candidate.errors).toEqual([])
-      expect(results.filter((result) => !result.geometryMatches).map((result) => result.route), 'geometry/style parity').toEqual([])
-      const comparableResults = results.filter((result) => result.intentionalNewRoute === null)
+      expect(results.filter((result) => result.intentionalNewRoute === null && result.intentionalRouteRedesign === null && !result.geometryMatches).map((result) => result.route), 'geometry/style parity').toEqual([])
+      const comparableResults = results.filter((result) => result.intentionalNewRoute === null && result.intentionalRouteRedesign === null)
       expect(
         comparableResults.filter((result) => result.differentPixelRatio > 0.12 || result.meanChannelDelta > 2)
           .map((result) => ({
