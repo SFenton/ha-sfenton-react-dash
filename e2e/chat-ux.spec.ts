@@ -127,7 +127,6 @@ test('cached keyboard geometry starts the modal lift early and dismissal reverse
     window.visualViewport!.dispatchEvent(new Event('resize'))
   })
   await expect.poll(() => layout.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingBottom))).toBeCloseTo(369, 0)
-  const liftedTop = (await navigation.boundingBox())!.y
 
   await input.evaluate((element) => element.blur())
   await page.evaluate(() => {
