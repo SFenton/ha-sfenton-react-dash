@@ -26,6 +26,7 @@ type ControllerConfig = {
   version: 1
   repository: string
   repositoryId: number
+  runnerGroupId: number
   workflowPath: string
   workflowSha256: string
   runnerImage: string
@@ -183,6 +184,20 @@ export function assertExpectedJobBinding(
   )
 }
 
+export function jitConfigurationRequest(
+  name: string,
+  label: string,
+  runnerGroupId: number,
+) {
+  assert(runnerGroupId > 0, 'JIT runner group ID is invalid')
+  return {
+    name,
+    runner_group_id: runnerGroupId,
+    labels: [label],
+    work_folder: '_work',
+  }
+}
+
 async function command(
   executable: string,
   args: string[],
@@ -305,6 +320,7 @@ async function workflowJob(repository: string, jobId: number) {
 
 async function generateJitConfiguration(
   repository: string,
+  runnerGroupId: number,
   candidate: ControllerCandidate,
 ) {
   const runnerName = safeIdentifier(
@@ -314,11 +330,11 @@ async function generateJitConfiguration(
     `repos/${repository}/actions/runners/generate-jitconfig`,
     {
       method: 'POST',
-      body: {
-        name: runnerName,
-        labels: [candidate.label],
-        work_folder: '_work',
-      },
+      body: jitConfigurationRequest(
+        runnerName,
+        candidate.label,
+        runnerGroupId,
+      ),
     },
   )
   assertJitRunnerLabels(configuration.runner, candidate.label)
@@ -345,6 +361,7 @@ async function loadConfig(path: string) {
   const config = JSON.parse(await readFile(resolve(path), 'utf8')) as ControllerConfig
   assert(config.version === 1, 'Controller config version is invalid')
   assert(config.repositoryId > 0, 'Controller repository ID is invalid')
+  assert(config.runnerGroupId > 0, 'Controller runner group ID is invalid')
   assert(/^[a-f0-9]{64}$/.test(config.workflowSha256), 'Workflow SHA-256 is invalid')
   assert(config.runnerImage.length > 0, 'Runner image is required')
   assert(/^sha256:[a-f0-9]{64}$/.test(config.runnerImageId), 'Runner image ID is invalid')
@@ -716,7 +733,11 @@ async function runCandidate(
   candidate: ControllerCandidate,
 ) {
   await validateControlPlane(config, candidate)
-  const jit = await generateJitConfiguration(config.repository, candidate)
+  const jit = await generateJitConfiguration(
+    config.repository,
+    config.runnerGroupId,
+    candidate,
+  )
   const prefix = safeIdentifier(
     `ha-jit-${candidate.run.id}-${candidate.run.run_attempt}`,
   )

@@ -2,6 +2,7 @@ import {
   assertExpectedJobBinding,
   assertJitRunnerLabels,
   expectedRunnerLabel,
+  jitConfigurationRequest,
   selectControllerCandidate,
   type WorkflowJob,
   type WorkflowRun,
@@ -158,6 +159,24 @@ describe('HA deploy runner controller', () => {
         labels: [{ name: 'self-hosted' }, ...runner.labels],
       }, 'ha-deploy-production-123-2'),
     ).toThrow('not exclusive')
+  })
+
+  it('binds JIT registration to the configured runner group', () => {
+    expect(
+      jitConfigurationRequest(
+        'runner-42',
+        'ha-deploy-production-123-2',
+        1,
+      ),
+    ).toEqual({
+      name: 'runner-42',
+      runner_group_id: 1,
+      labels: ['ha-deploy-production-123-2'],
+      work_folder: '_work',
+    })
+    expect(() =>
+      jitConfigurationRequest('runner-42', 'label', 0),
+    ).toThrow('runner group ID')
   })
 
   it('binds authorization to the exact GitHub runner identity', () => {
