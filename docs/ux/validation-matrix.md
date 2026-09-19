@@ -24,10 +24,16 @@ The protected `master` workflow runs the automated portion after merge in the
 requests intentionally skip that job while retaining quality and full
 Playwright checks. The job uses `layout:verify --automated-only`, which cannot
 claim manual or full visual acceptance. Do not rerun the broad automated corpus
-locally merely to permit a push. For a layout-sensitive release, inspect the
-post-merge Action artifact and perform its requested interactions against an
-owned preview of the exact merged head before deployment. A `non-layout`
-classification or zero-item manual worklist requires no human layout review.
+locally merely to permit a push.
+
+Post-merge layout automation is asynchronous regression detection. Do not wait
+for its completion or artifact before building, deploying, or completing a
+release. A failed run automatically files one deduplicated investigation issue
+for the merged commit; the run, artifact, and any manual review are follow-up
+evidence, not release gates. When layout review is separately performed or
+claimed complete, inspect the matching Action artifact and exercise an owned
+preview of the exact head. A `non-layout` classification or zero-item manual
+worklist requires no human layout review.
 
 Use normal elapsed clocks for transition readiness. Missing selected panels,
 outgoing content, merely reachable servers, empty route filters and screenshots

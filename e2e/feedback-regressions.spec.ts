@@ -429,9 +429,16 @@ async function openTheaterRemote(page: Page) {
   return dialog
 }
 
-test('Home cameras and Security tiles use content-aware spans at every tier', async ({ page }) => {
+// @covers src/components/hass/SecurityDashboard.tsx
+test('Home cameras and Security tiles keep stable equal tracks at every tier', async ({ page }) => {
   test.setTimeout(120_000)
-  for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
+  const gridViewports = [
+    PAGE_LAYOUT_VIEWPORTS[0],
+    { appColumns: 2, cameraColumns: 2, choreColumns: 2, customColumns: 2, height: 874, remoteColumns: 2, securityCellWidth: 180, width: 402 },
+    ...PAGE_LAYOUT_VIEWPORTS.slice(1),
+  ] as const
+
+  for (const viewport of gridViewports) {
     await page.setViewportSize(viewport)
     await page.goto('/at-a-glance/security?feedback-layout=' + viewport.width)
     const root = activeRoute(page, 'security')
@@ -443,8 +450,8 @@ test('Home cameras and Security tiles use content-aware spans at every tier', as
       .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
     await expect(controlGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
     await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
-    await expect(controlGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
-    await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    await expect(controlGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
+    await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     await expect(controlGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
 
@@ -465,8 +472,8 @@ test('Home cameras and Security tiles use content-aware spans at every tier', as
         })),
       )
       for (const cell of cells) {
-        const expectedWidth = viewport.securityCellWidth * cell.span + 10 * (cell.span - 1)
-        expect(Math.abs(cell.width - expectedWidth)).toBeLessThanOrEqual(1)
+        expect(cell.span).toBe(1)
+        expect(Math.abs(cell.width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
       }
     }
 
@@ -483,7 +490,7 @@ test('Home cameras and Security tiles use content-aware spans at every tier', as
     const homeCameraGrid = homeRoot.getByRole('button', { name: 'Open Front Door camera' })
       .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
-    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
@@ -494,10 +501,44 @@ test('Home cameras and Security tiles use content-aware spans at every tier', as
       })),
     )
     for (const cell of homeCells) {
-      const expectedWidth = viewport.securityCellWidth * cell.span + 10 * (cell.span - 1)
-      expect(Math.abs(cell.width - expectedWidth)).toBeLessThanOrEqual(1)
+      expect(cell.span).toBe(1)
+      expect(Math.abs(cell.width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
     }
   }
+})
+
+test('camera tracks do not resize while streams hydrate on phone portrait', async ({ page }) => {
+  await page.setViewportSize({ width: 402, height: 874 })
+  await page.route('**/webrtc/webrtc-camera.js*', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1_200))
+    await route.fallback()
+  })
+  await page.goto('/at-a-glance/security?feedback-camera-hydration=402')
+
+  const root = activeRoute(page, 'security')
+  const cameraGrid = root.getByRole('button', { name: 'Open Front Door camera' })
+    .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
+  const readGeometry = () => cameraGrid.evaluate((grid) => ({
+    box: {
+      height: Number(grid.getBoundingClientRect().height.toFixed(2)),
+      width: Number(grid.getBoundingClientRect().width.toFixed(2)),
+    },
+    cells: Array.from(grid.children).map((cell) => {
+      const rect = cell.getBoundingClientRect()
+      return {
+        height: Number(rect.height.toFixed(2)),
+        span: cell.getAttribute('data-dynamic-grid-span'),
+        width: Number(rect.width.toFixed(2)),
+        x: Number(rect.x.toFixed(2)),
+        y: Number(rect.y.toFixed(2)),
+      }
+    }),
+  }))
+
+  await expect(cameraGrid.locator('[data-loaded="false"]')).toHaveCount(4)
+  const loadingGeometry = await readGeometry()
+  await expect(cameraGrid.locator('[data-loaded="true"]')).toHaveCount(4)
+  expect(await readGeometry()).toEqual(loadingGeometry)
 })
 
 // @covers src/components/hass/EditTodoItemSheet.tsx

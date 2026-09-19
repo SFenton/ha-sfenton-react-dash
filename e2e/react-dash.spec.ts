@@ -1,5 +1,6 @@
 // @covers src/components/shell/AppShell.module.css
 // @covers src/components/core/ExpandingSearchAction.module.css
+// @covers src/pages/DashboardViewPage.tsx
 import { expect, test, type FrameLocator, type Locator, type Page } from './layout/fixture'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from './quick-links'
@@ -4836,6 +4837,170 @@ test('mobile bed dial maps taps, drag, and keyboard to targets without invoking 
       .filter((call) => call.domain === 'switch' && call.service === 'turn_off' && call.target === 'switch.nightcanvasrestful_left_power')
   ))
   expect(powerOffCalls).toHaveLength(0)
+})
+
+test('mobile SleepyPod target prompt keeps dial and active-stage stepper commands separate from All Nights persistence', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/master-bedroom')
+  await page.evaluate(() => {
+    const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
+    mock.setEntityState('climate.sleepypod_eight_pod_left_side', 'heat')
+    mock.setEntityState('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2')
+    mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
+  })
+
+  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
+  const dial = bedDialog.getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
+  const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-2')
+  const dialBox = await dial.boundingBox()
+  if (!dialBox) throw new Error('SleepyPod target dial geometry was not measurable')
+  const targetPoint = valueToThermostatPoint(-5, -10, 10)
+  await startSleepypodPromptFrameSampler(page)
+  await dial.click({
+    position: {
+      x: (targetPoint.x / 100) * dialBox.width,
+      y: (targetPoint.y / 100) * dialBox.height,
+    },
+  })
+
+  const scopeDialog = page.getByRole('dialog', { name: 'Set Bed Temperature' })
+  await expect(scopeDialog).toBeVisible()
+  await expect.poll(async () => (
+    (await sleepypodPromptFrameSamples(page)).filter((sample) => sample.promptMounted).length
+  )).toBeGreaterThanOrEqual(3)
+  const mountedPromptFrames = (await sleepypodPromptFrameSamples(page)).filter((sample) => sample.promptMounted)
+  expect(mountedPromptFrames.length).toBeGreaterThanOrEqual(3)
+  for (const frame of mountedPromptFrames) {
+    expect(frame.rangeValue).toBe('-5')
+    expect(frame.readout).toContain('-5')
+    expect(frame.regionLabel).toMatch(/Stephen's Bed thermostat Cooling -5/i)
+    expect(frame.sliderValue).toBe('-5')
+  }
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toEqual([{
+    domain: 'script',
+    service: 'sleepypod_stephen_temperature_tonight',
+    serviceData: { level: -5 },
+  }])
+  await expect(scopeDialog).toHaveAttribute('data-surface', 'hass-popup')
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -5")
+  await expect(scopeDialog.getByRole('button', { name: 'Tonight' })).toBeFocused()
+  await expect(scopeDialog.locator('[data-modal-disclosure]')).toHaveCount(0)
+  await expect.poll(async () => scopeDialog.evaluate((element) => Math.round(window.innerHeight - element.getBoundingClientRect().bottom))).toBe(0)
+  const promptLayout = await scopeDialog.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const choices = [...element.querySelectorAll('button[aria-label="Tonight"], button[aria-label="All Nights"]')]
+    return {
+      backgroundColor: getComputedStyle(element).backgroundColor,
+      bottomGap: Math.round(window.innerHeight - rect.bottom),
+      borderRadius: getComputedStyle(element).borderRadius,
+      choiceHeights: choices.map((choice) => Math.round(choice.getBoundingClientRect().height)),
+      height: Math.round(rect.height),
+      width: Math.round(rect.width),
+    }
+  })
+  expect(promptLayout).toMatchObject({
+    bottomGap: 0,
+    borderRadius: '30px 30px 0px 0px',
+    height: 430,
+    width: 393,
+  })
+  expect(promptLayout.backgroundColor).not.toBe('rgba(0, 0, 0, 0)')
+  expect(promptLayout.choiceHeights.every((height) => height >= 78)).toBe(true)
+
+  await scopeDialog.getByRole('button', { name: 'Tonight' }).click()
+  await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
+  await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
+  await expect(scopeDialog).toBeHidden()
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-5')
+  await expect(targetSlider).toBeFocused()
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toEqual([{
+    domain: 'script',
+    service: 'sleepypod_stephen_temperature_tonight',
+    serviceData: { level: -5 },
+  }])
+
+  await targetSlider.press('ArrowLeft')
+  await expect(scopeDialog).toBeVisible()
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • -6")
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toEqual([
+    {
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -5 },
+    },
+    {
+      domain: 'script',
+      service: 'sleepypod_stephen_temperature_tonight',
+      serviceData: { level: -6 },
+    },
+  ])
+  await scopeDialog.getByRole('button', { name: 'All Nights' }).click()
+
+  await expect(scopeDialog).toHaveAttribute('data-state', 'closed')
+  await expect(scopeDialog).toHaveAttribute('data-closing', 'true')
+  await page.waitForTimeout(350)
+  await expect(scopeDialog).toHaveCount(1)
+  await page.waitForTimeout(250)
+  await expect(scopeDialog).toHaveCount(0)
+  await expect(targetSlider).toBeFocused()
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'script')
+  ))).toHaveLength(2)
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'number' || call.domain === 'climate')
+  ))).toEqual([])
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+      .filter((call) => call.domain === 'input_number' && call.service === 'set_value')
+  ))).toEqual([{
+    domain: 'input_number',
+    service: 'set_value',
+    target: 'input_number.eight_sleep_stephen_bedtime_level',
+    serviceData: { value: -6 },
+  }])
+  await expect(targetSlider).toHaveAttribute('aria-valuenow', '-6')
+
+  await page.evaluate(() => {
+    const mock = (window as unknown as {
+      __mockHass: {
+        calls: Record<string, unknown>[]
+        setEntityState: (entityId: string, state: string) => void
+      }
+    }).__mockHass
+    mock.calls.length = 0
+    mock.setEntityState('input_number.eight_sleep_stephen_bedtime_level', '0')
+    mock.setEntityState('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2')
+  })
+  const increaseBedtime = bedDialog.getByRole('button', { name: "Increase Stephen's Bed Bedtime level" })
+  await increaseBedtime.click()
+  await expect(scopeDialog).toBeVisible()
+  await expect(scopeDialog).toContainText("Stephen's Bed • Bedtime • +1")
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+  ))).toEqual([{
+    domain: 'script',
+    service: 'sleepypod_stephen_temperature_tonight',
+    serviceData: { level: 1 },
+  }])
+  await scopeDialog.getByRole('button', { name: 'Tonight' }).click()
+  await expect(scopeDialog).toBeHidden()
+  await expect.poll(async () => page.evaluate(() => (
+    (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls
+  ))).toHaveLength(1)
+  await expect(increaseBedtime).toBeFocused()
 })
 
 test('mobile SleepyPod target prompt keeps current-target commands separate from All Nights persistence', async ({ page }) => {

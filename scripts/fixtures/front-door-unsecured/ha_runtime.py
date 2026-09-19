@@ -51,7 +51,9 @@ class Runtime:
         self.serial = 0
         self.persisted = {}
         self.step = {}
+        self.broker_depth = 0
         self.config = request["config"]
+        self.scripts = request.get("scripts", {})
         self.environment = NativeEnvironment(undefined=StrictUndefined)
         self.environment.filters["bool"] = lambda value, default=False: (
             value if isinstance(value, bool)
@@ -151,6 +153,12 @@ class Runtime:
                         break
                 else:
                     self.sequence(action.get("default", []), context, point + "/default")
+            elif "delay" in action:
+                delay = self.render(action["delay"], context)
+                self.now += float(delay.get("seconds", 0))
+            elif "condition" in action:
+                if not self.condition(action, context):
+                    raise Stopped("Condition failed")
             elif "stop" in action:
                 raise Stopped(action["stop"])
             elif "action" in action:
@@ -167,12 +175,26 @@ class Runtime:
     def service(self, action, context):
         name = action["action"]
         data = self.render(action.get("data", {}), context)
-        target = action.get("target", {}).get("entity_id")
+        target = self.render(action.get("target", {}).get("entity_id"), context)
         self.calls.append({"action": name, "target": target, "data": data, "at": self.now})
         if self.step.get("failService") == name:
             raise RuntimeError("Simulated service failure")
-        if name == "input_text.set_value" or name == "input_number.set_value":
-            self.set_state(target, {"state": data["value"]})
+        if name.startswith("script.") and name in self.scripts:
+            if name.endswith("sleepypod_hot_flash_broker") and self.broker_depth:
+                raise AssertionError("queued broker self-call is forbidden")
+            script_context = attributes({**context, **data})
+            if name.endswith("sleepypod_hot_flash_broker"):
+                self.broker_depth += 1
+            try:
+                self.sequence(self.scripts[name]["sequence"], script_context, "script/" + name)
+            finally:
+                if name.endswith("sleepypod_hot_flash_broker"):
+                    self.broker_depth -= 1
+        elif name in ("input_text.set_value", "input_number.set_value", "number.set_value"):
+            if name == "number.set_value":
+                self.request.setdefault("pending_echoes", []).append({"entity": target, "state": str(data["value"])})
+            else:
+                self.set_state(target, {"state": data["value"]})
         elif name == "input_select.select_option":
             self.set_state(target, data["option"])
         elif name in ("input_boolean.turn_on", "input_boolean.turn_off"):
@@ -185,6 +207,15 @@ class Runtime:
             })
         elif name == "homeassistant.save_persistent_states":
             self.persisted = copy.deepcopy(self.states)
+        elif name == "timer.start":
+            duration = float(data.get("duration", 900))
+            self.set_state(target, {"state": "active", "attributes": {"finishes_at": self.now + duration}})
+        elif name == "timer.cancel":
+            self.set_state(target, {"state": "idle", "attributes": {}})
+        elif name == "climate.set_hvac_mode":
+            self.request.setdefault("pending_echoes", []).append({"entity": target, "state": str(data["hvac_mode"])})
+        elif name == "mqtt.publish":
+            pass
         elif name == "lock.lock":
             if self.step.get("confirmLock"):
                 self.set_state(target, "locked")
@@ -198,6 +229,8 @@ class Runtime:
             self.now += during.get("advanceSeconds", 0)
         if self.step.get("crashAfterService") == name:
             raise Crashed(name)
+        if self.step.get("crashAfterCall") == len(self.calls):
+            raise Crashed(name)
 
     def run(self):
         for step in self.request["steps"]:
@@ -205,12 +238,14 @@ class Runtime:
             self.now = step["at"]
             if step.get("restart"):
                 for entity, state in self.persisted.items():
-                    if entity.startswith(("input_",)):
+                    if entity.startswith(("input_", "timer.")):
                         self.states[entity] = copy.deepcopy(state)
             entity = step.get("entity")
             before = copy.deepcopy(self.get(entity)) if entity else None
             for key, value in step.get("states", {}).items():
                 self.set_state(key, value)
+            for echo in step.get("echoes", []):
+                self.set_state(echo["entity"], echo)
             if entity:
                 self.set_state(entity, step["state"])
             if step.get("run", True) is False:
@@ -235,8 +270,8 @@ class Runtime:
             self.serial += 1
             context = attributes({"trigger": trigger, "context": {"id": f"test_incident_{self.serial:08d}"}})
             try:
-                self.sequence(self.config["actions"], context)
-            except (Stopped, Crashed):
+                self.sequence(step.get("actions", self.config["actions"]), context)
+            except (Stopped, Crashed, RuntimeError):
                 pass
         return {
             "calls": self.calls,
