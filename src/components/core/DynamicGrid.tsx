@@ -45,7 +45,7 @@ interface DynamicGridLayout {
 
 export type DynamicGridLastRow = 'center' | 'fill' | 'fill-minimum' | 'start'
 export type DynamicGridLayoutMode = 'bounded' | 'fill'
-export type DynamicGridItemSizing = 'content-aware' | 'uniform'
+export type DynamicGridItemSizing = 'content-aware' | 'fixed' | 'uniform'
 export type DynamicGridRowFill = boolean | 'except-last'
 
 interface DynamicGridProps {
@@ -281,7 +281,9 @@ function measuredLayout(
   const columnWidth = (gridWidth - gap * (availableColumns - 1)) / availableColumns
   if (columnWidth <= 0) return initialLayout(cells.length, availableColumns, fillRows, itemSizing)
 
-  const requiredCellWidths = cells.map((cell) => requiredCellWidth(cell, columnWidth))
+  const requiredCellWidths = itemSizing === 'fixed'
+    ? cells.map(() => 0)
+    : cells.map((cell) => requiredCellWidth(cell, columnWidth))
 
   const columns = itemSizing === 'uniform'
     ? uniformDynamicGridColumnCount(
@@ -292,9 +294,8 @@ function measuredLayout(
       MEASUREMENT_TOLERANCE_PX,
     )
     : availableColumns
-  const minimumSpans = itemSizing === 'uniform'
-    ? cells.map(() => 1)
-    : requiredCellWidths.map((requiredCellWidth) => {
+  const minimumSpans = itemSizing === 'content-aware'
+    ? requiredCellWidths.map((requiredCellWidth) => {
         let fittingSpan = availableColumns
 
         for (let candidateSpan = 1; candidateSpan <= availableColumns; candidateSpan += 1) {
@@ -307,11 +308,12 @@ function measuredLayout(
 
         return fittingSpan
       })
+    : cells.map(() => 1)
   const fillFinalRow = lastRow === 'fill'
     || (lastRow === 'fill-minimum' && !expanded)
   const rowFill = fillFinalRow ? 'all' : 'except-last'
   const fillMeasuredRows = fillRows === 'except-last' || fillFinalRow
-  const spans = itemSizing === 'uniform'
+  const spans = itemSizing !== 'content-aware'
     ? (
       fillMeasuredRows
         ? packDynamicGridSpans(Array.from({ length: cells.length }, () => 1), columns, rowFill)
@@ -322,6 +324,7 @@ function measuredLayout(
     ? centeredDynamicGridStarts(spans, columns)
     : Array.from({ length: cells.length }, () => 0)
   const wrapLabels = requiredCellWidths.map((requiredCellWidth, index) => {
+    if (itemSizing === 'fixed') return false
     if (itemSizing === 'content-aware' && minimumSpans[index] < availableColumns) return false
     if (itemSizing === 'uniform' && columns > 1) return false
     return requiredCellWidth > gridWidth + MEASUREMENT_TOLERANCE_PX
@@ -383,19 +386,25 @@ export function DynamicGrid({
     const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
     resizeObserver?.observe(grid)
     if (layoutMode === 'bounded' && grid.parentElement) resizeObserver?.observe(grid.parentElement)
-    for (const label of grid.querySelectorAll<HTMLElement>(`${LABEL_SELECTOR}, ${LABEL_CONTAINER_SELECTOR}`)) {
-      resizeObserver?.observe(label)
+
+    let mutationObserver: MutationObserver | null = null
+    if (itemSizing !== 'fixed') {
+      for (const label of grid.querySelectorAll<HTMLElement>(`${LABEL_SELECTOR}, ${LABEL_CONTAINER_SELECTOR}`)) {
+        resizeObserver?.observe(label)
+      }
+
+      mutationObserver = typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver(measure)
+      mutationObserver?.observe(grid, { characterData: true, childList: true, subtree: true })
     }
 
-    const mutationObserver = typeof MutationObserver === 'undefined'
-      ? null
-      : new MutationObserver(measure)
-    mutationObserver?.observe(grid, { characterData: true, childList: true, subtree: true })
-
-    let active = true
-    void document.fonts?.ready.then(() => {
-      if (active) measure()
-    })
+    let active = itemSizing !== 'fixed'
+    if (active) {
+      void document.fonts?.ready.then(() => {
+        if (active) measure()
+      })
+    }
 
     return () => {
       active = false
@@ -403,7 +412,7 @@ export function DynamicGrid({
       mutationObserver?.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [items.length, layoutMode, measure])
+  }, [itemSizing, items.length, layoutMode, measure])
 
   const activeLayout = layout.spans.length === items.length
     ? layout

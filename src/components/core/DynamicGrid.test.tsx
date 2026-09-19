@@ -186,6 +186,49 @@ describe('DynamicGrid', () => {
     })
   })
 
+  it('keeps fixed grids on stable tracks when marked labels change', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return 370
+      if (this.dataset.dynamicGridCell === 'true') return 180
+      if (this.dataset.dynamicGridLabelContainer === 'true') return 112
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
+      return Number(this.dataset.naturalWidth ?? 0)
+    })
+
+    const renderGrid = (state: string) => (
+      <DynamicGrid ariaLabel="Stable live tiles" columns={2} fillRows={false} itemSizing="fixed">
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-natural-width="260">Security System</span>
+            <span data-dynamic-grid-label="true" data-natural-width="200">{state}</span>
+          </span>
+        </button>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-natural-width="240">Front Door</span>
+            <span data-dynamic-grid-label="true" data-natural-width="180">Locked</span>
+          </span>
+        </button>
+      </DynamicGrid>
+    )
+    const view = render(renderGrid('Loading'))
+    const grid = screen.getByRole('group', { name: 'Stable live tiles' })
+
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '2')
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1'])
+    })
+
+    view.rerender(renderGrid('Live'))
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '2')
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1'])
+    })
+  })
+
   it('wraps only after a uniform grid reaches one column', async () => {
     const gridWidth = 210
     const clientWidth = (element: HTMLElement) => {
