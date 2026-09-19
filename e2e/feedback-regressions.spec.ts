@@ -3,8 +3,11 @@
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
 // @covers src/components/core/ModalSheet.tsx
+// @covers src/constants/roomPages.ts
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
+import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../src/constants/roomPages'
+import { MOBILE_GEOMETRY_PROFILES } from './responsive-acceptance-data'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
 import { waitForModalReady, waitForNavigation } from './layout/evidence'
 import { openQuickLinksTab } from './quick-links'
@@ -412,6 +415,22 @@ function activeRoute(page: Page, path: string) {
   return page.locator('[data-route-path="' + path + '"]:visible').last()
 }
 
+async function expectDynamicGridRowsToFill(grid: Locator) {
+  await expect.poll(() => grid.evaluate((element) => {
+    const gridBounds = element.getBoundingClientRect()
+    const cells = Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-dynamic-grid-cell="true"]'))
+      .map((cell) => ({ bounds: cell.getBoundingClientRect(), row: Math.round(cell.getBoundingClientRect().top) }))
+    const rows = [...new Set(cells.map((cell) => cell.row))]
+
+    return rows.every((row) => {
+      const rowCells = cells.filter((cell) => cell.row === row)
+      const left = Math.min(...rowCells.map((cell) => cell.bounds.left))
+      const right = Math.max(...rowCells.map((cell) => cell.bounds.right))
+      return Math.abs(left - gridBounds.left) <= 1 && Math.abs(right - gridBounds.right) <= 1
+    })
+  })).toBe(true)
+}
+
 async function setMockStates(page: Page, states: Record<string, string>) {
   await page.evaluate((entries) => {
     const mock = (window as unknown as {
@@ -539,6 +558,58 @@ test('camera tracks do not resize while streams hydrate on phone portrait', asyn
   const loadingGeometry = await readGeometry()
   await expect(cameraGrid.locator('[data-loaded="true"]')).toHaveCount(4)
   expect(await readGeometry()).toEqual(loadingGeometry)
+})
+
+test('room source grids stay within two columns and fill every row', async ({ page }) => {
+  test.setTimeout(120_000)
+
+  for (const profileName of ['island-phone-landscape-left', 'island-phone-landscape-right', 'rectangular-phone-landscape']) {
+    const profile = MOBILE_GEOMETRY_PROFILES.find((candidate) => candidate.name === profileName)!
+    await page.setViewportSize(profile.viewport)
+    await page.goto('/index.html?path=master-bedroom&feedback-room-grid=' + profile.name)
+    await setSafeAreaInsets(page, profile.insets)
+    const root = activeRoute(page, 'master-bedroom')
+    await expect(root.getByRole('heading', { level: 1, name: 'Master Bedroom' })).toBeVisible()
+    const climateGrid = root.getByRole('group', { name: 'Master Bedroom Climate' })
+
+    await expect(climateGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+    await expectDynamicGridRowsToFill(climateGrid)
+  }
+
+  for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
+    await page.setViewportSize(viewport)
+    await page.goto('/index.html?path=master-bedroom&feedback-room-grid=' + viewport.width)
+    const root = activeRoute(page, 'master-bedroom')
+    await expect(root.getByRole('heading', { level: 1, name: 'Master Bedroom' })).toBeVisible()
+    const climateGrid = root.getByRole('group', { name: 'Master Bedroom Climate' })
+
+    await expect(climateGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+    await expect(climateGrid).toHaveAttribute('data-dynamic-grid-last-row', 'fill')
+    await expect(climateGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    await expectDynamicGridRowsToFill(climateGrid)
+  }
+
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  for (const path of ROOM_PAGE_ORDER) {
+    const room = ROOM_PAGE_CONFIGS[path]
+    await page.goto('/index.html?path=' + path + '&feedback-room-grid-audit=1920')
+    const root = activeRoute(page, path)
+    await expect(root.getByRole('heading', { level: 1, name: room.title })).toBeVisible()
+
+    for (const section of room.sourceSections.filter((candidate) => candidate.showOnRoomPage !== false && candidate.layout !== 'app-launch')) {
+      const grids = [
+        root.getByRole('group', { name: `${room.title} ${section.title}`, exact: true }),
+        ...(section.layout === 'lead-row'
+          ? [root.getByRole('group', { name: `${room.title} ${section.title} Controls`, exact: true })]
+          : []),
+      ]
+
+      for (const grid of grids) {
+        await expect.poll(async () => Number(await grid.getAttribute('data-dynamic-grid-columns'))).toBeLessThanOrEqual(2)
+        await expectDynamicGridRowsToFill(grid)
+      }
+    }
+  }
 })
 
 // @covers src/components/hass/EditTodoItemSheet.tsx
