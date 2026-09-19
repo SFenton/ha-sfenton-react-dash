@@ -53,7 +53,7 @@ describe('AtAGlancePage', () => {
     render(<AtAGlancePage />)
 
     const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
-    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
