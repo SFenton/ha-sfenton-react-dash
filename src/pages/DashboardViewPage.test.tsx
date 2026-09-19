@@ -1721,7 +1721,7 @@ describe('DashboardViewPage', () => {
     try {
       render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-      fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Off/i }))
+      fireEvent.click(screen.getByRole('button', { name: /Your Side Off/i }))
       const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
       fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
       expect(mockCallServiceCalls).toContainEqual({
@@ -7674,6 +7674,10 @@ describe('DashboardViewPage', () => {
     ['unassigned-chores', 'todo.unassigned_upcoming', 'Upcoming', 'Past Due'],
     ['home-improvement-chores', 'todo.home_improvement_s_upcoming', 'Upcoming', 'No Due Date'],
   ])('does not render empty sections on the %s subpage', async (path, emptyEntityId, emptyHeading, remainingHeading) => {
+    const remainingList = TODO_PAGES[path].lists.find((list) => list.title === remainingHeading)
+    expect(remainingList).toBeDefined()
+    mockEntities[emptyEntityId] = entity(emptyEntityId, '1')
+    mockEntities[remainingList!.entityId] = entity(remainingList!.entityId, '1')
     mockTodoItemsByEntity[emptyEntityId] = []
     render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
 
