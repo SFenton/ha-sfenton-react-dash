@@ -15,26 +15,39 @@ Every UX change must satisfy the canonical viewport, resize, state, modal,
 fine-pointer desktop, preload-I/O, and mobile-baseline gates in
 `docs/ux/validation-matrix.md`.
 
-Start with `docs/ux/layouts.md` and the executable layout plan. Resolve a clean
-base commit and an explicit working tree; never substitute a stale/dirty checkout
-or an already-running unowned server. The post-merge `master` workflow runs `layout:check`, `layout:plan`,
-`layout:run`, and automated-only `layout:verify` as documented. Pull requests
-retain quality and full Playwright checks, while automated layout is intentionally
-skipped until after merge. Do not duplicate that broad automated corpus as a
-local pre-push gate. The plan selects affected scenarios or a conservative
+Start with `docs/ux/layouts.md` and the executable layout plan. Before the first
+repository code edit for each task, create a new branch-backed Git worktree from
+`master` and perform implementation, tests, and review there. Never substitute
+the primary checkout, a stale/dirty checkout, an unrelated existing worktree,
+or an already-running unowned server. The post-merge `master` workflow runs
+`layout:check`, `layout:plan`, `layout:run`, and automated-only
+`layout:verify` as documented. Pull requests retain quality and full Playwright
+checks, while automated layout is intentionally skipped until after merge. Do
+not duplicate that broad automated corpus as a local pre-push gate. The plan
+selects affected scenarios or a conservative
 full-known-mock fallback; it does not require every test for every non-layout
 change. Changed copy is layout-sensitive even when its character/word counts
 are unchanged.
 
-Actual manual Playwright interaction and image inspection remain mandatory for
-the plan's review items after merging and before deploying a layout-sensitive
-release.
-Use the post-merge `master` run's `layout-automation` artifact and an owned
-preview of the exact merged head before deployment. Captured files, tags,
-registration counts and filled review schemas are not visual judgment. Record
-missing or inaccessible evidence as blocked; never bypass access restrictions.
-Local validation is mock-only, no-proxy and provenance-bound, and grants no HA
-or deployment authority.
+Worktree cleanup is part of release completion. After successful deployment and
+production verification, remove the task's implementation worktree and every
+release-only temporary worktree unless the user explicitly asks to keep the
+implementation worktree. Do not force-remove a worktree that contains
+uncommitted changes, and do not delete its branch without separate
+authorization; report blocked cleanup explicitly.
+
+Post-merge layout automation is asynchronous regression detection. Do not wait
+for its completion or artifact before building, deploying, or completing a
+release. A failed run automatically files one deduplicated investigation issue
+for the merged commit; the run, artifact, and any manual review are follow-up
+evidence, not release gates.
+
+When layout review is separately performed or its plan items are claimed
+complete, use the exact run's `layout-automation` artifact and an owned preview
+of the matching head. Captured files, tags, registration counts and filled
+review schemas are not visual judgment. Record missing or inaccessible evidence
+as blocked; never bypass access restrictions. Local validation is mock-only,
+no-proxy and provenance-bound, and grants no HA or deployment authority.
 
 ## Current Stack
 
@@ -245,6 +258,10 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 - Entity-aware components should be reusable and typed narrowly enough to prevent invalid service calls where practical.
 - Avoid hard-coded UI state if the corresponding Home Assistant entity state is available.
 - Keep entity IDs and route/page configuration in constants rather than scattering strings across components.
+- For SleepyPod capability or protocol decisions, read the Pod's `/api/system/version`
+  endpoint and inspect that exact revision in the deployed fork. Public upstream
+  is comparison evidence only and must not be treated as the deployed capability
+  surface.
 
 ## Home Assistant Sidebar Wrapper
 
