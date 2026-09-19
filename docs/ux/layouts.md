@@ -125,15 +125,17 @@ dimensions to positional arrays or confuse a resize with native input emulation.
 | remote | modal | active | Is the complete active direction pad visible without auto-scroll, operable, and unchanged on portrait return? |
 | vacuum | modal | docked, cleaning, dock-cleaning, resumable, low-battery | Does the fitted vacuum map fill the stationary left pane in short and tall landscape while the right pane scrolls naturally, while runtime-driven minimal states immediately trim tabs, keep Controls non-empty, surface only the active dock stop action, close the area editor, and preserve the correct selected tab? |
 | weather | modal | condition, precipitation, wind, pressure-unavailable, pressure-long, forecast-error-stale, forecast-empty, forecast-error-empty | Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with complete carousel pages centered and incomplete final pages aligned left, equal small-tile heights, no preview dropdown and unchanged return geometry? |
-| navigation | page-shell-grid | home, back-page | Do content, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey? |
+| navigation | page-shell-grid | home, back-page | Do content, viewer-relative room controls, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey? |
 | host | host | legacy, panel | Does the actual product bridge preserve its app during synthetic resizing and forward independent outer safe edges to the correctly sized inner viewport? |
 | preload | preload | inert | Is the hidden preload geometry inert while the visible app remains usable? |
 | wake-room | page-shell-grid | ready, no-enabled, unavailable, active | Does the standard room tile convey ready, no-enabled, unavailable and active state without moving, and open useful controls without issuing a command? |
 | wake-light | modal | alarms, defaults, empty, source-only, no-enabled, vacation, unavailable, incompatible, blocked, active, source-snoozed, recovering, spent-once, legacy-ramp | Are alarm controls, current blockers, source ownership, ramp choices and active Stop truthful, readable and reachable without changing the shared frame? |
 | wake-editor | modal | one-time, scheduled, unchanged, dirty, reverted, pending, rejected, revision-conflict, legacy-ramp | Does the one-time-first editor preserve exact dirty state, ramp selection and rejected/conflicting drafts while acceptance remains required before closing? |
 | wake-source | modal | pod-editor, pod-alarm-detail, back | Does source navigation close the old sheet before opening the authoritative Pod editor, preserve execution weekdays and linked-room meaning, and return without duplicate writes? |
+| solo-trip-settings | page-shell-grid | idle, idle-selected, modal, scheduled, activating, active, active-home-viewer, active-unknown-viewer, degraded, ending, restore-required, unavailable | Does the dedicated Solo Trip page keep both Settings-style sections visible while idle, selected, modal, scheduled, activating, active, degraded, ending, restore-required, and unavailable states remain truthful across mobile and desktop? |
+| solo-trip-bed | modal | home-side, away-side, home-viewer-home-side, home-viewer-away-side | Is the Away status below the bed power controls in stacked layouts and above Sleep Schedule in the right pane, while the home resident controls the whole bed and the traveler side remains read-only? |
 
-Source-derived inventory: 46 routes; 88
+Source-derived inventory: 48 routes; 88
 configured room/hash openers. These are not unique modal or backend-state counts.
 
 ## Device-only / outside local certification

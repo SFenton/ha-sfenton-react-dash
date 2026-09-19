@@ -1,5 +1,5 @@
 import { expect, test } from './layout/fixture'
-import { RESPONSIVE_ROUTES } from './responsive-acceptance-data'
+import { PRELOAD_ROUTES } from './layout/scenarios'
 
 test('hidden preload geometry performs no runtime I/O', async ({ page }) => {
   await page.addInitScript(() => {
@@ -38,7 +38,7 @@ test('hidden preload geometry performs no runtime I/O', async ({ page }) => {
   await page.goto('/index.html?path=overview')
   const cache = page.locator('[data-dashboard-preload-cache="true"]')
   await expect(cache).toBeAttached()
-  await expect(cache.locator('[data-preload-route]')).toHaveCount(RESPONSIVE_ROUTES.length)
+  await expect(cache.locator('[data-preload-route]')).toHaveCount(PRELOAD_ROUTES.length)
   await expect(cache.locator('[data-preload-geometry="modal"]').first()).toBeAttached()
   await expect(cache.locator('[data-preload-modal="media#music-room-remote"]')).toBeAttached()
   await expect(cache.locator('[data-preload-modal="music-room#music-room-remote"]')).toBeAttached()

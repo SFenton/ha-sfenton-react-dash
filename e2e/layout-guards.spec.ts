@@ -14,13 +14,15 @@ guardedTest('built-in Playwright page and context receive the isolation fixture'
 guardedTest('declared route additions cannot conceal changed inherited cards or extra sections', async ({ context }) => {
   const baseline = await context.newPage()
   const candidate = await context.newPage()
-  const inherited = ['sleepypod', 'media', 'climate'].map(name => `<section id="section-${name}" style="height:80px">
-    <h2 style="margin:0;line-height:20px;font-size:16px">${name}</h2>
-    <button data-variant="card" style="width:361px;height:60px;box-sizing:border-box">Existing ${name}</button>
-  </section>`).join('')
+  const inherited = ['sleepypod', 'media', 'climate'].map(name => `<div data-responsive-section-item="true">
+    <section id="section-${name}" style="height:80px">
+      <h2 style="margin:0;line-height:20px;font-size:16px">${name}</h2>
+      <button data-action-kind="modal" data-variant="card" style="width:361px;height:60px;box-sizing:border-box">Existing ${name}</button>
+    </section>
+  </div>`).join('')
   const addition = `<div data-responsive-section-item="true"><section id="section-sleep-&-wake" style="height:184px">
     <h2 style="margin:0;line-height:64px;font-size:16px">Sleep & Wake</h2>
-    <button data-variant="card" data-action-kind="modal" style="width:361px;height:120px;border-radius:32px;box-sizing:border-box">Wake</button>
+    <button aria-label="Wake-Light Alarms Next Alarm: fixture" data-variant="card" data-action-kind="modal" style="width:361px;height:120px;border-radius:32px;box-sizing:border-box">Wake</button>
   </section></div>`
   const document = (content: string) => `<main style="display:grid;gap:18px;width:361px">${content}</main>`
   await baseline.setContent(document(inherited))
@@ -33,7 +35,7 @@ guardedTest('declared route additions cannot conceal changed inherited cards or 
   await expect(candidate.locator('[id="section-sleep-&-wake"]')).toBeVisible()
   await candidate.locator('#section-climate button').evaluate(button => { button.style.width = '320px' })
   await expect(inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')).rejects.toThrow()
-  await candidate.setContent(document(addition + inherited + '<section id="unclassified">Extra</section>'))
+  await candidate.setContent(document(addition + inherited + '<div data-responsive-section-item="true"><section id="unclassified">Extra</section></div>'))
   await expect(inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')).rejects.toThrow()
   await candidate.setContent(document(addition.replace('height:120px', 'height:119px') + inherited))
   await expect(inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')).rejects.toThrow()

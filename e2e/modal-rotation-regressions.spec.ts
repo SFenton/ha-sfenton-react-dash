@@ -1,9 +1,11 @@
 // @covers src/components/core/ModalSheet.module.css
+// @covers src/pages/DashboardViewPage.module.css
 // @covers src/components/core/GlassTile.module.css
 // @covers src/components/core/GlassTile.tsx
 // @covers src/components/shell/GlobalQuickLinksAction.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
-import { waitForModalReady, type ModalReadiness } from './layout/evidence'
+import { modalFacts, waitForModalReady, type ModalReadiness } from './layout/evidence'
+import { openSurface } from './layout/app'
 import { writeFileSync } from 'node:fs'
 import { ROOM_PAGE_CONFIGS } from '../src/constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../src/constants/mediaRemotes'
@@ -423,7 +425,7 @@ for (const tab of ['Overdue Chores', 'Upcoming Chores', 'Expired Food'] as const
     await page.setViewportSize(PORTRAIT)
     await installSafeAreaInsets(page, PORTRAIT.insets)
     await page.goto('/index.html?path=overview&user=stephen#daily-report')
-    const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+    const dialog = page.getByRole('dialog', { name: "Your Summary" })
     await settle(dialog)
     await dialog.getByRole('tab', { name: new RegExp(`^${tab}`) }).click()
     const list = dialog.getByLabel(`${tab} ${tab === 'Expired Food' ? 'inventory' : 'todo'} list`, { exact: true })
@@ -657,7 +659,7 @@ test('Quick Links and Summary share the same frame on rotation, reopen, tablet a
   ]) {
     await resize(page, PORTRAIT)
     await page.evaluate(() => { window.location.hash = '#daily-report' })
-    const summary = page.getByRole('dialog', { name: "Stephen's Summary" })
+    const summary = page.getByRole('dialog', { name: "Your Summary" })
     await settle(summary)
     await resize(page, profile)
     await expect(summary).toHaveAttribute('data-modal-presentation', profile.height < 560 ? 'landscape-dialog' : 'dialog')
@@ -982,6 +984,64 @@ async function bodyInsetMetrics(dialog: Locator) {
     return metrics
   }, previous)
 }
+
+async function expectSoloTripAwayChipPlacement(dialog: Locator, placement: 'right-pane' | 'stacked') {
+  const chip = dialog.locator('[data-eight-sleep-away-chip="true"]')
+  const powerActions = dialog.locator('[data-eight-sleep-power-actions="true"]')
+  const panel = dialog.locator('[data-scroll-region="eight-sleep-panel"]')
+  const schedule = panel.getByRole('heading', { name: 'Sleep Schedule' })
+
+  await expect(chip).toHaveCount(1)
+  await expect(dialog.getByRole('note', { name: 'Stephen Away' })).toHaveCount(1)
+  await expect(powerActions).toBeVisible()
+  await expect(panel).toBeVisible()
+  await expect(schedule).toBeVisible()
+
+  const [chipBox, powerActionsBox, panelBox, scheduleBox] = await Promise.all([
+    chip.boundingBox(),
+    powerActions.boundingBox(),
+    panel.boundingBox(),
+    schedule.boundingBox(),
+  ])
+  if (!chipBox || !powerActionsBox || !panelBox || !scheduleBox) throw new Error('Solo Trip away-chip placement requires visible geometry')
+
+  if (placement === 'right-pane') {
+    expect(Math.abs(chipBox.x - panelBox.x), 'Away chip aligns with the right pane').toBeLessThanOrEqual(1)
+    expect(Math.abs(chipBox.width - panelBox.width), 'Away chip matches the right pane width').toBeLessThanOrEqual(1)
+    expect(chipBox.y + chipBox.height, 'Away chip precedes Sleep Schedule').toBeLessThanOrEqual(scheduleBox.y + 1)
+    return
+  }
+
+  expect(chipBox.y, 'Away chip follows the Turn On/Turn Off container').toBeGreaterThanOrEqual(powerActionsBox.y + powerActionsBox.height - 1)
+  expect(chipBox.y + chipBox.height, 'Away chip precedes the stacked schedule panel').toBeLessThanOrEqual(panelBox.y + 1)
+}
+
+test('Solo Trip whole-bed SleepyPod content remains intrinsic after scrolling and mounted rotation', async ({ page }) => {
+  await page.setViewportSize(PORTRAIT)
+  const dialog = await openSurface(page, 'solo-trip-bed', 'home-side')
+  await installSafeAreaInsets(page, PORTRAIT.insets)
+  await modalFacts(dialog, 'panes')
+  await expectSoloTripAwayChipPlacement(dialog, 'stacked')
+  const chipHandle = await dialog.locator('[data-eight-sleep-away-chip="true"]').elementHandle()
+  if (!chipHandle) throw new Error('Solo Trip away chip did not mount')
+
+  for (const profile of LANDSCAPES.slice(0, 2)) {
+    await resize(page, profile)
+    await modalFacts(dialog, 'panes')
+    await expectSoloTripAwayChipPlacement(dialog, 'right-pane')
+  }
+
+  for (const profile of LANDSCAPES.slice(2, 4)) {
+    await resize(page, profile)
+    await modalFacts(dialog, 'panes')
+    await expectSoloTripAwayChipPlacement(dialog, 'stacked')
+  }
+
+  await resize(page, PORTRAIT)
+  await modalFacts(dialog, 'panes')
+  await expectSoloTripAwayChipPlacement(dialog, 'stacked')
+  expect(await chipHandle.evaluate((element) => element.isConnected)).toBe(true)
+})
 
 test('body-inset measurement rejects missing or non-finite terminal controls', async ({ page }) => {
   const markup = `<div role="dialog" data-state="open" style="width:200px">

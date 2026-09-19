@@ -10,6 +10,9 @@ import { modalSheetPresentationForViewport } from '../src/components/core/modalS
 import { VIEWPORTS, type ResponsiveViewport } from './responsive-acceptance-data'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
 
+// @covers src/components/core/ScheduleConfirmationForm.module.css
+// @covers src/components/core/FieldActionButton.module.css
+
 type ModalAudit = {
   backdropActive: boolean
   backdropAreaRatio: number
@@ -167,6 +170,7 @@ const EXPECTED_PHYSICAL_MODAL_CALLSITES = {
   'src/components/hass/VacuumCard.tsx:VacuumModal': 1,
   'src/components/hass/WeatherSummary.tsx:WeatherSummary': 1,
   'src/components/hass/wakeLights/WakeLightModalContent.tsx:WakeLightModal': 1,
+  'src/components/hass/householdAway/SoloTripEditorModal.tsx:SoloTripEditorModal': 1,
   'src/components/hass/recipes/RecipeDetailModal.tsx:RecipeDetailModal': 1,
   'src/components/hass/recipes/RecipeFloatingActions.tsx:RecipeFilterSheet': 1,
   'src/components/hass/recipes/RecipeFloatingActions.tsx:RecipeSortSheet': 1,
@@ -247,6 +251,7 @@ async function setMockStates(page: Page, states: Record<string, string>) {
 
 async function openVacationConfirmation(page: Page) {
   await gotoRoute(page, 'vacation')
+  await page.getByRole('button', { name: /Vacation Set away dates and prepare the house for vacation\./i }).click()
   await setMockStates(page, {
     'input_boolean.vacation_mode': 'off',
     'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers': 'on',
@@ -261,6 +266,19 @@ async function openVacationConfirmation(page: Page) {
   await opener.click()
   const dialog = page.getByRole('dialog', { name: 'Confirm Vacation' })
   await expect(dialog).toBeVisible()
+  await waitForDialogSettled(dialog)
+  return dialog
+}
+
+async function openSoloTripEditor(page: Page) {
+  await gotoRoute(page, 'vacation')
+  await page.getByRole('button', { name: /Solo Trip One traveler, one home resident/i }).click()
+  await page.getByRole('button', { name: 'You', exact: true }).click()
+  await clearMockCalls(page)
+  await page.getByRole('switch', { name: 'Solo Trip Off' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Schedule Solo Trip' })
+  await expect(dialog).toBeVisible()
+  await waitForDialogSettled(dialog)
   return dialog
 }
 
@@ -375,6 +393,13 @@ const MODAL_CASES: ModalCase[] = [
   },
   {
     expectedScrollMode: 'body',
+    expectedSize: 'form',
+    id: 'solo-trip-editor',
+    open: openSoloTripEditor,
+    physicalCallsite: 'src/components/hass/householdAway/SoloTripEditorModal.tsx:SoloTripEditorModal',
+  },
+  {
+    expectedScrollMode: 'body',
     expectedSize: 'media',
     id: 'admin-presence-overrides',
     open: (page) => openHashModal(page, 'admin', '#presence-based-overrides', 'Presence-Based Overrides'),
@@ -391,7 +416,7 @@ const MODAL_CASES: ModalCase[] = [
     expectedScrollMode: 'panes',
     expectedSize: 'workspace',
     id: 'eight-sleep',
-    open: (page) => openButtonModal(page, 'master-bedroom', /Steph.s Bed Off/i, /Steph.s Bed/),
+    open: (page) => openButtonModal(page, 'master-bedroom', /Steph's Side Off/i, /Steph.s Bed/),
     physicalCallsite: 'src/pages/DashboardViewPage.tsx:EightSleepBedModal',
     selectTabs: [/^(?:Temperature|Sleep Schedule)$/, 'Special Modes', 'Alarms', 'Status'],
   },
@@ -456,7 +481,7 @@ const MODAL_CASES: ModalCase[] = [
     expectedScrollMode: 'body',
     expectedSize: 'standard',
     id: 'daily-report',
-    open: (page) => openHashModal(page, 'overview&user=stephen', '#daily-report', "Stephen's Summary"),
+    open: (page) => openHashModal(page, 'overview&user=stephen', '#daily-report', "Your Summary"),
     physicalCallsite: 'src/components/hass/DailyReportModal.tsx:DailyReportModal',
     selectTabs: [/^Overdue Chores/, 'Upcoming Chores', /^Expired Food/],
   },
@@ -1073,7 +1098,7 @@ async function auditModal(page: Page, modalCase: ModalCase, dialog: Locator, vie
   return metrics
 }
 
-async function assertNoMutatingCalls(page: Page, modalCase: ModalCase) {
+async function assertNoMutatingCalls(page: Page, modalCase: Pick<ModalCase, 'id'>) {
   const calls = await page.evaluate(() => window.__mockHass?.calls ?? [])
   const allowedReadCalls = new Set([
     'evershelf.list_inventory',
@@ -1135,21 +1160,96 @@ test.describe('complete ModalSheet inventory acceptance', () => {
 
   test('reconciles physical ModalSheet nodes with expanded review surfaces', () => {
     expect(modalInventoryCounts()).toEqual({
-      directModalSheetJsxCallsites: 31,
-      expandedReviewRows: 33,
+      directModalSheetJsxCallsites: 32,
+      expandedReviewRows: 34,
       missingCenteredGeometryCallsites: [],
       optionPickerConsumerCallsites: EXPECTED_OPTION_PICKER_CONSUMERS,
       optionPickerSheetConsumers: 2,
       physicalCallsiteCounts: EXPECTED_PHYSICAL_MODAL_CALLSITES,
     })
-    expect(MODAL_CASES).toHaveLength(35)
-    expect(LANDSCAPE_INTENT_CASES).toHaveLength(54)
+    expect(MODAL_CASES).toHaveLength(36)
+    expect(LANDSCAPE_INTENT_CASES).toHaveLength(55)
     expect([...new Set(MODAL_CASES.map((modalCase) => modalCase.physicalCallsite))].sort()).toEqual(
       Object.keys(EXPECTED_PHYSICAL_MODAL_CALLSITES).sort(),
     )
     expect(MODAL_CASES.flatMap((modalCase) => modalCase.consumerCallsite ?? []).sort()).toEqual(
       EXPECTED_OPTION_PICKER_CONSUMERS,
     )
+  })
+
+  test('keeps Vacation and Solo Trip schedule forms visually identical', async ({ page }) => {
+    test.setTimeout(180_000)
+
+    const facts = async (dialog: Locator) => {
+      const fields = dialog.locator('[data-schedule-confirmation-fields="true"]')
+      const action = dialog.locator('[data-schedule-confirmation-action="true"]')
+      await expect(fields).toBeVisible()
+      await expect(action).toBeVisible()
+      await expect(fields.locator('label')).toHaveCount(4)
+      await expect(action).toHaveAttribute('data-variant', 'primary')
+      return {
+        dialog: await dialog.evaluate((element) => {
+          const rect = element.getBoundingClientRect()
+          return {
+            height: rect.height,
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+          }
+        }),
+        action: await action.evaluate((element) => {
+          const rect = element.getBoundingClientRect()
+          const style = getComputedStyle(element)
+          return {
+            backgroundColor: style.backgroundColor,
+            borderRadius: style.borderRadius,
+            boxShadow: style.boxShadow,
+            height: rect.height,
+            width: rect.width,
+          }
+        }),
+        fields: await fields.evaluate((element) => {
+          const rect = element.getBoundingClientRect()
+          const style = getComputedStyle(element)
+          return {
+            columns: style.gridTemplateColumns.split(' ').filter(Boolean).length,
+            gridTemplateColumns: style.gridTemplateColumns,
+            width: rect.width,
+          }
+        }),
+      }
+    }
+
+    for (const profile of [
+      { columns: 1, height: 852, insets: { bottom: 34, left: 0, right: 0, top: 59 }, width: 393 },
+      { columns: 2, height: 320, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 568 },
+      { columns: 2, height: 375, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 667 },
+      { columns: 2, height: 343, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 734 },
+      { columns: 2, height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, width: 852 },
+      { columns: 2, height: 393, insets: { bottom: 21, left: 44, right: 59, top: 0 }, width: 852 },
+      { columns: 2, height: 900, insets: { bottom: 0, left: 0, right: 0, top: 0 }, width: 1440 },
+    ]) {
+      await page.setViewportSize({ height: profile.height, width: profile.width })
+      await installSafeAreaInsets(page, profile.insets)
+      const vacation = await openVacationConfirmation(page)
+      const vacationFacts = await facts(vacation)
+      await assertNoMutatingCalls(page, { id: 'vacation-confirmation' })
+      await assertMountedClose(vacation)
+
+      const soloTrip = await openSoloTripEditor(page)
+      const soloTripFacts = await facts(soloTrip)
+      await assertNoMutatingCalls(page, { id: 'solo-trip-editor' })
+
+      expect(vacationFacts.fields.columns).toBe(profile.columns)
+      expect(soloTripFacts.fields.columns).toBe(profile.columns)
+      expect(soloTripFacts.dialog).toEqual(vacationFacts.dialog)
+      expect(Math.abs(vacationFacts.fields.width - vacationFacts.action.width)).toBeLessThanOrEqual(1)
+      expect(Math.abs(soloTripFacts.fields.width - soloTripFacts.action.width)).toBeLessThanOrEqual(1)
+      expect(soloTripFacts.fields.gridTemplateColumns).toBe(vacationFacts.fields.gridTemplateColumns)
+      expect(soloTripFacts.action).toEqual(vacationFacts.action)
+
+      await assertMountedClose(soloTrip)
+    }
   })
 
   for (const profile of LANDSCAPE_GEOMETRY_PROFILES) {

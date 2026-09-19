@@ -48,4 +48,23 @@ describe('manual chat cleanup contract', () => {
     expect(deploy).toContain('process.exitCode = 2')
     expect(read('.github/skills/release-dashboard/SKILL.md')).toContain('sfenton_react_chat')
   })
+
+  it('stages the native Solo Trip package before deploying React assets', () => {
+    const deploy = read('scripts/deploy.ts')
+    for (const path of [
+      'packages/solo_trip.yaml',
+      'custom_templates/solo_trip.jinja',
+      'solo_trip/stage_schedule_writer_migration_v1.yaml',
+      'solo_trip/vacation_consumer_migration.yaml',
+    ]) {
+      expect(deploy).toContain(`'${path}'`)
+      expect(read(`home-assistant/${path}`).length).toBeGreaterThan(0)
+    }
+    expect(deploy).toContain("await client.mkdir(`${configRoot}/custom_templates`")
+    expect(deploy).toContain("await client.mkdir(`${configRoot}/solo_trip`")
+    expect(deploy).toContain('const soloTripNativeChanged = changedConfig.some')
+    expect(deploy).toContain('Restart Home Assistant with approval only after the native Solo Trip package')
+    expect(deploy.indexOf('React assets were not uploaded.')).toBeLessThan(deploy.indexOf('Uploading'))
+    expect(deploy).toContain('process.exitCode = 2')
+  })
 })

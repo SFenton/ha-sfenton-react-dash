@@ -1,0 +1,85 @@
+{
+  "bed": {
+    "awayReadOnlyDescription": "This traveler bed side is view-only during an active Solo Trip. Make changes from {{homeResident}}'s bed side.",
+    "awayReadOnlyDescriptionHome": "{{traveler}}'s bed side is view-only during an active Solo Trip. Make changes from your bed side.",
+    "awayReadOnlyDescriptionTraveler": "Your bed side is view-only during an active Solo Trip. Make changes from {{homeResident}}'s bed side.",
+    "readOnlyPowerLabel": "{{side}} Power Control · Read-Only During Solo Trip",
+    "readOnlySubtitle": "Away · Read Only",
+    "unavailablePowerLabel": "{{side}} unavailable",
+    "wholeBedDescription": "While {{traveler}} is away from home and the Solo Trip setting is enabled in settings, your controls and alarms will control the entire bed.",
+    "wholeBedDescriptionTraveler": "While you are away from home and the Solo Trip setting is enabled in settings, {{homeResident}}'s controls and alarms will control the entire bed.",
+    "wholeBedState": "Whole Bed • {{state}}",
+    "wholeBedTitle": "{{bedTitle}} · Whole Bed"
+  },
+  "chooser": {
+    "ariaLabel": "Away options",
+    "soloTrip": "Solo Trip",
+    "soloTripSubtitle": "One traveler, one home resident",
+    "setupRequiredSubtitle": "Home Assistant Setup · Learn More",
+    "vacation": "Vacation Mode"
+  },
+  "editor": {
+    "changeReturn": "Change",
+    "cancelReturn": "Cancel",
+    "confirm": "Schedule Solo Trip",
+    "description": "Choose when Solo Trip starts and ends for the selected traveler.",
+    "endDate": "Return Date",
+    "endTime": "Return Time",
+    "homeResident": "At Home",
+    "saveReturn": "Save",
+    "startDate": "Departure Date",
+    "startTime": "Departure Time",
+    "title": "Schedule Solo Trip",
+    "traveler": "Away From Home",
+    "travelerSteph": "Steph",
+    "travelerStephen": "Stephen",
+    "validation": {
+      "endAfterStart": "Return must be after departure.",
+      "startInFuture": "Departure must be in the future.",
+      "travelerRequired": "Select the resident who will be away from home."
+    }
+  },
+  "errors": {
+    "commandFailed": "Home Assistant could not apply the Solo Trip change. Try again.",
+    "setupRequired": "Solo Trip scheduling is unavailable. Complete Household Away setup, then try again.",
+    "travelerRequired": "Select the user that will be away from home to continue.",
+    "unknownOutcome": "Home Assistant did not confirm the Solo Trip change. Wait for the dashboard to refresh before sending another request.",
+    "vacationConflict": "Vacation Mode is already engaged. Turn it off before scheduling Solo Trip."
+  },
+  "page": {
+    "awayFromHomeDescription": "Select the user that will be away from home",
+    "awayFromHomeTitle": "Away From Home",
+    "memberAriaLabel": "{{name}} {{state}}",
+    "soloTripDescription": "Enable or disable Solo Trip mode for the house.",
+    "toggleAriaLabel": "Solo Trip {{state}}",
+    "toggleDisabled": "Select the user that will be away from home first.",
+    "toggleOff": "Off",
+    "toggleOn": "On",
+    "travelerAway": "Away",
+    "travelerHome": "Home",
+    "travelerSelected": "Selected",
+    "travelerSelectedLabel": "Selected Traveler",
+    "valueAriaLabel": "{{label}} {{value}}"
+  },
+  "status": {
+    "activeDescription": "While {{traveler}} is away from home and the Solo Trip setting is enabled in settings, your controls and alarms will control the entire bed.",
+    "activeDescriptionTraveler": "While you are away from home and the Solo Trip setting is enabled in settings, {{homeResident}}'s controls and alarms will control the entire bed.",
+    "activeTitle": "{{traveler}} Away",
+    "activeUnconfirmedDescription": "Solo Trip is active, but some requested effects are still waiting for Home Assistant confirmation.",
+    "activatingDescription": "Solo Trip is starting. Wait for Home Assistant to confirm the current schedule, or end it now if needed.",
+    "activatingTitle": "Starting Solo Trip",
+    "cancel": "Cancel Solo Trip",
+    "degradedDescription": "Some requested effects are unconfirmed. Retries continue automatically, or end away mode.",
+    "degradedTitle": "Solo Trip Degraded",
+    "endingDescription": "Solo Trip is ending and restoring normal settings.",
+    "endingTitle": "Ending Solo Trip",
+    "endNow": "End Solo Trip Now",
+    "restoreKeepCurrent": "Keep Current Schedule",
+    "restoreRequiredDescription": "The away-side schedule changed unexpectedly during Solo Trip. Choose how to resolve it before Solo Trip can finish.",
+    "restoreRequiredTitle": "Solo Trip Needs Attention",
+    "restoreSaved": "Restore Saved Schedule",
+    "scheduledDescription": "Solo Trip for {{traveler}} starts {{startsAt}} and ends {{endsAt}}.",
+    "scheduledTitle": "Solo Trip Scheduled",
+    "updateEnd": "Change Return Time"
+  }
+}

@@ -257,7 +257,7 @@ test('Summary tabs switch without a blank flash or desktop dialog resize', async
   await page.setViewportSize(DESKTOP)
   await page.goto('/index.html?path=overview&user=stephen#daily-report')
 
-  const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+  const dialog = page.getByRole('dialog', { name: "Your Summary" })
   const nav = dialog.getByRole('tablist', { name: 'Daily report sections' })
   const panel = dialog.getByRole('tabpanel')
   await expect(dialog).toBeVisible()
@@ -1121,7 +1121,7 @@ test('Daily Summary keeps its host height through task and inventory detail page
   for (const viewport of [TABLET_PORTRAIT, TABLET_LANDSCAPE, DESKTOP]) {
     await page.setViewportSize(viewport)
     await page.goto(`/index.html?path=overview&user=stephen&feedback-summary=${viewport.width}#daily-report`)
-    const summary = page.getByRole('dialog', { name: "Stephen's Summary" })
+    const summary = page.getByRole('dialog', { name: "Your Summary" })
     await expect(summary).toBeVisible()
     const expectedHeight = Math.min(760, viewport.height - 64)
     expect(Math.abs(((await summary.boundingBox())?.height ?? 0) - expectedHeight)).toBeLessThanOrEqual(1)

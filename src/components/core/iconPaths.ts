@@ -1,5 +1,6 @@
 import {
   mdiAccount,
+  mdiAccountArrowRightOutline,
   mdiAccountCheck,
   mdiAccountCog,
   mdiAccountCircle,
@@ -20,6 +21,7 @@ import {
   mdiArrowUp,
   mdiAudioVideo,
   mdiAutorenew,
+  mdiBagSuitcase,
   mdiBarcodeScan,
   mdiBattery,
   mdiBathtub,
@@ -277,6 +279,7 @@ const ICON_PATHS = {
 const MATERIAL_ICON_PATHS: Record<string, string> = {
   'mdi:chat-outline': mdiChatOutline,
   'mdi:account': mdiAccount,
+  'mdi:account-arrow-right-outline': mdiAccountArrowRightOutline,
   'mdi:account-check': mdiAccountCheck,
   'mdi:account-cog': mdiAccountCog,
   'mdi:account-circle': mdiAccountCircle,
@@ -297,6 +300,7 @@ const MATERIAL_ICON_PATHS: Record<string, string> = {
   'mdi:arrow-up': mdiArrowUp,
   'mdi:audio-video': mdiAudioVideo,
   'mdi:autorenew': mdiAutorenew,
+  'mdi:bag-suitcase': mdiBagSuitcase,
   'mdi:barcode-scan': mdiBarcodeScan,
   'mdi:battery': mdiBattery,
   'mdi:bathtub': mdiBathtub,

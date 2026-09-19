@@ -1,0 +1,2774 @@
+# Solo Trip native package.
+#
+# Home Assistant owns the lifecycle through exactly four Solo helpers, two
+# retained MQTT sensors, two template gates, one queued response-bearing
+# script, and one reconciliation automation. The retained journal owns runtime
+# state after writer claim; the public status sensor is a redacted projection
+# that preserves the React v1 response shape.
+
+input_boolean:
+  solo_trip_enabled:
+    name: Solo Trip enabled
+    icon: mdi:account-arrow-right
+
+input_select:
+  solo_trip_traveler:
+    name: Solo Trip traveler
+    options:
+      - none
+      - stephen
+      - steph
+    icon: mdi:account-switch
+
+input_datetime:
+  solo_trip_start:
+    name: Solo Trip start
+    has_date: true
+    has_time: true
+  solo_trip_end:
+    name: Solo Trip end
+    has_date: true
+    has_time: true
+
+mqtt:
+  sensor:
+    - name: Solo Trip Journal
+      unique_id: solo_trip_journal
+      state_topic: household_away/native/journal
+      value_template: >-
+        {% from 'solo_trip.jinja' import journal_valid %}
+        {% set valid = journal_valid(value_json) | from_json %}
+        {% if valid %}
+          {{ value_json.generation }}
+        {% else %}
+          invalid
+        {% endif %}
+      json_attributes_topic: household_away/native/journal
+      icon: mdi:database-lock
+    - name: Household Away Status
+      unique_id: household_away_status
+      state_topic: household_away/native/status
+      value_template: >-
+        {% if value_json is mapping
+              and value_json.contract_version == 1
+              and value_json.state in ['idle', 'scheduled', 'activating', 'active', 'degraded', 'ending', 'restore_required'] %}
+          {{ value_json.state }}
+        {% else %}
+          unavailable
+        {% endif %}
+      json_attributes_topic: household_away/native/status
+      json_attributes_template: >-
+        {% from 'solo_trip.jinja' import journal_valid %}
+        {% set journal = states.sensor.solo_trip_journal.attributes if states.sensor.solo_trip_journal is defined else {} %}
+        {% set journal_ok = journal_valid(journal) | from_json %}
+        {% set pending = journal.get('pending_request') if journal is mapping else none %}
+        {% set status_revision_matches = value_json is mapping and value_json.revision == journal.get('revision') %}
+        {% set status_release_matches = value_json is mapping and value_json.release_token == journal.get('release_token') %}
+        {% set pending_status_match = value_json is mapping and pending is mapping and value_json.revision == pending.get('revision') and value_json.release_token == pending.get('release_token') and value_json.state == pending.get('state') %}
+        {% set status_ok = value_json is mapping and value_json.contract_version == 1 and ((status_revision_matches and status_release_matches) or pending_status_match) %}
+        {{ {
+          'contract_version': value_json.contract_version | default(0),
+          'revision': value_json.revision | default(0),
+          'command_available': journal_ok and status_ok and value_json.command_available == true,
+          'mode': value_json.mode | default('none'),
+          'traveler': value_json.traveler | default('none'),
+          'home_resident': value_json.home_resident | default('none'),
+          'starts_at': value_json.starts_at | default(none),
+          'ends_at': value_json.ends_at | default(none),
+          'blockers': value_json.blockers | default([]),
+          'effects': value_json.effects | default({}),
+          'restore_required': value_json.restore_required | default(true),
+          'release_token': value_json.release_token | default(none)
+        } | to_json }}
+      icon: mdi:home-export-outline
+
+template:
+  - binary_sensor:
+      - name: Solo Trip writer released
+        unique_id: solo_trip_writer_released
+        device_class: safety
+        state: >-
+          {% from 'solo_trip.jinja' import journal_valid %}
+          {% set journal = states.sensor.solo_trip_journal.attributes if states.sensor.solo_trip_journal is defined else {} %}
+          {% set journal_ok = journal_valid(journal) | from_json %}
+          {% set public_state = states('sensor.household_away_status') %}
+          {% set public_revision = state_attr('sensor.household_away_status', 'revision') %}
+          {% set public_token = state_attr('sensor.household_away_status', 'release_token') %}
+          {% set pending = journal.get('pending_request') if journal is mapping else none %}
+          {% set status_ok = (public_revision == journal.get('revision') and public_token == journal.get('release_token')) or (pending is mapping and public_revision == pending.get('revision') and public_token == pending.get('release_token')) %}
+          {{ journal_ok
+             and status_ok
+             and public_state in ['idle', 'scheduled']
+             and journal.get('solo_phase') in ['idle', 'scheduled']
+             and journal.get('writer_owner') in [none, '']
+             and journal.get('pending_request') in [none, '']
+             and journal.get('restore_record') in [none, '']
+             and state_attr('sensor.household_away_status', 'restore_required') is false }}
+      - name: Effective Vacation Mode
+        unique_id: effective_vacation_mode
+        device_class: safety
+        state: >-
+          {{ is_state('input_boolean.vacation_mode', 'on')
+             and is_state('binary_sensor.solo_trip_writer_released', 'on') }}
+
+script:
+  household_away_command:
+    alias: Household Away command
+    mode: queued
+    max: 10
+    fields:
+      operation:
+        description: schedule, cancel, end_now, update_end, resolve_restore, sleepypod_command, or reconcile
+        example: schedule
+      request_id:
+        description: Correlation and idempotency key
+      expected_revision:
+        description: Revision expected by the caller
+      mode:
+        description: Solo mode selector
+      traveler:
+        description: stephen or steph
+      start_date:
+        description: Local start date
+      start_time:
+        description: Local start time
+      end_date:
+        description: Local end date
+      end_time:
+        description: Local end time
+      resolve_action:
+        description: keep_current or restore_saved
+      action:
+        description: SleepyPod operation
+      side:
+        description: left or right
+      schedule:
+        description: Full or side-scoped SleepyPod schedule payload
+      alarm_rows:
+        description: Ordered alarm rows, preserved as arrays
+      enabled:
+        description: Climate power value
+      level:
+        description: Stage or temperature level
+      phase:
+        description: bedtime, asleep, or dawn
+      reason:
+        description: Reconciliation or end reason
+      internal_bypass:
+        description: Internal writer bypass for staged schedule migration
+    sequence:
+      - variables:
+          current_journal_json: >-
+            {{ dict(states.sensor.solo_trip_journal.attributes) | to_json(sort_keys=true)
+               if states.sensor.solo_trip_journal is defined
+               else '{}' }}
+          current_public_status_json: >-
+            {{ dict(states.sensor.household_away_status.attributes) | to_json(sort_keys=true)
+               if states.sensor.household_away_status is defined
+               else '{}' }}
+      - variables:
+          current_journal: "{{ current_journal_json | from_json }}"
+          current_public_status: "{{ current_public_status_json | from_json }}"
+      - variables:
+          solo_topic_journal: household_away/native/journal
+          solo_topic_status: household_away/native/status
+          sleepypod_topic_schedule: sleepypod/eight-pod/cmd/set-schedules
+          sleepypod_schedule_entity_id: sensor.master_bedroom_sleepypod_eight_pod_schedules
+          wake_light_entity_id: sensor.master_bedroom_wake_light
+          wake_light_profile_id: master-bedroom
+          normalized_operation: "{{ operation | default('', true) }}"
+          normalized_request_id: "{{ request_id | default('', true) }}"
+          normalized_sleepypod_action: "{{ action | default('', true) }}"
+          normalized_resolve_action: "{{ resolve_action | default('', true) }}"
+          normalized_side: "{{ side | default('', true) }}"
+          internal_sleepypod_bypass: "{{ internal_bypass == true and normalized_operation == 'sleepypod_command' }}"
+          supported_operations:
+            - schedule
+            - cancel
+            - end_now
+            - update_end
+            - resolve_restore
+            - sleepypod_command
+            - reconcile
+          supported_sleepypod_actions:
+            - set_power
+            - set_outside_level
+            - set_tonight_level
+            - set_stage_level
+            - set_schedule
+            - replace_alarms
+            - snooze_alarm
+            - stop_alarm
+          sleepypod_phase_entities:
+            left: sensor.sleepypod_stephen_schedule_phase
+            right: sensor.sleepypod_steph_schedule_phase
+          traveler_profiles:
+            stephen:
+              away_side: left
+              home_side: right
+              home_resident: steph
+              person_entity_id: person.stephen_fenton
+              away_alarm_state: sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state
+              away_alarm_stop: button.master_bedroom_sleepypod_eight_pod_left_alarm_stop
+              away_alarm_snooze: button.master_bedroom_sleepypod_eight_pod_left_alarm_snooze
+              home_alarm_stop: button.master_bedroom_sleepypod_eight_pod_right_alarm_stop
+              home_alarm_snooze: button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze
+            steph:
+              away_side: right
+              home_side: left
+              home_resident: stephen
+              person_entity_id: person.stephanie_hobart
+              away_alarm_state: sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state
+              away_alarm_stop: button.master_bedroom_sleepypod_eight_pod_right_alarm_stop
+              away_alarm_snooze: button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze
+              home_alarm_stop: button.master_bedroom_sleepypod_eight_pod_left_alarm_stop
+              home_alarm_snooze: button.master_bedroom_sleepypod_eight_pod_left_alarm_snooze
+          current_generation: "{{ current_journal.get('generation', 0) | int(0) if current_journal is mapping else 0 }}"
+          current_revision: "{{ current_journal.get('revision', 0) | int(0) if current_journal is mapping else 0 }}"
+          current_release_token: "{{ current_journal.get('release_token', 'bootstrap-v1') if current_journal is mapping else 'bootstrap-v1' }}"
+          journal_phase: "{{ current_journal.get('solo_phase', 'idle') if current_journal is mapping else 'idle' }}"
+          journal_owner: "{{ current_journal.get('writer_owner') if current_journal is mapping else none }}"
+          journal_plan: "{{ current_journal.get('runtime_plan') if current_journal is mapping else none }}"
+          journal_restore_record: "{{ current_journal.get('restore_record') if current_journal is mapping else none }}"
+          journal_request_results: "{{ current_journal.get('request_results', []) if current_journal is mapping else [] }}"
+          journal_pending_request: "{{ current_journal.get('pending_request') if current_journal is mapping else none }}"
+          presence_evidence: "{{ current_journal.get('presence_evidence', {}) if current_journal is mapping else {} }}"
+          journal_valid: >-
+            {% from 'solo_trip.jinja' import journal_valid %}
+            {{ journal_valid(current_journal) | from_json }}
+          status_revision_matches: "{{ current_public_status.get('revision') == current_revision if current_public_status is mapping else false }}"
+          status_release_matches: "{{ current_public_status.get('release_token') == current_release_token if current_public_status is mapping else false }}"
+          pending_status_match: >-
+            {{ current_public_status is mapping and journal_pending_request is mapping and current_public_status.get('revision') == journal_pending_request.get('revision') and current_public_status.get('release_token') == journal_pending_request.get('release_token') and states('sensor.household_away_status') == journal_pending_request.get('state') }}
+          status_ok: >-
+            {{ current_public_status.get('contract_version') == 1 and ((status_revision_matches and status_release_matches) or pending_status_match) }}
+          public_status_valid: >-
+            {{ states('sensor.household_away_status') in ['idle', 'scheduled', 'activating', 'active', 'degraded', 'ending', 'restore_required'] and status_ok }}
+          selected_traveler: >-
+            {% if traveler in ['stephen', 'steph'] %}
+              {{ traveler }}
+            {% elif journal_plan is mapping and journal_plan.traveler is defined %}
+              {{ journal_plan.traveler }}
+            {% else %}
+              {{ states('input_select.solo_trip_traveler') if states('input_select.solo_trip_traveler') in ['stephen', 'steph'] else 'none' }}
+            {% endif %}
+          selected_profile: "{{ traveler_profiles.get(selected_traveler, {}) }}"
+          home_side: "{{ selected_profile.home_side | default('right') }}"
+          away_side: "{{ selected_profile.away_side | default('left') }}"
+          home_resident: "{{ selected_profile.home_resident | default('none') }}"
+          traveler_person_entity_id: "{{ selected_profile.person_entity_id | default('person.unknown') }}"
+          traveler_state: "{{ states(traveler_person_entity_id) if traveler_person_entity_id != 'person.unknown' else 'unknown' }}"
+          sleepypod_phase_side: "{{ home_side if journal_phase == 'active' else normalized_side }}"
+          sleepypod_phase_state: >-
+            {{ states(sleepypod_phase_entities[sleepypod_phase_side])
+               if sleepypod_phase_side in ['left', 'right']
+               else 'unknown' }}
+          wake_current_revision: "{{ state_attr(wake_light_entity_id, 'revision') | int(0) }}"
+          current_schedule_payload: >-
+            {{ {
+              'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
+              'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
+            } }}
+          current_schedule_ready: >-
+            {{ current_schedule_payload is mapping
+               and current_schedule_payload.left is mapping
+               and current_schedule_payload.right is mapping
+               and current_schedule_payload.left | count > 0
+               and current_schedule_payload.right | count > 0 }}
+          current_away_fingerprint: >-
+            {% from 'solo_trip.jinja' import side_fingerprint %}
+            {{ side_fingerprint(current_schedule_payload[away_side]) }}
+          current_full_schedule_fingerprint: >-
+            {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+            {{ full_schedule_fingerprint(current_schedule_payload) }}
+          request_start_iso: >-
+            {% if start_date is string and start_time is string %}
+              {% set parsed = strptime(start_date ~ ' ' ~ start_time, '%Y-%m-%d %H:%M', none) %}
+              {{ parsed.isoformat() if parsed else none }}
+            {% else %}
+              {{ none }}
+            {% endif %}
+          request_end_iso: >-
+            {% if end_date is string and end_time is string %}
+              {% set parsed = strptime(end_date ~ ' ' ~ end_time, '%Y-%m-%d %H:%M', none) %}
+              {{ parsed.isoformat() if parsed else none }}
+            {% else %}
+              {{ none }}
+            {% endif %}
+          request_start_timestamp: "{{ as_timestamp(request_start_iso) if request_start_iso is string and request_start_iso | length > 0 else none }}"
+          request_end_timestamp: "{{ as_timestamp(request_end_iso) if request_end_iso is string and request_end_iso | length > 0 else none }}"
+          plan_start_timestamp: "{{ as_timestamp(journal_plan.starts_at) if journal_plan is mapping and journal_plan.starts_at is defined else none }}"
+          plan_end_timestamp: "{{ as_timestamp(journal_plan.ends_at) if journal_plan is mapping and journal_plan.ends_at is defined else none }}"
+          now_timestamp: "{{ as_timestamp(now()) }}"
+          current_minute_timestamp: "{{ as_timestamp(now().replace(second=0, microsecond=0)) }}"
+          request_payload: >-
+            {{ {
+              'operation': normalized_operation,
+              'request_id': normalized_request_id,
+              'mode': mode | default(none),
+              'traveler': traveler | default(none),
+              'start_date': start_date | default(none),
+              'start_time': start_time | default(none),
+              'end_date': end_date | default(none),
+              'end_time': end_time | default(none),
+              'resolve_action': normalized_resolve_action | default(none),
+              'action': normalized_sleepypod_action | default(none),
+              'side': normalized_side | default(none),
+              'schedule': schedule | default(none),
+              'alarm_rows': alarm_rows | default(none),
+              'enabled': enabled | default(none),
+              'level': level | default(none),
+              'phase': phase | default(none),
+              'reason': reason | default(none)
+            } }}
+          request_hash_value: >-
+            {% from 'solo_trip.jinja' import request_hash %}
+            {{ request_hash(request_payload) }}
+          known_request_entry: >-
+            {% if normalized_operation != 'reconcile' and not internal_sleepypod_bypass %}
+              {% set matches = journal_request_results | selectattr('request_id', 'defined') | selectattr('request_id', 'eq', normalized_request_id) | list %}
+              {{ matches[-1] if matches | count > 0 else journal_pending_request if journal_pending_request is mapping and journal_pending_request.request_id == normalized_request_id else none }}
+            {% else %}
+              {{ none }}
+            {% endif %}
+          known_request_response: "{{ known_request_entry.response if known_request_entry is mapping and known_request_entry.response is defined else none }}"
+          known_request_hash: "{{ known_request_entry.request_hash if known_request_entry is mapping and known_request_entry.request_hash is defined else none }}"
+          default_response: >-
+            {{ {
+              'request_id': normalized_request_id,
+              'status': 'rejected',
+              'revision': current_revision,
+              'state': states('sensor.household_away_status'),
+              'error_code': 'invalid_request',
+              'retryable': false,
+              'confirmed_effects': []
+            } }}
+      - choose:
+          - conditions: "{{ normalized_operation != 'reconcile' and not internal_sleepypod_bypass and known_request_hash is string and known_request_hash != request_hash_value }}"
+            sequence:
+              - variables:
+                  household_away_response: "{{ dict(default_response, error_code='request_id_conflict') }}"
+              - stop: Solo Trip request_id conflict
+                response_variable: household_away_response
+          - conditions: "{{ normalized_operation != 'reconcile' and not internal_sleepypod_bypass and known_request_response is mapping }}"
+            sequence:
+              - variables:
+                  household_away_response: "{{ known_request_response }}"
+              - stop: Replaying stored Solo Trip result
+                response_variable: household_away_response
+          - conditions: "{{ normalized_request_id | length == 0 }}"
+            sequence:
+              - variables:
+                  household_away_response: "{{ dict(default_response, error_code='missing_request_id') }}"
+              - stop: Solo Trip requires request_id
+                response_variable: household_away_response
+          - conditions: "{{ normalized_operation not in supported_operations }}"
+            sequence:
+              - variables:
+                  household_away_response: "{{ dict(default_response, error_code='unknown_operation') }}"
+              - stop: Unsupported operation
+                response_variable: household_away_response
+          - conditions: "{{ not journal_valid or (normalized_operation != 'reconcile' and not public_status_valid) }}"
+            sequence:
+              - variables:
+                  household_away_response: "{{ dict(default_response, error_code='invalid_journal_contract', retryable=true) }}"
+              - stop: Retained contract is not ready
+                response_variable: household_away_response
+          - conditions: "{{ normalized_operation not in ['reconcile'] and not internal_sleepypod_bypass and expected_revision | int(-1) != current_revision }}"
+            sequence:
+              - variables:
+                  household_away_response: "{{ dict(default_response, error_code='expected_revision_mismatch') }}"
+              - stop: Revision mismatch
+                response_variable: household_away_response
+          - conditions: >-
+              {{ normalized_operation != 'reconcile'
+                 and not internal_sleepypod_bypass
+                 and journal_pending_request is mapping
+                 and known_request_entry is not mapping }}
+            sequence:
+              - variables:
+                  household_away_response: >-
+                    {{ dict(default_response, error_code='request_in_progress', retryable=true) }}
+              - stop: Another Solo Trip request is still pending
+                response_variable: household_away_response
+
+      - choose:
+          - conditions: "{{ normalized_operation == 'schedule' }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ journal_phase != 'idle' }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='solo_trip_already_configured') }}"
+                      - stop: Existing Solo Trip must be cleared first
+                        response_variable: household_away_response
+                  - conditions: "{{ mode != 'solo_trip' }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='unsupported_mode') }}"
+                      - stop: Unsupported mode
+                        response_variable: household_away_response
+                  - conditions: "{{ selected_traveler not in ['stephen', 'steph'] }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='unknown_traveler') }}"
+                      - stop: Traveler required
+                        response_variable: household_away_response
+                  - conditions: "{{ is_state('input_boolean.vacation_mode', 'on') }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='vacation_mode_conflict') }}"
+                      - stop: Vacation conflict
+                        response_variable: household_away_response
+                  - conditions: "{{ request_start_timestamp is not number or request_end_timestamp is not number or request_start_timestamp < current_minute_timestamp or request_end_timestamp <= request_start_timestamp }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='start_in_past' if request_start_timestamp is number and request_start_timestamp < current_minute_timestamp else 'invalid_dates') }}"
+                      - stop: Invalid dates
+                        response_variable: household_away_response
+              - variables:
+                  schedule_release_token: "{{ 'release-v1-r' ~ (current_revision + 1) }}"
+                  schedule_pending_response: >-
+                    {{ {
+                      'request_id': normalized_request_id,
+                      'status': 'indeterminate',
+                      'revision': current_revision + 1,
+                      'state': 'scheduled',
+                      'error_code': 'status_echo_timeout',
+                      'retryable': true,
+                      'confirmed_effects': []
+                    } }}
+                  schedule_pending_request: >-
+                    {% from 'solo_trip.jinja' import pending_request_record %}
+                    {{ pending_request_record(normalized_request_id, request_hash_value, 'schedule', current_revision + 1, schedule_release_token, 'scheduled', schedule_pending_response) }}
+                  schedule_admission_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + 1,
+                      'revision': current_revision + 1,
+                      'solo_phase': 'scheduled',
+                      'writer_owner': none,
+                      'release_token': schedule_release_token,
+                      'runtime_plan': {
+                        'mode': 'solo_trip',
+                        'traveler': selected_traveler,
+                        'traveler_person_entity_id': traveler_person_entity_id,
+                        'home_resident': home_resident,
+                        'away_side': away_side,
+                        'home_side': home_side,
+                        'starts_at': request_start_iso,
+                        'ends_at': request_end_iso,
+                        'started_at': none
+                      },
+                      'sleepypod_baseline': none,
+                      'baseline_fingerprint': none,
+                      'last_confirmed_overlay_fingerprint': none,
+                      'wake_source_ref': none,
+                      'wake_owner_ref': none,
+                      'wake_prior_state': none,
+                      'presence_evidence': {},
+                      'pending_request': schedule_pending_request | from_json,
+                      'restore_record': none,
+                      'request_results': journal_request_results
+                    }) }}
+                  schedule_status_payload: >-
+                    {{ {
+                      'contract_version': 1,
+                      'revision': current_revision + 1,
+                      'command_available': true,
+                      'mode': 'solo_trip',
+                      'traveler': selected_traveler,
+                      'home_resident': home_resident,
+                      'starts_at': request_start_iso,
+                      'ends_at': request_end_iso,
+                      'blockers': [],
+                      'effects': {'sleepypod_live_follow': false, 'sleepypod_schedule': false, 'wake_light_source': false},
+                      'restore_required': false,
+                      'release_token': schedule_release_token,
+                      'state': 'scheduled'
+                    } | to_json(sort_keys=true) }}
+                  schedule_terminal_response: >-
+                    {{ {
+                      'request_id': normalized_request_id,
+                      'status': 'accepted',
+                      'revision': current_revision + 1,
+                      'state': 'scheduled',
+                      'error_code': none,
+                      'retryable': false,
+                      'confirmed_effects': ['journal_committed', 'status_committed']
+                    } }}
+                  schedule_terminal_request_results: >-
+                    {% from 'solo_trip.jinja' import append_terminal_result %}
+                    {{ append_terminal_result(journal_request_results, normalized_request_id, request_hash_value, schedule_terminal_response) }}
+                  schedule_terminal_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + 2,
+                      'revision': current_revision + 1,
+                      'solo_phase': 'scheduled',
+                      'writer_owner': none,
+                      'release_token': schedule_release_token,
+                      'runtime_plan': {
+                        'mode': 'solo_trip',
+                        'traveler': selected_traveler,
+                        'traveler_person_entity_id': traveler_person_entity_id,
+                        'home_resident': home_resident,
+                        'away_side': away_side,
+                        'home_side': home_side,
+                        'starts_at': request_start_iso,
+                        'ends_at': request_end_iso,
+                        'started_at': none
+                      },
+                      'sleepypod_baseline': none,
+                      'baseline_fingerprint': none,
+                      'last_confirmed_overlay_fingerprint': none,
+                      'wake_source_ref': none,
+                      'wake_owner_ref': none,
+                      'wake_prior_state': none,
+                      'presence_evidence': {},
+                      'pending_request': none,
+                      'restore_record': none,
+                      'request_results': schedule_terminal_request_results | from_json
+                    }) }}
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.solo_trip_traveler
+                data:
+                  option: "{{ selected_traveler }}"
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.solo_trip_start
+                data:
+                  datetime: "{{ request_start_iso }}"
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.solo_trip_end
+                data:
+                  datetime: "{{ request_end_iso }}"
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.solo_trip_enabled
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_journal }}"
+                  payload: "{{ schedule_admission_journal_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (schedule_admission_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (schedule_admission_journal_payload | from_json).payload_checksum }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(schedule_pending_response, error_code='journal_echo_timeout') }}"
+                      - stop: Schedule admission journal echo timed out
+                        response_variable: household_away_response
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_status }}"
+                  payload: "{{ schedule_status_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (schedule_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (schedule_status_payload | from_json).release_token and states('sensor.household_away_status') == 'scheduled' }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ schedule_pending_response }}"
+                      - stop: Schedule status echo timed out
+                        response_variable: household_away_response
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_journal }}"
+                  payload: "{{ schedule_terminal_journal_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (schedule_terminal_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (schedule_terminal_journal_payload | from_json).payload_checksum }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(schedule_pending_response, error_code='terminal_journal_echo_timeout') }}"
+                      - stop: Schedule terminal journal echo timed out
+                        response_variable: household_away_response
+              - variables:
+                  household_away_response: "{{ schedule_terminal_response }}"
+              - stop: Solo Trip scheduled
+                response_variable: household_away_response
+
+          - conditions: "{{ normalized_operation == 'cancel' }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ journal_phase not in ['idle', 'scheduled'] }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='solo_trip_not_scheduled') }}"
+                      - stop: Only scheduled Solo Trip can be canceled
+                        response_variable: household_away_response
+              - variables:
+                  cancel_release_token: "{{ 'release-v1-r' ~ (current_revision + 1) }}"
+                  cancel_pending_response: >-
+                    {{ {
+                      'request_id': normalized_request_id,
+                      'status': 'indeterminate',
+                      'revision': current_revision + 1,
+                      'state': 'idle',
+                      'error_code': 'status_echo_timeout',
+                      'retryable': true,
+                      'confirmed_effects': []
+                    } }}
+                  cancel_pending_request: >-
+                    {% from 'solo_trip.jinja' import pending_request_record %}
+                    {{ pending_request_record(normalized_request_id, request_hash_value, 'cancel', current_revision + 1, cancel_release_token, 'idle', cancel_pending_response) }}
+                  cancel_admission_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + 1,
+                      'revision': current_revision + 1,
+                      'solo_phase': 'idle',
+                      'writer_owner': none,
+                      'release_token': cancel_release_token,
+                      'runtime_plan': none,
+                      'sleepypod_baseline': none,
+                      'baseline_fingerprint': none,
+                      'last_confirmed_overlay_fingerprint': none,
+                      'wake_source_ref': none,
+                      'wake_owner_ref': none,
+                      'wake_prior_state': none,
+                      'presence_evidence': {},
+                      'pending_request': cancel_pending_request | from_json,
+                      'restore_record': none,
+                      'request_results': journal_request_results
+                    }) }}
+                  cancel_status_payload: >-
+                    {{ {
+                      'contract_version': 1,
+                      'revision': current_revision + 1,
+                      'command_available': true,
+                      'mode': 'none',
+                      'traveler': 'none',
+                      'home_resident': 'none',
+                      'starts_at': none,
+                      'ends_at': none,
+                      'blockers': [],
+                      'effects': {'sleepypod_live_follow': false, 'sleepypod_schedule': false, 'wake_light_source': false},
+                      'restore_required': false,
+                      'release_token': cancel_release_token,
+                      'state': 'idle'
+                    } | to_json(sort_keys=true) }}
+                  cancel_terminal_response: >-
+                    {{ {
+                      'request_id': normalized_request_id,
+                      'status': 'accepted',
+                      'revision': current_revision + 1,
+                      'state': 'idle',
+                      'error_code': none,
+                      'retryable': false,
+                      'confirmed_effects': ['writer_released']
+                    } }}
+                  cancel_terminal_request_results: >-
+                    {% from 'solo_trip.jinja' import append_terminal_result %}
+                    {{ append_terminal_result(journal_request_results, normalized_request_id, request_hash_value, cancel_terminal_response) }}
+                  cancel_terminal_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + 2,
+                      'revision': current_revision + 1,
+                      'solo_phase': 'idle',
+                      'writer_owner': none,
+                      'release_token': cancel_release_token,
+                      'runtime_plan': none,
+                      'sleepypod_baseline': none,
+                      'baseline_fingerprint': none,
+                      'last_confirmed_overlay_fingerprint': none,
+                      'wake_source_ref': none,
+                      'wake_owner_ref': none,
+                      'wake_prior_state': none,
+                      'presence_evidence': {},
+                      'pending_request': none,
+                      'restore_record': none,
+                      'request_results': cancel_terminal_request_results | from_json
+                    }) }}
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_journal }}"
+                  payload: "{{ cancel_admission_journal_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (cancel_admission_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (cancel_admission_journal_payload | from_json).payload_checksum }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(cancel_pending_response, error_code='journal_echo_timeout') }}"
+                      - stop: Cancel admission journal echo timed out
+                        response_variable: household_away_response
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_status }}"
+                  payload: "{{ cancel_status_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (cancel_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (cancel_status_payload | from_json).release_token and states('sensor.household_away_status') == 'idle' }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ cancel_pending_response }}"
+                      - stop: Cancel status echo timed out
+                        response_variable: household_away_response
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_journal }}"
+                  payload: "{{ cancel_terminal_journal_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (cancel_terminal_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (cancel_terminal_journal_payload | from_json).payload_checksum }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(cancel_pending_response, error_code='terminal_journal_echo_timeout') }}"
+                      - stop: Cancel terminal journal echo timed out
+                        response_variable: household_away_response
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.solo_trip_enabled
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.solo_trip_traveler
+                data:
+                  option: none
+              - variables:
+                  household_away_response: "{{ cancel_terminal_response }}"
+              - stop: Solo Trip canceled
+                response_variable: household_away_response
+
+          - conditions: "{{ normalized_operation == 'update_end' }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ journal_plan is not mapping }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='missing_runtime_plan') }}"
+                      - stop: No plan to update
+                        response_variable: household_away_response
+                  - conditions: "{{ request_end_timestamp is not number or plan_start_timestamp is not number or request_end_timestamp <= plan_start_timestamp }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='invalid_dates') }}"
+                      - stop: Invalid end time
+                        response_variable: household_away_response
+              - variables:
+                  update_end_release_token: "{{ current_release_token if journal_phase in ['active', 'restore_required'] else ('release-v1-r' ~ (current_revision + 1)) }}"
+                  update_end_pending_response: >-
+                    {{ {
+                      'request_id': normalized_request_id,
+                      'status': 'indeterminate',
+                      'revision': current_revision + 1,
+                      'state': journal_phase,
+                      'error_code': 'status_echo_timeout',
+                      'retryable': true,
+                      'confirmed_effects': []
+                    } }}
+                  update_end_pending_request: >-
+                    {% from 'solo_trip.jinja' import pending_request_record %}
+                    {{ pending_request_record(normalized_request_id, request_hash_value, 'update_end', current_revision + 1, update_end_release_token, journal_phase, update_end_pending_response) }}
+                  update_end_admission_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + 1,
+                      'revision': current_revision + 1,
+                      'solo_phase': journal_phase,
+                      'writer_owner': journal_owner,
+                      'release_token': update_end_release_token,
+                      'runtime_plan': dict(journal_plan, ends_at=request_end_iso),
+                      'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                      'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                      'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                      'wake_source_ref': current_journal.get('wake_source_ref'),
+                      'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                      'wake_prior_state': current_journal.get('wake_prior_state'),
+                      'presence_evidence': presence_evidence,
+                      'pending_request': update_end_pending_request | from_json,
+                      'restore_record': journal_restore_record,
+                      'request_results': journal_request_results
+                    }) }}
+                  update_end_status_payload: >-
+                    {{ {
+                      'contract_version': 1,
+                      'revision': current_revision + 1,
+                      'command_available': true,
+                      'mode': 'solo_trip',
+                      'traveler': selected_traveler,
+                      'home_resident': home_resident,
+                      'starts_at': journal_plan.starts_at,
+                      'ends_at': request_end_iso,
+                      'blockers': [],
+                      'effects': current_public_status.get('effects', {}),
+                      'restore_required': journal_phase == 'restore_required',
+                      'release_token': update_end_release_token,
+                      'state': journal_phase
+                    } | to_json(sort_keys=true) }}
+                  update_end_terminal_response: >-
+                    {{ {
+                      'request_id': normalized_request_id,
+                      'status': 'accepted',
+                      'revision': current_revision + 1,
+                      'state': journal_phase,
+                      'error_code': none,
+                      'retryable': false,
+                      'confirmed_effects': ['journal_committed', 'status_committed']
+                    } }}
+                  update_end_terminal_request_results: >-
+                    {% from 'solo_trip.jinja' import append_terminal_result %}
+                    {{ append_terminal_result(journal_request_results, normalized_request_id, request_hash_value, update_end_terminal_response) }}
+                  update_end_terminal_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + 2,
+                      'revision': current_revision + 1,
+                      'solo_phase': journal_phase,
+                      'writer_owner': journal_owner,
+                      'release_token': update_end_release_token,
+                      'runtime_plan': dict(journal_plan, ends_at=request_end_iso),
+                      'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                      'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                      'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                      'wake_source_ref': current_journal.get('wake_source_ref'),
+                      'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                      'wake_prior_state': current_journal.get('wake_prior_state'),
+                      'presence_evidence': presence_evidence,
+                      'pending_request': none,
+                      'restore_record': journal_restore_record,
+                      'request_results': update_end_terminal_request_results | from_json
+                    }) }}
+              - action: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.solo_trip_end
+                data:
+                  datetime: "{{ request_end_iso }}"
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_journal }}"
+                  payload: "{{ update_end_admission_journal_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (update_end_admission_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (update_end_admission_journal_payload | from_json).payload_checksum }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(update_end_pending_response, error_code='journal_echo_timeout') }}"
+                      - stop: Update-end journal echo timed out
+                        response_variable: household_away_response
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_status }}"
+                  payload: "{{ update_end_status_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (update_end_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (update_end_status_payload | from_json).release_token and states('sensor.household_away_status') == journal_phase }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ update_end_pending_response }}"
+                      - stop: Update-end status echo timed out
+                        response_variable: household_away_response
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_journal }}"
+                  payload: "{{ update_end_terminal_journal_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (update_end_terminal_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (update_end_terminal_journal_payload | from_json).payload_checksum }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(update_end_pending_response, error_code='terminal_journal_echo_timeout') }}"
+                      - stop: Update-end terminal journal echo timed out
+                        response_variable: household_away_response
+              - variables:
+                  household_away_response: "{{ update_end_terminal_response }}"
+              - stop: Solo Trip end updated
+                response_variable: household_away_response
+
+          - conditions: "{{ normalized_operation == 'reconcile' }}"
+            sequence:
+              - choose:
+                  - conditions: >-
+                      {{ journal_pending_request is mapping
+                         and journal_phase in ['idle', 'scheduled'] }}
+                    sequence:
+                      - variables:
+                          recovered_pending_response: >-
+                            {{ journal_pending_request.response
+                               if journal_pending_request.response is mapping
+                               else {
+                                 'request_id': journal_pending_request.request_id | default(normalized_request_id),
+                                 'status': 'indeterminate',
+                                 'revision': current_revision,
+                                 'state': journal_phase,
+                                 'error_code': 'pending_request_recovered',
+                                 'retryable': true,
+                                 'confirmed_effects': []
+                               } }}
+                          recovered_pending_results: >-
+                            {% from 'solo_trip.jinja' import append_terminal_result %}
+                            {{ append_terminal_result(
+                              journal_request_results,
+                              journal_pending_request.request_id | default(normalized_request_id),
+                              journal_pending_request.request_hash | default(request_hash_value),
+                              recovered_pending_response
+                            ) }}
+                          recovered_pending_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 1,
+                              'revision': current_revision,
+                              'solo_phase': journal_phase,
+                              'writer_owner': journal_owner,
+                              'release_token': current_release_token,
+                              'runtime_plan': journal_plan,
+                              'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                              'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                              'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                              'wake_source_ref': current_journal.get('wake_source_ref'),
+                              'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                              'wake_prior_state': current_journal.get('wake_prior_state'),
+                              'presence_evidence': presence_evidence,
+                              'pending_request': none,
+                              'restore_record': journal_restore_record,
+                              'request_results': recovered_pending_results | from_json
+                            }) }}
+                          recovered_pending_status_payload: >-
+                            {{ {
+                              'contract_version': 1,
+                              'revision': current_revision,
+                              'command_available': true,
+                              'mode': 'solo_trip' if journal_phase == 'scheduled' and journal_plan is mapping else 'none',
+                              'traveler': selected_traveler if journal_phase == 'scheduled' else 'none',
+                              'home_resident': home_resident if journal_phase == 'scheduled' else 'none',
+                              'starts_at': journal_plan.starts_at if journal_phase == 'scheduled' and journal_plan is mapping else none,
+                              'ends_at': journal_plan.ends_at if journal_phase == 'scheduled' and journal_plan is mapping else none,
+                              'blockers': [],
+                              'effects': {
+                                'sleepypod_live_follow': false,
+                                'sleepypod_schedule': false,
+                                'wake_light_source': false
+                              },
+                              'restore_required': false,
+                              'release_token': current_release_token,
+                              'state': journal_phase
+                            } | to_json(sort_keys=true) }}
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_status }}"
+                          payload: "{{ recovered_pending_status_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (recovered_pending_status_payload | from_json).revision
+                             and state_attr('sensor.household_away_status', 'release_token') == (recovered_pending_status_payload | from_json).release_token
+                             and states('sensor.household_away_status') == journal_phase }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(recovered_pending_response, error_code='pending_status_recovery_timeout', retryable=true) }}"
+                              - stop: Pending request status recovery timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ recovered_pending_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (recovered_pending_journal_payload | from_json).generation
+                             and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (recovered_pending_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(recovered_pending_response, error_code='pending_journal_recovery_timeout', retryable=true) }}"
+                              - stop: Pending request journal recovery timed out
+                                response_variable: household_away_response
+                      - variables:
+                          household_away_response: "{{ recovered_pending_response }}"
+                      - stop: Pending Solo Trip request recovered
+                        response_variable: household_away_response
+
+                  - conditions: >-
+                      {{ journal_phase == 'scheduled'
+                         and (
+                           is_state('input_boolean.vacation_mode', 'on')
+                           or is_state('input_boolean.solo_trip_enabled', 'off')
+                           or (plan_end_timestamp is number and now_timestamp >= plan_end_timestamp)
+                         ) }}
+                    sequence:
+                      - variables:
+                          yielded_release_token: "{{ 'release-v1-r' ~ (current_revision + 1) }}"
+                          yielded_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 1,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'idle',
+                              'writer_owner': none,
+                              'release_token': yielded_release_token,
+                              'runtime_plan': none,
+                              'sleepypod_baseline': none,
+                              'baseline_fingerprint': none,
+                              'last_confirmed_overlay_fingerprint': none,
+                              'wake_source_ref': none,
+                              'wake_owner_ref': none,
+                              'wake_prior_state': none,
+                              'presence_evidence': {},
+                              'pending_request': none,
+                              'restore_record': none,
+                              'request_results': journal_request_results
+                            }) }}
+                          yielded_status_payload: >-
+                            {{ {
+                              'contract_version': 1,
+                              'revision': current_revision + 1,
+                              'command_available': true,
+                              'mode': 'none',
+                              'traveler': 'none',
+                              'home_resident': 'none',
+                              'starts_at': none,
+                              'ends_at': none,
+                              'blockers': [],
+                              'effects': {'sleepypod_live_follow': false, 'sleepypod_schedule': false, 'wake_light_source': false},
+                              'restore_required': false,
+                              'release_token': yielded_release_token,
+                              'state': 'idle'
+                            } | to_json(sort_keys=true) }}
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ yielded_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (yielded_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (yielded_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(default_response, status='indeterminate', error_code='journal_echo_timeout', retryable=true) }}"
+                              - stop: Vacation yield journal echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_status }}"
+                          payload: "{{ yielded_status_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (yielded_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (yielded_status_payload | from_json).release_token and states('sensor.household_away_status') == 'idle' }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(default_response, status='indeterminate', error_code='status_echo_timeout', retryable=true) }}"
+                              - stop: Vacation yield status echo timed out
+                                response_variable: household_away_response
+                      - action: input_boolean.turn_off
+                        target:
+                          entity_id: input_boolean.solo_trip_enabled
+                      - action: input_select.select_option
+                        target:
+                          entity_id: input_select.solo_trip_traveler
+                        data:
+                          option: none
+                      - variables:
+                          household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'accepted', 'revision': current_revision + 1, 'state': 'idle', 'error_code': none, 'retryable': false, 'confirmed_effects': ['writer_released']} }}"
+                      - stop: Scheduled Solo Trip yielded to Vacation
+                        response_variable: household_away_response
+
+                  - conditions: "{{ journal_phase in ['activating', 'ending'] }}"
+                    sequence:
+                      - variables:
+                          interrupted_effects: >-
+                            {{ {
+                              'sleepypod_live_follow': false,
+                              'sleepypod_schedule': false,
+                              'wake_light_source': false
+                            } }}
+                          interrupted_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 1,
+                              'revision': current_revision,
+                              'solo_phase': 'restore_required',
+                              'writer_owner': journal_owner,
+                              'release_token': current_release_token,
+                              'runtime_plan': journal_plan,
+                              'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                              'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                              'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                              'wake_source_ref': current_journal.get('wake_source_ref'),
+                              'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                              'wake_prior_state': current_journal.get('wake_prior_state'),
+                              'presence_evidence': presence_evidence,
+                              'pending_request': none,
+                              'restore_record': {'reason': 'interrupted_transition'},
+                              'request_results': journal_request_results
+                            }) }}
+                          interrupted_status_payload: >-
+                            {{ {
+                              'contract_version': 1,
+                              'revision': current_revision,
+                              'command_available': true,
+                              'mode': 'solo_trip',
+                              'traveler': selected_traveler,
+                              'home_resident': home_resident,
+                              'starts_at': journal_plan.starts_at if journal_plan is mapping else none,
+                              'ends_at': journal_plan.ends_at if journal_plan is mapping else none,
+                              'blockers': ['interrupted_transition'],
+                              'effects': interrupted_effects,
+                              'restore_required': true,
+                              'release_token': current_release_token,
+                              'state': 'restore_required'
+                            } | to_json(sort_keys=true) }}
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ interrupted_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (interrupted_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (interrupted_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'indeterminate', 'revision': current_revision, 'state': 'restore_required', 'error_code': 'journal_echo_timeout', 'retryable': true, 'confirmed_effects': []} }}"
+                              - stop: Interrupted transition journal echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_status }}"
+                          payload: "{{ interrupted_status_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (interrupted_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (interrupted_status_payload | from_json).release_token and states('sensor.household_away_status') == 'restore_required' }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'indeterminate', 'revision': current_revision, 'state': 'restore_required', 'error_code': 'status_echo_timeout', 'retryable': true, 'confirmed_effects': []} }}"
+                              - stop: Interrupted transition status echo timed out
+                                response_variable: household_away_response
+                      - variables:
+                          household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'indeterminate', 'revision': current_revision, 'state': 'restore_required', 'error_code': 'interrupted_transition', 'retryable': false, 'confirmed_effects': []} }}"
+                      - stop: Interrupted transition requires restore
+                        response_variable: household_away_response
+
+                  - conditions: "{{ journal_phase == 'scheduled' and is_state('input_boolean.solo_trip_enabled', 'on') and plan_start_timestamp is number and plan_end_timestamp is number and now_timestamp >= plan_start_timestamp and now_timestamp < plan_end_timestamp }}"
+                    sequence:
+                      - choose:
+                          - conditions: "{{ not current_schedule_ready }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: >-
+                                    {{ dict(default_response, error_code='schedule_unavailable', retryable=true) }}
+                              - stop: SleepyPod schedule is not ready for activation
+                                response_variable: household_away_response
+                      - variables:
+                          activation_release_token: "{{ 'release-v1-r' ~ (current_revision + 1) }}"
+                          activation_owner_ref: "{{ 'solo_trip:' ~ normalized_request_id }}"
+                          activation_pending_response: >-
+                            {{ {'request_id': normalized_request_id, 'status': 'indeterminate', 'revision': current_revision + 1, 'state': 'restore_required', 'error_code': 'journal_claim_echo_timeout', 'retryable': true, 'confirmed_effects': []} }}
+                          activation_claim_pending_request: >-
+                            {% from 'solo_trip.jinja' import pending_request_record %}
+                            {{ pending_request_record(normalized_request_id, request_hash_value, 'reconcile', current_revision + 1, activation_release_token, 'activating', activation_pending_response) }}
+                          activation_claim_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 1,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'activating',
+                              'writer_owner': activation_owner_ref,
+                              'release_token': activation_release_token,
+                              'runtime_plan': journal_plan,
+                              'sleepypod_baseline': none,
+                              'baseline_fingerprint': none,
+                              'last_confirmed_overlay_fingerprint': none,
+                              'wake_source_ref': 'sleepypod:' ~ away_side,
+                              'wake_owner_ref': activation_owner_ref,
+                              'wake_prior_state': states(wake_light_entity_id),
+                              'presence_evidence': presence_evidence,
+                              'pending_request': activation_claim_pending_request | from_json,
+                              'restore_record': none,
+                              'request_results': journal_request_results
+                            }) }}
+                          activating_status_payload: >-
+                            {{ {'contract_version': 1, 'revision': current_revision + 1, 'command_available': true, 'mode': 'solo_trip', 'traveler': selected_traveler, 'home_resident': home_resident, 'starts_at': journal_plan.starts_at, 'ends_at': journal_plan.ends_at, 'blockers': [], 'effects': {'sleepypod_live_follow': false, 'sleepypod_schedule': false, 'wake_light_source': false}, 'restore_required': false, 'release_token': activation_release_token, 'state': 'activating'} | to_json(sort_keys=true) }}
+                          baseline_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 2,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'activating',
+                              'writer_owner': activation_owner_ref,
+                              'release_token': activation_release_token,
+                              'runtime_plan': dict(journal_plan, started_at=now().isoformat()),
+                              'sleepypod_baseline': current_schedule_payload[away_side],
+                              'baseline_fingerprint': current_away_fingerprint,
+                              'last_confirmed_overlay_fingerprint': none,
+                              'wake_source_ref': 'sleepypod:' ~ away_side,
+                              'wake_owner_ref': activation_owner_ref,
+                              'wake_prior_state': states(wake_light_entity_id),
+                              'presence_evidence': {'entity_id': traveler_person_entity_id, 'observed_at': now().isoformat(), 'observed_state': traveler_state, 'post_start_away': traveler_state not in ['home', 'unknown', 'unavailable']},
+                              'pending_request': activation_claim_pending_request | from_json,
+                              'restore_record': none,
+                              'request_results': journal_request_results
+                            }) }}
+                          mirrored_schedule_payload: >-
+                            {% from 'solo_trip.jinja' import merged_schedule %}
+                            {{ merged_schedule(current_schedule_payload, current_schedule_payload[home_side], home_side, true, home_side, away_side) }}
+                          mirrored_schedule_map: >-
+                            {{ mirrored_schedule_payload
+                               if mirrored_schedule_payload is mapping
+                               else mirrored_schedule_payload | from_json }}
+                          mirrored_schedule_json: >-
+                            {{ mirrored_schedule_payload | to_json(sort_keys=true)
+                               if mirrored_schedule_payload is mapping
+                               else mirrored_schedule_payload }}
+                          mirrored_away_fingerprint: >-
+                            {% from 'solo_trip.jinja' import side_fingerprint %}
+                            {{ side_fingerprint(mirrored_schedule_map[away_side]) }}
+                          mirrored_full_schedule_fingerprint: >-
+                            {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+                            {{ full_schedule_fingerprint(mirrored_schedule_map) }}
+                          active_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 3,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'active',
+                              'writer_owner': activation_owner_ref,
+                              'release_token': activation_release_token,
+                              'runtime_plan': dict(journal_plan, started_at=now().isoformat()),
+                              'sleepypod_baseline': current_schedule_payload[away_side],
+                              'baseline_fingerprint': current_away_fingerprint,
+                              'last_confirmed_overlay_fingerprint': mirrored_away_fingerprint,
+                              'wake_source_ref': 'sleepypod:' ~ away_side,
+                              'wake_owner_ref': activation_owner_ref,
+                              'wake_prior_state': states(wake_light_entity_id),
+                              'presence_evidence': {'entity_id': traveler_person_entity_id, 'observed_at': now().isoformat(), 'observed_state': traveler_state, 'post_start_away': traveler_state not in ['home', 'unknown', 'unavailable']},
+                              'pending_request': none,
+                              'restore_record': none,
+                              'request_results': journal_request_results
+                            }) }}
+                          active_status_payload: >-
+                            {{ {'contract_version': 1, 'revision': current_revision + 1, 'command_available': true, 'mode': 'solo_trip', 'traveler': selected_traveler, 'home_resident': home_resident, 'starts_at': journal_plan.starts_at, 'ends_at': journal_plan.ends_at, 'blockers': [], 'effects': {'sleepypod_live_follow': true, 'sleepypod_schedule': true, 'wake_light_source': true}, 'restore_required': false, 'release_token': activation_release_token, 'state': 'active'} | to_json(sort_keys=true) }}
+                          restore_required_activation_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 4,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'restore_required',
+                              'writer_owner': activation_owner_ref,
+                              'release_token': activation_release_token,
+                              'runtime_plan': dict(journal_plan, started_at=now().isoformat()),
+                              'sleepypod_baseline': current_schedule_payload[away_side],
+                              'baseline_fingerprint': current_away_fingerprint,
+                              'last_confirmed_overlay_fingerprint': none,
+                              'wake_source_ref': 'sleepypod:' ~ away_side,
+                              'wake_owner_ref': activation_owner_ref,
+                              'wake_prior_state': states(wake_light_entity_id),
+                              'presence_evidence': {'entity_id': traveler_person_entity_id, 'observed_at': now().isoformat(), 'observed_state': traveler_state, 'post_start_away': traveler_state not in ['home', 'unknown', 'unavailable']},
+                              'pending_request': none,
+                              'restore_record': {'reason': 'activation_incomplete'},
+                              'request_results': journal_request_results
+                            }) }}
+                          restore_required_activation_status_payload: >-
+                            {{ {'contract_version': 1, 'revision': current_revision + 1, 'command_available': true, 'mode': 'solo_trip', 'traveler': selected_traveler, 'home_resident': home_resident, 'starts_at': journal_plan.starts_at, 'ends_at': journal_plan.ends_at, 'blockers': ['activation_incomplete'], 'effects': {'sleepypod_live_follow': false, 'sleepypod_schedule': false, 'wake_light_source': false}, 'restore_required': true, 'release_token': activation_release_token, 'state': 'restore_required'} | to_json(sort_keys=true) }}
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ activation_claim_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (activation_claim_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (activation_claim_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ activation_pending_response }}"
+                              - stop: Claim journal echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_status }}"
+                          payload: "{{ activating_status_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (activating_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (activating_status_payload | from_json).release_token and states('sensor.household_away_status') == 'activating' }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_activation_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_activation_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(activation_pending_response, error_code='status_echo_timeout') }}"
+                              - stop: Activating status echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ baseline_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (baseline_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (baseline_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_activation_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_activation_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(activation_pending_response, error_code='journal_baseline_echo_timeout') }}"
+                              - stop: Baseline journal echo timed out
+                                response_variable: household_away_response
+                      - choose:
+                          - conditions: >-
+                              {% from 'solo_trip.jinja' import side_fingerprint %}
+                              {{ side_fingerprint(state_attr(sleepypod_schedule_entity_id, away_side))
+                                 != current_away_fingerprint }}
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_activation_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_activation_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(activation_pending_response, error_code='restore_required_due_to_divergence') }}"
+                              - stop: SleepyPod baseline diverged before effects
+                                response_variable: household_away_response
+                      - action: wake_light.command
+                        data:
+                          profile_id: "{{ wake_light_profile_id }}"
+                          expected_revision: "{{ wake_current_revision }}"
+                          request_id: "{{ normalized_request_id }}"
+                          operation: set_source_suspension
+                          source_ref: "{{ 'sleepypod:' ~ away_side }}"
+                          suspended: true
+                          owner_ref: "{{ activation_owner_ref }}"
+                        response_variable: wake_light_response
+                      - choose:
+                          - conditions: "{{ wake_light_response.outcome not in ['accepted', 'no_change'] }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_activation_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_activation_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(activation_pending_response, error_code='wake_light_rejected') }}"
+                              - stop: Wake Light rejected activation
+                                response_variable: household_away_response
+                      - choose:
+                          - conditions: "{{ states(selected_profile.away_alarm_state) in ['ringing', 'snoozed'] }}"
+                            sequence:
+                              - action: button.press
+                                target:
+                                  entity_id: "{{ selected_profile.away_alarm_stop }}"
+                              - wait_template: >-
+                                  {{ states(selected_profile.away_alarm_state) not in ['ringing', 'snoozed'] }}
+                                timeout: "00:00:10"
+                                continue_on_timeout: true
+                              - choose:
+                                  - conditions: "{{ not wait.completed }}"
+                                    sequence:
+                                      - action: mqtt.publish
+                                        data:
+                                          topic: "{{ solo_topic_journal }}"
+                                          payload: "{{ restore_required_activation_payload }}"
+                                          qos: 1
+                                          retain: true
+                                      - action: mqtt.publish
+                                        data:
+                                          topic: "{{ solo_topic_status }}"
+                                          payload: "{{ restore_required_activation_status_payload }}"
+                                          qos: 1
+                                          retain: true
+                                      - variables:
+                                          household_away_response: "{{ dict(activation_pending_response, error_code='away_alarm_clear_timeout') }}"
+                                      - stop: Away alarm did not clear
+                                        response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ sleepypod_topic_schedule }}"
+                          payload: "{{ mirrored_schedule_json }}"
+                          qos: 1
+                          retain: false
+                      - wait_template: >-
+                          {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+                          {{ full_schedule_fingerprint({
+                            'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
+                            'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
+                          }) == mirrored_full_schedule_fingerprint }}
+                        timeout: "00:02:00"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_activation_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_activation_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(activation_pending_response, error_code='schedule_echo_timeout') }}"
+                              - stop: Activation schedule echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ active_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (active_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (active_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_activation_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_activation_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(activation_pending_response, error_code='journal_echo_timeout') }}"
+                              - stop: Active journal echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_status }}"
+                          payload: "{{ active_status_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (active_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (active_status_payload | from_json).release_token and states('sensor.household_away_status') == 'active' }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_activation_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_activation_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(activation_pending_response, error_code='status_echo_timeout') }}"
+                              - stop: Active status echo timed out
+                                response_variable: household_away_response
+                      - variables:
+                          household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'accepted', 'revision': current_revision + 1, 'state': 'active', 'error_code': none, 'retryable': false, 'confirmed_effects': ['writer_claimed', 'wake_light_source', 'sleepypod_schedule']} }}"
+                      - stop: Solo Trip activated
+                        response_variable: household_away_response
+
+                  - conditions: >-
+                      {% from 'solo_trip.jinja' import side_fingerprint %}
+                      {{ journal_phase == 'active'
+                         and (
+                           current_journal.get('last_confirmed_overlay_fingerprint') is not string
+                           or side_fingerprint(current_schedule_payload[away_side])
+                             != current_journal.get('last_confirmed_overlay_fingerprint')
+                         ) }}
+                    sequence:
+                      - variables:
+                          active_divergence_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 1,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'restore_required',
+                              'writer_owner': journal_owner,
+                              'release_token': current_release_token,
+                              'runtime_plan': journal_plan,
+                              'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                              'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                              'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                              'wake_source_ref': current_journal.get('wake_source_ref'),
+                              'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                              'wake_prior_state': current_journal.get('wake_prior_state'),
+                              'presence_evidence': presence_evidence,
+                              'pending_request': none,
+                              'restore_record': {
+                                'reason': 'sleepypod_schedule_diverged',
+                                'observed_away_side': current_schedule_payload[away_side],
+                                'observed_fingerprint': current_away_fingerprint
+                              },
+                              'request_results': journal_request_results
+                            }) }}
+                          active_divergence_status_payload: >-
+                            {{ {
+                              'contract_version': 1,
+                              'revision': current_revision + 1,
+                              'command_available': true,
+                              'mode': 'solo_trip',
+                              'traveler': selected_traveler,
+                              'home_resident': home_resident,
+                              'starts_at': journal_plan.starts_at,
+                              'ends_at': journal_plan.ends_at,
+                              'blockers': ['sleepypod_schedule_diverged'],
+                              'effects': {
+                                'sleepypod_live_follow': false,
+                                'sleepypod_schedule': false,
+                                'wake_light_source': true
+                              },
+                              'restore_required': true,
+                              'release_token': current_release_token,
+                              'state': 'restore_required'
+                            } | to_json(sort_keys=true) }}
+                          active_divergence_response: >-
+                            {{ {
+                              'request_id': normalized_request_id,
+                              'status': 'indeterminate',
+                              'revision': current_revision + 1,
+                              'state': 'restore_required',
+                              'error_code': 'restore_required_due_to_divergence',
+                              'retryable': false,
+                              'confirmed_effects': ['wake_light_source']
+                            } }}
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ active_divergence_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (active_divergence_journal_payload | from_json).generation
+                             and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (active_divergence_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(active_divergence_response, error_code='journal_echo_timeout', retryable=true) }}"
+                              - stop: Active divergence journal echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_status }}"
+                          payload: "{{ active_divergence_status_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (active_divergence_status_payload | from_json).revision
+                             and state_attr('sensor.household_away_status', 'release_token') == (active_divergence_status_payload | from_json).release_token
+                             and states('sensor.household_away_status') == 'restore_required' }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(active_divergence_response, error_code='status_echo_timeout', retryable=true) }}"
+                              - stop: Active divergence status echo timed out
+                                response_variable: household_away_response
+                      - variables:
+                          household_away_response: "{{ active_divergence_response }}"
+                      - stop: Active SleepyPod schedule diverged
+                        response_variable: household_away_response
+
+                  - conditions: "{{ journal_phase == 'active' and traveler_state not in ['home', 'unknown', 'unavailable'] and not (presence_evidence.post_start_away | default(false)) }}"
+                    sequence:
+                      - variables:
+                          evidence_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 1,
+                              'revision': current_revision,
+                              'solo_phase': 'active',
+                              'writer_owner': journal_owner,
+                              'release_token': current_release_token,
+                              'runtime_plan': journal_plan,
+                              'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                              'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                              'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                              'wake_source_ref': current_journal.get('wake_source_ref'),
+                              'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                              'wake_prior_state': current_journal.get('wake_prior_state'),
+                              'presence_evidence': {'entity_id': traveler_person_entity_id, 'observed_at': now().isoformat(), 'observed_state': traveler_state, 'post_start_away': true},
+                              'pending_request': none,
+                              'restore_record': none,
+                              'request_results': journal_request_results
+                            }) }}
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ evidence_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (evidence_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (evidence_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'indeterminate', 'revision': current_revision, 'state': 'active', 'error_code': 'journal_echo_timeout', 'retryable': true, 'confirmed_effects': []} }}"
+                              - stop: Presence evidence journal echo timed out
+                                response_variable: household_away_response
+                      - variables:
+                          household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'accepted', 'revision': current_revision, 'state': 'active', 'error_code': none, 'retryable': false, 'confirmed_effects': []} }}"
+                      - stop: Presence evidence updated
+                        response_variable: household_away_response
+
+                  - conditions: >-
+                      {{ journal_phase in ['active', 'restore_required']
+                         and (
+                           is_state('input_boolean.solo_trip_enabled', 'off')
+                           or is_state('input_boolean.vacation_mode', 'on')
+                           or (plan_end_timestamp is number and now_timestamp >= plan_end_timestamp)
+                           or (
+                             traveler_state == 'home'
+                             and presence_evidence is mapping
+                             and presence_evidence.post_start_away | default(false)
+                           )
+                         ) }}
+                    sequence:
+                      - variables:
+                          ending_reason: >-
+                            {% if is_state('input_boolean.solo_trip_enabled', 'off') %}
+                              explicit_end_now
+                            {% elif is_state('input_boolean.vacation_mode', 'on') %}
+                              vacation_mode_requested
+                            {% elif plan_end_timestamp is number and now_timestamp >= plan_end_timestamp %}
+                              scheduled_end
+                            {% else %}
+                              traveler_returned
+                            {% endif %}
+                          final_end_release_token: "{{ 'release-v1-r' ~ (current_revision + 1) }}"
+                          final_end_pending_response: >-
+                            {{ {'request_id': normalized_request_id, 'status': 'indeterminate', 'revision': current_revision + 1, 'state': 'restore_required', 'error_code': 'status_echo_timeout', 'retryable': true, 'confirmed_effects': []} }}
+                          ending_pending_request: >-
+                            {% from 'solo_trip.jinja' import pending_request_record %}
+                            {{ pending_request_record(normalized_request_id, request_hash_value, 'end_now', current_revision + 1, current_release_token, 'ending', final_end_pending_response) }}
+                          ending_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 1,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'ending',
+                              'writer_owner': journal_owner,
+                              'release_token': current_release_token,
+                              'runtime_plan': journal_plan,
+                              'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                              'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                              'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                              'wake_source_ref': current_journal.get('wake_source_ref'),
+                              'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                              'wake_prior_state': current_journal.get('wake_prior_state'),
+                              'presence_evidence': presence_evidence,
+                              'pending_request': ending_pending_request | from_json,
+                              'restore_record': none,
+                              'request_results': journal_request_results
+                            }) }}
+                          ending_status_payload: >-
+                            {{ {'contract_version': 1, 'revision': current_revision + 1, 'command_available': true, 'mode': 'solo_trip', 'traveler': selected_traveler, 'home_resident': home_resident, 'starts_at': journal_plan.starts_at, 'ends_at': journal_plan.ends_at, 'blockers': [], 'effects': {'sleepypod_live_follow': true, 'sleepypod_schedule': true, 'wake_light_source': true}, 'restore_required': false, 'release_token': current_release_token, 'state': 'ending'} | to_json(sort_keys=true) }}
+                          restore_required_end_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 2,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'restore_required',
+                              'writer_owner': journal_owner,
+                              'release_token': current_release_token,
+                              'runtime_plan': journal_plan,
+                              'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                              'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                              'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                              'wake_source_ref': current_journal.get('wake_source_ref'),
+                              'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                              'wake_prior_state': current_journal.get('wake_prior_state'),
+                              'presence_evidence': presence_evidence,
+                              'pending_request': ending_pending_request | from_json,
+                              'restore_record': {'reason': 'sleepypod_schedule_diverged'},
+                              'request_results': journal_request_results
+                            }) }}
+                          restore_required_end_status_payload: >-
+                            {{ {'contract_version': 1, 'revision': current_revision + 1, 'command_available': true, 'mode': 'solo_trip', 'traveler': selected_traveler, 'home_resident': home_resident, 'starts_at': journal_plan.starts_at, 'ends_at': journal_plan.ends_at, 'blockers': ['sleepypod_schedule_diverged'], 'effects': {'sleepypod_live_follow': false, 'sleepypod_schedule': false, 'wake_light_source': true}, 'restore_required': true, 'release_token': current_release_token, 'state': 'restore_required'} | to_json(sort_keys=true) }}
+                          restored_schedule_payload: >-
+                            {% from 'solo_trip.jinja' import restored_schedule %}
+                            {{ restored_schedule(current_schedule_payload, current_journal.get('sleepypod_baseline', {}), away_side) }}
+                          restored_schedule_map: >-
+                            {{ restored_schedule_payload
+                               if restored_schedule_payload is mapping
+                               else restored_schedule_payload | from_json }}
+                          restored_schedule_json: >-
+                            {{ restored_schedule_payload | to_json(sort_keys=true)
+                               if restored_schedule_payload is mapping
+                               else restored_schedule_payload }}
+                          restored_full_schedule_fingerprint: >-
+                            {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+                            {{ full_schedule_fingerprint(restored_schedule_map) }}
+                          final_end_terminal_response: >-
+                            {{ {'request_id': normalized_request_id, 'status': 'accepted', 'revision': current_revision + 1, 'state': 'idle', 'error_code': none, 'retryable': false, 'confirmed_effects': ['sleepypod_schedule', 'wake_light_source', 'writer_released']} }}
+                          final_end_terminal_request_results: >-
+                            {{ journal_request_results | to_json(sort_keys=true) }}
+                          final_end_terminal_journal_payload: >-
+                            {% from 'solo_trip.jinja' import signed_journal %}
+                            {{ signed_journal({
+                              'schema_version': 1,
+                              'canonicalization_version': 1,
+                              'generation': current_generation + 2,
+                              'revision': current_revision + 1,
+                              'solo_phase': 'idle',
+                              'writer_owner': none,
+                              'release_token': final_end_release_token,
+                              'runtime_plan': none,
+                              'sleepypod_baseline': none,
+                              'baseline_fingerprint': none,
+                              'last_confirmed_overlay_fingerprint': none,
+                              'wake_source_ref': none,
+                              'wake_owner_ref': none,
+                              'wake_prior_state': none,
+                              'presence_evidence': {},
+                              'pending_request': none,
+                              'restore_record': none,
+                              'request_results': final_end_terminal_request_results | from_json
+                            }) }}
+                          final_end_status_payload: >-
+                            {{ {'contract_version': 1, 'revision': current_revision + 1, 'command_available': true, 'mode': 'none', 'traveler': 'none', 'home_resident': 'none', 'starts_at': none, 'ends_at': none, 'blockers': [], 'effects': {'sleepypod_live_follow': false, 'sleepypod_schedule': false, 'wake_light_source': false}, 'restore_required': false, 'release_token': final_end_release_token, 'state': 'idle'} | to_json(sort_keys=true) }}
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ ending_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (ending_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (ending_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(final_end_pending_response, state='ending', error_code='journal_echo_timeout') }}"
+                              - stop: Ending journal echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_status }}"
+                          payload: "{{ ending_status_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (ending_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (ending_status_payload | from_json).release_token and states('sensor.household_away_status') == 'ending' }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(final_end_pending_response, state='ending', error_code='status_echo_timeout') }}"
+                              - stop: Ending status echo timed out
+                                response_variable: household_away_response
+                      - choose:
+                          - conditions: "{{ states(selected_profile.away_alarm_state) in ['ringing', 'snoozed'] }}"
+                            sequence:
+                              - action: button.press
+                                target:
+                                  entity_id: "{{ selected_profile.away_alarm_stop }}"
+                              - wait_template: >-
+                                  {{ states(selected_profile.away_alarm_state) not in ['ringing', 'snoozed'] }}
+                                timeout: "00:00:10"
+                                continue_on_timeout: true
+                              - choose:
+                                  - conditions: "{{ not wait.completed }}"
+                                    sequence:
+                                      - action: mqtt.publish
+                                        data:
+                                          topic: "{{ solo_topic_journal }}"
+                                          payload: "{{ restore_required_end_journal_payload }}"
+                                          qos: 1
+                                          retain: true
+                                      - action: mqtt.publish
+                                        data:
+                                          topic: "{{ solo_topic_status }}"
+                                          payload: "{{ restore_required_end_status_payload }}"
+                                          qos: 1
+                                          retain: true
+                                      - variables:
+                                          household_away_response: "{{ dict(final_end_pending_response, error_code='away_alarm_clear_timeout') }}"
+                                      - stop: Away alarm did not clear during end
+                                        response_variable: household_away_response
+                      - choose:
+                          - conditions: "{{ current_away_fingerprint != current_journal.get('last_confirmed_overlay_fingerprint') }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_end_journal_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_end_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(final_end_pending_response, error_code='restore_required_due_to_divergence') }}"
+                              - stop: Schedule divergence requires restore resolution
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ sleepypod_topic_schedule }}"
+                          payload: "{{ restored_schedule_json }}"
+                          qos: 1
+                          retain: false
+                      - wait_template: >-
+                          {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+                          {{ full_schedule_fingerprint({
+                            'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
+                            'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
+                          }) == restored_full_schedule_fingerprint }}
+                        timeout: "00:02:00"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_end_journal_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_end_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(final_end_pending_response, error_code='schedule_echo_timeout') }}"
+                              - stop: Restore schedule echo timed out
+                                response_variable: household_away_response
+                      - action: wake_light.command
+                        data:
+                          profile_id: "{{ wake_light_profile_id }}"
+                          expected_revision: "{{ wake_current_revision }}"
+                          request_id: "{{ normalized_request_id }}"
+                          operation: set_source_suspension
+                          source_ref: "{{ current_journal.get('wake_source_ref') }}"
+                          suspended: false
+                          owner_ref: "{{ current_journal.get('wake_owner_ref') }}"
+                        response_variable: wake_light_response
+                      - choose:
+                          - conditions: "{{ wake_light_response.outcome not in ['accepted', 'no_change'] }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ restore_required_end_journal_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ restore_required_end_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - variables:
+                                  household_away_response: "{{ dict(final_end_pending_response, error_code='wake_light_rejected') }}"
+                              - stop: Wake Light release was rejected
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ final_end_terminal_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (final_end_terminal_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (final_end_terminal_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(final_end_pending_response, error_code='journal_echo_timeout') }}"
+                              - stop: Final end journal echo timed out
+                                response_variable: household_away_response
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_status }}"
+                          payload: "{{ final_end_status_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (final_end_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (final_end_status_payload | from_json).release_token and states('sensor.household_away_status') == 'idle' }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(final_end_pending_response, error_code='status_echo_timeout') }}"
+                              - stop: Final end status echo timed out
+                                response_variable: household_away_response
+                      - action: input_boolean.turn_off
+                        target:
+                          entity_id: input_boolean.solo_trip_enabled
+                      - action: input_select.select_option
+                        target:
+                          entity_id: input_select.solo_trip_traveler
+                        data:
+                          option: none
+                      - variables:
+                          household_away_response: "{{ final_end_terminal_response }}"
+                      - stop: Solo Trip ended
+                        response_variable: household_away_response
+
+              - variables:
+                  household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'accepted', 'revision': current_revision, 'state': journal_phase, 'error_code': none, 'retryable': false, 'confirmed_effects': []} }}"
+              - stop: Reconcile found no work
+                response_variable: household_away_response
+
+          - conditions: "{{ normalized_operation == 'resolve_restore' }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ journal_phase != 'restore_required' }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='restore_not_required') }}"
+                      - stop: Restore not required
+                        response_variable: household_away_response
+                  - conditions: "{{ normalized_resolve_action not in ['keep_current', 'restore_saved'] }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='unknown_resolve_action') }}"
+                      - stop: Unknown restore action
+                        response_variable: household_away_response
+              - variables:
+                  resolve_release_token: "{{ 'release-v1-r' ~ (current_revision + 1) }}"
+                  resolve_pending_response: >-
+                    {{ {'request_id': normalized_request_id, 'status': 'indeterminate', 'revision': current_revision + 1, 'state': 'restore_required', 'error_code': 'status_echo_timeout', 'retryable': true, 'confirmed_effects': []} }}
+                  resolve_pending_request: >-
+                    {% from 'solo_trip.jinja' import pending_request_record %}
+                    {{ pending_request_record(normalized_request_id, request_hash_value, 'resolve_restore', current_revision + 1, resolve_release_token, 'restore_required', resolve_pending_response) }}
+                  resolve_admission_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + 1,
+                      'revision': current_revision + 1,
+                      'solo_phase': 'restore_required',
+                      'writer_owner': journal_owner,
+                      'release_token': resolve_release_token,
+                      'runtime_plan': journal_plan,
+                      'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                      'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                      'last_confirmed_overlay_fingerprint': current_journal.get('last_confirmed_overlay_fingerprint'),
+                      'wake_source_ref': current_journal.get('wake_source_ref'),
+                      'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                      'wake_prior_state': current_journal.get('wake_prior_state'),
+                      'presence_evidence': presence_evidence,
+                      'pending_request': resolve_pending_request | from_json,
+                      'restore_record': journal_restore_record,
+                      'request_results': journal_request_results
+                    }) }}
+                  resolve_schedule_payload: >-
+                    {% from 'solo_trip.jinja' import restored_schedule %}
+                    {% if normalized_resolve_action == 'restore_saved' %}
+                      {{ restored_schedule(current_schedule_payload, current_journal.get('sleepypod_baseline', {}), away_side) }}
+                    {% else %}
+                      {{ current_schedule_payload | to_json(sort_keys=true) }}
+                    {% endif %}
+                  resolve_schedule_map: >-
+                    {{ resolve_schedule_payload
+                       if resolve_schedule_payload is mapping
+                       else resolve_schedule_payload | from_json }}
+                  resolve_schedule_json: >-
+                    {{ resolve_schedule_payload | to_json(sort_keys=true)
+                       if resolve_schedule_payload is mapping
+                       else resolve_schedule_payload }}
+                  resolve_full_schedule_fingerprint: >-
+                    {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+                    {{ full_schedule_fingerprint(resolve_schedule_map) }}
+                  resolve_terminal_response: >-
+                    {{ {'request_id': normalized_request_id, 'status': 'accepted', 'revision': current_revision + 1, 'state': 'idle', 'error_code': none, 'retryable': false, 'confirmed_effects': ['wake_light_source', 'writer_released'] + (['sleepypod_schedule'] if normalized_resolve_action == 'restore_saved' else [])} }}
+                  resolve_terminal_request_results: >-
+                    {% from 'solo_trip.jinja' import append_terminal_result %}
+                    {{ append_terminal_result(journal_request_results, normalized_request_id, request_hash_value, resolve_terminal_response) }}
+                  resolve_terminal_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + 2,
+                      'revision': current_revision + 1,
+                      'solo_phase': 'idle',
+                      'writer_owner': none,
+                      'release_token': resolve_release_token,
+                      'runtime_plan': none,
+                      'sleepypod_baseline': none,
+                      'baseline_fingerprint': none,
+                      'last_confirmed_overlay_fingerprint': none,
+                      'wake_source_ref': none,
+                      'wake_owner_ref': none,
+                      'wake_prior_state': none,
+                      'presence_evidence': {},
+                      'pending_request': none,
+                      'restore_record': none,
+                      'request_results': resolve_terminal_request_results | from_json
+                    }) }}
+                  resolve_status_payload: >-
+                    {{ {'contract_version': 1, 'revision': current_revision + 1, 'command_available': true, 'mode': 'none', 'traveler': 'none', 'home_resident': 'none', 'starts_at': none, 'ends_at': none, 'blockers': [], 'effects': {'sleepypod_live_follow': false, 'sleepypod_schedule': false, 'wake_light_source': false}, 'restore_required': false, 'release_token': resolve_release_token, 'state': 'idle'} | to_json(sort_keys=true) }}
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_journal }}"
+                  payload: "{{ resolve_admission_journal_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (resolve_admission_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (resolve_admission_journal_payload | from_json).payload_checksum }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(resolve_pending_response, error_code='journal_echo_timeout') }}"
+                      - stop: Resolve admission journal echo timed out
+                        response_variable: household_away_response
+              - choose:
+                  - conditions: "{{ normalized_resolve_action == 'restore_saved' }}"
+                    sequence:
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ sleepypod_topic_schedule }}"
+                          payload: "{{ resolve_schedule_json }}"
+                          qos: 1
+                          retain: false
+                      - wait_template: >-
+                          {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+                          {{ full_schedule_fingerprint({
+                            'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
+                            'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
+                          }) == resolve_full_schedule_fingerprint }}
+                        timeout: "00:02:00"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(resolve_pending_response, error_code='schedule_echo_timeout') }}"
+                              - stop: Restore schedule echo timed out
+                                response_variable: household_away_response
+              - action: wake_light.command
+                data:
+                  profile_id: "{{ wake_light_profile_id }}"
+                  expected_revision: "{{ wake_current_revision }}"
+                  request_id: "{{ normalized_request_id }}"
+                  operation: set_source_suspension
+                  source_ref: "{{ current_journal.get('wake_source_ref') }}"
+                  suspended: false
+                  owner_ref: "{{ current_journal.get('wake_owner_ref') }}"
+                response_variable: wake_light_response
+              - choose:
+                  - conditions: "{{ wake_light_response.outcome not in ['accepted', 'no_change'] }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(resolve_pending_response, error_code='wake_light_rejected', retryable=false) }}"
+                      - stop: Wake Light release rejected
+                        response_variable: household_away_response
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_journal }}"
+                  payload: "{{ resolve_terminal_journal_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.solo_trip_journal', 'generation') | int(-1) == (resolve_terminal_journal_payload | from_json).generation and state_attr('sensor.solo_trip_journal', 'payload_checksum') == (resolve_terminal_journal_payload | from_json).payload_checksum }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(resolve_pending_response, error_code='terminal_journal_echo_timeout') }}"
+                      - stop: Resolve terminal journal echo timed out
+                        response_variable: household_away_response
+              - action: mqtt.publish
+                data:
+                  topic: "{{ solo_topic_status }}"
+                  payload: "{{ resolve_status_payload }}"
+                  qos: 1
+                  retain: true
+              - wait_template: >-
+                  {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (resolve_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (resolve_status_payload | from_json).release_token and states('sensor.household_away_status') == 'idle' }}
+                timeout: "00:00:10"
+                continue_on_timeout: true
+              - choose:
+                  - conditions: "{{ not wait.completed }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ resolve_pending_response }}"
+                      - stop: Resolve status echo timed out
+                        response_variable: household_away_response
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.solo_trip_enabled
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.solo_trip_traveler
+                data:
+                  option: none
+              - variables:
+                  household_away_response: "{{ resolve_terminal_response }}"
+              - stop: Restore resolved
+                response_variable: household_away_response
+
+          - conditions: "{{ normalized_operation == 'sleepypod_command' }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ normalized_sleepypod_action not in supported_sleepypod_actions }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='unknown_sleepypod_action') }}"
+                      - stop: Unknown SleepyPod action
+                        response_variable: household_away_response
+                  - conditions: >-
+                      {{ normalized_side not in ['left', 'right']
+                         and not (
+                           internal_sleepypod_bypass
+                           and normalized_sleepypod_action == 'set_schedule'
+                           and schedule is mapping
+                         ) }}
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='invalid_side') }}"
+                      - stop: Invalid side
+                        response_variable: household_away_response
+                  - conditions: "{{ journal_phase in ['activating', 'ending', 'restore_required', 'degraded'] }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='sleepypod_locked') }}"
+                      - stop: SleepyPod is locked
+                        response_variable: household_away_response
+                  - conditions: "{{ journal_phase == 'active' and normalized_side == away_side and not internal_sleepypod_bypass }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='traveler_side_read_only') }}"
+                      - stop: Traveler side is read only
+                        response_variable: household_away_response
+                  - conditions: "{{ normalized_sleepypod_action == 'set_power' and enabled not in [true, false] }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='missing_enabled') }}"
+                      - stop: Missing power value
+                        response_variable: household_away_response
+                  - conditions: >-
+                      {{ normalized_sleepypod_action in ['set_outside_level', 'set_tonight_level', 'set_stage_level']
+                         and (
+                           level is not number
+                           or level | float(-100) < -10
+                           or level | float(100) > 10
+                         ) }}
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='invalid_level') }}"
+                      - stop: Invalid level
+                        response_variable: household_away_response
+                  - conditions: >-
+                      {{ normalized_sleepypod_action == 'set_tonight_level'
+                         and sleepypod_phase_state not in ['bedtime', 'asleep', 'dawn'] }}
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='wrong_schedule_phase') }}"
+                      - stop: Tonight temperature requires an active schedule phase
+                        response_variable: household_away_response
+                  - conditions: >-
+                      {{ normalized_sleepypod_action == 'set_outside_level'
+                         and sleepypod_phase_state != 'outside' }}
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='wrong_schedule_phase') }}"
+                      - stop: Outside temperature requires the outside schedule phase
+                        response_variable: household_away_response
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and phase not in ['bedtime', 'asleep', 'dawn'] }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='invalid_phase') }}"
+                      - stop: Invalid phase
+                        response_variable: household_away_response
+                  - conditions: "{{ normalized_sleepypod_action == 'set_schedule' and schedule is not mapping }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='schedule_unavailable') }}"
+                      - stop: Schedule payload required
+                        response_variable: household_away_response
+                  - conditions: "{{ normalized_sleepypod_action == 'replace_alarms' and alarm_rows is not iterable }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='missing_alarm_rows') }}"
+                      - stop: Alarm rows required
+                        response_variable: household_away_response
+                  - conditions: >-
+                      {% set rows = alarm_rows | list if alarm_rows is iterable and alarm_rows is not string else [] %}
+                      {{ normalized_sleepypod_action == 'replace_alarms'
+                         and (
+                           rows | selectattr('day', 'defined') | list | count != rows | count
+                           or rows | selectattr('day', 'in', ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']) | list | count != rows | count
+                           or rows | selectattr('alarmTemperature', 'defined') | list | count != rows | count
+                           or rows | selectattr('duration', 'defined') | list | count != rows | count
+                           or rows | selectattr('enabled', 'defined') | list | count != rows | count
+                           or rows | selectattr('time', 'defined') | list | count != rows | count
+                           or rows | selectattr('vibrationIntensity', 'defined') | list | count != rows | count
+                           or rows | selectattr('vibrationPattern', 'defined') | list | count != rows | count
+                         ) }}
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='invalid_alarm_rows') }}"
+                      - stop: Invalid alarm rows
+                        response_variable: household_away_response
+              - variables:
+                  sleepypod_effective_side: "{{ home_side if journal_phase == 'active' else normalized_side }}"
+                  sleepypod_schedule_payload: >-
+                    {% from 'solo_trip.jinja' import merged_schedule, replaced_alarms %}
+                    {% if normalized_sleepypod_action == 'set_schedule' %}
+                      {{ merged_schedule(current_schedule_payload, schedule if schedule is mapping else {}, sleepypod_effective_side, journal_phase == 'active', home_side, away_side) }}
+                    {% elif normalized_sleepypod_action == 'replace_alarms' %}
+                      {{ replaced_alarms(current_schedule_payload, sleepypod_effective_side, alarm_rows if alarm_rows is iterable else [], journal_phase == 'active', home_side, away_side) }}
+                    {% else %}
+                      {{ none }}
+                    {% endif %}
+                  sleepypod_schedule_map: >-
+                    {% if normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] %}
+                      {{ sleepypod_schedule_payload
+                         if sleepypod_schedule_payload is mapping
+                         else sleepypod_schedule_payload | from_json }}
+                    {% else %}
+                      {{ none }}
+                    {% endif %}
+                  sleepypod_schedule_json: >-
+                    {% if normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] %}
+                      {{ sleepypod_schedule_payload | to_json(sort_keys=true)
+                         if sleepypod_schedule_payload is mapping
+                         else sleepypod_schedule_payload }}
+                    {% else %}
+                      {{ none }}
+                    {% endif %}
+                  sleepypod_away_fingerprint: >-
+                    {% from 'solo_trip.jinja' import side_fingerprint %}
+                    {{ side_fingerprint(sleepypod_schedule_map[away_side])
+                       if normalized_sleepypod_action in ['set_schedule', 'replace_alarms']
+                       else none }}
+                  sleepypod_full_schedule_fingerprint: >-
+                    {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+                    {{ full_schedule_fingerprint(sleepypod_schedule_map)
+                       if normalized_sleepypod_action in ['set_schedule', 'replace_alarms']
+                       else none }}
+                  sleepypod_terminal_response: >-
+                    {{ {'request_id': normalized_request_id, 'status': 'accepted', 'revision': current_revision + (1 if normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] and not internal_sleepypod_bypass else 0), 'state': journal_phase, 'error_code': none, 'retryable': false, 'confirmed_effects': ['sleepypod_schedule'] if normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] else []} }}
+                  sleepypod_terminal_request_results: >-
+                    {% from 'solo_trip.jinja' import append_terminal_result %}
+                    {{ append_terminal_result(journal_request_results, normalized_request_id, request_hash_value, sleepypod_terminal_response) }}
+                  sleepypod_terminal_journal_payload: >-
+                    {% from 'solo_trip.jinja' import signed_journal %}
+                    {{ signed_journal({
+                      'schema_version': 1,
+                      'canonicalization_version': 1,
+                      'generation': current_generation + (1 if normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] else 0),
+                      'revision': current_revision + (1 if normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] and not internal_sleepypod_bypass else 0),
+                      'solo_phase': journal_phase,
+                      'writer_owner': journal_owner,
+                      'release_token': current_release_token,
+                      'runtime_plan': journal_plan,
+                      'sleepypod_baseline': current_journal.get('sleepypod_baseline'),
+                      'baseline_fingerprint': current_journal.get('baseline_fingerprint'),
+                      'last_confirmed_overlay_fingerprint': sleepypod_away_fingerprint if normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] and journal_phase == 'active' else current_journal.get('last_confirmed_overlay_fingerprint'),
+                      'wake_source_ref': current_journal.get('wake_source_ref'),
+                      'wake_owner_ref': current_journal.get('wake_owner_ref'),
+                      'wake_prior_state': current_journal.get('wake_prior_state'),
+                      'presence_evidence': presence_evidence,
+                      'pending_request': none,
+                      'restore_record': none,
+                      'request_results': sleepypod_terminal_request_results | from_json if not internal_sleepypod_bypass else journal_request_results
+                    }) }}
+                  sleepypod_status_payload: >-
+                    {{ {'contract_version': 1, 'revision': current_revision + (1 if normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] and not internal_sleepypod_bypass else 0), 'command_available': true, 'mode': 'solo_trip' if journal_plan is mapping else 'none', 'traveler': selected_traveler if journal_plan is mapping else 'none', 'home_resident': home_resident if journal_plan is mapping else 'none', 'starts_at': journal_plan.starts_at if journal_plan is mapping else none, 'ends_at': journal_plan.ends_at if journal_plan is mapping else none, 'blockers': [], 'effects': current_public_status.get('effects', {}), 'restore_required': false, 'release_token': current_release_token, 'state': journal_phase} | to_json(sort_keys=true) }}
+              - choose:
+                  - conditions: "{{ normalized_sleepypod_action == 'set_power' and journal_phase == 'active' and not internal_sleepypod_bypass }}"
+                    sequence:
+                      - action: climate.set_hvac_mode
+                        target:
+                          entity_id:
+                            - climate.sleepypod_eight_pod_left_side
+                            - climate.sleepypod_eight_pod_right_side
+                        data:
+                          hvac_mode: "{{ 'heat' if enabled else 'off' }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_power' and normalized_side == 'left' }}"
+                    sequence:
+                      - action: climate.set_hvac_mode
+                        target:
+                          entity_id: climate.sleepypod_eight_pod_left_side
+                        data:
+                          hvac_mode: "{{ 'heat' if enabled else 'off' }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_power' and normalized_side == 'right' }}"
+                    sequence:
+                      - action: climate.set_hvac_mode
+                        target:
+                          entity_id: climate.sleepypod_eight_pod_right_side
+                        data:
+                          hvac_mode: "{{ 'heat' if enabled else 'off' }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_tonight_level' and journal_phase == 'active' and not internal_sleepypod_bypass and selected_traveler == 'stephen' }}"
+                    sequence:
+                      - action: script.sleepypod_steph_temperature_tonight
+                        data:
+                          level: "{{ level }}"
+                      - action: script.sleepypod_stephen_temperature_tonight
+                        data:
+                          level: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_tonight_level' and journal_phase == 'active' and not internal_sleepypod_bypass and selected_traveler == 'steph' }}"
+                    sequence:
+                      - action: script.sleepypod_stephen_temperature_tonight
+                        data:
+                          level: "{{ level }}"
+                      - action: script.sleepypod_steph_temperature_tonight
+                        data:
+                          level: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_tonight_level' and normalized_side == 'left' }}"
+                    sequence:
+                      - action: script.sleepypod_stephen_temperature_tonight
+                        data:
+                          level: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_tonight_level' and normalized_side == 'right' }}"
+                    sequence:
+                      - action: script.sleepypod_steph_temperature_tonight
+                        data:
+                          level: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_outside_level' and journal_phase == 'active' and not internal_sleepypod_bypass and selected_traveler == 'stephen' }}"
+                    sequence:
+                      - action: script.sleepypod_steph_temperature_outside_schedule
+                        data:
+                          level: "{{ level }}"
+                      - action: script.sleepypod_stephen_temperature_outside_schedule
+                        data:
+                          level: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_outside_level' and journal_phase == 'active' and not internal_sleepypod_bypass and selected_traveler == 'steph' }}"
+                    sequence:
+                      - action: script.sleepypod_stephen_temperature_outside_schedule
+                        data:
+                          level: "{{ level }}"
+                      - action: script.sleepypod_steph_temperature_outside_schedule
+                        data:
+                          level: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_outside_level' and normalized_side == 'left' }}"
+                    sequence:
+                      - action: script.sleepypod_stephen_temperature_outside_schedule
+                        data:
+                          level: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_outside_level' and normalized_side == 'right' }}"
+                    sequence:
+                      - action: script.sleepypod_steph_temperature_outside_schedule
+                        data:
+                          level: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and journal_phase == 'active' and not internal_sleepypod_bypass and phase == 'bedtime' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id:
+                            - input_number.eight_sleep_stephen_bedtime_level
+                            - input_number.eight_sleep_steph_bedtime_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and journal_phase == 'active' and not internal_sleepypod_bypass and phase == 'asleep' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id:
+                            - input_number.eight_sleep_stephen_asleep_level
+                            - input_number.eight_sleep_steph_asleep_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and journal_phase == 'active' and not internal_sleepypod_bypass and phase == 'dawn' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id:
+                            - input_number.eight_sleep_stephen_dawn_level
+                            - input_number.eight_sleep_steph_dawn_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and normalized_side == 'left' and phase == 'bedtime' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: input_number.eight_sleep_stephen_bedtime_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and normalized_side == 'left' and phase == 'asleep' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: input_number.eight_sleep_stephen_asleep_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and normalized_side == 'left' and phase == 'dawn' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: input_number.eight_sleep_stephen_dawn_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and normalized_side == 'right' and phase == 'bedtime' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: input_number.eight_sleep_steph_bedtime_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and normalized_side == 'right' and phase == 'asleep' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: input_number.eight_sleep_steph_asleep_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'set_stage_level' and normalized_side == 'right' and phase == 'dawn' }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: input_number.eight_sleep_steph_dawn_level
+                        data:
+                          value: "{{ level }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'snooze_alarm' and journal_phase == 'active' and not internal_sleepypod_bypass }}"
+                    sequence:
+                      - action: button.press
+                        target:
+                          entity_id:
+                            - "{{ selected_profile.home_alarm_snooze }}"
+                            - "{{ selected_profile.away_alarm_snooze }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'snooze_alarm' and normalized_side == 'left' }}"
+                    sequence:
+                      - action: button.press
+                        target:
+                          entity_id: button.master_bedroom_sleepypod_eight_pod_left_alarm_snooze
+                  - conditions: "{{ normalized_sleepypod_action == 'snooze_alarm' and normalized_side == 'right' }}"
+                    sequence:
+                      - action: button.press
+                        target:
+                          entity_id: button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze
+                  - conditions: "{{ normalized_sleepypod_action == 'stop_alarm' and journal_phase == 'active' and not internal_sleepypod_bypass }}"
+                    sequence:
+                      - action: button.press
+                        target:
+                          entity_id:
+                            - "{{ selected_profile.home_alarm_stop }}"
+                            - "{{ selected_profile.away_alarm_stop }}"
+                  - conditions: "{{ normalized_sleepypod_action == 'stop_alarm' and normalized_side == 'left' }}"
+                    sequence:
+                      - action: button.press
+                        target:
+                          entity_id: button.master_bedroom_sleepypod_eight_pod_left_alarm_stop
+                  - conditions: "{{ normalized_sleepypod_action == 'stop_alarm' and normalized_side == 'right' }}"
+                    sequence:
+                      - action: button.press
+                        target:
+                          entity_id: button.master_bedroom_sleepypod_eight_pod_right_alarm_stop
+              - choose:
+                  - conditions: "{{ normalized_sleepypod_action in ['set_schedule', 'replace_alarms'] }}"
+                    sequence:
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ sleepypod_topic_schedule }}"
+                          payload: "{{ sleepypod_schedule_json }}"
+                          qos: 1
+                          retain: false
+                      - wait_template: >-
+                          {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
+                          {{ full_schedule_fingerprint({
+                            'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
+                            'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
+                          }) == sleepypod_full_schedule_fingerprint }}
+                        timeout: "00:02:00"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(default_response, error_code='schedule_echo_timeout', status='indeterminate', state=journal_phase, retryable=true) }}"
+                              - stop: Active schedule echo timed out
+                                response_variable: household_away_response
+                      - choose:
+                          - conditions: "{{ not internal_sleepypod_bypass or journal_phase == 'active' }}"
+                            sequence:
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_journal }}"
+                                  payload: "{{ sleepypod_terminal_journal_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - wait_template: >-
+                                  {{ state_attr('sensor.solo_trip_journal', 'payload_checksum') == (sleepypod_terminal_journal_payload | from_json).payload_checksum }}
+                                timeout: "00:00:10"
+                                continue_on_timeout: true
+                              - choose:
+                                  - conditions: "{{ not wait.completed }}"
+                                    sequence:
+                                      - variables:
+                                          household_away_response: "{{ dict(default_response, error_code='terminal_journal_echo_timeout', status='indeterminate', state=journal_phase, retryable=true) }}"
+                                      - stop: SleepyPod terminal journal echo timed out
+                                        response_variable: household_away_response
+                              - action: mqtt.publish
+                                data:
+                                  topic: "{{ solo_topic_status }}"
+                                  payload: "{{ sleepypod_status_payload }}"
+                                  qos: 1
+                                  retain: true
+                              - wait_template: >-
+                                  {{ state_attr('sensor.household_away_status', 'revision') | int(-1) == (sleepypod_status_payload | from_json).revision and state_attr('sensor.household_away_status', 'release_token') == (sleepypod_status_payload | from_json).release_token and states('sensor.household_away_status') == journal_phase }}
+                                timeout: "00:00:10"
+                                continue_on_timeout: true
+                              - choose:
+                                  - conditions: "{{ not wait.completed }}"
+                                    sequence:
+                                      - variables:
+                                          household_away_response: "{{ dict(default_response, error_code='status_echo_timeout', status='indeterminate', state=journal_phase, retryable=true) }}"
+                                      - stop: SleepyPod status echo timed out
+                                        response_variable: household_away_response
+                  - conditions: "{{ normalized_sleepypod_action not in ['set_schedule', 'replace_alarms'] and not internal_sleepypod_bypass }}"
+                    sequence:
+                      - action: mqtt.publish
+                        data:
+                          topic: "{{ solo_topic_journal }}"
+                          payload: "{{ sleepypod_terminal_journal_payload }}"
+                          qos: 1
+                          retain: true
+                      - wait_template: >-
+                          {{ state_attr('sensor.solo_trip_journal', 'payload_checksum') == (sleepypod_terminal_journal_payload | from_json).payload_checksum }}
+                        timeout: "00:00:10"
+                        continue_on_timeout: true
+                      - choose:
+                          - conditions: "{{ not wait.completed }}"
+                            sequence:
+                              - variables:
+                                  household_away_response: "{{ dict(default_response, error_code='terminal_journal_echo_timeout', status='indeterminate', state=journal_phase, retryable=true) }}"
+                              - stop: SleepyPod journal echo timed out
+                                response_variable: household_away_response
+              - variables:
+                  household_away_response: "{{ sleepypod_terminal_response }}"
+              - stop: SleepyPod command dispatched
+                response_variable: household_away_response
+
+          - conditions: "{{ normalized_operation == 'end_now' }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ journal_phase not in ['active', 'restore_required'] }}"
+                    sequence:
+                      - variables:
+                          household_away_response: "{{ dict(default_response, error_code='solo_trip_not_active') }}"
+                      - stop: Solo Trip is not active
+                        response_variable: household_away_response
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.solo_trip_enabled
+              - variables:
+                  household_away_response: "{{ {'request_id': normalized_request_id, 'status': 'indeterminate', 'revision': current_revision, 'state': 'ending', 'error_code': 'ending_requested', 'retryable': true, 'confirmed_effects': []} }}"
+              - stop: Solo Trip ending requested
+                response_variable: household_away_response
+
+automation:
+  - id: solo_trip_reconcile
+    alias: Solo Trip reconcile
+    mode: queued
+    max: 10
+    triggers:
+      - trigger: homeassistant
+        event: start
+        id: startup
+      - trigger: time_pattern
+        minutes: "/1"
+        id: watchdog
+      - trigger: state
+        entity_id:
+          - input_boolean.solo_trip_enabled
+          - input_select.solo_trip_traveler
+          - input_datetime.solo_trip_start
+          - input_datetime.solo_trip_end
+          - input_boolean.vacation_mode
+        id: intent
+      - trigger: state
+        entity_id:
+          - sensor.solo_trip_journal
+          - sensor.household_away_status
+        id: lifecycle
+      - trigger: state
+        entity_id:
+          - sensor.master_bedroom_sleepypod_eight_pod_schedules
+          - sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state
+          - sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state
+          - person.stephen_fenton
+          - person.stephanie_hobart
+        id: engaged_device
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ trigger.id != 'engaged_device'
+             or state_attr('sensor.solo_trip_journal', 'solo_phase')
+               in ['activating', 'active', 'degraded', 'ending', 'restore_required'] }}
+    actions:
+      - action: script.household_away_command
+        data:
+          operation: reconcile
+          request_id: >-
+            reconcile-{{ trigger.id | default('unknown', true) }}-{{ trigger.entity_id | default('state', true) | replace('.', '-') }}-{{ trigger.to_state.context.id if trigger.to_state is defined and trigger.to_state is not none else 'no-context' }}-{{ now().strftime('%Y%m%d%H%M%S%f') }}
+          expected_revision: >-
+            {{ state_attr('sensor.solo_trip_journal', 'revision') | int(0) }}
+          reason: >-
+            {{ trigger.entity_id | default(trigger.platform, true) }}

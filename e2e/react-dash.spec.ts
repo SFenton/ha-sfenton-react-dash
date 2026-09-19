@@ -2018,7 +2018,7 @@ test('grocery deletes use native browser confirmations and prompts', async ({ pa
   page.off('dialog', countMultiDeleteDialogs)
 
   await page.goto('/index.html?path=overview&user=stephen#daily-report')
-  const summary = page.getByRole('dialog', { name: "Stephen's Summary" })
+  const summary = page.getByRole('dialog', { name: "Your Summary" })
   await summary.getByRole('tab', { name: /^Expired Food/ }).click()
   await summary.getByRole('button', { name: 'Edit Milk' }).click()
   const quickProfile = page.getByRole('dialog', { name: 'Milk' })
@@ -2264,7 +2264,7 @@ test('SleepyPod current marker aligns with a reached physical target', async ({ 
     mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
   })
 
-  await page.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }).click()
+  await page.getByRole('button', { name: /Your Side Heating • \+1/i }).click()
 
   const dial = page.getByRole('dialog').getByRole('region', { name: /Stephen's Bed thermostat Heating \+1 • 85°F/i })
   const target = dial.getByRole('slider', { name: "Stephen's Bed target level" })
@@ -2301,7 +2301,7 @@ test('SleepyPod hot flash keeps the cancel action stable from cooling through th
     mock.setEntityState('timer.eight_sleep_stephen_hot_flash', 'idle')
   })
 
-  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  await page.getByRole('button', { name: /Your Side Cooling/i }).click()
   const dialog = page.getByRole('dialog', { name: "Stephen's Bed" })
   await dialog.getByRole('tab', { name: 'Special Modes' }).click()
   await dialog.getByRole('button', { name: 'Hot Flash Mode Inactive' }).click()
@@ -2314,7 +2314,7 @@ test('SleepyPod hot flash keeps the cancel action stable from cooling through th
   await expect(currentMarker).toBeVisible()
   expect(Number(await currentMarker.getAttribute('data-value'))).toBeCloseTo(-0.55, 2)
   await expect(dialog.getByRole('slider', { name: "Stephen's Bed target level" })).toHaveCount(0)
-  await expect(page.locator("button[aria-label=\"Stephen's Bed Hot Flash Mode • Cooling\"]")).toHaveCount(1)
+  await expect(page.locator('button[aria-label="Your Side Hot Flash Mode • Cooling"]')).toHaveCount(1)
 
   const cancel = dialog.getByRole('button', { name: "Cancel Stephen's Bed hot flash mode" })
   const status = cancel.locator('..')
@@ -2337,7 +2337,7 @@ test('SleepyPod hot flash keeps the cancel action stable from cooling through th
   })
 
   await expect(phase).toHaveText('15:00')
-  await expect(page.locator("button[aria-label=\"Stephen's Bed 15:00 Remaining\"]")).toHaveCount(1)
+  await expect(page.locator('button[aria-label="Your Side 15:00 Remaining"]')).toHaveCount(1)
   const holdingPhaseBox = await phase.boundingBox()
   const holdingCancelBox = await cancel.boundingBox()
   if (!holdingPhaseBox || !holdingCancelBox) throw new Error('Hot Flash hold status was not measurable')
@@ -2361,7 +2361,7 @@ test("SleepyPod active alarm actions stay per-side and optimistic", async ({ pag
     mock.setEntityState("sensor.master_bedroom_sleepypod_eight_pod_left_alarm_state", "ringing")
     mock.setEntityState("sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state", "ringing")
   })
-  await page.getByRole("button", { name: /Steph.s Bed Off/i }).click()
+  await page.getByRole("button", { name: /Steph's Side Off/i }).click()
 
   const dialog = page.getByRole("dialog", { name: /Steph.s Bed/ })
   const section = dialog.locator("[data-sleepypod-side=\"right\"]")
@@ -2421,7 +2421,7 @@ test.describe('desktop modal layout', () => {
       const mock = (window as unknown as { __mockHass: { setEntityState: (entityId: string, state: string) => void } }).__mockHass
       mock.setEntityState("sensor.master_bedroom_sleepypod_eight_pod_right_alarm_state", "ringing")
     })
-    await page.getByRole("button", { name: /Steph.s Bed Off/i }).click()
+    await page.getByRole("button", { name: /Steph's Side Off/i }).click()
 
     const dialog = page.getByRole("dialog", { name: /Steph.s Bed/ })
     const heroColumn = dialog.locator("[data-scroll-region=\"eight-sleep-hero-column\"]")
@@ -2599,7 +2599,7 @@ test.describe('desktop modal layout', () => {
   test('bed modal uses the shared landscape frame on a short wide viewport', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 500 })
     await page.goto('/at-a-glance/master-bedroom')
-    await page.getByRole('button', { name: /Steph's Bed Off/i }).click()
+    await page.getByRole('button', { name: /Steph's Side Off/i }).click()
 
     const dialog = page.getByRole('dialog', { name: "Steph's Bed" })
     await expect(dialog).toBeVisible()
@@ -3016,7 +3016,7 @@ test('settings links to Vacation mode controls', async ({ page }) => {
   await page.getByRole('button', { name: /Vacation Set away dates and prepare the house for vacation\./i }).click()
 
   await expect(page).toHaveURL(/\/at-a-glance\/settings\?path=vacation/)
-  await expect(page.getByRole('heading', { name: 'Vacation Mode', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Vacation Mode', exact: true, level: 2 })).toBeVisible()
   await expect(page.getByText('Enable or disable vacation mode for the house')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Vacation Mode On' })).toHaveCSS('outline-style', 'none')
   await expect(page.getByRole('heading', { name: 'Vacation Dates' })).toBeVisible()
@@ -3150,9 +3150,9 @@ test('chores render HA-supplied vacation lists exactly and omit empty sections o
   await expect(page.getByRole('heading', { name: 'Past Due' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'No Due Date' })).toBeVisible()
 
-  await page.getByRole('button', { name: /Stephen's Tasks/i }).click()
+  await page.getByRole('button', { name: /Your Chores/i }).click()
 
-  await expect(page.getByRole('heading', { name: "Stephen's Chores" })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your Chores' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'No Chores Due' })).toBeVisible()
   // Vacation mode is on for this scenario, so the copy must credit vacation, not Stephen.
   await expect(page.getByText('Enjoy vacation!')).toBeVisible()
@@ -3654,7 +3654,7 @@ test('Music Room source tiles follow external routed-source truth without simult
 
 test('Free Sleep global Add Alarm defaults to weekdays and writes enabled backend records', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const dialog = await openBedAlarmDialog(page, /Steph's Side Off/i)
   const addAlarm = await openAddAlarmForm(dialog, "Steph's Bed")
 
   await addAlarm.getByLabel('Alarm time').fill('08:00')
@@ -3715,7 +3715,7 @@ test('humidifier Sleep readout matches SleepyPod OFF typography and keeps mobile
   expect(sleepReadout.gaps.right).toBeGreaterThanOrEqual(48)
 
   await page.goto('/at-a-glance/master-bedroom')
-  await page.getByRole('button', { name: /Steph.s Bed Off/i }).click()
+  await page.getByRole('button', { name: /Steph's Side Off/i }).click()
   const sleepypodDialog = page.getByRole('dialog')
   const offText = sleepypodDialog.getByRole('region', { name: /Steph.s Bed thermostat Off/i }).getByText('OFF', { exact: true })
   const offReadout = await offText.evaluate((element) => {
@@ -3787,7 +3787,7 @@ test('schedule detail pages keep the outer modal sheet anchored', async ({ page 
 
 test('Free Sleep day Add Alarm is locked to that day and returns to day management', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const dialog = await openBedAlarmDialog(page, /Steph's Side Off/i)
   await dialog.getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }).click()
   await expect(dialog).toHaveAccessibleName("Steph's Bed Sunday Alarms")
 
@@ -3812,7 +3812,7 @@ test('SleepyPod inline toggle updates a single main row without opening edit', a
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')
   await setMockFreeSleepWakeDayAlarms(page, 'right', 'sunday', [{ enabled: true, time: '06:30' }])
-  await page.getByRole('button', { name: /Steph.s Bed Off/i }).click()
+  await page.getByRole('button', { name: /Steph's Side Off/i }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
   await dialog.getByRole('tab', { name: 'Alarms', exact: true }).click()
@@ -3843,7 +3843,7 @@ test('SleepyPod inline toggle updates a single main row without opening edit', a
 
 test('SleepyPod inline toggle updates one multi-alarm day row without opening edit', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const dialog = await openBedAlarmDialog(page, /Steph's Side Off/i)
   const dayGroup = dialog.getByRole('button', { name: 'Steph\u0027s Bed Sunday Alarms 2 Enabled' })
   await expect(dialog.getByRole('switch', { name: /Sunday alarm/i })).toHaveCount(0)
   await dayGroup.click()
@@ -3874,7 +3874,7 @@ test('SleepyPod inline toggle updates one multi-alarm day row without opening ed
 })
 
 test('Free Sleep alarm active state is edited from its day page', async ({ page }) => {
-  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const dialog = await openBedAlarmDialog(page, /Steph's Side Off/i)
   await dialog.getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }).click()
   await dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i }).click()
 
@@ -3895,7 +3895,7 @@ test('Free Sleep alarm active state is edited from its day page', async ({ page 
 })
 
 test('Free Sleep alarm time edit preserves enabled state and payload fields', async ({ page }) => {
-  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const dialog = await openBedAlarmDialog(page, /Steph's Side Off/i)
   await dialog.getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }).click()
   await dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i }).click()
 
@@ -3911,7 +3911,7 @@ test('Free Sleep alarm time edit preserves enabled state and payload fields', as
 })
 
 test('Free Sleep alarm delete returns to the day page and keeps the remaining alarm normalized', async ({ page }) => {
-  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const dialog = await openBedAlarmDialog(page, /Steph's Side Off/i)
   await dialog.getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }).click()
   await dialog.getByRole('button', { name: /Steph.s Bed Sunday alarm at 6:30 AM, Enabled/i }).click()
 
@@ -3952,7 +3952,7 @@ test('Free Sleep alarm delete returns to the day page and keeps the remaining al
 
 test('Free Sleep grouped day navigation restores nested scroll and focus in one mobile sheet', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  const dialog = await openBedAlarmDialog(page, /Steph.s Bed Off/i)
+  const dialog = await openBedAlarmDialog(page, /Steph's Side Off/i)
   const modalBody = dialog.locator('[data-modal-sheet-body="true"]')
   await modalBody.evaluate((element) => {
     element.style.height = '160px'
@@ -4738,7 +4738,7 @@ test('thermostat modal contains full-size heat and cool markers at all mobile ta
 test('mobile bed thermostat keeps its top-arc hit target inside the scroller and its footer fixed', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/at-a-glance/master-bedroom')
-  await page.getByRole('button', { name: /Steph's Bed Off/i }).click()
+  await page.getByRole('button', { name: /Steph's Side Off/i }).click()
 
   const dialog = page.getByRole('dialog', { name: "Steph's Bed" })
   const body = dialog.locator('[data-modal-sheet-body="true"]')
@@ -4774,7 +4774,7 @@ test('mobile bed dial maps taps, drag, and keyboard to targets without invoking 
     await dialog.dismiss()
   })
   await page.goto('/at-a-glance/master-bedroom')
-  await page.getByRole('button', { name: /Stephen's Bed (?:Cooling|Heating)/i }).click()
+  await page.getByRole('button', { name: /Your Side (?:Cooling|Heating)/i }).click()
 
   const dialog = page.getByRole('dialog', { name: "Stephen's Bed" })
   const dial = dialog.locator('[role="region"][data-size="modal"]')
@@ -4849,7 +4849,7 @@ test('mobile SleepyPod target prompt keeps dial and active-stage stepper command
     mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
   })
 
-  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  await page.getByRole('button', { name: /Your Side Cooling/i }).click()
   const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
   const dial = bedDialog.getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
   const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
@@ -5013,7 +5013,7 @@ test('mobile SleepyPod target prompt keeps current-target commands separate from
     mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
   })
 
-  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  await page.getByRole('button', { name: /Your Side Cooling/i }).click()
   const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
   const dial = bedDialog.getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
   const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
@@ -5330,8 +5330,8 @@ test('thermostat hero dial allows vertical swipe scrolling', async ({ page, brow
 test('daily summary deep link opens the tabbed modal for the requested user', async ({ page }) => {
   await page.goto('/index.html?path=overview&user=stephen#daily-report')
 
-  const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
-  await expect(dialog.getByRole('heading', { name: "Stephen's Summary" })).toBeVisible()
+  const dialog = page.getByRole('dialog', { name: "Your Summary" })
+  await expect(dialog.getByRole('heading', { name: "Your Summary" })).toBeVisible()
   await expect(dialog).toHaveAttribute('data-has-subtitle', 'false')
 
   const nav = dialog.getByRole('tablist', { name: 'Daily report sections' })
@@ -5430,12 +5430,12 @@ test('daily summary modal closes back to the home dashboard', async ({ page }) =
 test('header profile button opens the summary modal from any page', async ({ page }) => {
   await page.goto('/index.html?path=vacuums')
 
-  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary/ })
+  const profileButton = page.getByRole('button', { name: /^Open Your Summary/ })
   await expect(profileButton).toBeVisible()
   await profileButton.click()
 
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByRole('heading', { name: "Stephen's Summary" })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: "Your Summary" })).toBeVisible()
   await expect(dialog.getByRole('tablist', { name: 'Daily report sections' })).toBeVisible()
   await expect.poll(() => new URL(page.url()).hash).toBe('#daily-report')
 
@@ -5446,7 +5446,7 @@ test('header profile button opens the summary modal from any page', async ({ pag
 test('header profile button stays visible and opaque across route changes', async ({ page }) => {
   await page.goto('/index.html?path=overview')
 
-  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary/ })
+  const profileButton = page.getByRole('button', { name: /^Open Your Summary/ })
   await expect(profileButton).toBeVisible()
 
   await page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Security' }).click()
@@ -5470,7 +5470,7 @@ test('daily summary empty tabs centre without scrolling the sheet', async ({ pag
     api.setEntityState('input_boolean.vacation_mode', 'on')
   })
 
-  await page.getByRole('button', { name: /^Open .+'s Summary/ }).click()
+  await page.getByRole('button', { name: /^Open Your Summary/ }).click()
   const dialog = page.getByRole('dialog')
 
   await expect(dialog.getByRole('heading', { level: 2, name: 'No Chores Due' })).toBeVisible()
@@ -5490,7 +5490,7 @@ test('daily summary keeps the last expired-food empty state centred while the se
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/index.html?path=overview&user=stephen')
 
-  await page.getByRole('button', { name: /^Open .+'s Summary/ }).click()
+  await page.getByRole('button', { name: /^Open Your Summary/ }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tablist', { name: 'Daily report sections' }).getByRole('tab', { name: /^Expired Food/ }).click()
 
@@ -5561,7 +5561,7 @@ test('daily summary keeps the last expired-food empty state centred while the se
 test('profile button badges overdue chores plus expired food, capped at 9+', async ({ page }) => {
   await page.goto('/index.html?path=overview')
 
-  const profile = page.getByRole('button', { name: /^Open .+'s Summary/ })
+  const profile = page.getByRole('button', { name: /^Open Your Summary/ })
   const badge = profile.locator('[data-count]')
 
   const setCounts = async (overdue: number, expired: number, upcoming: number) => {

@@ -38,7 +38,7 @@ for (const deviceCase of cases) {
 
       const shell = await page.evaluate((insets) => {
         const menu = document.querySelector<HTMLElement>('button[aria-label="Open navigation menu"]')?.getBoundingClientRect()
-        const profileButton = document.querySelector<HTMLElement>('button[aria-label^="Open Stephen"]')?.getBoundingClientRect()
+        const profileButton = document.querySelector<HTMLElement>('button[aria-label^="Open Your Summary"]')?.getBoundingClientRect()
         const bottomNav = document.querySelector<HTMLElement>('[data-adaptive-navigation="bottom"]')?.getBoundingClientRect()
         return {
           bottomNav: bottomNav && bottomNav.width > 0 && bottomNav.height > 0

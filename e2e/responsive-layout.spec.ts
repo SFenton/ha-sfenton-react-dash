@@ -32,7 +32,7 @@ test('preserves the approved 393x852 Home geometry', async ({ page }) => {
       bottomNav: box(document.querySelector('[data-adaptive-navigation="bottom"]')),
       camera: box(document.querySelector('button[aria-label$=" camera"]')),
       menu: box(document.querySelector('button[aria-label="Open navigation menu"]')),
-      profile: box(document.querySelector('button[aria-label^="Open Stephen"]')),
+      profile: box(document.querySelector('button[aria-label^="Open Your Summary"]')),
       scroller: box(document.querySelector('[data-page-scroller="true"]')),
       weather: box(document.querySelector('button[aria-label^="Open seven-day weather forecast"]')),
     }
