@@ -4,6 +4,10 @@ import { MaterialIcon } from './Icon'
 import { useCopy } from '../../i18n'
 import { useModalBackdropBands } from '../../hooks/useModalBackdropBands'
 import {
+  armDashboardKeyboardPrediction,
+  isDashboardKeyboardInput,
+} from '../../hooks/useDashboardViewport'
+import {
   modalBodyTierForInlineSize,
   useModalSheetPresentation,
   type ModalBodyTier,
@@ -81,10 +85,35 @@ interface ModalCenteredGeometrySnapshot {
   size: ModalSheetSize
 }
 export const MODAL_SHEET_EXIT_ANIMATION_MS = 520
+const PREVENT_SCROLL_INPUT_TYPES = new Set([
+  '',
+  'email',
+  'number',
+  'password',
+  'search',
+  'tel',
+  'text',
+  'url',
+])
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   if (typeof ref === 'function') ref(value)
   else if (ref) ref.current = value
+}
+
+function focusKeyboardInputWithoutScroll(target: EventTarget | null) {
+  if (
+    target instanceof HTMLTextAreaElement
+    || (
+      target instanceof HTMLInputElement
+      && PREVENT_SCROLL_INPUT_TYPES.has(target.getAttribute('type')?.toLowerCase() ?? '')
+    )
+    || (target instanceof HTMLElement && target.isContentEditable)
+  ) {
+    target.focus({ preventScroll: true })
+    return true
+  }
+  return false
 }
 
 function previewModalBackdropPolicy(policy: ModalSheetBackdropPolicy) {
@@ -100,14 +129,17 @@ function automaticBackdropSupported(snapshot: ModalSheetSnapshot) {
     || snapshot.surfaceDecorationOccludesBackdrop === true
 }
 
-function modalBackdropStyle(contentStyle: ModalSheetStyle | undefined): ModalSheetStyle | undefined {
-  if (!contentStyle) return undefined
-  const height = contentStyle['--modal-mobile-height']
-  const maxHeight = contentStyle['--modal-mobile-max-height']
-  if (height === undefined && maxHeight === undefined) return undefined
+function modalBackdropStyle(
+  contentStyle: ModalSheetStyle | undefined,
+  keyboardSurfaceBlockSize: string | null,
+): ModalSheetStyle | undefined {
+  const height = contentStyle?.['--modal-mobile-height']
+  const maxHeight = contentStyle?.['--modal-mobile-max-height']
+  if (height === undefined && maxHeight === undefined && keyboardSurfaceBlockSize === null) return undefined
   return {
     '--modal-mobile-height': height,
     '--modal-mobile-max-height': maxHeight,
+    '--modal-keyboard-surface-block-size': keyboardSurfaceBlockSize ?? undefined,
   }
 }
 
@@ -115,6 +147,8 @@ function modalContentStyle(
   contentStyle: ModalSheetStyle | undefined,
   geometrySnapshot: ModalCenteredGeometrySnapshot | null,
   closing: boolean,
+  closingKeyboardInset: string | null,
+  keyboardSurfaceBlockSize: string | null,
 ) {
   const resolved: ModalSheetStyle = {
     '--modal-surface-backing': contentStyle?.['--color-modal-surface'] === undefined
@@ -129,6 +163,12 @@ function modalContentStyle(
     resolved['--modal-centered-block-size'] = centeredGeometry.blockPolicy === 'fixed' ? centeredGeometry.blockSize : 'auto'
     resolved['--modal-centered-max-block-size'] = centeredGeometry.maxBlockSize
       ?? (centeredGeometry.blockPolicy === 'fixed' ? centeredGeometry.blockSize : undefined)
+  }
+  if (keyboardSurfaceBlockSize !== null) {
+    resolved['--modal-keyboard-surface-block-size'] = keyboardSurfaceBlockSize
+  }
+  if (closing && closingKeyboardInset !== null) {
+    resolved['--modal-keyboard-inset'] = closingKeyboardInset
   }
   if (closing) resolved.pointerEvents = 'none'
   return Object.keys(resolved).length > 0 ? resolved : undefined
@@ -199,6 +239,8 @@ export function ModalSheet({
   const [previousOpen, setPreviousOpen] = useState(open)
   const [rapidReopen, setRapidReopen] = useState(false)
   const [rapidReopenPending, setRapidReopenPending] = useState(false)
+  const [closingKeyboardInset, setClosingKeyboardInset] = useState<string | null>(null)
+  const [keyboardSurfaceBlockSize, setKeyboardSurfaceBlockSize] = useState<string | null>(null)
   const [inputShielded, setInputShielded] = useState(false)
   const inputShieldFrameRef = useRef<number | null>(null)
   const currentPresentation = useModalSheetPresentation()
@@ -227,6 +269,14 @@ export function ModalSheet({
       setOpenCenteredGeometrySnapshot(currentCenteredGeometrySnapshot)
       setRapidReopen(rapidReopenPending)
       setRapidReopenPending(false)
+      setClosingKeyboardInset(null)
+      setKeyboardSurfaceBlockSize(null)
+    } else {
+      setClosingKeyboardInset(
+        getComputedStyle(document.documentElement)
+          .getPropertyValue('--dashboard-keyboard-overlay-inset')
+          .trim() || '0px',
+      )
     }
   }
   if (geometryIdentityChanged) setOpenCenteredGeometrySnapshot(currentCenteredGeometrySnapshot)
@@ -254,12 +304,18 @@ export function ModalSheet({
     const frame = requestAnimationFrame(() => setInitialStarting(false))
     return () => cancelAnimationFrame(frame)
   }, [initialStarting])
-  const renderedContentStyle = modalContentStyle(rendered.contentStyle, renderedCenteredGeometrySnapshot, closing)
+  const renderedContentStyle = modalContentStyle(
+    rendered.contentStyle,
+    renderedCenteredGeometrySnapshot,
+    closing,
+    closingKeyboardInset,
+    keyboardSurfaceBlockSize,
+  )
   const renderedBackdropPolicy: ModalSheetBackdropPolicy = rendered.backdropPolicy === 'auto' && automaticBackdropSupported(rendered)
     ? 'auto'
     : 'full'
   const renderBackdropBands = renderedBackdropPolicy === 'auto'
-  const renderedBackdropStyle = modalBackdropStyle(rendered.contentStyle)
+  const renderedBackdropStyle = modalBackdropStyle(rendered.contentStyle, keyboardSurfaceBlockSize)
   const { contentRef: backdropContentRef, overlayRef: backdropOverlayRef } = useModalBackdropBands(Boolean(
     open
     && renderBackdropBands
@@ -274,7 +330,6 @@ export function ModalSheet({
     bodyRef.current = node
     assignRef(bodyElementRef, node)
   }, [bodyElementRef])
-
   const requestClose = () => {
     if (inputShieldFrameRef.current !== null) window.cancelAnimationFrame(inputShieldFrameRef.current)
     setInputShielded(true)
@@ -284,6 +339,11 @@ export function ModalSheet({
     })
     setRapidReopen(false)
     setRapidReopenPending(true)
+    setClosingKeyboardInset(
+      getComputedStyle(document.documentElement)
+        .getPropertyValue('--dashboard-keyboard-overlay-inset')
+        .trim() || '0px',
+    )
     setLastOpenSnapshot(currentSnapshot)
     setLastOpenPresentation(currentPresentation)
     setLastOpenBodyTier(currentBodyTier)
@@ -444,6 +504,18 @@ export function ModalSheet({
               hidden={false}
               inert={closing ? true : undefined}
               initialFocus={false}
+              onPointerDownCapture={(event) => {
+                if (isDashboardKeyboardInput(event.target)) {
+                  const blockSize = event.currentTarget.getBoundingClientRect().height
+                  if (blockSize && blockSize > 0) {
+                    setKeyboardSurfaceBlockSize(`${blockSize}px`)
+                  }
+                  armDashboardKeyboardPrediction()
+                  if (document.activeElement !== event.target && focusKeyboardInputWithoutScroll(event.target)) {
+                    event.preventDefault()
+                  }
+                }
+              }}
               ref={backdropContentRef}
               style={renderedContentStyle}
             >
@@ -457,7 +529,7 @@ export function ModalSheet({
                   {rendered.surfaceDecoration}
                 </div>
               )}
-              <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isDialogPresentation ? 'true' : undefined}>
+              <Drawer.Content className={styles.contentLayout} data-base-ui-swipe-ignore={isDialogPresentation ? 'true' : undefined} data-modal-sheet-content-layout="true">
                 {showDragHandle && <div className={styles.handle} data-mobile-drag-handle="true" />}
                 <div className={styles.header}>
                   <div className={styles.headingGroup}>

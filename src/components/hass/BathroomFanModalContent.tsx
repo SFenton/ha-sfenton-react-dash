@@ -168,7 +168,7 @@ function BathroomFanModalView({
 
   return (
     <div className={styles.root} data-bathroom-fan-modal-content="true">
-      <DynamicGrid columns={2} gap={8}>
+      <DynamicGrid columns={2} gap={8} itemSizing="uniform">
         <StatusPill
           grouped
           icon={occupancyActive ? 'mdi:motion-sensor' : 'mdi:motion-sensor-off'}

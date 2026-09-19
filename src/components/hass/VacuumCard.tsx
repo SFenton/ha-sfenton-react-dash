@@ -6,7 +6,11 @@ import { InfoBox } from '../core/InfoBox'
 import { DynamicGrid } from '../core/DynamicGrid'
 import { MaterialIcon } from '../core/Icon'
 import { ModalActionButton, type ModalActionTone } from '../core/ModalActionFooter'
-import { ModalIconTabNav } from '../core/ModalTabNav'
+import {
+  MODAL_TAB_CONTENT_FADE_MS,
+  MODAL_TAB_MEMBERSHIP_LAYOUT_MS,
+  ModalIconTabNav,
+} from '../core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { useModalSheetPresentation } from '../core/modalSheetPresentation'
@@ -18,6 +22,7 @@ import { VACUUM_MODAL_TABS, type VacuumModalTab } from '../../constants/surfaceS
 import { DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from '../../constants/loading'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
 import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
+import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState, type OptimisticCommitOptions } from '../../hooks/useOptimisticState'
 import { APP_LOCALE, COMMON_COPY_NAMESPACE, CORE_COPY_KEYS, CORE_COPY_NAMESPACE, VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
@@ -72,6 +77,7 @@ const VACUUM_CENTERED_GEOMETRY = {
 type VacuumCleanTarget = 'rooms' | 'area'
 type VacuumMapStatusLayout = 'stacked' | 'split'
 type VacuumLayoutPreparationPhase = 'content' | 'exiting' | 'loading'
+type VacuumRuntimeContentPhase = 'expand-fade' | 'expand-layout' | 'expand-pre-fade' | 'idle' | 'shrink-fade' | 'shrink-layout'
 type VacuumViewportLayout = 'portrait' | 'short-landscape' | 'tall-landscape'
 
 const VACUUM_LAYOUT_LOADING_MIN_MS = 120
@@ -160,6 +166,12 @@ interface ResolvedVacuumStatus {
   primaryRevision?: string
 }
 
+interface VacuumRuntimeContentSnapshot {
+  optimisticState: OptimisticVacuumState
+  runtimeMode: VacuumRuntimeMode
+  status: ResolvedVacuumStatus
+}
+
 const VACUUM_MODAL_PREVIEW_EVENT = 'react-dash:vacuum-modal-preview-mode'
 let vacuumModalPreviewMode: VacuumModalPreviewMode = 'live'
 let vacuumModalPreviewRegistrations = 0
@@ -177,6 +189,129 @@ function isUnavailableState(state: string | undefined) {
 
 function isResumable(statusFlag: string | undefined) {
   return statusFlag === 'resumable'
+}
+
+function useVacuumRuntimeContentTransition(
+  optimisticState: OptimisticVacuumState,
+  runtimeMode: VacuumRuntimeMode,
+  status: ResolvedVacuumStatus,
+): VacuumRuntimeContentSnapshot & { phase: VacuumRuntimeContentPhase } {
+  const reducedMotion = useReducedMotion()
+  const [displayedRuntimeMode, setDisplayedRuntimeMode] = useState(runtimeMode)
+  const [phase, setPhase] = useState<VacuumRuntimeContentPhase>('idle')
+  const displayedRuntimeModeRef = useRef(displayedRuntimeMode)
+  const phaseRef = useRef(phase)
+  const [frozenSnapshot, setFrozenSnapshot] = useState<VacuumRuntimeContentSnapshot>({ optimisticState, runtimeMode, status })
+  const latestSnapshotRef = useRef<VacuumRuntimeContentSnapshot>({ optimisticState, runtimeMode, status })
+  const phaseTimerRef = useRef<number | null>(null)
+  const settleTimerRef = useRef<number | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
+  const latestSnapshot = useMemo(
+    () => ({ optimisticState, runtimeMode, status }),
+    [optimisticState, runtimeMode, status],
+  )
+
+  const setTrackedPhase = useCallback((nextPhase: VacuumRuntimeContentPhase) => {
+    phaseRef.current = nextPhase
+    setPhase(nextPhase)
+  }, [])
+
+  const setTrackedRuntimeMode = useCallback((nextMode: VacuumRuntimeMode) => {
+    displayedRuntimeModeRef.current = nextMode
+    setDisplayedRuntimeMode(nextMode)
+  }, [])
+
+  const clearSchedule = useCallback(() => {
+    if (phaseTimerRef.current !== null) window.clearTimeout(phaseTimerRef.current)
+    if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current)
+    if (animationFrameRef.current !== null) window.cancelAnimationFrame(animationFrameRef.current)
+    phaseTimerRef.current = null
+    settleTimerRef.current = null
+    animationFrameRef.current = null
+  }, [])
+
+  useLayoutEffect(() => {
+    latestSnapshotRef.current = latestSnapshot
+  }, [latestSnapshot])
+
+  useEffect(() => clearSchedule, [clearSchedule])
+
+  useEffect(() => {
+    clearSchedule()
+
+    if (reducedMotion) {
+      return
+    }
+
+    const displayedMode = displayedRuntimeModeRef.current
+    if (runtimeMode === displayedMode) {
+      if (phaseRef.current === 'shrink-fade') {
+        setTrackedPhase('expand-fade')
+        settleTimerRef.current = window.setTimeout(() => {
+          setTrackedPhase('idle')
+          settleTimerRef.current = null
+        }, MODAL_TAB_CONTENT_FADE_MS)
+      } else {
+        setTrackedPhase('idle')
+      }
+      return
+    }
+
+    if (runtimeMode === 'minimal') {
+      phaseTimerRef.current = window.setTimeout(() => {
+        setTrackedPhase('shrink-fade')
+        phaseTimerRef.current = window.setTimeout(() => {
+          setFrozenSnapshot(latestSnapshotRef.current)
+          setTrackedRuntimeMode('minimal')
+          setTrackedPhase('shrink-layout')
+          settleTimerRef.current = window.setTimeout(() => {
+            setTrackedPhase('idle')
+            settleTimerRef.current = null
+          }, MODAL_TAB_MEMBERSHIP_LAYOUT_MS)
+          phaseTimerRef.current = null
+        }, MODAL_TAB_CONTENT_FADE_MS)
+      }, 0)
+      return
+    }
+
+    phaseTimerRef.current = window.setTimeout(() => {
+      setTrackedPhase('expand-layout')
+      phaseTimerRef.current = window.setTimeout(() => {
+        setFrozenSnapshot(latestSnapshotRef.current)
+        setTrackedRuntimeMode('full')
+        setTrackedPhase('expand-pre-fade')
+        animationFrameRef.current = window.requestAnimationFrame(() => {
+          setTrackedPhase('expand-fade')
+          settleTimerRef.current = window.setTimeout(() => {
+            setTrackedPhase('idle')
+            settleTimerRef.current = null
+          }, MODAL_TAB_CONTENT_FADE_MS)
+          animationFrameRef.current = null
+        })
+        phaseTimerRef.current = null
+      }, MODAL_TAB_MEMBERSHIP_LAYOUT_MS)
+    }, 0)
+  }, [clearSchedule, reducedMotion, runtimeMode, setTrackedPhase, setTrackedRuntimeMode])
+
+  const effectiveDisplayedRuntimeMode = reducedMotion ? runtimeMode : displayedRuntimeMode
+  const effectivePhase = reducedMotion
+    ? 'idle'
+    : runtimeMode === 'full' && displayedRuntimeMode === 'minimal' && phase !== 'idle'
+      ? 'expand-layout'
+    : phase !== 'idle'
+      ? phase
+      : runtimeMode !== displayedRuntimeMode
+        ? runtimeMode === 'minimal' ? 'shrink-fade' : 'expand-layout'
+        : phase
+  const displayedSnapshot = effectiveDisplayedRuntimeMode === runtimeMode
+    ? latestSnapshot
+    : frozenSnapshot
+
+  return {
+    ...displayedSnapshot,
+    phase: effectivePhase,
+    runtimeMode: effectiveDisplayedRuntimeMode,
+  }
 }
 
 function installVacuumModalPreviewApi() {
@@ -357,11 +492,12 @@ function useVacuumModalRuntime(vacuum: VacuumConfig): VacuumModalRuntime {
     liveStatusFlag: statusFlag?.state,
   })
   const runtimeMode = previewMode === 'live' ? liveRuntimeMode : previewMode
+  const previewDisplayState = previewMode === 'minimal' ? 'cleaning' : displayState
   const optimisticState = useMemo<OptimisticVacuumState>(() => ({
     commitState: commitDisplayState,
     liveState: primaryState,
-    state: displayState,
-  }), [commitDisplayState, displayState, primaryState])
+    state: previewDisplayState,
+  }), [commitDisplayState, previewDisplayState, primaryState])
   const visibleTabs = useMemo(
     () => vacuumModalTabsForMode(vacuum, runtimeMode, dockStatus?.state),
     [dockStatus?.state, runtimeMode, vacuum],
@@ -384,14 +520,40 @@ function useVacuumActiveTab({
   visibleTabs: readonly (typeof VACUUM_MODAL_TABS)[number][]
 }) {
   const focusControlsRef = useRef(false)
+  const focusWithinActiveRegionRef = useRef(false)
   const effectiveActiveTab = visibleTabs.some((tab) => tab.tab === activeTab) ? activeTab : 'controls'
+
+  useLayoutEffect(() => {
+    const trackFocus = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return
+      const trackedTab = document.getElementById(modalTabId(idPrefix, activeTab))
+      const trackedPanel = document.getElementById(modalTabPanelId(idPrefix, 'content'))
+      focusWithinActiveRegionRef.current = Boolean(
+        trackedTab?.contains(target) || trackedPanel?.contains(target),
+      )
+    }
+    const handleFocus = (event: FocusEvent) => trackFocus(event.target)
+    trackFocus(document.activeElement)
+    document.addEventListener('focusin', handleFocus)
+    return () => document.removeEventListener('focusin', handleFocus)
+  }, [activeTab, idPrefix])
+
+  useLayoutEffect(() => {
+    const activeElement = document.activeElement
+    if (!(activeElement instanceof HTMLElement)) return
+    const activeTabElement = document.getElementById(modalTabId(idPrefix, activeTab))
+    const activePanel = document.getElementById(modalTabPanelId(idPrefix, 'content'))
+    focusWithinActiveRegionRef.current = Boolean(
+      activeTabElement?.contains(activeElement) || activePanel?.contains(activeElement),
+    )
+  }, [activeTab, idPrefix])
 
   useLayoutEffect(() => {
     if (activeTab === effectiveActiveTab) return
     const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const hiddenTab = document.getElementById(modalTabId(idPrefix, activeTab))
     const hiddenPanel = document.getElementById(modalTabPanelId(idPrefix, 'content'))
-    focusControlsRef.current = Boolean(activeElement) && (
+    focusControlsRef.current = focusWithinActiveRegionRef.current || Boolean(activeElement) && (
       hiddenTab === activeElement
       || Boolean(hiddenTab?.contains(activeElement))
       || Boolean(hiddenPanel?.contains(activeElement))
@@ -1101,7 +1263,7 @@ function VacuumStatusSummary({
 
   return (
     <section className={styles.statusPanel}>
-      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.statusGridLabel)} className={styles.statusPills} columns={2} gap={8}>
+      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.statusGridLabel)} className={styles.statusPills} columns={2} gap={8} itemSizing="uniform">
         <InfoPill icon={visual.icon} label="Status" tone={visual.tone} value={stateLabel} />
         <InfoPill icon="mdi:battery" label="Battery" tone={status.primaryAvailable ? undefined : 'unavailable'} value={batteryLabel} />
         {vacuum.dockControls
@@ -1567,9 +1729,13 @@ function VacuumControlsSection({
       || optimisticState.state === 'paused'
       || optimisticState.state === 'returning'
     )
-  const fallbackMessage = status.primaryAvailable
-    ? status.currentIssue.raw ?? formatStateValue(optimisticState.state)
-    : copy(VACUUM_COPY_KEYS.status.unavailableHelp)
+  const fallbackMessage = !status.primaryAvailable
+    ? copy(VACUUM_COPY_KEYS.status.unavailableHelp)
+    : status.currentIssue.status === VACUUM_ISSUE_PRESENT
+      ? status.currentIssue.raw
+      : status.currentIssue.status === VACUUM_ISSUE_UNKNOWN
+        ? copy(VACUUM_COPY_KEYS.status.errorSourceUnavailableHelp)
+        : null
 
   return (
     <div className={styles.controlStack}>
@@ -1586,7 +1752,7 @@ function VacuumControlsSection({
         optimisticState={optimisticState}
         vacuum={vacuum}
       />
-      {!panelStatusVisible && !runtimeActionsVisible && (
+      {!panelStatusVisible && !runtimeActionsVisible && fallbackMessage && (
         <ControlSection title={formatStateValue(optimisticState.state)}>
           <Description>{fallbackMessage}</Description>
         </ControlSection>
@@ -1678,7 +1844,7 @@ function VacuumAutoCleanDisabledRooms({ vacuum }: { vacuum: VacuumConfig }) {
     <section className={styles.section}>
       <SectionHeader title="Disabled Auto-Clean Rooms" />
       <Description className={styles.autoCleanDescription}>{AUTO_CLEAN_DISABLED_DESCRIPTION}</Description>
-      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.autoCleanGridLabel)} className={styles.autoCleanCheckboxGrid} columns={2} forceEquivalentColumnCount gap={8}>
+      <DynamicGrid ariaLabel={copy(VACUUM_COPY_KEYS.autoCleanGridLabel)} className={styles.autoCleanCheckboxGrid} columns={2} gap={8} itemSizing="uniform">
         {rooms.map((room) => <AutoCleanDisabledRoomCheckbox key={room.entityId} room={room} />)}
       </DynamicGrid>
     </section>
@@ -1763,6 +1929,7 @@ function VacuumModalTabContent({
   const leftPaneRef = useRef<HTMLDivElement | null>(null)
   const tabIdPrefix = `vacuum-${vacuum.vacuumMapId}`
   const { displayedTab: displayedActiveTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
+  const runtimeContent = useVacuumRuntimeContentTransition(optimisticState, runtimeMode, status)
   const [requestedMapStatusLayout, setRequestedMapStatusLayout] = useState<VacuumMapStatusLayout>(() => (
     typeof window !== 'undefined' && window.innerWidth >= 760 && window.innerHeight < 560 ? 'split' : 'stacked'
   ))
@@ -2072,20 +2239,26 @@ function VacuumModalTabContent({
                 ) : cleaningReportInRightPane ? (
                   <VacuumWhileAwaySection onOpenOutcomes={onOpenOutcomes} presentation={outcomePresentation} vacuum={vacuum} />
                 ) : null}
-                <VacuumControlsSection
-                  areaEditorMeta={areaEditorMeta}
-                  areaSelection={areaSelection}
-                  commandPolicyMode={status.commandPolicyMode}
-                  coordinator={coordinator}
-                  onAreaSelectionChange={onAreaSelectionChange}
-                  onOpenRoomsTab={openRoomsTab}
-                  onEditArea={editArea}
-                  panelStatusVisible={controlsPanelStatusVisible}
-                  optimisticState={optimisticState}
-                  runtimeMode={runtimeMode}
-                  status={status}
-                  vacuum={vacuum}
-                />
+                <div
+                  className={styles.runtimeControlsTransition}
+                  data-vacuum-runtime-content-phase={runtimeContent.phase}
+                  data-vacuum-runtime-content-transition="true"
+                >
+                  <VacuumControlsSection
+                    areaEditorMeta={areaEditorMeta}
+                    areaSelection={areaSelection}
+                    commandPolicyMode={runtimeContent.status.commandPolicyMode}
+                    coordinator={coordinator}
+                    onAreaSelectionChange={onAreaSelectionChange}
+                    onOpenRoomsTab={openRoomsTab}
+                    onEditArea={editArea}
+                    panelStatusVisible={controlsPanelStatusVisible}
+                    optimisticState={runtimeContent.optimisticState}
+                    runtimeMode={runtimeContent.runtimeMode}
+                    status={runtimeContent.status}
+                    vacuum={vacuum}
+                  />
+                </div>
               </>
             )}
             {displayedActiveTab === 'zones' && <VacuumZones coordinator={coordinator} onToggleZone={toggleRoom} runtimeMode={runtimeMode} vacuum={vacuum} />}

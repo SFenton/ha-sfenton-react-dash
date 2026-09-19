@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ModalSheet, type ModalCenteredGeometry } from './ModalSheet'
+import { clearDashboardKeyboardPrediction } from '../../hooks/useDashboardViewport'
 
 const modalSheetCss = readFileSync(resolve(process.cwd(), 'src/components/core/ModalSheet.module.css'), 'utf8')
 const tokensCss = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8')
@@ -120,6 +121,32 @@ describe('ModalSheet mounted orientation', () => {
 })
 
 describe('ModalSheet', () => {
+  it('arms keyboard geometry before a modal text input receives focus', () => {
+    render(
+      <ModalSheet onClose={() => undefined} open title="Keyboard controls">
+        <input aria-label="Modal text" />
+      </ModalSheet>,
+    )
+
+    fireEvent.pointerDown(screen.getByRole('textbox', { name: 'Modal text' }))
+
+    expect(document.documentElement).toHaveAttribute('data-dashboard-kb-arming', 'true')
+    expect(screen.getByRole('textbox', { name: 'Modal text' })).toHaveFocus()
+    clearDashboardKeyboardPrediction()
+  })
+
+  it('freezes the keyboard lift while the sheet closes', () => {
+    document.documentElement.style.setProperty('--dashboard-keyboard-overlay-inset', '369px')
+    render(<ModalSheetHarness />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveAttribute('data-closing', 'true')
+    expect(dialog.style.getPropertyValue('--modal-keyboard-inset')).toBe('369px')
+    document.documentElement.style.removeProperty('--dashboard-keyboard-overlay-inset')
+  })
+
   it('preserves the latest detail snapshot on controlled close and completes navigation after exit', async () => {
     const complete = vi.fn()
     const view = render(<ModalSheet onClose={() => undefined} onCloseComplete={complete} open retainLatestOnControlledClose title="Overview">Overview content</ModalSheet>)
@@ -420,7 +447,9 @@ describe('ModalSheet', () => {
     expect(modalSheetCss).toMatch(/\.overlay\[data-exposed-backdrop-bands='true'\]\s*\{[^}]*-webkit-backdrop-filter:\s*none;\s*backdrop-filter:\s*none;/s)
     expect(modalSheetCss).toMatch(/\.backdropScrim\s*\{[^}]*inset:\s*0;[^}]*background:\s*var\(--color-modal-overlay\);/s)
     expect(modalSheetCss).toContain('background: var(--modal-surface-backing, var(--color-modal-surface))')
-    expect(modalSheetCss).toMatch(/\.content,\s*\.backdropGeometryProxy\s*\{[^}]*height:\s*var\(--modal-mobile-height,\s*90dvh\);[^}]*max-height:\s*min\(\s*var\(--modal-mobile-max-height,\s*90dvh\),[^}]*--dashboard-visible-height[^}]*--rd-safe-top/s)
+    expect(modalSheetCss).toMatch(/\.content,\s*\.backdropGeometryProxy\s*\{[^}]*height:\s*var\(--modal-mobile-height,\s*90dvh\);[^}]*max-height:\s*min\(\s*var\(--modal-mobile-max-height,\s*90dvh\),[^}]*--dashboard-viewport-height[^}]*--rd-safe-top/s)
+    expect(modalSheetCss).toMatch(/data-dashboard-kb-arming='true'[^}]*\.contentLayout,[\s\S]*data-dashboard-keyboard='open'[^}]*\.contentLayout,[\s\S]*data-closing='true'[^}]*\.contentLayout\s*\{[^}]*transition:\s*padding-bottom 300ms cubic-bezier\(\.32,\s*\.72,\s*0,\s*1\);/s)
+    expect(modalSheetCss).toMatch(/data-dashboard-keyboard='open'[^}]*\.contentLayout,\s*\.content\[data-closing='true'\] \.contentLayout\s*\{[^}]*box-sizing:\s*border-box;[^}]*padding-bottom:\s*var\(--modal-keyboard-inset\);/s)
     expect(modalSheetCss).toMatch(/\.overlay\[data-exposed-backdrop-bands='true'\]\[data-modal-presentation='landscape-dialog'\]\s*\{[^}]*-webkit-backdrop-filter:\s*var\(--blur-modal\);\s*backdrop-filter:\s*var\(--blur-modal\);/s)
     expect(modalSheetCss).toMatch(/margin-bottom:\s*calc\(-1 \* var\(--modal-backdrop-band-overlap\)\);[\s\S]*top:\s*var\(--modal-backdrop-band-overlap\);/)
     expect(tokensCss).toMatch(/--color-modal-surface:\s*rgba\(24,\s*24,\s*24,\s*0\.97\);/)

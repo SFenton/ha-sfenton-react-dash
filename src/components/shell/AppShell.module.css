@@ -66,19 +66,10 @@
   gap: var(--floating-action-gap);
   pointer-events: none;
   --floating-action-bottom: calc(var(--bottom-nav-height) - 14px + var(--rd-bottom-nav-offset));
-  --floating-action-keyboard-gap: 14px;
+  --floating-action-keyboard-gap: 8px;
   animation: floatingActionFadeIn 170ms ease-out;
   transform: translate3d(0, 0, 0);
-  transition: transform 150ms ease;
-}
-
-:global(html[data-dashboard-kb-arming='true'][data-dashboard-search-expanded='true']:not([data-dashboard-keyboard='open'])) .floatingAction {
-  transform: translate3d(
-    0,
-    calc(var(--floating-action-bottom) - var(--floating-action-keyboard-gap) - var(--dashboard-keyboard-predicted-inset, 0px)),
-    0
-  );
-  transition: none;
+  transition: transform 300ms cubic-bezier(.32, .72, 0, 1);
 }
 
 :global(html[data-dashboard-keyboard='open']) .floatingAction {
@@ -87,7 +78,6 @@
     calc(var(--floating-action-bottom) - var(--floating-action-keyboard-gap) - var(--dashboard-keyboard-overlay-inset, 0px)),
     0
   );
-  transition: transform 90ms linear;
 }
 
 .floatingAction > * {

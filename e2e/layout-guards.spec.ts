@@ -276,18 +276,21 @@ for (const overflow of ['hidden', 'clip'] as const) {
   })
 }
 
-guardedTest('declared vacuum readiness permits only an actually empty unavailable panel', async ({ page }) => {
+guardedTest('declared vacuum readiness permits only a semantically empty Controls panel', async ({ page }) => {
   await page.setContent(`<div role="dialog" data-state="open">
     <button id="selected" role="tab" aria-selected="true" aria-controls="panel">Controls</button>
-    <div id="region" data-layout-preparation-phase="content" data-scroll-region="vacuum-panel" data-modal-tab-transition-state="idle">
+    <div id="region" data-layout-preparation-phase="content" data-scroll-region="vacuum-panel" data-tab="controls" data-modal-tab-transition-state="idle">
       <div id="panel" role="tabpanel" aria-labelledby="selected"><div></div></div>
     </div>
   </div>`)
   const dialog = page.getByRole('dialog')
-  await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()
-  await dialog.evaluate((element) => element.insertAdjacentHTML('beforeend', '<div id="state" data-tone="unavailable"><span>Status</span><strong>Unavailable</strong></div>'))
   await expect(waitForModalReady(dialog, 150)).rejects.toThrow()
   await waitForModalReady(dialog, 500, 'vacuum-tabs')
+  await page.locator('#panel').evaluate((panel) => {
+    panel.innerHTML = '<span>Unexpected content</span>'
+    Object.assign((panel as HTMLElement).style, { height: '0', overflow: 'hidden' })
+  })
+  await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()
   await page.locator('#panel').evaluate((panel) => { panel.innerHTML = '<button hidden aria-label="Hidden action"></button>' })
   await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()
   await page.locator('#panel').evaluate((panel) => { panel.innerHTML = '<div></div>'; panel.setAttribute('aria-labelledby', 'wrong-tab') })
@@ -296,9 +299,10 @@ guardedTest('declared vacuum readiness permits only an actually empty unavailabl
   await page.locator('#region').evaluate((region) => region.setAttribute('data-modal-tab-transition-state', 'exiting'))
   await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()
   await page.locator('#region').evaluate((region) => region.setAttribute('data-modal-tab-transition-state', 'idle'))
-  await page.locator('#state').evaluate((state) => document.body.append(state))
+  await page.locator('#region').evaluate((region) => region.setAttribute('data-tab', 'actions'))
   await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()
-  await dialog.evaluate((element) => element.append(document.querySelector('#state')!))
+  await page.locator('#region').evaluate((region) => region.setAttribute('data-tab', 'controls'))
+  await waitForModalReady(dialog, 500, 'vacuum-tabs')
   await page.locator('#region').evaluate((region) => region.removeAttribute('data-scroll-region'))
   await expect(waitForModalReady(dialog, 150, 'vacuum-tabs')).rejects.toThrow()
   await page.locator('#region').evaluate((region) => region.setAttribute('data-scroll-region', 'vacuum-panel'))

@@ -63,7 +63,7 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
       ? 'solo-trip'
       : scenario === 'filters' || scenario === 'recipe-grocery'
         ? 'recipes'
-        : scenario === 'form'
+        : scenario === 'form' || scenario === 'admin-todo-edit'
           ? 'to-do'
           : scenario === 'remote'
             ? 'music-room'
@@ -120,6 +120,16 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
     await page.getByRole('textbox', { name: 'Task', exact: true }).fill('Layout validation draft')
     await page.getByRole('textbox', { name: 'Task', exact: true }).blur()
   }
+  if (scenario === 'admin-todo-edit') {
+    await page.evaluate(() => {
+      const mock = window.__mockHass!
+      mock.setEntityState('todo.groceries', '1')
+      mock.setTodoItems('todo.groceries', [
+        { status: 'needs_action', summary: 'Layout validation task', uid: 'layout-admin-task' },
+      ])
+    })
+    await page.getByLabel('Admin To-Do todo list').getByRole('button', { name: 'Edit Layout validation task' }).click()
+  }
   if (scenario === 'remote') await page.evaluate(({ entity, hash }) => {
     if (!window.__mockHass) throw new Error('Mock preflight failed')
     window.__mockHass.setEntityState(entity, 'idle')
@@ -145,8 +155,26 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
     name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/,
   }).click()
   if (scenario === 'recipe-grocery' && state !== 'ready') {
-    await dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }).click()
-    await expect(dialog.locator(`[data-recipe-grocery-phase="${state === 'loading' ? '1' : '3'}"]`)).toBeVisible()
+    if (state === 'exhausted') {
+      await dialog.getByRole('button', { name: 'Add Canned tomatoes · 1 can to groceries' }).click()
+      await expect(dialog.getByRole('button', { name: 'Remove Canned tomatoes · 1 can from groceries' })).toBeVisible()
+      await dialog.getByRole('button', { name: 'Add Yellow Onion · 1 small to groceries' }).click()
+      await expect(dialog.locator('[data-recipe-grocery-exhausted="true"]')).toHaveCount(1)
+    } else {
+      await dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' }).click()
+      await expect(dialog.locator(`[data-recipe-grocery-phase="${state === 'loading' ? '1' : '3'}"]`)).toBeVisible()
+    }
+  }
+  if (scenario === 'admin-todo-edit') {
+  const input = dialog.getByRole('textbox', { name: 'Task Name' })
+  if (state === 'dirty') {
+    await input.fill('Layout validation renamed task')
+  } else if (state === 'failure') {
+    await input.fill('Layout validation failed task')
+    await dialog.page().evaluate(() => window.__mockHass!.setCallServiceOutcome('todo', 'update_item', 'reject'))
+    await dialog.getByRole('button', { name: 'Save' }).click()
+    await expect(dialog.getByRole('alert')).toHaveText('Mock service rejection')
+  }
   }
   if (scenario === 'weather') {
     const page = dialog.page()
@@ -201,7 +229,7 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
       mock.calls.splice(0, mock.calls.length)
     }, state)
   }
-  await waitForModalReady(dialog)
+  await waitForModalReady(dialog, undefined, scenario === 'vacuum' ? 'vacuum-tabs' : 'tabs')
 }
 
 export async function openHost(page: Page, state: string) {

@@ -155,24 +155,16 @@
   pointer-events: none;
 }
 
-:global(html[data-dashboard-keyboard='open']) .viewport,
-:global(html[data-dashboard-kb-arming='true']) .viewport {
-  /* Some WebViews shrink dvh without resizing the iframe; cap both paths instead of subtracting twice. */
-  height: min(
-    100%,
-    calc(var(--dashboard-viewport-height, 100vh) - var(--dashboard-keyboard-overlay-inset, 0px))
-  );
-  height: min(
-    100%,
-    100dvh,
-    calc(var(--dashboard-viewport-height, 100dvh) - var(--dashboard-keyboard-overlay-inset, 0px))
-  );
+:global(html[data-dashboard-keyboard='open']) .viewport {
+  height: var(--dashboard-viewport-height, 100vh);
+  height: var(--dashboard-viewport-height, 100dvh);
 }
 
 .content {
   --modal-intent-width: 720px;
   --modal-intent-max-width: 720px;
   --modal-intent-height: auto;
+  --modal-keyboard-inset: 0px;
   position: relative;
   isolation: isolate;
   display: flex;
@@ -206,6 +198,24 @@
     var(--modal-mobile-max-height, 90dvh),
     calc(var(--dashboard-visible-height, var(--dashboard-viewport-height, 100dvh)) - var(--rd-safe-top))
   );
+}
+
+:global(html[data-dashboard-keyboard='open']) .content {
+  --modal-keyboard-inset: var(--dashboard-keyboard-overlay-inset, 0px);
+}
+
+:global(html[data-dashboard-keyboard='open']) .content[data-modal-presentation='sheet'] .navigation,
+:global(html[data-dashboard-keyboard='open']) .content[data-modal-presentation='sheet'] .footer {
+  padding-bottom: 8px;
+}
+
+:global(html[data-dashboard-keyboard='open']) .content,
+:global(html[data-dashboard-keyboard='open']) .backdropGeometryProxy {
+  height: var(
+    --modal-keyboard-surface-block-size,
+    calc(var(--dashboard-viewport-height, 100dvh) * 0.9)
+  );
+  max-height: calc(var(--dashboard-viewport-height, 100dvh) - var(--rd-safe-top));
 }
 
 .content[data-size='compact'] {
@@ -271,6 +281,18 @@
   height: 100%;
   flex: 1 1 auto;
   flex-direction: column;
+}
+
+:global(html[data-dashboard-kb-arming='true']) .contentLayout,
+:global(html[data-dashboard-keyboard='open']) .contentLayout,
+.content[data-closing='true'] .contentLayout {
+  transition: padding-bottom 300ms cubic-bezier(.32, .72, 0, 1);
+}
+
+:global(html[data-dashboard-keyboard='open']) .contentLayout,
+.content[data-closing='true'] .contentLayout {
+  box-sizing: border-box;
+  padding-bottom: var(--modal-keyboard-inset);
 }
 
 .surfaceDecoration {
@@ -505,6 +527,12 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .contentLayout {
+    transition-duration: 1ms;
+  }
+}
+
 .overlay[data-exposed-backdrop-bands='true'][data-modal-presentation='dialog'],
 .overlay[data-exposed-backdrop-bands='true'][data-modal-presentation='landscape-dialog'] {
   background: var(--color-modal-overlay);
@@ -572,6 +600,10 @@
   height: 100%;
   max-height: 100%;
   flex: 0 0 100%;
+}
+
+:global(html[data-dashboard-keyboard='open']) .content[data-modal-presentation='landscape-dialog'] {
+  min-height: 100%;
 }
 
 .content[data-modal-presentation='dialog'][data-starting-style],

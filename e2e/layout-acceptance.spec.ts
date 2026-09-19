@@ -17,24 +17,33 @@ import { isWakeScenario, openWakeRoomState, wakeRoomFacts, wakeStateFacts } from
 // @covers src/pages/DashboardViewPage.module.css
 
 async function recipeGroceryFacts(dialog: Locator, state: string) {
-  const command = dialog.locator('[data-recipe-grocery-phase]')
+  const exhaustedCopy = 'All missing ingredients have already been added to groceries.'
+  const command = state === 'exhausted'
+    ? dialog.locator('[data-recipe-grocery-exhausted="true"]')
+    : dialog.locator('[data-recipe-grocery-phase], [data-recipe-grocery-complete="true"]')
   if (state === 'ready') {
     await expect(dialog.getByRole('button', { name: 'Add Missing Ingredients to Groceries' })).toBeEnabled()
     await expect(command).toHaveAttribute('data-recipe-grocery-phase', '0')
   } else if (state === 'loading') {
     await expect(dialog.locator('[data-recipe-grocery-spinner="true"]')).toBeVisible()
     await expect(command).toHaveAttribute('data-recipe-grocery-phase', '1')
-  } else {
+  } else if (state === 'success') {
     await expect(dialog.locator('[data-recipe-grocery-check="true"]')).toBeVisible()
     await expect(command).toHaveAttribute('data-recipe-grocery-phase', '3')
     await expect(dialog.getByText('Missing ingredients were submitted.')).toHaveCount(0)
+  } else {
+    await expect(command).toHaveAttribute('data-recipe-grocery-exhausted', 'true')
+    await expect(command).toHaveAttribute('aria-hidden', 'true')
+    await expect(dialog.locator('[data-recipe-grocery-phase]')).toHaveCount(0)
+    await expect(dialog.locator('[data-recipe-grocery-status="true"]')).toHaveText(exhaustedCopy)
+    await expect(dialog.getByText(exhaustedCopy, { exact: true })).toHaveClass(/visuallyHidden/)
   }
   const facts = {
     state,
     commandHeight: await command.evaluate((element) => element.getBoundingClientRect().height),
-    visibleStatusCopy: await dialog.locator('[data-recipe-grocery-success="true"]:not([class*="visuallyHidden"])').count(),
+    visibleStatusCopy: await dialog.locator('[data-recipe-grocery-status="true"]:not([class*="visuallyHidden"])').count(),
   }
-  expect(facts.commandHeight).toBeCloseTo(50, 0)
+  expect(facts.commandHeight).toBeCloseTo(state === 'exhausted' ? 0 : 50, 0)
   expect(facts.visibleStatusCopy).toBe(0)
   return facts
 }
@@ -89,7 +98,12 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     || (scenario === 'solo-trip-bed' && !state.startsWith('editor'))
     ? 'panes'
     : 'body'
-  const facts: Record<string, unknown> = await modalFacts(dialog, preferredScrollMode)
+  const facts: Record<string, unknown> = await modalFacts(
+    dialog,
+    preferredScrollMode,
+    'controls',
+    scenario === 'vacuum' ? 'vacuum-tabs' : 'tabs',
+  )
   await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
   if (scenario === 'solo-trip-bed') {
     if (state.startsWith('editor')) {
@@ -227,6 +241,48 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     await expect(dialog.getByRole('textbox', { name: 'Task' })).toHaveValue('Layout validation draft')
     facts.draft = 'preserved'
   }
+  if (scenario === 'admin-todo-edit') {
+    await expect(dialog.getByRole('textbox', { name: 'Task Name' })).toHaveValue(
+      state === 'pristine' ? 'Layout validation task' : state === 'dirty' ? 'Layout validation renamed task' : 'Layout validation failed task',
+    )
+    const reset = dialog.getByRole('button', { name: 'Reset' })
+    const save = dialog.getByRole('button', { name: 'Save' })
+    await expect(reset).toBeVisible()
+    await expect(save).toBeVisible()
+    if (state === 'pristine') {
+      await expect(reset).toBeDisabled()
+      await expect(save).toBeDisabled()
+    } else if (state === 'dirty') {
+      await expect(reset).toBeEnabled()
+      await expect(save).toBeEnabled()
+    } else {
+      await expect(reset).toBeEnabled()
+      await expect(save).toBeEnabled()
+      await expect(dialog.getByRole('alert')).toHaveText('Mock service rejection')
+    }
+    const [resetBox, saveBox] = await Promise.all([reset.boundingBox(), save.boundingBox()])
+    expect(resetBox).not.toBeNull()
+    expect(saveBox).not.toBeNull()
+    const actionGap = saveBox!.x - (resetBox!.x + resetBox!.width)
+    expect(Math.abs(resetBox!.y - saveBox!.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(resetBox!.height - saveBox!.height)).toBeLessThanOrEqual(1)
+    expect(actionGap).toBeGreaterThanOrEqual(9)
+    expect(actionGap).toBeLessThanOrEqual(11)
+    expect(saveBox!.width).toBeGreaterThan(resetBox!.width)
+    facts.adminTodoEdit = {
+      state,
+      footer: ['Reset', 'Save'],
+      footerGeometry: {
+        actionGap,
+        orientation: 'horizontal',
+        resetWidth: resetBox!.width,
+        saveWidth: saveBox!.width,
+      },
+      route: 'to-do',
+      entity: 'todo.groceries',
+      overflow: await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth),
+    }
+  }
   if (scenario === 'weather') {
     await expect(dialog.locator('[data-weather-scene-preview], select')).toHaveCount(0)
     const pressure = dialog.locator('[data-kind="pressure"]')
@@ -242,15 +298,25 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     facts.weather = { state, pressureHeights: heights, previewControls: 0, selectedMode: label }
   }
   if (scenario === 'vacuum') {
+    const visibleTabs = await dialog.getByRole('tab').evaluateAll((elements) => (
+      elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '')
+    ))
+    const expectedTabs = state === 'docked'
+      ? ['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info']
+      : state === 'dock-cleaning'
+        ? ['Controls', 'Auto-Clean', 'Actions', 'Info']
+        : ['Controls', 'Auto-Clean', 'Info']
+    expect(visibleTabs).toEqual(expectedTabs)
+    await expect(dialog.getByRole('tab', { name: 'Controls' })).toHaveAttribute('aria-selected', 'true')
+    facts.vacuumTabs = { state, visibleTabs }
+
     const pane = dialog.getByRole('group', { name: 'Main Floor map and status' })
     const map = pane.getByRole('region', { name: 'Main Floor Valetudo map' })
     await expect(pane).toHaveAttribute('data-map-status-layout-transition', 'idle')
-    const modalBody = dialog.locator('[data-area-editor="false"]')
-    const canShowTwoPanes = await modalBody.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length >= 2)
-    const constrained = facts.presentation === 'landscape-dialog' && canShowTwoPanes
+    const splitMapStatus = await pane.evaluate((element) => getComputedStyle(element).gridTemplateAreas !== 'none')
     const viewportLayout = await pane.getAttribute('data-vacuum-viewport-layout')
     const landscapeMap = viewportLayout === 'short-landscape' || viewportLayout === 'tall-landscape'
-    await expect(pane).toHaveAttribute('data-map-status-layout', constrained ? 'split' : 'stacked')
+    await expect(pane).toHaveAttribute('data-map-status-layout', splitMapStatus ? 'split' : 'stacked')
     await expect(map).toHaveAttribute('data-map-display', landscapeMap ? 'fitted' : 'contained')
     if (landscapeMap) {
       await expect(pane.getByRole('heading', { name: 'Status' })).toHaveCount(0)
@@ -667,7 +733,7 @@ for (const scenario of SCENARIO_IDS) {
         const initialProfile = stateObligations[0]?.profile
         if (initialProfile) await applyProfile(page, initialProfile)
         await enterState(dialog, scenario, state)
-      } else if (scenario === 'weather') await enterState(dialog, scenario, state)
+      } else if (scenario === 'weather' || scenario === 'vacuum' || scenario === 'admin-todo-edit') await enterState(dialog, scenario, state)
       if (scenario === 'quick-links' && state === 'rooms') await dialog.getByRole('button', { name: 'Rooms', exact: true }).click()
       if (scenario === 'quick-links' && state === 'back') await dialog.getByRole('button', { name: 'Back', exact: true }).click()
       if (scenario === 'summary') await dialog.getByRole('tab', { name: state === 'overdue' ? /^Overdue Chores/ : state === 'upcoming' ? 'Upcoming Chores' : /^Expired Food/ }).click()

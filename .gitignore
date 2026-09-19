@@ -20,6 +20,7 @@ __pycache__/
 .cache/
 .autonomous/
 .outbox/
+.deploy/
 artifacts/
 home-mcp/.data/
 home-mcp/.tls/

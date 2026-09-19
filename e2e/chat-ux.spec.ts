@@ -1,3 +1,4 @@
+// @covers src/components/core/ModalSheet.module.css
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { test, expect, devices, type Locator, type Page } from './layout/fixture'
@@ -543,7 +544,7 @@ test('multiline keyboard input and pending controls fit a synthetic contracted v
   expect(frame!.x).toBeCloseTo(71, 0)
   expect(frame!.y).toBeCloseTo(8, 0)
   expect(frame!.width).toBeCloseTo(725, 0)
-  expect(frame!.height).toBeCloseTo(226, 0)
+  expect(frame!.height).toBeCloseTo(356, 0)
   await page.evaluate(() => window.__mockHass!.chat.setPending())
   await input.press('Enter')
   await expect(dialog.locator('[data-chat-thinking]')).toBeAttached()
@@ -610,7 +611,7 @@ test('chat history and new-chat actions remain reachable at a long transcript ta
   expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
   await expectReachableChatActions(dialog)
   const frame = await dialog.boundingBox()
-  expect(frame!.height).toBeCloseTo(226, 0)
+  expect(frame!.height).toBeCloseTo(356, 0)
   await page.screenshot({ path: resolve(directory, 'header-tail-keyboard.png'), scale: 'css' })
   await dialog.getByRole('button', { name: 'Start New Chat', exact: true }).click()
   await expect(dialog.locator('[data-chat-role]')).toHaveCount(0)

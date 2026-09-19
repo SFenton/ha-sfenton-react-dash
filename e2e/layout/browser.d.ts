@@ -17,6 +17,7 @@ export interface LayoutMockController {
   }
   reset: () => void
   setEntityState: (entityId: string, state: string) => void
+  setTodoItems: (entityId: string, items: { status: string; summary: string; uid: string }[]) => void
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
   setCallServiceOutcome: (domain: string, service: string, outcome: 'pending' | 'reject' | 'resolve') => void
   setUser: (user: { id: string; name: string; is_admin?: boolean } | null) => void

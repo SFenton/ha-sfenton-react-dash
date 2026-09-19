@@ -164,7 +164,7 @@ export function CustomLightsPage() {
       <Section className={styles.section} gap={12} span="full" title={frontYardTitle}>
         <ModeToggleCard mode={mode} modeBackground={modeBackground(mode)} modeTitle={lightingModeTitle} onOpenModePicker={() => setPickerOpen(true)} />
         {showCustomGrid && (
-          <DynamicGrid className={styles.lightGrid} columns={2} fillRows={false} gap={12} itemSizing="uniform" layout="bounded" maxCellWidth={280} maxColumns={4}>
+          <DynamicGrid className={styles.lightGrid} columns={2} fillRows={false} gap={12} layout="bounded" maxCellWidth={280} maxColumns={4}>
             {CUSTOM_LIGHTS.map((light) => (
               <div className={styles.lightCell} key={light.entityId}>
                 <LightBrightnessCard

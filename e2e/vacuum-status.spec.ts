@@ -1,5 +1,8 @@
 // @covers src/components/hass/VacuumCard.module.css
 // @covers src/components/hass/VacuumCard.tsx
+// @covers src/components/core/ModalTabNav.module.css
+// @covers src/components/core/ModalTabNav.tsx
+import type { TestInfo } from '@playwright/test'
 import { expect, test, type Page } from './layout/fixture'
 import { waitForModalReady } from './layout/evidence'
 import { NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
@@ -85,6 +88,356 @@ async function setMainFloorDockStatus(page: Page, dockStatus: string) {
 
 async function mainFloorTabLabels(dialog: ReturnType<Page['getByRole']>) {
   return dialog.getByRole('tab').evaluateAll((tabs) => tabs.map((tab) => tab.getAttribute('aria-label')))
+}
+
+async function mainFloorTabPositions(dialog: ReturnType<Page['getByRole']>) {
+  return dialog.getByRole('tab').evaluateAll((tabs) => Object.fromEntries(tabs.map((tab) => {
+    const label = tab.getAttribute('aria-label') ?? tab.textContent?.trim() ?? ''
+    const rect = tab.getBoundingClientRect()
+    return [label, { left: rect.left, width: rect.width }]
+  })))
+}
+
+async function mainFloorTabContentMetrics(dialog: ReturnType<Page['getByRole']>, label: string) {
+  return dialog.getByRole('tab', { name: label }).evaluate((tab) => {
+    const rect = tab.getBoundingClientRect()
+    const content = tab.querySelector<HTMLElement>('[data-modal-tab-content="true"]')
+    if (!(content instanceof HTMLElement)) throw new Error('Vacuum tab content is missing')
+    const contentStyle = getComputedStyle(content)
+    const iconNode = tab.querySelector<HTMLElement>('[data-modal-tab-icon="true"]')
+    const iconStyle = iconNode ? getComputedStyle(iconNode) : null
+    const labelNode = tab.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+    const labelStyle = labelNode ? getComputedStyle(labelNode) : null
+    return {
+      columnGap: Number.parseFloat(contentStyle.columnGap || '0'),
+      contentOpacity: Number.parseFloat(contentStyle.opacity || '1'),
+      contentTransition: content.style.transition,
+      iconOpacity: iconStyle ? Number.parseFloat(iconStyle.opacity || '1') : null,
+      inlineWidth: tab.style.width ? Number.parseFloat(tab.style.width) : null,
+      justifySelf: tab.style.justifySelf,
+      left: rect.left,
+      labelDisplay: labelStyle?.display ?? null,
+      labelOpacity: labelStyle ? Number.parseFloat(labelStyle.opacity || '1') : null,
+      transform: tab.style.transform,
+      transition: tab.style.transition,
+      width: rect.width,
+    }
+  })
+}
+
+async function captureTabNavScreenshot(
+  nav: ReturnType<Page['getByRole']>,
+  testInfo: TestInfo,
+  filename: string,
+) {
+  const screenshotPath = testInfo.outputPath(filename)
+  await nav.screenshot({
+    animations: 'allow',
+    path: screenshotPath,
+    scale: 'css',
+  })
+  return screenshotPath
+}
+
+async function captureMainFloorTabWidthTrace(
+  nav: ReturnType<Page['getByRole']>,
+  label: string,
+  phase: 'expand-layout' | 'shrink-layout',
+) {
+  return nav.evaluate((element, { label, phase }) => new Promise<{
+    end: {
+      inlineWidth: number | null
+      justifySelf: string
+      phase: string | null
+      transform: string
+      transition: string
+      width: number
+    } | null
+    samples: {
+      inlineWidth: number | null
+      justifySelf: string
+      phase: string | null
+      time: number
+      transform: string
+      transition: string
+      width: number
+    }[]
+  }>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      observer.disconnect()
+      reject(new Error(`Timed out waiting for ${phase} width trace`))
+    }, 2_000)
+
+    const read = () => {
+      const tab = element.querySelector<HTMLElement>(`[role="tab"][aria-label="${label}"]`)
+      if (!(tab instanceof HTMLElement)) return null
+      const rect = tab.getBoundingClientRect()
+      return {
+        inlineWidth: tab.style.width ? Number.parseFloat(tab.style.width) : null,
+        justifySelf: tab.style.justifySelf,
+        phase: element.getAttribute('data-membership-phase'),
+        time: performance.now(),
+        transform: tab.style.transform,
+        transition: tab.style.transition,
+        width: rect.width,
+      }
+    }
+
+    const samples: {
+      inlineWidth: number | null
+      justifySelf: string
+      phase: string | null
+      time: number
+      transform: string
+      transition: string
+      width: number
+    }[] = []
+
+    const finish = () => {
+      window.clearTimeout(timeoutId)
+      observer.disconnect()
+      const endSnapshot = read()
+      resolve({
+        end: endSnapshot ? {
+          inlineWidth: endSnapshot.inlineWidth,
+          justifySelf: endSnapshot.justifySelf,
+          phase: endSnapshot.phase,
+          transform: endSnapshot.transform,
+          transition: endSnapshot.transition,
+          width: endSnapshot.width,
+        } : null,
+        samples,
+      })
+    }
+
+    const sample = () => {
+      const snapshot = read()
+      if (!snapshot) {
+        finish()
+        return
+      }
+      samples.push(snapshot)
+      if (element.getAttribute('data-membership-phase') === phase) {
+        window.requestAnimationFrame(sample)
+        return
+      }
+      finish()
+    }
+
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute('data-membership-phase') !== phase) return
+      observer.disconnect()
+      window.requestAnimationFrame(sample)
+    })
+
+    if (element.getAttribute('data-membership-phase') === phase) {
+      window.requestAnimationFrame(sample)
+      return
+    }
+
+    observer.observe(element, {
+      attributeFilter: ['data-membership-phase'],
+      attributes: true,
+    })
+  }), { label, phase })
+}
+
+async function captureMainFloorTabFadeTrace(
+  nav: ReturnType<Page['getByRole']>,
+  phase: 'expand-fade' | 'shrink-fade',
+) {
+  return nav.evaluate((element, phase) => new Promise<{
+    end: {
+      items: {
+        contentOpacity: number | null
+        iconOpacity: number | null
+        key: string
+        labelDisplay: string | null
+        labelOpacity: number | null
+        left: number
+        opacity: number
+        text: string
+        top: number
+      }[]
+      navHeight: number
+      navTop: number
+      phase: string | null
+      time: number
+    } | null
+    samples: {
+      items: {
+        contentOpacity: number | null
+        iconOpacity: number | null
+        key: string
+        labelDisplay: string | null
+        labelOpacity: number | null
+        left: number
+        opacity: number
+        text: string
+        top: number
+      }[]
+      navHeight: number
+      navTop: number
+      phase: string | null
+      time: number
+    }[]
+  }>((resolve, reject) => {
+    const timeoutId = window.setTimeout(() => {
+      observer.disconnect()
+      reject(new Error(`Timed out waiting for ${phase} opacity trace`))
+    }, 2_000)
+
+    const snapshot = () => ({
+      items: [...element.querySelectorAll<HTMLElement>('[role="tab"], [data-modal-tab-ghost="true"]')].map((node) => {
+        const contentNode = node.querySelector<HTMLElement>('[data-modal-tab-content="true"]')
+        const contentStyle = contentNode ? getComputedStyle(contentNode) : null
+        const iconNode = node.querySelector<HTMLElement>('[data-modal-tab-icon="true"]')
+        const iconStyle = iconNode ? getComputedStyle(iconNode) : null
+        const labelNode = node.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+        const labelStyle = labelNode ? getComputedStyle(labelNode) : null
+        const nodeStyle = getComputedStyle(node)
+        const rect = node.getBoundingClientRect()
+        return {
+          contentOpacity: contentStyle ? Number.parseFloat(contentStyle.opacity || '1') : null,
+          iconOpacity: iconStyle ? Number.parseFloat(iconStyle.opacity || '1') : null,
+          key: `${node.getAttribute('data-modal-tab-ghost') === 'true' ? 'ghost' : 'tab'}:${node.getAttribute('aria-label') ?? node.getAttribute('data-tab') ?? ''}`,
+          labelDisplay: labelStyle?.display ?? null,
+          labelOpacity: labelStyle ? Number.parseFloat(labelStyle.opacity || '1') : null,
+          left: rect.left,
+          opacity: Number.parseFloat(nodeStyle.opacity || '1'),
+          text: node.textContent?.trim() ?? '',
+          top: rect.top,
+        }
+      }),
+      navHeight: element.getBoundingClientRect().height,
+      navTop: element.getBoundingClientRect().top,
+      phase: element.getAttribute('data-membership-phase'),
+      time: performance.now(),
+    })
+
+    const samples: {
+      items: {
+        contentOpacity: number | null
+        iconOpacity: number | null
+        key: string
+        labelDisplay: string | null
+        labelOpacity: number | null
+        left: number
+        opacity: number
+        text: string
+        top: number
+      }[]
+      navHeight: number
+      navTop: number
+      phase: string | null
+      time: number
+    }[] = []
+
+    const finish = () => {
+      window.clearTimeout(timeoutId)
+      observer.disconnect()
+      resolve({
+        end: snapshot(),
+        samples,
+      })
+    }
+
+    const sample = () => {
+      samples.push(snapshot())
+      if (element.getAttribute('data-membership-phase') === phase) {
+        window.requestAnimationFrame(sample)
+        return
+      }
+      finish()
+    }
+
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute('data-membership-phase') !== phase) return
+      observer.disconnect()
+      window.requestAnimationFrame(sample)
+    })
+
+    if (element.getAttribute('data-membership-phase') === phase) {
+      window.requestAnimationFrame(sample)
+      return
+    }
+
+    observer.observe(element, {
+      attributeFilter: ['data-membership-phase'],
+      attributes: true,
+    })
+  }), phase)
+}
+
+async function mainFloorTabNavSnapshot(dialog: ReturnType<Page['getByRole']>) {
+  return dialog.getByRole('tablist', { name: 'Main Floor modal sections' }).evaluate((element) => {
+    const navRect = element.getBoundingClientRect()
+    const items = [...element.querySelectorAll<HTMLElement>('[role="tab"], [data-modal-tab-ghost="true"]')].map((node) => {
+      const contentNode = node.querySelector<HTMLElement>('[data-modal-tab-content="true"]')
+      const contentStyle = contentNode ? getComputedStyle(contentNode) : null
+      const iconNode = node.querySelector<HTMLElement>('[data-modal-tab-icon="true"]')
+      const iconStyle = iconNode ? getComputedStyle(iconNode) : null
+      const labelNode = node.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+      const labelStyle = labelNode ? getComputedStyle(labelNode) : null
+      const accessoryNode = node.querySelector<HTMLElement>('[data-modal-tab-accessory="true"]')
+      const accessoryStyle = accessoryNode ? getComputedStyle(accessoryNode) : null
+      const nodeStyle = getComputedStyle(node)
+      const rect = node.getBoundingClientRect()
+      return {
+        key: `${node.getAttribute('data-modal-tab-ghost') === 'true' ? 'ghost' : 'tab'}:${node.getAttribute('aria-label') ?? node.getAttribute('data-tab') ?? ''}`,
+        accessoryOpacity: accessoryStyle ? Number.parseFloat(accessoryStyle.opacity || '1') : null,
+        contentOpacity: contentStyle ? Number.parseFloat(contentStyle.opacity || '1') : null,
+        iconOpacity: iconStyle ? Number.parseFloat(iconStyle.opacity || '1') : null,
+        labelDisplay: labelStyle?.display ?? null,
+        labelOpacity: labelStyle ? Number.parseFloat(labelStyle.opacity || '1') : null,
+        left: rect.left,
+        opacity: Number.parseFloat(nodeStyle.opacity || '1'),
+        text: node.textContent?.trim() ?? '',
+        top: rect.top,
+      }
+    })
+
+    return {
+      items,
+      navHeight: navRect.height,
+      navTop: navRect.top,
+      phase: element.getAttribute('data-membership-phase'),
+    }
+  })
+}
+
+function findTabSnapshotItem(
+  snapshot: Awaited<ReturnType<typeof mainFloorTabNavSnapshot>>,
+  kind: 'ghost' | 'tab',
+  label: string,
+) {
+  const normalizedLabel = label.toLowerCase()
+  const aliases = normalizedLabel === 'rooms'
+    ? ['rooms', 'zones']
+    : normalizedLabel === 'actions'
+      ? ['actions', 'more']
+      : [normalizedLabel]
+  return snapshot.items.find((item) => (
+    aliases.some((alias) => item.key.toLowerCase() === `${kind}:${alias}`)
+    || aliases.some((alias) => item.text.toLowerCase() === alias)
+  )) ?? null
+}
+
+async function waitForTabNavSnapshot(
+  page: Page,
+  dialog: ReturnType<Page['getByRole']>,
+  predicate: (snapshot: Awaited<ReturnType<typeof mainFloorTabNavSnapshot>>) => boolean,
+  description: string,
+) {
+  let lastSnapshot: Awaited<ReturnType<typeof mainFloorTabNavSnapshot>> | null = null
+  const deadline = Date.now() + 4_000
+  while (Date.now() < deadline) {
+    const snapshot = await mainFloorTabNavSnapshot(dialog)
+    lastSnapshot = snapshot
+    if (predicate(snapshot)) return snapshot
+    await page.waitForTimeout(16)
+  }
+  throw new Error(`Timed out waiting for ${description}. Last phase: ${lastSnapshot?.phase ?? 'unknown'}`)
 }
 
 async function openUnavailableMusicVacuum(page: Page, path = '/at-a-glance/vacuums') {
@@ -674,6 +1027,1023 @@ test('runtime mode changes immediately retarget hidden tabs and preserve auto-cl
   await setMainFloorVacuumRuntime(page, { state: 'docked' })
   await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
   await expect(dialog.getByRole('tab', { name: 'Info', selected: true })).toBeVisible()
+})
+
+test('tab membership shrink waits for the fade phase before surviving tabs shift left', async ({ page, browserName }) => {
+  await page.setViewportSize({ height: 375, width: 667 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
+  await nav.evaluate((element) => {
+    const runtime = window as typeof window & {
+      __vacuumShrinkLayout667Observer?: MutationObserver
+      __vacuumShrinkLayout667Snapshot?: {
+        items: {
+          contentOpacity: number | null
+          iconOpacity: number | null
+          key: string
+          labelDisplay: string | null
+          labelOpacity: number | null
+          text: string
+        }[]
+      } | null
+      __vacuumTabNavObserver?: MutationObserver
+      __vacuumTabNavPhaseSnapshots?: Record<string, {
+        items: {
+          key: string
+          labelDisplay: string | null
+          left: number
+          opacity: number
+          top: number
+        }[]
+        navHeight: number
+        navTop: number
+      }>
+    }
+    const snapshot = () => {
+      const navRect = element.getBoundingClientRect()
+      const items = [...element.querySelectorAll<HTMLElement>('[role="tab"], [data-modal-tab-ghost="true"]')].map((node) => {
+        const labelNode = node.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+        const labelStyle = labelNode ? getComputedStyle(labelNode) : null
+        const nodeStyle = getComputedStyle(node)
+        const rect = node.getBoundingClientRect()
+        return {
+          key: `${node.getAttribute('data-modal-tab-ghost') === 'true' ? 'ghost' : 'tab'}:${node.getAttribute('aria-label') ?? node.getAttribute('data-tab') ?? ''}`,
+          labelDisplay: labelStyle?.display ?? null,
+          left: rect.left,
+          opacity: Number.parseFloat(nodeStyle.opacity || '1'),
+          top: rect.top,
+        }
+      })
+      return {
+        items,
+        navHeight: navRect.height,
+        navTop: navRect.top,
+      }
+    }
+    const shrinkLayoutSnapshot = () => ({
+      items: [...element.querySelectorAll<HTMLElement>('[role="tab"], [data-modal-tab-ghost="true"]')].map((node) => {
+        const contentNode = node.querySelector<HTMLElement>('[data-modal-tab-content="true"]')
+        const labelNode = node.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+        const iconNode = node.querySelector<HTMLElement>('[data-modal-tab-icon="true"]')
+        return {
+          contentOpacity: contentNode ? Number.parseFloat(getComputedStyle(contentNode).opacity || '1') : null,
+          iconOpacity: iconNode ? Number.parseFloat(getComputedStyle(iconNode).opacity || '1') : null,
+          key: `${node.getAttribute('data-modal-tab-ghost') === 'true' ? 'ghost' : 'tab'}:${node.getAttribute('aria-label') ?? node.getAttribute('data-tab') ?? ''}`,
+          labelDisplay: labelNode ? getComputedStyle(labelNode).display : null,
+          labelOpacity: labelNode ? Number.parseFloat(getComputedStyle(labelNode).opacity || '1') : null,
+          text: node.textContent?.trim() ?? '',
+        }
+      }),
+    })
+    let shrinkLayoutSampling = false
+    const record = () => {
+      const phase = element.getAttribute('data-membership-phase')
+      if (!phase) return
+      runtime.__vacuumTabNavPhaseSnapshots ??= {}
+      runtime.__vacuumTabNavPhaseSnapshots[phase] ??= snapshot()
+      if (
+        phase !== 'shrink-layout'
+        || shrinkLayoutSampling
+        || runtime.__vacuumShrinkLayout667Snapshot
+      ) return
+      shrinkLayoutSampling = true
+      const captureTranslucentLabel = () => {
+        if (
+          element.getAttribute('data-membership-phase') !== 'shrink-layout'
+          || runtime.__vacuumShrinkLayout667Snapshot
+        ) return
+        const candidate = shrinkLayoutSnapshot()
+        const controls = candidate.items.find((item) => item.key === 'tab:Controls')
+        if (
+          controls?.labelOpacity != null
+          && controls.labelOpacity > 0.05
+          && controls.labelOpacity < 0.9
+        ) {
+          runtime.__vacuumShrinkLayout667Snapshot = candidate
+          runtime.__vacuumShrinkLayout667Observer?.disconnect()
+          return
+        }
+        window.requestAnimationFrame(captureTranslucentLabel)
+      }
+      window.requestAnimationFrame(captureTranslucentLabel)
+    }
+    runtime.__vacuumShrinkLayout667Snapshot = null
+    runtime.__vacuumShrinkLayout667Observer?.disconnect()
+    runtime.__vacuumShrinkLayout667Observer = new MutationObserver(record)
+    runtime.__vacuumShrinkLayout667Observer.observe(element, {
+      attributeFilter: ['data-membership-phase'],
+      attributes: true,
+    })
+    runtime.__vacuumTabNavPhaseSnapshots = {}
+    runtime.__vacuumTabNavObserver?.disconnect()
+    runtime.__vacuumTabNavObserver = new MutationObserver(record)
+    runtime.__vacuumTabNavObserver.observe(element, {
+      attributeFilter: ['data-membership-phase'],
+      attributes: true,
+      childList: true,
+      subtree: true,
+    })
+    record()
+  })
+  const before = await mainFloorTabPositions(dialog)
+  const beforeSnapshot = await mainFloorTabNavSnapshot(dialog)
+  expect(findTabSnapshotItem(beforeSnapshot, 'tab', 'Controls')?.labelDisplay).toBe('none')
+
+  await dialog.getByRole('tab', { name: 'Rooms' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Rooms', selected: true })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'shrink-fade')
+  await expect(nav).toHaveAttribute('data-visual-count', '5')
+  await expect(nav).toHaveAttribute('data-semantic-count', '3')
+  await expect(dialog.getByRole('tab', { name: 'Controls', selected: true })).toBeVisible()
+  await expect(dialog.getByRole('tab', { name: 'Rooms' })).toHaveCount(0)
+  await expect(dialog.getByRole('tab', { name: 'Actions' })).toHaveCount(0)
+  await expect.poll(async () => {
+    const snapshot = await mainFloorTabNavSnapshot(dialog)
+    const rows = snapshot.items.map((item) => item.top)
+    return snapshot.phase === 'shrink-fade'
+      && rows.length === 5
+      && Math.max(...rows) - Math.min(...rows) <= 1
+      && Math.abs(snapshot.navHeight - beforeSnapshot.navHeight) <= 1
+      && Math.abs(snapshot.navTop - beforeSnapshot.navTop) <= 1
+  }).toBe(true)
+
+  const shrinkFadeEarly = await waitForTabNavSnapshot(page, dialog, (snapshot) => {
+    const roomsGhost = findTabSnapshotItem(snapshot, 'ghost', 'Rooms')
+    const actionsGhost = findTabSnapshotItem(snapshot, 'ghost', 'Actions')
+    return snapshot.phase === 'shrink-fade'
+      && (roomsGhost?.contentOpacity ?? -1) > 0.35
+      && (roomsGhost?.contentOpacity ?? 1) < 0.95
+      && (actionsGhost?.contentOpacity ?? -1) > 0.35
+      && (actionsGhost?.contentOpacity ?? 1) < 0.95
+  }, 'short-landscape shrink mid-fade content opacity')
+  const roomsGhost = findTabSnapshotItem(shrinkFadeEarly, 'ghost', 'Rooms')
+  const actionsGhost = findTabSnapshotItem(shrinkFadeEarly, 'ghost', 'Actions')
+  expect(roomsGhost?.contentOpacity).toBeGreaterThan(0.35)
+  expect(roomsGhost?.contentOpacity).toBeLessThan(0.95)
+  expect(roomsGhost?.iconOpacity).toBeCloseTo(1, 4)
+  expect(actionsGhost?.contentOpacity).toBeGreaterThan(0.35)
+  expect(actionsGhost?.contentOpacity).toBeLessThan(0.95)
+  expect(actionsGhost?.iconOpacity).toBeCloseTo(1, 4)
+
+  const duringFade = await mainFloorTabPositions(dialog)
+  expect(duringFade['Auto-Clean']?.left).toBeCloseTo(before['Auto-Clean']?.left ?? 0, 0)
+  expect(duringFade.Info?.left).toBeCloseTo(before.Info?.left ?? 0, 0)
+
+  await page.waitForFunction(() => {
+    const runtime = window as typeof window & {
+      __vacuumShrinkLayout667Snapshot?: unknown
+    }
+    return runtime.__vacuumShrinkLayout667Snapshot != null
+  })
+  const shrinkLayoutSnapshot = await page.evaluate(() => {
+    const runtime = window as typeof window & {
+      __vacuumShrinkLayout667Observer?: MutationObserver
+      __vacuumShrinkLayout667Snapshot?: Awaited<ReturnType<typeof mainFloorTabNavSnapshot>> | null
+    }
+    runtime.__vacuumShrinkLayout667Observer?.disconnect()
+    return runtime.__vacuumShrinkLayout667Snapshot
+  })
+  const controlsLabel = findTabSnapshotItem(shrinkLayoutSnapshot, 'tab', 'Controls')
+  expect(controlsLabel?.labelDisplay).toBe('block')
+  if (browserName === 'chromium') {
+    expect(controlsLabel?.labelOpacity).toBeGreaterThan(0.05)
+    expect(controlsLabel?.labelOpacity).toBeLessThan(0.9)
+  } else {
+    expect(controlsLabel?.labelOpacity).toBeGreaterThanOrEqual(0)
+    expect(controlsLabel?.labelOpacity).toBeLessThan(1)
+  }
+  expect(controlsLabel?.contentOpacity).toBeCloseTo(1, 4)
+  expect(controlsLabel?.iconOpacity).toBeCloseTo(1, 4)
+
+  await expect.poll(async () => nav.getAttribute('data-membership-phase')).toBe('idle')
+  await expect.poll(async () => (await mainFloorTabContentMetrics(dialog, 'Controls')).labelOpacity ?? 0).toBeGreaterThan(0.9)
+  await expect.poll(async () => (await mainFloorTabPositions(dialog)).Info?.left).toBeLessThan((before.Info?.left ?? 0) - 5)
+  const phaseSnapshots = await page.evaluate(() => {
+    const runtime = window as typeof window & {
+      __vacuumTabNavObserver?: MutationObserver
+      __vacuumTabNavPhaseSnapshots?: Record<string, {
+        items: {
+          key: string
+          labelDisplay: string | null
+          left: number
+          opacity: number
+          top: number
+        }[]
+        navHeight: number
+        navTop: number
+      }>
+    }
+    runtime.__vacuumTabNavObserver?.disconnect()
+    return runtime.__vacuumTabNavPhaseSnapshots ?? {}
+  })
+  const shrinkFadeSnapshot = phaseSnapshots['shrink-fade']
+  expect(shrinkFadeSnapshot).toBeTruthy()
+  const shrinkFadeRows = shrinkFadeSnapshot.items.map((item) => item.top)
+  expect(Math.max(...shrinkFadeRows) - Math.min(...shrinkFadeRows)).toBeLessThanOrEqual(1)
+  expect(Math.abs(shrinkFadeSnapshot.navHeight - beforeSnapshot.navHeight)).toBeLessThanOrEqual(1)
+  expect(Math.abs(shrinkFadeSnapshot.navTop - beforeSnapshot.navTop)).toBeLessThanOrEqual(1)
+  expect(shrinkFadeSnapshot.items.find((item) => item.key === 'tab:Controls')?.labelDisplay).toBe('none')
+  const afterSnapshot = await mainFloorTabNavSnapshot(dialog)
+  const rows = afterSnapshot.items.map((item) => item.top)
+  expect(Math.max(...rows) - Math.min(...rows)).toBeLessThanOrEqual(1)
+  expect(Math.abs(afterSnapshot.navHeight - beforeSnapshot.navHeight)).toBeLessThanOrEqual(1)
+  expect(Math.abs(afterSnapshot.navTop - beforeSnapshot.navTop)).toBeLessThanOrEqual(1)
+  expect(findTabSnapshotItem(afterSnapshot, 'tab', 'Controls')?.labelDisplay).toBe('block')
+  expect(findTabSnapshotItem(afterSnapshot, 'tab', 'Controls')?.labelOpacity).toBeCloseTo(1, 1)
+})
+
+test('tab membership expansion grows the grid before the new tabs become semantic tabs', async ({ page }) => {
+  await page.setViewportSize({ height: 375, width: 667 })
+  await page.goto('/at-a-glance/vacuums')
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+  await page.getByRole('button', { name: /Main Floor Cleaning/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
+  await nav.evaluate((element) => {
+    const runtime = window as typeof window & {
+      __vacuumExpandLayout667Observer?: MutationObserver
+      __vacuumExpandLayout667Snapshot?: {
+        items: {
+          contentOpacity: number | null
+          iconOpacity: number | null
+          key: string
+          labelDisplay: string | null
+          labelOpacity: number | null
+          text: string
+        }[]
+      } | null
+      __vacuumTabNavObserver?: MutationObserver
+      __vacuumTabNavPhaseSnapshots?: Record<string, {
+        items: {
+          key: string
+          labelDisplay: string | null
+          left: number
+          opacity: number
+          top: number
+        }[]
+      }>
+    }
+    const snapshot = () => ({
+      items: [...element.querySelectorAll<HTMLElement>('[role="tab"], [data-modal-tab-ghost="true"]')].map((node) => {
+        const labelNode = node.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+        const labelStyle = labelNode ? getComputedStyle(labelNode) : null
+        const nodeStyle = getComputedStyle(node)
+        const rect = node.getBoundingClientRect()
+        return {
+          key: `${node.getAttribute('data-modal-tab-ghost') === 'true' ? 'ghost' : 'tab'}:${node.getAttribute('aria-label') ?? node.getAttribute('data-tab') ?? ''}`,
+          labelDisplay: labelStyle?.display ?? null,
+          left: rect.left,
+          opacity: Number.parseFloat(nodeStyle.opacity || '1'),
+          top: rect.top,
+        }
+      }),
+    })
+    const expandLayoutSnapshot = () => ({
+      items: [...element.querySelectorAll<HTMLElement>('[role="tab"], [data-modal-tab-ghost="true"]')].map((node) => {
+        const contentNode = node.querySelector<HTMLElement>('[data-modal-tab-content="true"]')
+        const labelNode = node.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+        const iconNode = node.querySelector<HTMLElement>('[data-modal-tab-icon="true"]')
+        return {
+          contentOpacity: contentNode ? Number.parseFloat(getComputedStyle(contentNode).opacity || '1') : null,
+          iconOpacity: iconNode ? Number.parseFloat(getComputedStyle(iconNode).opacity || '1') : null,
+          key: `${node.getAttribute('data-modal-tab-ghost') === 'true' ? 'ghost' : 'tab'}:${node.getAttribute('aria-label') ?? node.getAttribute('data-tab') ?? ''}`,
+          labelDisplay: labelNode ? getComputedStyle(labelNode).display : null,
+          labelOpacity: labelNode ? Number.parseFloat(getComputedStyle(labelNode).opacity || '1') : null,
+          text: node.textContent?.trim() ?? '',
+        }
+      }),
+    })
+    let expandLayoutSampling = false
+    const record = () => {
+      const phase = element.getAttribute('data-membership-phase')
+      if (!phase) return
+      runtime.__vacuumTabNavPhaseSnapshots ??= {}
+      runtime.__vacuumTabNavPhaseSnapshots[phase] ??= snapshot()
+      if (
+        phase !== 'expand-layout'
+        || expandLayoutSampling
+        || runtime.__vacuumExpandLayout667Snapshot
+      ) return
+      expandLayoutSampling = true
+      const captureTranslucentLabel = () => {
+        if (
+          element.getAttribute('data-membership-phase') !== 'expand-layout'
+          || runtime.__vacuumExpandLayout667Snapshot
+        ) return
+        const candidate = expandLayoutSnapshot()
+        const autoClean = candidate.items.find((item) => item.key === 'tab:Auto-Clean')
+        if (
+          autoClean?.labelOpacity != null
+          && autoClean.labelOpacity > 0.05
+          && autoClean.labelOpacity < 0.9
+        ) {
+          runtime.__vacuumExpandLayout667Snapshot = candidate
+          runtime.__vacuumExpandLayout667Observer?.disconnect()
+          return
+        }
+        window.requestAnimationFrame(captureTranslucentLabel)
+      }
+      window.requestAnimationFrame(captureTranslucentLabel)
+    }
+    runtime.__vacuumExpandLayout667Snapshot = null
+    runtime.__vacuumExpandLayout667Observer?.disconnect()
+    runtime.__vacuumExpandLayout667Observer = new MutationObserver(record)
+    runtime.__vacuumExpandLayout667Observer.observe(element, {
+      attributeFilter: ['data-membership-phase'],
+      attributes: true,
+    })
+    runtime.__vacuumTabNavPhaseSnapshots = {}
+    runtime.__vacuumTabNavObserver?.disconnect()
+    runtime.__vacuumTabNavObserver = new MutationObserver(record)
+    runtime.__vacuumTabNavObserver.observe(element, {
+      attributeFilter: ['data-membership-phase'],
+      attributes: true,
+      childList: true,
+      subtree: true,
+    })
+    record()
+  })
+  const before = await mainFloorTabPositions(dialog)
+  const beforeSnapshot = await mainFloorTabNavSnapshot(dialog)
+  expect(findTabSnapshotItem(beforeSnapshot, 'tab', 'Controls')?.labelDisplay).toBe('block')
+  expect(findTabSnapshotItem(beforeSnapshot, 'tab', 'Controls')?.labelOpacity).toBeCloseTo(1, 1)
+
+  await setMainFloorVacuumRuntime(page, { state: 'docked' })
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'expand-layout')
+  await expect(nav).toHaveAttribute('data-visual-count', '5')
+  await expect(nav).toHaveAttribute('data-semantic-count', '3')
+
+  await expect.poll(async () => {
+    const positions = await mainFloorTabPositions(dialog)
+    return (positions['Auto-Clean']?.left ?? 0) - (before['Auto-Clean']?.left ?? 0) > 5
+  }).toBe(true)
+  await page.waitForFunction(() => {
+    const runtime = window as typeof window & {
+      __vacuumExpandLayout667Snapshot?: unknown
+    }
+    return runtime.__vacuumExpandLayout667Snapshot != null
+  })
+  const expandLayoutSnapshot = await page.evaluate(() => {
+    const runtime = window as typeof window & {
+      __vacuumExpandLayout667Observer?: MutationObserver
+      __vacuumExpandLayout667Snapshot?: Awaited<ReturnType<typeof mainFloorTabNavSnapshot>> | null
+    }
+    runtime.__vacuumExpandLayout667Observer?.disconnect()
+    return runtime.__vacuumExpandLayout667Snapshot
+  })
+  const autoCleanLabel = findTabSnapshotItem(expandLayoutSnapshot, 'tab', 'Auto-Clean')
+  expect(autoCleanLabel?.labelDisplay).toBe('block')
+  expect(autoCleanLabel?.labelOpacity).toBeGreaterThan(0.05)
+  expect(autoCleanLabel?.labelOpacity).toBeLessThan(0.9)
+  expect(findTabSnapshotItem(expandLayoutSnapshot, 'tab', 'Rooms')).toBeFalsy()
+  expect(findTabSnapshotItem(expandLayoutSnapshot, 'tab', 'Actions')).toBeFalsy()
+
+  await expect.poll(async () => nav.getAttribute('data-membership-phase')).toBe('expand-fade')
+  await expect(dialog.getByRole('tab', { name: 'Rooms' })).toBeVisible()
+  await expect(dialog.getByRole('tab', { name: 'Actions' })).toBeVisible()
+  const expandFadeEarly = await waitForTabNavSnapshot(page, dialog, (snapshot) => {
+    const roomsTab = findTabSnapshotItem(snapshot, 'tab', 'Rooms')
+    const actionsTab = findTabSnapshotItem(snapshot, 'tab', 'Actions')
+    return snapshot.phase === 'expand-fade'
+      && (roomsTab?.contentOpacity ?? -1) > 0.05
+      && (roomsTab?.contentOpacity ?? 1) < 0.9
+      && (actionsTab?.contentOpacity ?? -1) > 0.05
+      && (actionsTab?.contentOpacity ?? 1) < 0.9
+  }, 'short-landscape expansion mid-fade content opacity')
+  const roomsTab = findTabSnapshotItem(expandFadeEarly, 'tab', 'Rooms')
+  const actionsTab = findTabSnapshotItem(expandFadeEarly, 'tab', 'Actions')
+  expect(roomsTab?.contentOpacity).toBeGreaterThan(0.05)
+  expect(roomsTab?.contentOpacity).toBeLessThan(0.9)
+  expect(roomsTab?.iconOpacity).toBeCloseTo(1, 4)
+  expect(actionsTab?.contentOpacity).toBeGreaterThan(0.05)
+  expect(actionsTab?.contentOpacity).toBeLessThan(0.9)
+  expect(actionsTab?.iconOpacity).toBeCloseTo(1, 4)
+  await expect.poll(async () => nav.getAttribute('data-membership-phase')).toBe('idle')
+  const phaseSnapshots = await page.evaluate(() => {
+    const runtime = window as typeof window & {
+      __vacuumTabNavObserver?: MutationObserver
+      __vacuumTabNavPhaseSnapshots?: Record<string, {
+        items: {
+          key: string
+          labelDisplay: string | null
+          left: number
+          opacity: number
+          top: number
+        }[]
+      }>
+    }
+    runtime.__vacuumTabNavObserver?.disconnect()
+    return runtime.__vacuumTabNavPhaseSnapshots ?? {}
+  })
+  const expandFadeSnapshot = phaseSnapshots['expand-fade']
+  expect(expandFadeSnapshot).toBeTruthy()
+  expect(expandFadeSnapshot.items.find((item) => item.key === 'tab:Controls')?.labelDisplay).toBe('none')
+  expect(expandFadeSnapshot.items.find((item) => item.key === 'tab:Auto-Clean')?.labelDisplay).toBe('none')
+  expect(expandFadeSnapshot.items.find((item) => item.key === 'tab:Rooms')?.labelDisplay).toBe('none')
+  expect(findTabSnapshotItem(expandFadeEarly, 'tab', 'Controls')?.contentOpacity).toBeCloseTo(1, 4)
+  expect(findTabSnapshotItem(expandFadeEarly, 'tab', 'Controls')?.iconOpacity).toBeCloseTo(1, 4)
+  const afterSnapshot = await mainFloorTabNavSnapshot(dialog)
+  expect(findTabSnapshotItem(afterSnapshot, 'tab', 'Controls')?.labelDisplay).toBe('none')
+  expect(findTabSnapshotItem(afterSnapshot, 'tab', 'Rooms')?.labelDisplay).toBe('none')
+})
+
+test('tab membership shrink fades icon-only portrait content wrappers at 393x852', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium' && browserName !== 'webkit', 'Vacuum tab fade evidence is collected in Chromium and WebKit only.')
+
+  await page.setViewportSize({ height: 852, width: 393 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
+  const beforePositions = await mainFloorTabPositions(dialog)
+  const shrinkFadeTracePromise = captureMainFloorTabFadeTrace(nav, 'shrink-fade')
+
+  await dialog.getByRole('tab', { name: 'Rooms' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Rooms', selected: true })).toBeVisible()
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'shrink-fade')
+  const shrinkFadeTrace = await shrinkFadeTracePromise
+  const shrinkFadeSamples = shrinkFadeTrace.samples.filter((sample) => sample.phase === 'shrink-fade')
+  const shrinkMidFadeSnapshot = shrinkFadeSamples.find((sample) => {
+    const roomsGhost = findTabSnapshotItem(sample, 'ghost', 'Rooms')
+    const actionsGhost = findTabSnapshotItem(sample, 'ghost', 'Actions')
+    return roomsGhost?.labelDisplay === 'none'
+      && actionsGhost?.labelDisplay === 'none'
+      && (roomsGhost?.contentOpacity ?? 0) > 0.2
+      && (roomsGhost?.contentOpacity ?? 1) < 0.85
+      && (actionsGhost?.contentOpacity ?? 0) > 0.2
+      && (actionsGhost?.contentOpacity ?? 1) < 0.85
+  })
+  expect(shrinkFadeSamples.length).toBeGreaterThanOrEqual(2)
+  expect(shrinkMidFadeSnapshot).toBeTruthy()
+  const roomsGhostOpacities = shrinkFadeSamples
+    .map((sample) => findTabSnapshotItem(sample, 'ghost', 'Rooms')?.contentOpacity)
+    .filter((opacity): opacity is number => opacity != null)
+  const actionsGhostOpacities = shrinkFadeSamples
+    .map((sample) => findTabSnapshotItem(sample, 'ghost', 'Actions')?.contentOpacity)
+    .filter((opacity): opacity is number => opacity != null)
+  expect(roomsGhostOpacities.length).toBeGreaterThanOrEqual(2)
+  expect(actionsGhostOpacities.length).toBeGreaterThanOrEqual(2)
+  expect(roomsGhostOpacities.at(0) ?? 0).toBeGreaterThan(roomsGhostOpacities.at(-1) ?? 1)
+  expect(actionsGhostOpacities.at(0) ?? 0).toBeGreaterThan(actionsGhostOpacities.at(-1) ?? 1)
+  const roomsGhost = findTabSnapshotItem(shrinkMidFadeSnapshot!, 'ghost', 'Rooms')
+  const actionsGhost = findTabSnapshotItem(shrinkMidFadeSnapshot!, 'ghost', 'Actions')
+  const autoCleanDuringFade = findTabSnapshotItem(shrinkMidFadeSnapshot!, 'tab', 'Auto-Clean')
+  const infoDuringFade = findTabSnapshotItem(shrinkMidFadeSnapshot!, 'tab', 'Info')
+  expect(roomsGhost?.labelDisplay).toBe('none')
+  expect(actionsGhost?.labelDisplay).toBe('none')
+  expect(roomsGhost?.contentOpacity).toBeGreaterThan(0.2)
+  expect(roomsGhost?.contentOpacity).toBeLessThan(0.85)
+  expect(roomsGhost?.iconOpacity).toBeCloseTo(1, 4)
+  expect(actionsGhost?.contentOpacity).toBeGreaterThan(0.2)
+  expect(actionsGhost?.contentOpacity).toBeLessThan(0.85)
+  expect(actionsGhost?.iconOpacity).toBeCloseTo(1, 4)
+  expect(findTabSnapshotItem(shrinkMidFadeSnapshot!, 'tab', 'Controls')?.labelDisplay).toBe('none')
+  const controlsOpacities = shrinkFadeSamples
+    .map((sample) => findTabSnapshotItem(sample, 'tab', 'Controls')?.contentOpacity)
+    .filter((opacity): opacity is number => opacity != null)
+  expect(controlsOpacities.length).toBeGreaterThan(0)
+  for (const opacity of controlsOpacities) expect(opacity).toBeCloseTo(1, 4)
+  expect(autoCleanDuringFade?.left).toBeCloseTo(beforePositions['Auto-Clean']?.left ?? 0, 0)
+  expect(infoDuringFade?.left).toBeCloseTo(beforePositions.Info?.left ?? 0, 0)
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'idle')
+})
+
+test('tab membership expansion fades icon-only portrait entering content wrappers at 393x852', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium' && browserName !== 'webkit', 'Vacuum tab fade evidence is collected in Chromium and WebKit only.')
+
+  await page.setViewportSize({ height: 852, width: 393 })
+  await page.goto('/at-a-glance/vacuums')
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+  await page.getByRole('button', { name: /Main Floor Cleaning/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
+  const expandFadeTracePromise = captureMainFloorTabFadeTrace(nav, 'expand-fade')
+  await setMainFloorVacuumRuntime(page, { state: 'docked' })
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'expand-fade')
+  const expandFadeTrace = await expandFadeTracePromise
+  const expandFadeSamples = expandFadeTrace.samples.filter((sample) => sample.phase === 'expand-fade')
+  const expandMidFadeSnapshot = expandFadeSamples.find((sample) => {
+    const roomsTab = findTabSnapshotItem(sample, 'tab', 'Rooms')
+    const actionsTab = findTabSnapshotItem(sample, 'tab', 'Actions')
+    return roomsTab?.labelDisplay === 'none'
+      && actionsTab?.labelDisplay === 'none'
+      && (roomsTab?.contentOpacity ?? 0) > 0.15
+      && (roomsTab?.contentOpacity ?? 1) < 0.8
+      && (actionsTab?.contentOpacity ?? 0) > 0.15
+      && (actionsTab?.contentOpacity ?? 1) < 0.8
+  })
+  expect(expandFadeSamples.length).toBeGreaterThanOrEqual(2)
+  expect(expandMidFadeSnapshot).toBeTruthy()
+  const roomsTabOpacities = expandFadeSamples
+    .map((sample) => findTabSnapshotItem(sample, 'tab', 'Rooms')?.contentOpacity)
+    .filter((opacity): opacity is number => opacity != null)
+  const actionsTabOpacities = expandFadeSamples
+    .map((sample) => findTabSnapshotItem(sample, 'tab', 'Actions')?.contentOpacity)
+    .filter((opacity): opacity is number => opacity != null)
+  expect(roomsTabOpacities.length).toBeGreaterThanOrEqual(2)
+  expect(actionsTabOpacities.length).toBeGreaterThanOrEqual(2)
+  expect(roomsTabOpacities.at(-1) ?? 0).toBeGreaterThan(roomsTabOpacities.at(0) ?? 1)
+  expect(actionsTabOpacities.at(-1) ?? 0).toBeGreaterThan(actionsTabOpacities.at(0) ?? 1)
+  const roomsTab = findTabSnapshotItem(expandMidFadeSnapshot!, 'tab', 'Rooms')
+  const actionsTab = findTabSnapshotItem(expandMidFadeSnapshot!, 'tab', 'Actions')
+  expect(expandMidFadeSnapshot?.phase).toBe('expand-fade')
+  expect(roomsTab?.labelDisplay).toBe('none')
+  expect(actionsTab?.labelDisplay).toBe('none')
+  expect(roomsTab?.contentOpacity).toBeGreaterThan(0.15)
+  expect(roomsTab?.contentOpacity).toBeLessThan(0.8)
+  expect(roomsTab?.iconOpacity).toBeCloseTo(1, 4)
+  expect(actionsTab?.contentOpacity).toBeGreaterThan(0.15)
+  expect(actionsTab?.contentOpacity).toBeLessThan(0.8)
+  expect(actionsTab?.iconOpacity).toBeCloseTo(1, 4)
+  const expandControlsOpacities = expandFadeSamples
+    .map((sample) => findTabSnapshotItem(sample, 'tab', 'Controls')?.contentOpacity)
+    .filter((opacity): opacity is number => opacity != null)
+  expect(expandControlsOpacities.length).toBeGreaterThan(0)
+  for (const opacity of expandControlsOpacities) expect(opacity).toBeCloseTo(1, 4)
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'idle')
+})
+
+test('Controls fades the outgoing Docked section and fades it back after the tab bar expands', async ({ page }) => {
+  await page.setViewportSize({ height: 852, width: 393 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
+  const runtimeContent = dialog.locator('[data-vacuum-runtime-content-transition="true"]')
+  await expect(runtimeContent.getByRole('heading', { name: 'Docked' })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'shrink-fade')
+  await expect(runtimeContent).toHaveAttribute('data-vacuum-runtime-content-phase', 'shrink-fade')
+  await expect(runtimeContent.getByRole('heading', { name: 'Docked' })).toBeVisible()
+  await expect.poll(async () => {
+    const opacity = await runtimeContent.evaluate((element) => Number.parseFloat(getComputedStyle(element).opacity || '1'))
+    return opacity > 0.15 && opacity < 0.85
+  }).toBe(true)
+
+  await expect(runtimeContent.getByRole('heading', { name: 'Docked' })).toHaveCount(0)
+  await expect(runtimeContent.getByRole('heading', { name: 'Cleaning' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Pause' })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { state: 'docked' })
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'expand-layout')
+  await expect(runtimeContent).toHaveAttribute('data-vacuum-runtime-content-phase', 'expand-layout')
+  await expect(runtimeContent.getByRole('heading', { name: 'Docked' })).toHaveCount(0)
+  await expect(runtimeContent).toHaveAttribute('data-vacuum-runtime-content-phase', 'expand-fade')
+  await expect(runtimeContent.getByRole('heading', { name: 'Docked' })).toBeVisible()
+  await expect.poll(async () => {
+    const opacity = await runtimeContent.evaluate((element) => Number.parseFloat(getComputedStyle(element).opacity || '1'))
+    return opacity > 0.15 && opacity < 0.85
+  }).toBe(true)
+
+  await expect(runtimeContent).toHaveAttribute('data-vacuum-runtime-content-phase', 'idle')
+  await expect(runtimeContent).toHaveCSS('opacity', '1')
+})
+
+test('tab membership shrink keeps five-tab labels visibly fading at 844x390', async ({ page, browserName }, testInfo) => {
+  await page.setViewportSize({ height: 390, width: 844 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
+  const beforeSnapshot = await mainFloorTabNavSnapshot(dialog)
+  const beforePositions = await mainFloorTabPositions(dialog)
+  const beforeControls = await mainFloorTabContentMetrics(dialog, 'Controls')
+  const shrinkWidthTracePromise = captureMainFloorTabWidthTrace(nav, 'Controls', 'shrink-layout')
+  await nav.evaluate((element) => {
+    const runtime = window as typeof window & {
+      __vacuumShrinkFade844Observer?: MutationObserver
+      __vacuumShrinkFade844Snapshot?: Awaited<ReturnType<typeof mainFloorTabNavSnapshot>> | null
+    }
+    const snapshot = () => ({
+      items: [...element.querySelectorAll<HTMLElement>('[role="tab"], [data-modal-tab-ghost="true"]')].map((node) => {
+        const contentNode = node.querySelector<HTMLElement>('[data-modal-tab-content="true"]')
+        const iconNode = node.querySelector<HTMLElement>('[data-modal-tab-icon="true"]')
+        const labelNode = node.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+        const nodeStyle = getComputedStyle(node)
+        const rect = node.getBoundingClientRect()
+        return {
+          contentOpacity: contentNode ? Number.parseFloat(getComputedStyle(contentNode).opacity || '1') : null,
+          iconOpacity: iconNode ? Number.parseFloat(getComputedStyle(iconNode).opacity || '1') : null,
+          key: `${node.getAttribute('data-modal-tab-ghost') === 'true' ? 'ghost' : 'tab'}:${node.getAttribute('aria-label') ?? node.getAttribute('data-tab') ?? ''}`,
+          labelDisplay: labelNode ? getComputedStyle(labelNode).display : null,
+          labelOpacity: labelNode ? Number.parseFloat(getComputedStyle(labelNode).opacity || '1') : null,
+          left: rect.left,
+          opacity: Number.parseFloat(nodeStyle.opacity || '1'),
+          text: node.textContent?.trim() ?? '',
+          top: rect.top,
+        }
+      }),
+      navHeight: element.getBoundingClientRect().height,
+      navTop: element.getBoundingClientRect().top,
+      phase: element.getAttribute('data-membership-phase'),
+    })
+    let sampling = false
+    const record = () => {
+      if (
+        sampling
+        || element.getAttribute('data-membership-phase') !== 'shrink-fade'
+        || runtime.__vacuumShrinkFade844Snapshot
+      ) return
+      sampling = true
+      const captureTranslucentFrame = () => {
+        if (
+          element.getAttribute('data-membership-phase') !== 'shrink-fade'
+          || runtime.__vacuumShrinkFade844Snapshot
+        ) return
+        const candidate = snapshot()
+        const rooms = candidate.items.find((item) => item.key.startsWith('ghost:') && item.text === 'Rooms')
+        if (
+          rooms?.contentOpacity != null
+          && rooms.contentOpacity > 0.35
+          && rooms.contentOpacity < 0.95
+        ) {
+          runtime.__vacuumShrinkFade844Snapshot = candidate
+          runtime.__vacuumShrinkFade844Observer?.disconnect()
+          return
+        }
+        window.requestAnimationFrame(captureTranslucentFrame)
+      }
+      window.requestAnimationFrame(captureTranslucentFrame)
+    }
+    runtime.__vacuumShrinkFade844Snapshot = null
+    runtime.__vacuumShrinkFade844Observer?.disconnect()
+    runtime.__vacuumShrinkFade844Observer = new MutationObserver(record)
+    runtime.__vacuumShrinkFade844Observer.observe(element, {
+      attributeFilter: ['data-membership-phase'],
+      attributes: true,
+    })
+    record()
+  })
+  expect(findTabSnapshotItem(beforeSnapshot, 'tab', 'Rooms')?.labelDisplay).toBe('block')
+  expect(findTabSnapshotItem(beforeSnapshot, 'tab', 'Actions')?.labelDisplay).toBe('block')
+  expect(beforeControls.columnGap).toBeCloseTo(8, 4)
+
+  await dialog.getByRole('tab', { name: 'Rooms' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Rooms', selected: true })).toBeVisible()
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'shrink-fade')
+  await page.waitForFunction(() => {
+    const runtime = window as typeof window & {
+      __vacuumShrinkFade844Snapshot?: unknown
+    }
+    return runtime.__vacuumShrinkFade844Snapshot != null
+  })
+  const earlyFadeSnapshot = await page.evaluate(() => {
+    const runtime = window as typeof window & {
+      __vacuumShrinkFade844Observer?: MutationObserver
+      __vacuumShrinkFade844Snapshot?: Awaited<ReturnType<typeof mainFloorTabNavSnapshot>> | null
+    }
+    runtime.__vacuumShrinkFade844Observer?.disconnect()
+    return runtime.__vacuumShrinkFade844Snapshot
+  })
+  const duringFadePositions = await mainFloorTabPositions(dialog)
+  const roomsGhost = findTabSnapshotItem(earlyFadeSnapshot, 'ghost', 'Rooms')
+  const actionsGhost = findTabSnapshotItem(earlyFadeSnapshot, 'ghost', 'Actions')
+  expect(roomsGhost?.labelDisplay).toBe('block')
+  if (browserName === 'chromium') {
+    expect(roomsGhost?.contentOpacity).toBeGreaterThan(0.35)
+    expect(roomsGhost?.contentOpacity).toBeLessThan(0.95)
+  }
+  expect(roomsGhost?.iconOpacity).toBeCloseTo(1, 4)
+  expect(roomsGhost?.labelOpacity).toBeCloseTo(1, 4)
+  if (browserName === 'chromium') {
+    expect(actionsGhost?.contentOpacity).toBeGreaterThan(0.35)
+    expect(actionsGhost?.contentOpacity).toBeLessThan(0.95)
+  }
+  expect(actionsGhost?.iconOpacity).toBeCloseTo(1, 4)
+  expect(actionsGhost?.labelOpacity).toBeCloseTo(1, 4)
+  expect(Math.abs(earlyFadeSnapshot.navHeight - beforeSnapshot.navHeight)).toBeLessThanOrEqual(1)
+  expect(Math.abs(earlyFadeSnapshot.navTop - beforeSnapshot.navTop)).toBeLessThanOrEqual(1)
+  expect(duringFadePositions['Auto-Clean']?.left).toBeCloseTo(beforePositions['Auto-Clean']?.left ?? 0, 0)
+  expect(duringFadePositions.Info?.left).toBeCloseTo(beforePositions.Info?.left ?? 0, 0)
+  await captureTabNavScreenshot(nav, testInfo, 'vacuum-tab-membership-shrink-844x390-mid-fade.png')
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'idle')
+  const shrinkWidthTrace = await shrinkWidthTracePromise
+  const afterPositions = await mainFloorTabPositions(dialog)
+  const afterControls = await mainFloorTabContentMetrics(dialog, 'Controls')
+  expect(afterControls.columnGap).toBeCloseTo(beforeControls.columnGap, 4)
+  expect(afterControls.labelDisplay).toBe('block')
+  expect(afterControls.labelOpacity).toBeCloseTo(1, 4)
+  expect(afterPositions['Auto-Clean']?.left).toBeLessThan((beforePositions['Auto-Clean']?.left ?? 0) - 5)
+  expect(afterPositions.Info?.left).toBeLessThan((beforePositions.Info?.left ?? 0) - 5)
+  expect(afterControls.width).toBeGreaterThan(beforeControls.width + 80)
+  expect(afterControls.inlineWidth).toBeNull()
+  expect(afterControls.justifySelf).toBe('')
+  expect(afterControls.transition).toBe('')
+
+  const shrinkPhaseSamples = shrinkWidthTrace.samples.filter((sample) => sample.phase === 'shrink-layout')
+  const shrinkWidths = shrinkPhaseSamples.map((sample) => sample.width)
+  const uniqueShrinkWidths = [...new Set(shrinkWidths.map((width) => Math.round(width * 10) / 10))]
+  expect(shrinkPhaseSamples.length).toBeGreaterThanOrEqual(browserName === 'chromium' ? 3 : 1)
+  expect(uniqueShrinkWidths.length).toBeGreaterThanOrEqual(browserName === 'chromium' ? 3 : 1)
+  expect(shrinkPhaseSamples.some((sample) => sample.width > beforeControls.width + 1 && sample.width < afterControls.width - 1)).toBe(browserName === 'chromium')
+  expect(shrinkPhaseSamples.every((sample) => sample.inlineWidth !== null)).toBe(true)
+  expect(shrinkPhaseSamples.every((sample) => sample.justifySelf === 'start')).toBe(true)
+  expect(shrinkPhaseSamples.every((sample) => sample.transition.includes('width 180ms'))).toBe(true)
+  if (browserName === 'chromium') {
+    const duringLayoutControls = await mainFloorTabContentMetrics(dialog, 'Controls')
+    expect(duringLayoutControls.columnGap).toBeCloseTo(beforeControls.columnGap, 4)
+    expect(duringLayoutControls.contentOpacity).toBeCloseTo(1, 4)
+    expect(duringLayoutControls.iconOpacity).toBeCloseTo(1, 4)
+  }
+  for (let index = 1; index < shrinkWidths.length; index += 1) {
+    expect(shrinkWidths[index]).toBeGreaterThanOrEqual(shrinkWidths[index - 1] - 1)
+  }
+})
+
+test('tab membership expansion keeps entering five-tab labels translucently visible at 844x390', async ({ page, browserName }, testInfo) => {
+  await page.setViewportSize({ height: 390, width: 844 })
+  await page.goto('/at-a-glance/vacuums')
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+  await page.getByRole('button', { name: /Main Floor Cleaning/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
+  const beforeSnapshot = await mainFloorTabNavSnapshot(dialog)
+  const beforeControls = await mainFloorTabContentMetrics(dialog, 'Controls')
+  const expandWidthTracePromise = captureMainFloorTabWidthTrace(nav, 'Controls', 'expand-layout')
+  expect(findTabSnapshotItem(beforeSnapshot, 'tab', 'Controls')?.labelDisplay).toBe('block')
+  expect(findTabSnapshotItem(beforeSnapshot, 'tab', 'Auto-Clean')?.labelDisplay).toBe('block')
+  expect(findTabSnapshotItem(beforeSnapshot, 'tab', 'Info')?.labelDisplay).toBe('block')
+  await nav.evaluate((element) => {
+    const runtime = window as typeof window & {
+      __vacuumExpandFade844Observer?: MutationObserver
+      __vacuumExpandFade844Snapshot?: {
+        items: {
+          contentOpacity: number | null
+          iconOpacity: number | null
+          key: string
+          labelDisplay: string | null
+          labelOpacity: number | null
+          text: string
+        }[]
+      } | null
+    }
+    const snapshot = () => ({
+      items: [...element.querySelectorAll<HTMLElement>('[role="tab"], [data-modal-tab-ghost="true"]')].map((node) => {
+        const contentNode = node.querySelector<HTMLElement>('[data-modal-tab-content="true"]')
+        const iconNode = node.querySelector<HTMLElement>('[data-modal-tab-icon="true"]')
+        const labelNode = node.querySelector<HTMLElement>('[data-modal-tab-label="true"]')
+        return {
+          contentOpacity: contentNode ? Number.parseFloat(getComputedStyle(contentNode).opacity || '1') : null,
+          iconOpacity: iconNode ? Number.parseFloat(getComputedStyle(iconNode).opacity || '1') : null,
+          key: `${node.getAttribute('data-modal-tab-ghost') === 'true' ? 'ghost' : 'tab'}:${node.getAttribute('aria-label') ?? node.getAttribute('data-tab') ?? ''}`,
+          labelDisplay: labelNode ? getComputedStyle(labelNode).display : null,
+          labelOpacity: labelNode ? Number.parseFloat(getComputedStyle(labelNode).opacity || '1') : null,
+          text: node.textContent?.trim() ?? '',
+        }
+      }),
+    })
+    let sampling = false
+    const record = () => {
+      if (
+        sampling
+        || element.getAttribute('data-membership-phase') !== 'expand-fade'
+        || runtime.__vacuumExpandFade844Snapshot
+      ) return
+      sampling = true
+      const captureTranslucentFrame = () => {
+        if (
+          element.getAttribute('data-membership-phase') !== 'expand-fade'
+          || runtime.__vacuumExpandFade844Snapshot
+        ) return
+        const candidate = snapshot()
+        const rooms = candidate.items.find((item) => item.key === 'tab:Rooms')
+        if (
+          rooms?.contentOpacity != null
+          && rooms.contentOpacity > 0.05
+          && rooms.contentOpacity < 0.8
+        ) {
+          runtime.__vacuumExpandFade844Snapshot = candidate
+          runtime.__vacuumExpandFade844Observer?.disconnect()
+          return
+        }
+        window.requestAnimationFrame(captureTranslucentFrame)
+      }
+      window.requestAnimationFrame(captureTranslucentFrame)
+    }
+    runtime.__vacuumExpandFade844Snapshot = null
+    runtime.__vacuumExpandFade844Observer?.disconnect()
+    runtime.__vacuumExpandFade844Observer = new MutationObserver(record)
+    runtime.__vacuumExpandFade844Observer.observe(element, {
+      attributeFilter: ['data-membership-phase'],
+      attributes: true,
+    })
+    record()
+  })
+
+  await setMainFloorVacuumRuntime(page, { state: 'docked' })
+  await expect(nav).toHaveAttribute('data-membership-phase', 'expand-layout')
+  await expect.poll(
+    async () => (await mainFloorTabContentMetrics(dialog, 'Controls')).transition,
+  ).toContain('width 180ms')
+  const duringLayoutControls = await mainFloorTabContentMetrics(dialog, 'Controls')
+  expect(duringLayoutControls.inlineWidth).not.toBeNull()
+  expect(duringLayoutControls.justifySelf).toBe('start')
+  await page.waitForFunction(() => {
+    const runtime = window as typeof window & {
+      __vacuumExpandFade844Snapshot?: unknown
+    }
+    return runtime.__vacuumExpandFade844Snapshot != null
+  })
+  const initialFadeSnapshot = await page.evaluate(() => {
+    const runtime = window as typeof window & {
+      __vacuumExpandFade844Observer?: MutationObserver
+      __vacuumExpandFade844Snapshot?: Awaited<ReturnType<typeof mainFloorTabNavSnapshot>> | null
+    }
+    runtime.__vacuumExpandFade844Observer?.disconnect()
+    return runtime.__vacuumExpandFade844Snapshot
+  })
+  const earlyFadeSnapshot = initialFadeSnapshot
+  const roomsTab = findTabSnapshotItem(earlyFadeSnapshot, 'tab', 'Rooms')
+  const actionsTab = findTabSnapshotItem(earlyFadeSnapshot, 'tab', 'Actions')
+  expect(roomsTab?.labelDisplay).toBe('block')
+  if (browserName === 'chromium') {
+    expect(roomsTab?.contentOpacity).toBeGreaterThan(0.05)
+    expect(roomsTab?.contentOpacity).toBeLessThan(0.8)
+  }
+  expect(roomsTab?.iconOpacity).toBeCloseTo(1, 4)
+  expect(roomsTab?.labelOpacity).toBeCloseTo(1, 4)
+  if (browserName === 'chromium') {
+    expect(actionsTab?.contentOpacity).toBeGreaterThan(0.05)
+    expect(actionsTab?.contentOpacity).toBeLessThan(0.8)
+  }
+  expect(actionsTab?.iconOpacity).toBeCloseTo(1, 4)
+  expect(actionsTab?.labelOpacity).toBeCloseTo(1, 4)
+  expect(findTabSnapshotItem(initialFadeSnapshot, 'tab', 'Rooms')?.labelDisplay).toBe('block')
+  await captureTabNavScreenshot(nav, testInfo, 'vacuum-tab-membership-expand-844x390-mid-fade.png')
+  await expect(nav).toHaveAttribute('data-membership-phase', 'idle')
+  const expandWidthTrace = await expandWidthTracePromise
+  const afterControls = await mainFloorTabContentMetrics(dialog, 'Controls')
+  expect(afterControls.width).toBeLessThan(beforeControls.width - 80)
+  expect(afterControls.inlineWidth).toBeNull()
+  expect(afterControls.justifySelf).toBe('')
+  expect(afterControls.transition).toBe('')
+
+  const expandPhaseSamples = expandWidthTrace.samples.filter((sample) => sample.phase === 'expand-layout')
+  const expandWidths = expandPhaseSamples.map((sample) => sample.width)
+  const uniqueExpandWidths = [...new Set(expandWidths.map((width) => Math.round(width * 10) / 10))]
+  expect(expandPhaseSamples.length).toBeGreaterThanOrEqual(browserName === 'chromium' ? 3 : 1)
+  expect(uniqueExpandWidths.length).toBeGreaterThanOrEqual(browserName === 'chromium' ? 3 : 1)
+  expect(expandPhaseSamples.some((sample) => sample.width < beforeControls.width - 1 && sample.width > afterControls.width + 1)).toBe(browserName === 'chromium')
+  expect(expandPhaseSamples.every((sample) => sample.inlineWidth !== null)).toBe(true)
+  expect(expandPhaseSamples.every((sample) => sample.justifySelf === 'start')).toBe(true)
+  expect(expandPhaseSamples.every((sample) => sample.transition.includes('width 180ms'))).toBe(true)
+  for (let index = 1; index < expandWidths.length; index += 1) {
+    expect(expandWidths[index]).toBeLessThanOrEqual(expandWidths[index - 1] + 1)
+  }
+})
+
+test('tab membership reversal restores the five-tab layout after in-flight shrink progress at 844x390', async ({ page, browserName }) => {
+  await page.setViewportSize({ height: 390, width: 844 })
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
+  const beforeDockedControls = await mainFloorTabContentMetrics(dialog, 'Controls')
+  await dialog.getByRole('tab', { name: 'Rooms' }).click()
+  await expect(dialog.getByRole('tab', { name: 'Rooms', selected: true })).toBeVisible()
+
+  await setMainFloorVacuumRuntime(page, { state: 'cleaning' })
+  const reversalTrigger = await nav.evaluate((element, requireLayoutProgress) => new Promise<{
+    inlineWidth: number | null
+    width: number
+  }>((resolve, reject) => {
+    const startedAt = performance.now()
+    const reverseOnceShrinkIsReady = () => {
+      const controls = [...element.querySelectorAll<HTMLElement>('[role="tab"]')]
+        .find((node) => node.getAttribute('aria-label') === 'Controls')
+      if (!controls) {
+        reject(new Error('Controls tab is unavailable before reversal'))
+        return
+      }
+      const inlineWidth = controls.style.width ? Number.parseFloat(controls.style.width) : null
+      const phase = element.getAttribute('data-membership-phase')
+      const hasShrinkStarted = phase === 'shrink-fade' || phase === 'shrink-layout'
+      const hasLayoutProgress = phase === 'shrink-layout'
+        && inlineWidth != null
+        && inlineWidth - controls.getBoundingClientRect().width >= 10
+      if (!hasShrinkStarted || (requireLayoutProgress && !hasLayoutProgress)) {
+        if (performance.now() - startedAt >= 2_000) {
+          reject(new Error('Timed out waiting for in-flight shrink width'))
+          return
+        }
+        window.requestAnimationFrame(reverseOnceShrinkIsReady)
+        return
+      }
+
+      const runtime = window as typeof window & {
+        __vacuumMembershipReversalObserver?: MutationObserver
+        __vacuumMembershipReversalPhases?: string[]
+      }
+      runtime.__vacuumMembershipReversalObserver?.disconnect()
+      runtime.__vacuumMembershipReversalPhases = []
+      const recordPhase = () => {
+        const nextPhase = element.getAttribute('data-membership-phase')
+        if (!nextPhase) return
+        const phases = runtime.__vacuumMembershipReversalPhases ?? []
+        if (phases.at(-1) !== nextPhase) phases.push(nextPhase)
+        runtime.__vacuumMembershipReversalPhases = phases
+        if (nextPhase === 'idle' && phases.includes('expand-layout')) {
+          runtime.__vacuumMembershipReversalObserver?.disconnect()
+        }
+      }
+      runtime.__vacuumMembershipReversalObserver = new MutationObserver(recordPhase)
+      runtime.__vacuumMembershipReversalObserver.observe(element, {
+        attributeFilter: ['data-membership-phase'],
+        attributes: true,
+      })
+      recordPhase()
+      const mock = window.__mockHass
+      if (!mock) {
+        runtime.__vacuumMembershipReversalObserver.disconnect()
+        reject(new Error('Mock Home Assistant API is unavailable'))
+        return
+      }
+      const before = {
+        inlineWidth,
+        width: controls.getBoundingClientRect().width,
+      }
+      mock.setEntityState('vacuum.valetudo_exaltedsneakydeer', 'docked')
+      mock.setEntityState('sensor.valetudo_exaltedsneakydeer_error', 'No error')
+      mock.setEntityState('sensor.valetudo_exaltedsneakydeer_status_flag', 'none')
+      mock.calls.splice(0, mock.calls.length)
+      resolve(before)
+    }
+
+    reverseOnceShrinkIsReady()
+  }), browserName === 'chromium')
+
+  if (browserName === 'chromium') {
+    expect(reversalTrigger.inlineWidth).not.toBeNull()
+    expect(reversalTrigger.width).toBeLessThanOrEqual((reversalTrigger.inlineWidth ?? 0) - 10)
+  }
+
+  await expect(nav).toHaveAttribute('data-membership-phase', 'idle')
+  const reversalPhases = await page.evaluate(() => {
+    const runtime = window as typeof window & {
+      __vacuumMembershipReversalObserver?: MutationObserver
+      __vacuumMembershipReversalPhases?: string[]
+    }
+    runtime.__vacuumMembershipReversalObserver?.disconnect()
+    return runtime.__vacuumMembershipReversalPhases ?? []
+  })
+  expect(reversalPhases).toContain('expand-layout')
+  await expect(dialog.getByRole('tab')).toHaveCount(5)
+  await expect(dialog.getByRole('tab', { selected: true })).toHaveCount(1)
+  const afterControls = await mainFloorTabContentMetrics(dialog, 'Controls')
+  expect(afterControls.width).toBeCloseTo(beforeDockedControls.width, 0)
+  expect(afterControls.inlineWidth).toBeNull()
+  expect(afterControls.justifySelf).toBe('')
+  expect(afterControls.transition).toBe('')
+  expect(afterControls.transform).toBe('')
 })
 
 test('busy dock minimal mode shows Actions only for the active dock stop control', async ({ page }) => {

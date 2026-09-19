@@ -41,7 +41,25 @@ interface PendingKeyboardPrediction {
   startedAt: number
 }
 
+interface DashboardViewportPanState {
+  embedded: boolean
+  keyboardInset: number
+  scrollY: number
+  visualOffsetTop: number
+}
+
 let pendingKeyboardPrediction: PendingKeyboardPrediction | null = null
+
+export function shouldResetDashboardViewportPan({
+  embedded,
+  keyboardInset,
+  scrollY,
+  visualOffsetTop,
+}: DashboardViewportPanState) {
+  return embedded
+    && keyboardInset > 0
+    && (scrollY > 0 || visualOffsetTop > 0)
+}
 
 function sameOriginTopWindow() {
   try {
@@ -76,14 +94,18 @@ function setCssPx(root: HTMLElement, property: string, value: number) {
   if (root.style.getPropertyValue(property) !== nextValue) root.style.setProperty(property, nextValue)
 }
 
-function keyboardInputFocused() {
-  const activeElement = document.activeElement
-  if (activeElement instanceof HTMLTextAreaElement) return !activeElement.disabled && !activeElement.readOnly
-  if (activeElement instanceof HTMLSelectElement) return !activeElement.disabled
-  if (activeElement instanceof HTMLInputElement) {
-    return !activeElement.disabled && !activeElement.readOnly && !NON_KEYBOARD_INPUT_TYPES.has(activeElement.type)
+export function isDashboardKeyboardInput(target: EventTarget | null) {
+  if (target instanceof HTMLTextAreaElement) return !target.disabled && !target.readOnly
+  if (target instanceof HTMLSelectElement) return !target.disabled
+  if (target instanceof HTMLInputElement) {
+    return !target.disabled && !target.readOnly && !NON_KEYBOARD_INPUT_TYPES.has(target.type)
   }
-  return activeElement instanceof HTMLElement && activeElement.isContentEditable
+  return target instanceof HTMLElement
+    && Boolean(target.isContentEditable || target.getAttribute('contenteditable') === 'true')
+}
+
+function keyboardInputFocused() {
+  return isDashboardKeyboardInput(document.activeElement)
 }
 
 function viewportOrientation(width: number, height: number) {
@@ -333,6 +355,14 @@ export function useDashboardViewport() {
       if (import.meta.env.DEV) setCssPx(root, '--dashboard-keyboard-inset', keyboardInset)
       setCssPx(root, '--dashboard-keyboard-overlay-inset', appliedOverlayInset)
       setKeyboardState(keyboardOpen)
+      if (shouldResetDashboardViewportPan({
+        embedded: frameElement !== null,
+        keyboardInset,
+        scrollY: viewportWindow.scrollY,
+        visualOffsetTop: viewportWindow.visualViewport?.offsetTop ?? 0,
+      })) {
+        viewportWindow.scrollTo(0, 0)
+      }
     }
 
     const scheduleUpdate = () => {

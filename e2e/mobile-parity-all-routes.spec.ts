@@ -71,6 +71,48 @@ const PHONE_PARITY_VIEWPORTS = [
   { height: 852, name: 'phone-portrait', width: 393 },
   { height: 393, name: 'phone-landscape', width: 852 },
 ] as const
+const INTENTIONAL_DYNAMIC_GRID_ROUTES = new Set<ResponsiveRoute>([
+  'chores',
+  'garage',
+  'guest-bathroom',
+  'guest-room',
+  'guests-staying-over',
+  'gym',
+  'kitchen',
+  'living-room',
+  'master-bathroom',
+  'master-bedroom',
+  'media',
+  'music-room',
+  'office',
+  'overview',
+  'back-deck',
+  'dining-room',
+  'security',
+  'theater-room',
+  'vacuums',
+])
+
+async function normalizeDynamicGridRegions(page: Page) {
+  return page.locator('[data-dynamic-grid="true"]').evaluateAll((grids) => {
+    for (const grid of grids) {
+      const element = grid as HTMLElement
+      element.style.width = '100%'
+      element.style.maxWidth = 'none'
+      element.style.marginInline = '0'
+      element.style.gridTemplateColumns = 'minmax(0, 1fr)'
+      for (const cell of Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-dynamic-grid-cell="true"]'))) {
+        cell.style.gridColumn = 'span 1'
+      }
+      for (const label of Array.from(element.querySelectorAll<HTMLElement>('[data-dynamic-grid-label="true"]'))) {
+        label.style.width = 'auto'
+        label.style.maxWidth = '100%'
+        label.style.whiteSpace = 'normal'
+      }
+    }
+    return grids.length
+  })
+}
 const BASELINE_NAVIGATION_LABELS = {
   thermostat: 'Climate',
 } satisfies Partial<Record<ResponsiveRoute, string>>
@@ -365,6 +407,12 @@ async function pageSignature(page: Page): Promise<ElementSignature[]> {
   })
 }
 
+function parityScreenshotMasks(page: Page, route: ResponsiveRoute) {
+  const masks = [page.locator('button[aria-label$=" camera"]')]
+  if (INTENTIONAL_DYNAMIC_GRID_ROUTES.has(route)) masks.push(page.locator('[data-dynamic-grid="true"]'))
+  return masks
+}
+
 async function comparePngs(page: Page, baseline: Buffer, candidate: Buffer, ignoredRegions: PixelRegion[] = []) {
   return page.evaluate(async ({ baselineBase64, candidateBase64, ignoredRegions }) => {
     const load = (source: string) => new Promise<HTMLImageElement>((resolve, reject) => {
@@ -495,6 +543,18 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           await ensureRouteContent(candidate.page, route)
           await ensureInventoryContent(candidate.page, route)
           await settleStableVisual(candidate.page)
+          if (INTENTIONAL_DYNAMIC_GRID_ROUTES.has(route)) {
+            const [baselineGridCount, candidateGridCount] = await Promise.all([
+              normalizeDynamicGridRegions(baseline.page),
+              normalizeDynamicGridRegions(candidate.page),
+            ])
+            expect(candidateGridCount, `${route}: normalized DynamicGrid count`).toBe(baselineGridCount)
+            expect(candidateGridCount, `${route}: normalized DynamicGrid presence`).toBeGreaterThan(0)
+            await Promise.all([
+              settleStableVisual(baseline.page),
+              settleStableVisual(candidate.page),
+            ])
+          }
           const backHeaderSelector = 'main header:has(button[aria-label="Go back"])'
           const oldBackMenuSelector = `${backHeaderSelector} button[aria-label="Open navigation menu"]`
           const baselineBackMenus = await baseline.page.locator(oldBackMenuSelector).count()
@@ -564,11 +624,11 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           ).filter((entry) => JSON.stringify(entry.baseline) !== JSON.stringify(entry.candidate))
 
           const [baselineScreenshot, candidateScreenshot] = await Promise.all([
-            baseline.page.screenshot({ animations: 'disabled', mask: [baseline.page.locator('button[aria-label$=" camera"]')] }),
-            candidate.page.screenshot({ animations: 'disabled', mask: [candidate.page.locator('button[aria-label$=" camera"]')] }),
+            baseline.page.screenshot({ animations: 'disabled', mask: parityScreenshotMasks(baseline.page, route) }),
+            candidate.page.screenshot({ animations: 'disabled', mask: parityScreenshotMasks(candidate.page, route) }),
           ])
           const rawBaselineScreenshot = rawBaseline
-            ? await rawBaseline.page.screenshot({ animations: 'disabled', mask: [rawBaseline.page.locator('button[aria-label$=" camera"]')] })
+            ? await rawBaseline.page.screenshot({ animations: 'disabled', mask: parityScreenshotMasks(rawBaseline.page, route) })
             : baselineScreenshot
           if (screenshotDirectory) {
             fs.writeFileSync(path.join(screenshotDirectory, `${sanitizeRoute(route)}-baseline.png`), baselineScreenshot)
@@ -609,9 +669,10 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           baselineURL: BASELINE_URL,
           candidateURL: CANDIDATE_URL,
           generatedAt: new Date().toISOString(),
-          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. A registry-declared added section is hidden only after its exact geometry/semantics and every inherited section are asserted; its visible layout is captured separately. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
+          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. On routes changed by the DynamicGrid migration, each baseline/candidate grid is normalized to the same one-column geometry and only those exact grid rectangles are masked; the rest of each route remains in geometry, perceptual, and maximum-channel comparison. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. A registry-declared added section is hidden only after its exact geometry/semantics and every inherited section are asserted; its visible layout is captured separately. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
           baselineFilterRepairs: baseline.filterRepairs,
           routeCount: SELECTED_ROUTES.length,
+          intentionalDynamicGridRoutes: [...INTENTIONAL_DYNAMIC_GRID_ROUTES],
           results,
           viewport: parityViewport,
         }, null, 2)}\n`)

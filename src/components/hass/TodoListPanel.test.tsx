@@ -1,3 +1,5 @@
+// @covers src/components/hass/TodoListPanel.tsx
+// @covers src/components/hass/adminTodoEdit.ts
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { TodoListPanel } from './TodoListPanel'
 import { entity, mockCallServiceCalls, mockEntities, mockTodoItemsByEntity, resetMockHass } from '../../test/mocks/hakitCoreState'

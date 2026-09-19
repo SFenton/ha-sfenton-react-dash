@@ -53,6 +53,9 @@ the shared behavior layer rather than duplicating HA-owned side effects.
   unbroken pasted text. Do not trap overflow or grow stable composer geometry.
 - Keep card, control, modal, slider, and navigation dimensions stable while
   live entity values update.
+- Security overview controls and Home/Security camera grids keep stable equal
+  tracks. Live camera hydration, camera status, and pending door command copy
+  must not change their columns or spans after first paint.
 - Square room/admin overview tiles are presentation-specific. Portrait `sheet` uses the
   accepted fluid two-column standard cards; phone `landscape-dialog` uses
   equal-width square tracks with a 132px minimum; tablet/desktop `dialog`
@@ -73,6 +76,14 @@ the shared behavior layer rather than duplicating HA-owned side effects.
   without shrinking their text-required spans or changing order. Ties go to
   the later item. The final row retains its required spans and aligns left.
   On a four-track layout the ordinary six-link example is `2+2`, `2+1+1`, `2`.
+- Every shared `DynamicGrid` declares its text strategy through `itemSizing`.
+  Tile/card grids use `content-aware`, so each tile can independently claim the
+  tracks required by any marked title, subtitle, or secondary label. Row,
+  status, and option grids use `uniform`: if any marked label does not fit on
+  one line, the whole grid reduces from N columns to N-1 and remeasures until
+  all labels fit or one column remains. Only an overlong one-column label may
+  wrap. For bounded uniform grids, `maxCellWidth` controls when columns are
+  added; text fitting may widen the remaining columns after a reduction.
 - Daily Summary uses the shared centered frame and fills the padded desktop body,
   while its tab navigator retains the family reading measure. It keeps the documented
   16px title and compact row typography. It reflows chore
@@ -181,9 +192,19 @@ clamped to the viewport after `max(32px, safe-edge)` padding on each edge.
 These values reuse the established media width and workspace height rather
 than making compact text or forms span that entire width.
 
-Centered viewport height comes directly from `100dvh` minus the existing
-keyboard overlay inset, not from a stale JS height captured before rotation.
-Do not apply the page's 320px minimum height to a keyboard-reduced dialog.
+The modal popup surface remains anchored to the layout viewport while a
+software keyboard is open and continues behind the keyboard's rounded corners
+and suggestion bar. The shared content layout, not the popup, lifts by the
+keyboard overlay inset. This keeps every modal's top edge and backing stable
+while controls remain inside the visible region. Do not apply the page's 320px
+minimum height to the keyboard-visible content region.
+
+`ModalSheet` captures its open block size before text focus, uses one shared
+keyboard curve, and freezes the resolved inset during mounted close. Embedded
+Home Assistant hosts may pan their outer document to reveal a bottom input;
+`useDashboardViewport` resets only that embedded keyboard pan after the focused
+control has moved into the visible region. Product modals must not add local
+viewport listeners, keyboard offsets, or focus-scroll corrections.
 Desktop modal bodies fill the padded frame so their content can use the available
 space; readable tab navigation retains the family measure.
 `contentWidth="full"` opts navigation out of that cap without changing

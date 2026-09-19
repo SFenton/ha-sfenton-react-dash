@@ -1294,7 +1294,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
             <GuestPresenceSecuritySection onOpen={openHash} />
 
             <SectionHeader title="Cameras" />
-            <DynamicGrid className={styles.cameraGrid} columns={2} fillRows={false} itemSizing="uniform" layout="fill" maxCellWidth={280} maxColumns={4}>
+            <DynamicGrid className={styles.cameraGrid} columns={2} fillRows={false} itemSizing="fixed" layout="fill" maxCellWidth={280} maxColumns={4}>
               {CAMERA_ITEMS.map((camera) => (
                 <CameraTile camera={camera} key={camera.entityId} live={hydrateHeavyContent && !preload} onOpen={openHash} />
               ))}

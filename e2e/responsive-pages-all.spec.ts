@@ -1,5 +1,9 @@
 // @covers src/components/core/InfoBox.module.css
 // @covers src/i18n/locales/en/pages/chores.json
+// @covers src/components/core/DynamicGrid.module.css
+// @covers src/components/hass/BathroomFanModalContent.tsx
+// @covers src/components/hass/SecurityDashboard.tsx
+// @covers src/components/hass/VacuumCard.tsx
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Page } from './layout/fixture'
@@ -116,10 +120,31 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
       .flatMap((grid) => {
         const maxCellWidth = Number.parseFloat(grid.dataset.dynamicGridMaxCellWidth ?? '')
         if (!Number.isFinite(maxCellWidth)) return []
+        const textReducedUniformGrid = grid.dataset.dynamicGridItemSizing === 'uniform'
+          && Number(grid.dataset.dynamicGridColumns) < Number(grid.dataset.dynamicGridAvailableColumns)
+        if (textReducedUniformGrid) return []
         return Array.from(grid.querySelectorAll<HTMLElement>(':scope > [data-dynamic-grid-cell="true"]'))
           .filter((cell) => Number.parseFloat(getComputedStyle(cell).getPropertyValue('--dynamic-grid-span')) <= 1)
           .filter((cell) => cell.getBoundingClientRect().width > maxCellWidth + 2)
       }).length
+    const uniformTextViolations = Array.from(document.querySelectorAll<HTMLElement>('[data-dynamic-grid-item-sizing="uniform"]'))
+      .filter(isVisible)
+      .filter((grid) => Number(grid.dataset.dynamicGridColumns) > 1)
+      .flatMap((grid) => Array.from(grid.querySelectorAll<HTMLElement>('[data-dynamic-grid-label="true"]')))
+      .filter(isVisible)
+      .filter((label) => label.scrollWidth > label.clientWidth + 1)
+      .length
+    const contentAwareTextViolations = Array.from(document.querySelectorAll<HTMLElement>('[data-dynamic-grid-item-sizing="content-aware"]'))
+      .filter(isVisible)
+      .flatMap((grid) => Array.from(grid.querySelectorAll<HTMLElement>('[data-dynamic-grid-label-container="true"]')))
+      .filter(isVisible)
+      .filter((labelContainer) => labelContainer.scrollWidth > labelContainer.clientWidth + 1)
+      .map((labelContainer) => ({
+        clientWidth: labelContainer.clientWidth,
+        gridLabel: labelContainer.closest<HTMLElement>('[data-dynamic-grid="true"]')?.getAttribute('aria-label') ?? null,
+        scrollWidth: labelContainer.scrollWidth,
+        text: labelContainer.textContent?.trim() ?? '',
+      }))
     const cameraWidthViolations = Array.from(document.querySelectorAll<HTMLElement>('button[aria-label$=" camera"]'))
       .filter(isVisible)
       .filter((camera) => camera.getBoundingClientRect().width > 462)
@@ -143,6 +168,7 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
     return {
       boundedCellViolations,
       cameraWidthViolations,
+      contentAwareTextViolations,
       contentWidth: Math.round(content?.getBoundingClientRect().width ?? 0),
       documentOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
       fixedControlOverlapViolations,
@@ -154,6 +180,7 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
       scrollerHeight: Math.round(scroller?.getBoundingClientRect().height ?? 0),
       scrollerOverflow: scroller ? Math.max(0, scroller.scrollWidth - scroller.clientWidth) : -1,
       scrollerOverflowY: scrollerStyle?.overflowY ?? '',
+      uniformTextViolations,
     }
   })
 
@@ -175,7 +202,9 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
   expect(['auto', 'scroll']).toContain(metrics.scrollerOverflowY)
   expect(metrics.boundedCellViolations, `${route} ${stage} bounded cards`).toBe(0)
   expect(metrics.cameraWidthViolations, `${route} ${stage} camera caps`).toBe(0)
+  expect(metrics.contentAwareTextViolations, `${route} ${stage} content-aware grid text fit`).toEqual([])
   expect(metrics.fixedControlOverlapViolations, `${route} ${stage} fixed control overlap`).toBe(0)
+  expect(metrics.uniformTextViolations, `${route} ${stage} uniform grid text fit`).toBe(0)
 
   const measureCap = metrics.pageMeasure === 'reading' ? 960 : metrics.pageMeasure === 'media' ? 1440 : 1280
   expect(metrics.contentWidth, `${route} ${stage} content measure`).toBeLessThanOrEqual(Math.min(measureCap, viewport.width))

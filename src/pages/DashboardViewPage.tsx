@@ -18,6 +18,8 @@ import { SpecialDeviceModeCard } from '../components/hass/SpecialDeviceModeCard'
 import { StatusRail, type StatusRailChip } from '../components/hass/StatusRail'
 import { TodoListPanel } from '../components/hass/TodoListPanel'
 import { CreateDonetickTaskSheet } from '../components/hass/CreateDonetickTaskSheet'
+import { EditTodoItemSheet } from '../components/hass/EditTodoItemSheet'
+import type { AdminTodoEditTarget } from '../components/hass/adminTodoEdit'
 import type { DonetickTaskEditTarget } from '../components/hass/donetickTaskForm'
 import { EverShelfInventoryPanel, type EverShelfInventoryLocation } from '../components/hass/EverShelfInventoryPanel'
 import { useEverShelfInventoryControls, type EverShelfInventoryControls } from '../components/hass/EverShelfInventoryControls'
@@ -68,7 +70,7 @@ import {
 import { Card, type CardColor } from '../components/core/Card'
 import { CheckboxRow } from '../components/core/CheckboxRow'
 import { Description } from '../components/core/Description'
-import { DynamicGrid, type DynamicGridItemSizing } from '../components/core/DynamicGrid'
+import { DynamicGrid } from '../components/core/DynamicGrid'
 import { EmptyState } from '../components/core/EmptyState'
 import { FieldActionButton } from '../components/core/FieldActionButton'
 import { GlassTile } from '../components/core/GlassTile'
@@ -168,6 +170,8 @@ import {
   TODO_PAGES,
   UNAVAILABLE_COLOR,
   SWITCH_ACTIVE_COLOR,
+  ADMIN_TODO_COMPLETION_SCRIPT,
+  ADMIN_TODO_ENTITY_ID,
   RELAY_CONTROL_MODE_ENTITY_ID,
   VACATION_DATE_RANGE_ERROR,
   VACATION_DATES_DESCRIPTION,
@@ -284,7 +288,7 @@ const APP_LAUNCH_MAX_COLUMNS = 6
 // controls keep the standard responsive room grid underneath it.
 const LEAD_ROW_GRID_LABEL_SUFFIX = 'Controls'
 
-function RoomGrid({ ariaLabel, children, itemSizing, layout }: { ariaLabel: string; children: ReactNode; itemSizing?: DynamicGridItemSizing; layout?: RoomSourceSectionLayout }) {
+function RoomGrid({ ariaLabel, children, layout }: { ariaLabel: string; children: ReactNode; layout?: RoomSourceSectionLayout }) {
   if (layout === 'app-launch') {
     return (
       <DynamicGrid
@@ -304,13 +308,13 @@ function RoomGrid({ ariaLabel, children, itemSizing, layout }: { ariaLabel: stri
   }
 
   if (layout === 'lead-row') {
-    return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2} itemSizing={itemSizing}>{children}</DynamicGrid>
+    return <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2}>{children}</DynamicGrid>
   }
 
   if (layout === 'two-column-fill') {
     return (
       <DynamicGrid ariaLabel={ariaLabel} className={styles.roomGrid} columns={2}
-        itemSizing={itemSizing} lastRow="fill" layout="fill">
+        lastRow="fill" layout="fill">
         {children}
       </DynamicGrid>
     )
@@ -321,7 +325,6 @@ function RoomGrid({ ariaLabel, children, itemSizing, layout }: { ariaLabel: stri
       ariaLabel={ariaLabel}
       className={styles.roomGrid}
       columns={2}
-      itemSizing={itemSizing}
       lastRow="fill-minimum"
       layout="bounded"
       maxCellWidth={280}
@@ -1605,7 +1608,10 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
   const [editingTask, setEditingTask] = useState<DonetickTaskEditTarget | null>(null)
+  const [editingTodoItem, setEditingTodoItem] = useState<AdminTodoEditTarget | null>(null)
   const [editSheetOpen, setEditSheetOpen] = useState(false)
+  const [todoEditSheetOpen, setTodoEditSheetOpen] = useState(false)
+  const [todoEditSession, setTodoEditSession] = useState(0)
   const [todoReloadVersion, setTodoReloadVersion] = useState(0)
   const hideEmptyTodoSections = config.showEmptyStateWhenEmpty ?? isChoreTodoPage(configPath)
   // Donetick empties these lists during vacation, so "nice job" would take credit for hidden chores.
@@ -1621,6 +1627,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
     : config.emptyDescription
   const lockPageScroll = path !== 'chores' && showTodoEmptyState
   const editableDonetickTasks = config.taskSource === 'donetick'
+  const editableAdminTodo = isAdminTodoSurface(configPath, config)
 
   const handleTodoSectionState = (entityId: string, state: { loaded: boolean; visible: boolean }) => {
     setSectionStates((current) => {
@@ -1640,6 +1647,12 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
     setEditSheetOpen(true)
   }
 
+  const openTodoItemEditor = (target: AdminTodoEditTarget) => {
+    setEditingTodoItem(target)
+    setTodoEditSession((current) => current + 1)
+    setTodoEditSheetOpen(true)
+  }
+
   const refreshTodoLists = () => {
     setTodoReloadVersion((current) => current + 1)
   }
@@ -1651,7 +1664,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
         const entityVersion = `${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
-        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onEditTask={editableDonetickTasks ? openTaskEditor : undefined} onSectionStateChange={handleTodoSectionState} reloadVersion={todoReloadVersion} responsiveItems={editableDonetickTasks} rowVariant={configPath === 'to-do' ? 'settings' : undefined} />
+        return <TodoSection entityVersion={entityVersion} hideListHeader={config.hideListHeaders} hideWhenEmpty={hideEmptyTodoSections} key={list.entityId} list={list} mayHaveItems={todoEntityMayHaveItems(entity)} onEditTask={editableDonetickTasks ? openTaskEditor : undefined} onEditTodoItem={editableAdminTodo ? openTodoItemEditor : undefined} onSectionStateChange={handleTodoSectionState} reloadVersion={todoReloadVersion} responsiveItems={editableDonetickTasks} rowVariant={configPath === 'to-do' ? 'settings' : undefined} />
       })}
       {editingTask && (
         <CreateDonetickTaskSheet
@@ -1662,8 +1675,24 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
           open={editSheetOpen}
         />
       )}
+      {editingTodoItem && (
+        <EditTodoItemSheet
+          editTarget={editingTodoItem}
+          key={todoEditSession}
+          onClose={() => setTodoEditSheetOpen(false)}
+          onSaved={refreshTodoLists}
+          open={todoEditSheetOpen}
+        />
+      )}
     </div>
   )
+}
+
+function isAdminTodoSurface(configPath: string, config: TodoPageConfig) {
+  return configPath === 'to-do'
+    && config.lists.length === 1
+    && config.lists[0]?.entityId === ADMIN_TODO_ENTITY_ID
+    && config.lists[0]?.completionScript === ADMIN_TODO_COMPLETION_SCRIPT
 }
 
 function isChoreTodoPage(path: string) {
@@ -1675,7 +1704,7 @@ function todoEntityMayHaveItems(entity: EntityActionStateMap[string] & { state?:
   return Number(entity.state) > 0
 }
 
-function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onEditTask, onSectionStateChange, reloadVersion, responsiveItems = false, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onEditTask?: (target: DonetickTaskEditTarget) => void; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; reloadVersion?: number; responsiveItems?: boolean; rowVariant?: 'settings' }) {
+function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, list, mayHaveItems, onEditTask, onEditTodoItem, onSectionStateChange, reloadVersion, responsiveItems = false, rowVariant }: { entityVersion: string; hideListHeader?: boolean; hideWhenEmpty: boolean | undefined; list: TodoListConfig; mayHaveItems: boolean; onEditTask?: (target: DonetickTaskEditTarget) => void; onEditTodoItem?: (target: AdminTodoEditTarget) => void; onSectionStateChange?: (entityId: string, state: { loaded: boolean; visible: boolean }) => void; reloadVersion?: number; responsiveItems?: boolean; rowVariant?: 'settings' }) {
   const [visibleItemState, setVisibleItemState] = useState<{ entityVersion: string; value: number | null }>({ entityVersion, value: hideWhenEmpty && !mayHaveItems ? 0 : null })
   const visibleItemCount = visibleItemState.entityVersion !== entityVersion && hideWhenEmpty && mayHaveItems && visibleItemState.value === 0
     ? null
@@ -1695,7 +1724,7 @@ function TodoSection({ entityVersion, hideListHeader = false, hideWhenEmpty, lis
   return (
     <section className={styles.section}>
       {!hideListHeader && <SectionHeader title={list.title} />}
-      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} layout={responsiveItems ? 'responsive-grid' : 'list'} onEditTask={onEditTask} onVisibleItemsChange={hideWhenEmpty ? handleVisibleItemsChange : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
+      <TodoListPanel completionScript={list.completionScript} entityId={list.entityId} hideCompleted={list.hideCompleted} layout={responsiveItems ? 'responsive-grid' : 'list'} onEditTask={onEditTask} onEditTodoItem={onEditTodoItem} onVisibleItemsChange={hideWhenEmpty ? handleVisibleItemsChange : undefined} optimisticStatuses={todoOptimisticStatuses} reloadVersion={reloadVersion} rowVariant={rowVariant} title={list.title} />
     </section>
   )
 }
@@ -1710,7 +1739,7 @@ function ChoresIntro({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
     <section className={styles.section}>
       <SectionHeader title="Quick Links" />
-      <DynamicGrid ariaLabel="Chore quick links" className={styles.choreQuickGrid} columns={2} itemSizing="uniform" itemSizingMinWidth={560} lastRow="fill-minimum" layout="bounded" maxCellWidth={380} maxColumns={3}>
+      <DynamicGrid ariaLabel="Chore quick links" className={styles.choreQuickGrid} columns={2} lastRow="fill-minimum" layout="bounded" maxCellWidth={380} maxColumns={3}>
         {CHORE_QUICK_LINKS.map((item) => (
           <ChoreQuickLink item={item} key={item.path} onNavigate={onNavigate} />
         ))}
@@ -2792,11 +2821,11 @@ function MediaPage({ preload = false, preloadHash, preloadHashes = [] }: { prelo
 
           return (
             <Section className={styles.section} key={section.title} title={section.title}>
-              <DynamicGrid ariaLabel={section.title} className={styles.mediaLeadGrid} columns={1} fillRows={false} itemSizing="uniform">
+              <DynamicGrid ariaLabel={section.title} className={styles.mediaLeadGrid} columns={1} fillRows={false}>
                 {leadCards.map(renderCard)}
               </DynamicGrid>
               {followUpCards.length > 0 && (
-                <RoomGrid ariaLabel={coreCopy(CORE_COPY_KEYS.groups.controls, { title: section.title })} itemSizing="uniform" layout="lead-row">
+                <RoomGrid ariaLabel={coreCopy(CORE_COPY_KEYS.groups.controls, { title: section.title })} layout="lead-row">
                   {followUpCards.map(renderCard)}
                 </RoomGrid>
               )}
@@ -3383,6 +3412,13 @@ interface BedTemperatureScopeRequest {
   value: number
 }
 
+type CommitBedTemperatureIntent = (
+  value: number,
+  phase: SleepypodSchedulePhase,
+  returnFocus: HTMLElement | null,
+  sendCurrentTarget: boolean,
+) => boolean
+
 interface EightSleepAlarmEditorDraft {
   days: FreeSleepAlarmDay[]
   editingId: string | null
@@ -3420,6 +3456,8 @@ const EIGHT_SLEEP_UNAVAILABLE_HOLD_MS = 10000
 const FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID = 'sensor.nightcanvasrestful_schedules'
 const FREE_SLEEP_SCHEDULE_SET_TOPIC = 'free-sleep/NightCanvasRestful/schedules/set'
 const SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID = 'sensor.master_bedroom_sleepypod_eight_pod_schedules'
+const SLEEPYPOD_SCHEDULE_SET_TOPIC = 'sleepypod/eight-pod/cmd/set-schedules'
+const SLEEPYPOD_HOT_FLASH_BROKER_SERVICE = 'sleepypod_hot_flash_broker'
 const FREE_SLEEP_BEDTIME_SET_TOPIC_PREFIX = 'free-sleep/NightCanvasRestful'
 const FREE_SLEEP_ALARM_DEBUG_TOPIC = 'free-sleep/NightCanvasRestful/debug/react-dash/alarm'
 const FREE_SLEEP_ALARM_DIAGNOSTICS_STORAGE_KEY = 'freeSleepAlarmDiagnostics'
@@ -4300,11 +4338,11 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
 
 function EightSleepThermostatHero({
   modalState,
-  onRequestTemperatureScope,
+  onCommitTemperatureIntent,
   side,
 }: {
   modalState: EightSleepBedModalState
-  onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
+  onCommitTemperatureIntent?: CommitBedTemperatureIntent
   side: EightSleepSideConfig
 }) {
   const sleepypodCopy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
@@ -4327,7 +4365,13 @@ function EightSleepThermostatHero({
   const [optimisticTargetValue, commitHeroTargetValue, cancelHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const displayedTargetValue = modalState.hotFlashActive ? sourceTargetValue : dragValue ?? optimisticTargetValue
   const scopedSleepypodTarget = controlMode === 'climate' && targetScale === 'level'
-  const canSetTarget = sideAvailable && soloTripInteractive && controlsSideOn && !modalState.hotFlashActive && displayedTargetValue !== null && (!scopedSleepypodTarget || schedulePhaseAvailable)
+  const canSetTarget = sideAvailable
+    && soloTripInteractive
+    && controlsSideOn
+    && !modalState.hotFlashActive
+    && displayedTargetValue !== null
+    && (!scopedSleepypodTarget || schedulePhaseAvailable)
+    && (!scopedSleepypodTarget || !activeSchedulePhase || Boolean(onCommitTemperatureIntent))
   const [previousCanSetTarget, setPreviousCanSetTarget] = useState(canSetTarget)
   if (previousCanSetTarget !== canSetTarget) {
     setPreviousCanSetTarget(canSetTarget)
@@ -4468,25 +4512,18 @@ function EightSleepThermostatHero({
       if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
       targetSyncTimerRef.current = null
       pendingTargetValueRef.current = null
+      const accepted = onCommitTemperatureIntent?.(
+        clampedValue,
+        activeSchedulePhase,
+        targetSliderRef.current,
+        shouldSendTargetCommand,
+      ) ?? false
+      if (!accepted) return
       if (shouldSendTargetCommand) {
         pendingTargetCommandRef.current = { liveValue: liveTargetValue, value: clampedValue }
         commitHeroTargetValue(clampedValue)
         commitTargetTemperature(clampedValue)
-        if (soloTripScope.controlsWholeBed) {
-          void sendSoloTripCommand({
-            action: 'set_tonight_level',
-            level: clampedValue,
-            side: side.scheduleSide,
-          })
-        } else {
-          callService({
-            domain: 'script',
-            service: sleepypodTonightTemperatureService(side.scheduleSide),
-            serviceData: { level: clampedValue },
-          })
-        }
       }
-      onRequestTemperatureScope?.(clampedValue, activeSchedulePhase, targetSliderRef.current)
       return
     }
     if (!shouldSendTargetCommand) return
@@ -4615,7 +4652,7 @@ function EightSleepThermostatHero({
       controlsSideOnRef.current = true
       commitDisplaySideOn(true)
       if (soloTripScope.controlsWholeBed) void sendSoloTripCommand({ action: 'set_power', enabled: true, side: side.scheduleSide })
-      else if (controlMode === 'climate' && side.climateEntityId) callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'heat' } })
+      else if (controlMode === 'climate') callService({ domain: 'script', service: SLEEPYPOD_HOT_FLASH_BROKER_SERVICE, serviceData: { action: 'power_heat', side: side.scheduleSide } })
       else callService({ domain: 'switch', service: 'turn_on', target: side.powerSwitchEntityId })
       return
     }
@@ -4625,7 +4662,7 @@ function EightSleepThermostatHero({
     setDragValue(null)
     commitDisplaySideOn(false)
     if (soloTripScope.controlsWholeBed) void sendSoloTripCommand({ action: 'set_power', enabled: false, side: side.scheduleSide })
-    else if (controlMode === 'climate' && side.climateEntityId) callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'off' } })
+    else if (controlMode === 'climate') callService({ domain: 'script', service: SLEEPYPOD_HOT_FLASH_BROKER_SERVICE, serviceData: { action: 'power_off', side: side.scheduleSide } })
     else callService({ domain: 'switch', service: 'turn_off', target: side.powerSwitchEntityId })
   }
 
@@ -4733,9 +4770,17 @@ function EightSleepAwayModeCard({ modalState, side }: { modalState: EightSleepBe
   )
 }
 
-function EightSleepScheduleSection({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+function EightSleepScheduleSection({
+  modalState,
+  onCommitTemperatureIntent,
+  side,
+}: {
+  modalState: EightSleepBedModalState
+  onCommitTemperatureIntent?: CommitBedTemperatureIntent
+  side: EightSleepSideConfig
+}) {
   const scheduleEntityId = modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID : FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID
-  const scheduleSetTopic = undefined
+  const scheduleSetTopic = modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SET_TOPIC : undefined
 
   return (
     <section className={styles.section}>
@@ -4749,9 +4794,12 @@ function EightSleepScheduleSection({ modalState, side }: { modalState: EightSlee
             key={stage.key}
             label={stage.label}
             modalState={modalState}
+            activeSchedulePhase={modalState.activeSchedulePhase}
+            onCommitTemperatureIntent={modalState.controlMode === 'climate' && modalState.targetScale === 'level'
+              ? onCommitTemperatureIntent
+              : undefined}
             scheduleEntityId={scheduleEntityId}
             scheduleSetTopic={scheduleSetTopic}
-            sendSleepypodSchedule={modalState.sendSleepypodSchedule}
             side={side}
             sideTitle={side.title}
             stageKey={stage.key}
@@ -4854,14 +4902,12 @@ function useEightSleepAlarmsController({
   scheduleEntityId = FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID,
   scheduleSetTopic = FREE_SLEEP_SCHEDULE_SET_TOPIC,
   sendSoloTripCommand,
-  sendSleepypodSchedule,
   side,
   soloTripScope,
 }: {
   scheduleEntityId?: string
   scheduleSetTopic?: string
   sendSoloTripCommand: HouseholdAwayController['sendSleepypodCommand']
-  sendSleepypodSchedule: HouseholdAwayController['sendSleepypodSchedule']
   side: EightSleepSideConfig
   soloTripScope: HouseholdAwayBedScope
 }) {
@@ -5034,19 +5080,15 @@ function useEightSleepAlarmsController({
       side: side.scheduleSide,
       topic: scheduleSetTopic,
     })
-    if (scheduleEntityId === SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID) {
-      void sendSleepypodSchedule(payload, side.scheduleSide)
-    } else {
-      callService({
-        domain: 'mqtt',
-        service: 'publish',
-        serviceData: {
-          payload: JSON.stringify(payload),
-          topic: scheduleSetTopic,
-        },
-      })
-    }
-  }, [alarmDaySemantics, callService, legacyAlarmAvailable, schedule, scheduleEntityId, scheduleSetTopic, scheduleSideAvailable, sendSleepypodSchedule, sendSoloTripCommand, side, soloTripScope.controlsWholeBed, soloTripScope.engaged])
+    callService({
+      domain: 'mqtt',
+      service: 'publish',
+      serviceData: {
+        payload: JSON.stringify(payload),
+        topic: scheduleSetTopic,
+      },
+    })
+  }, [alarmDaySemantics, callService, legacyAlarmAvailable, schedule, scheduleEntityId, scheduleSetTopic, scheduleSideAvailable, sendSoloTripCommand, side, soloTripScope.controlsWholeBed, soloTripScope.engaged])
 
   useLayoutEffect(() => {
     syncAlarmRecordsRef.current = syncAlarmRecords
@@ -5227,6 +5269,7 @@ function useEightSleepAlarmsController({
 function useWakeLightBedProvisioning(config: WakeLightConfig): WakeLightBedProvisioning {
   const householdAway = useHouseholdAwayController()
   const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
+  const callService = useCallService()
   const scheduleEntity = useEntity(asEntityName(config.sleepypodScheduleEntityId), { returnNullIfNotFound: true })
   const schedule = useMemo(
     () => scheduleEntity && !isUnavailable(scheduleEntity)
@@ -5291,10 +5334,14 @@ function useWakeLightBedProvisioning(config: WakeLightConfig): WakeLightBedProvi
       void householdAway.sendSleepypodCommand({ action: 'replace_alarms', alarmRows, side })
       return
     }
-    void householdAway.sendSleepypodSchedule(
-      alarmSchedulePayload(nextRecords, sideConfig, schedule, 'execution'),
-      side,
-    )
+    callService({
+      domain: 'mqtt',
+      service: 'publish',
+      serviceData: {
+        payload: JSON.stringify(alarmSchedulePayload(nextRecords, sideConfig, schedule, 'execution')),
+        topic: SLEEPYPOD_SCHEDULE_SET_TOPIC,
+      },
+    })
   }
 
   return { createAlarms, targets }
@@ -5452,26 +5499,28 @@ function EightSleepAlarmDayPage({
 }
 
 function EightSleepScheduleTemperatureControl({
+  activeSchedulePhase,
   entityId,
   fallbackTemperature,
   icon,
   label,
   modalState,
+  onCommitTemperatureIntent,
   scheduleEntityId,
   scheduleSetTopic,
-  sendSleepypodSchedule,
   side,
   sideTitle,
   stageKey,
 }: {
+  activeSchedulePhase: SleepypodSchedulePhase | null
   entityId: string
   fallbackTemperature: number | null
   icon: string
   label: string
   modalState: EightSleepBedModalState
+  onCommitTemperatureIntent?: CommitBedTemperatureIntent
   scheduleEntityId: string
   scheduleSetTopic?: string
-  sendSleepypodSchedule: HouseholdAwayController['sendSleepypodSchedule']
   side: EightSleepSideConfig
   sideTitle: string
   stageKey: FreeSleepScheduleStage
@@ -5481,7 +5530,11 @@ function EightSleepScheduleTemperatureControl({
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const callService = useCallService()
   const valueSyncTimerRef = useRef<number | null>(null)
-  const pendingValueRef = useRef<number | null>(null)
+  const pendingValueRef = useRef<{
+    returnFocus: HTMLElement | null
+    scopedPhase: SleepypodSchedulePhase | null
+    value: number
+  } | null>(null)
   const unavailable = !entity || entity.state === 'unavailable'
   const liveValue = unavailable ? null : numberValue(entity.state)
   const min = numberValue(entity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
@@ -5503,23 +5556,32 @@ function EightSleepScheduleTemperatureControl({
     if (valueSyncTimerRef.current !== null) window.clearTimeout(valueSyncTimerRef.current)
   }, [])
 
-  const queueValueSync = (nextValue: number) => {
-    pendingValueRef.current = nextValue
+  const queueValueSync = (nextValue: number, returnFocus: HTMLElement | null) => {
+    pendingValueRef.current = {
+      returnFocus,
+      scopedPhase: activeSchedulePhase === stageKey ? activeSchedulePhase : null,
+      value: nextValue,
+    }
     if (valueSyncTimerRef.current !== null) window.clearTimeout(valueSyncTimerRef.current)
     valueSyncTimerRef.current = window.setTimeout(() => {
-      const pendingValue = pendingValueRef.current
+      const pending = pendingValueRef.current
       pendingValueRef.current = null
       valueSyncTimerRef.current = null
-      if (pendingValue === null) return
+      if (!pending) return
       if (modalState.soloTripScope.controlsWholeBed) {
         void modalState.sendSoloTripCommand({
           action: 'set_stage_level',
-          level: pendingValue,
+          level: pending.value,
           phase: stageKey,
           side: side.scheduleSide,
         })
         return
       }
+      if (pending.scopedPhase) {
+        onCommitTemperatureIntent?.(pending.value, pending.scopedPhase, pending.returnFocus, true)
+        return
+      }
+      const pendingValue = pending.value
       callService({ domain: entityId.split('.')[0], service: 'set_value', target: entityId, serviceData: { value: pendingValue } })
       if (scheduleSetTopic) {
         const levels = Object.fromEntries(FREE_SLEEP_SCHEDULE_STAGES.map((stage) => {
@@ -5529,18 +5591,14 @@ function EightSleepScheduleTemperatureControl({
         })) as Record<FreeSleepScheduleStage, number>
         const schedule = scheduleFromEntityAttributes(scheduleEntity?.attributes as Record<string, unknown> | undefined)
         const payload = sleepypodSchedulePayload(side, schedule, levels)
-        if (scheduleEntityId === SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID) {
-          void sendSleepypodSchedule(payload, side.scheduleSide)
-        } else {
-          callService({
-            domain: 'mqtt',
-            service: 'publish',
-            serviceData: {
-              payload: JSON.stringify(payload),
-              topic: scheduleSetTopic,
-            },
-          })
-        }
+        callService({
+          domain: 'mqtt',
+          service: 'publish',
+          serviceData: {
+            payload: JSON.stringify(payload),
+            topic: scheduleSetTopic,
+          },
+        })
       }
     }, FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS)
   }
@@ -5551,7 +5609,7 @@ function EightSleepScheduleTemperatureControl({
     const nextValue = snapNumberToStep(currentValue + delta, min, max, step)
     baseValueRef.current = nextValue
     commitDisplayValue(nextValue)
-    queueValueSync(nextValue)
+    queueValueSync(nextValue, document.activeElement instanceof HTMLElement ? document.activeElement : null)
   }
 
   return (
@@ -5623,9 +5681,8 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   const [alarmPage, setAlarmPage] = useState<EightSleepAlarmDetailPage | null>(null)
   const alarmController = useEightSleepAlarmsController({
     scheduleEntityId: modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID : FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID,
-    scheduleSetTopic: modalState.controlMode === 'climate' ? undefined : FREE_SLEEP_SCHEDULE_SET_TOPIC,
+    scheduleSetTopic: modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SET_TOPIC : FREE_SLEEP_SCHEDULE_SET_TOPIC,
     sendSoloTripCommand: modalState.sendSoloTripCommand,
-    sendSleepypodSchedule: modalState.sendSleepypodSchedule,
     side,
     soloTripScope: modalState.soloTripScope,
   })
@@ -5788,7 +5845,24 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
     else closeDetailPage()
   }
 
-  const requestTemperatureScope = (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => {
+  const commitTemperatureIntent: CommitBedTemperatureIntent = (value, phase, returnFocus, sendCurrentTarget) => {
+    const current = scopeCommandStateRef.current
+    if (!current.sideAvailable || current.activeSchedulePhase !== phase) return false
+    if (sendCurrentTarget) {
+      if (modalState.soloTripScope.controlsWholeBed) {
+        void modalState.sendSoloTripCommand({
+          action: 'set_tonight_level',
+          level: value,
+          side: side.scheduleSide,
+        })
+      } else {
+        callService({
+          domain: 'script',
+          service: sleepypodTonightTemperatureService(side.scheduleSide),
+          serviceData: { level: value },
+        })
+      }
+    }
     setScopeRequest({
       open: true,
       phase,
@@ -5796,6 +5870,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
       targetText: formatBedTargetValue(value, modalState),
       value,
     })
+    return true
   }
 
   const chooseTemperatureScope = (scope: SleepypodTemperatureScope) => {
@@ -5878,7 +5953,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
             onEditAlarm={openAlarmEditor}
             onOpenAlarmDay={openAlarmDay}
             onPanelElementChange={setAlarmPanelElement}
-            onRequestTemperatureScope={requestTemperatureScope}
+            onCommitTemperatureIntent={commitTemperatureIntent}
             side={side}
             tabs={tabs}
             wakeLightConfig={wakeLightConfig}
@@ -5890,7 +5965,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
             alarmPage={null}
             modalState={modalState}
             onPanelElementChange={setAlarmPanelElement}
-            onRequestTemperatureScope={requestTemperatureScope}
+            onCommitTemperatureIntent={commitTemperatureIntent}
             side={side}
             tabs={tabs}
           />
@@ -5966,7 +6041,7 @@ interface EightSleepBedModalContentProps {
   onEditAlarm?: (alarm: FreeSleepAlarmRecord) => void
   onOpenAlarmDay?: (day: FreeSleepAlarmDay) => void
   onPanelElementChange?: (element: HTMLDivElement | null) => void
-  onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
+  onCommitTemperatureIntent?: CommitBedTemperatureIntent
   side: EightSleepSideConfig
   tabs?: typeof EIGHT_SLEEP_MODAL_TABS
   wakeLightConfig?: WakeLightConfig
@@ -5986,7 +6061,7 @@ function EightSleepBedModalContentView({
   onEditAlarm,
   onOpenAlarmDay,
   onPanelElementChange,
-  onRequestTemperatureScope,
+  onCommitTemperatureIntent,
   side,
   tabs,
   wakeLightConfig,
@@ -6110,7 +6185,7 @@ function EightSleepBedModalContentView({
     >
       <div className={styles.eightSleepHeroColumn} data-scroll-region="eight-sleep-hero-column">
         <div className={`${styles.eightSleepModalHeroShell} ${styles.thermostatModalDialShell}`} data-section="eight-sleep-hero" data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
-          <EightSleepThermostatHero modalState={modalState} onRequestTemperatureScope={onRequestTemperatureScope} side={side} />
+          <EightSleepThermostatHero modalState={modalState} onCommitTemperatureIntent={onCommitTemperatureIntent} side={side} />
         </div>
         <SleepypodActiveAlarmSection
           command={alarmController?.activeAlarmCommand}
@@ -6155,7 +6230,13 @@ function EightSleepBedModalContentView({
             <InlineAlert>{householdAwayCommandError(soloTripCopy, modalState.soloTripCommandError)}</InlineAlert>
           </section>
         )}
-        {modalState.sideAvailable && effectiveActiveTab === 'schedule' && <EightSleepScheduleSection modalState={modalState} side={side} />}
+        {modalState.sideAvailable && effectiveActiveTab === 'schedule' && (
+          <EightSleepScheduleSection
+            modalState={modalState}
+            onCommitTemperatureIntent={onCommitTemperatureIntent}
+            side={side}
+          />
+        )}
         {modalState.sideAvailable && effectiveActiveTab === 'modes' && (
           <section className={styles.section}>
             <SectionHeader title="Special Modes" />
@@ -6892,7 +6973,7 @@ function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-pr
     return (
       <section className={styles.section}>
         <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.trackSelected}</Description>
-        <DynamicGrid ariaLabel="Selected thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
+        <DynamicGrid ariaLabel="Selected thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8} itemSizing="uniform">
           {THERMOSTAT_ROOM_VIEWS.map((room, index) => <ThermostatTrackCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
         </DynamicGrid>
       </section>
@@ -6906,7 +6987,7 @@ function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-pr
     return (
       <section className={styles.section}>
         <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.forceCritical}</Description>
-        <DynamicGrid ariaLabel="Critical protection thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
+        <DynamicGrid ariaLabel="Critical protection thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8} itemSizing="uniform">
           {THERMOSTAT_ROOM_VIEWS
             .filter((room) => entities[thermostatTrackEntityId(room)]?.state !== 'on')
             .map((room, index) => <ThermostatForceCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
@@ -6918,7 +6999,7 @@ function ThermostatTrackingDetailPage({ detailType }: { detailType: 'critical-pr
   return (
     <section className={styles.section}>
       <Description>{THERMOSTAT_SECTION_DESCRIPTIONS.trackOnlyWhenOccupied}</Description>
-      <DynamicGrid ariaLabel="Occupied-only thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8}>
+      <DynamicGrid ariaLabel="Occupied-only thermostat rooms" className={styles.thermostatTrackingGrid} columns={2} gap={8} itemSizing="uniform">
         {THERMOSTAT_ROOM_VIEWS.map((room, index) => <ThermostatTrackOnlyWhenOccupiedCheckbox detailAutoFocus={index === 0} key={room.key} room={room} />)}
       </DynamicGrid>
     </section>
@@ -7002,7 +7083,7 @@ function ThermostatRoomsRoot({ onOpenRoom }: { onOpenRoom: (room: ThermostatRoom
     <section className={styles.section}>
       <SectionHeader title="Rooms" />
       <Description>{THERMOSTAT_MODAL_TABS.find((tab) => tab.tab === 'rooms')?.description}</Description>
-      <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} forceEquivalentColumnCount gap={8}>
+      <DynamicGrid ariaLabel="Thermostat rooms" className={styles.thermostatRoomGrid} columns={2} gap={8}>
         {THERMOSTAT_ROOM_VIEWS.map((room) => <ThermostatRoomRow key={room.key} onOpen={() => onOpenRoom(room)} room={room} />)}
       </DynamicGrid>
     </section>

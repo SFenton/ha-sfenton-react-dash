@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
 import { vi } from 'vitest'
 import { materialIconPath } from '../components/core/iconPaths'
@@ -1713,6 +1713,34 @@ describe('DashboardViewPage', () => {
     expect(warning.parentElement).toHaveAttribute('data-settings-section-controls', 'true')
   })
 
+  it('routes SleepyPod power changes through the Hot Flash broker', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'off'
+    mockEntities['switch.nightcanvasrestful_left_power'].state = 'off'
+    try {
+      render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+      fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Off/i }))
+      const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+      fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'script',
+        service: 'sleepypod_hot_flash_broker',
+        serviceData: { action: 'power_heat', side: 'left' },
+      })
+      fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
+      expect(confirm).toHaveBeenCalledWith("Turn off Stephen's Bed?")
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'script',
+        service: 'sleepypod_hot_flash_broker',
+        serviceData: { action: 'power_off', side: 'left' },
+      })
+    } finally {
+      confirm.mockRestore()
+    }
+  })
+
   it.each([
     ['off', 'off'],
     ['on', 'off'],
@@ -2148,7 +2176,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).queryByText(/11 rooms/i)).not.toBeInTheDocument()
     const roomGrid = within(dialog).getByRole('group', { name: 'Thermostat rooms' })
     expect(roomGrid.children).toHaveLength(11)
-    expect(roomGrid).toHaveAttribute('data-dynamic-grid-force-equivalent-column-count', 'true')
+    expect(roomGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     expect(roomGrid.lastElementChild).toHaveAttribute('data-dynamic-grid-span', '2')
   })
 
@@ -5593,7 +5621,7 @@ describe('DashboardViewPage', () => {
     expect(livingSection).not.toBe(theaterSection)
     expect(screen.getByRole('button', { name: /^Living Room SHIELD Off$/i }).closest('[data-dynamic-grid="true"]')).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }).closest('[data-dynamic-grid="true"]')).toHaveAttribute('data-dynamic-grid-layout', 'fill')
-    expect(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }).closest('[data-dynamic-grid="true"]')).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }).closest('[data-dynamic-grid="true"]')).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     expect(screen.getByRole('group', { name: 'Theater Room Controls' })).toContainElement(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }))
 
     fireEvent.click(screen.getByRole('button', { name: /^Nintendo Switch Off$/i }))
@@ -5869,7 +5897,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: /Projector Off/i })).toHaveAttribute('data-tone', 'media')
     expect(screen.getByRole('button', { name: /Projector Off/i })).toHaveAttribute('data-icon', 'mdi:projector')
     const deviceGrid = screen.getByRole('button', { name: /Projector Off/i }).closest('[data-dynamic-grid="true"]')
-    expect(deviceGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(deviceGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     expect(deviceGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '260')
     expect(deviceGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
     expect(screen.getByRole('button', { name: /Theater Room PC On/i })).toHaveAttribute('data-tone', 'switch')
@@ -5985,7 +6013,7 @@ describe('DashboardViewPage', () => {
     const autoCleanHeading = within(controlsPane).getByRole('heading', { name: 'Disabled Auto-Clean Rooms' })
     expect(autoCleanHeading).toBeInTheDocument()
     const autoCleanGrid = autoCleanHeading.closest('section')?.querySelector('[data-dynamic-grid]')
-    expect(autoCleanGrid).toHaveAttribute('data-dynamic-grid-force-equivalent-column-count', 'true')
+    expect(autoCleanGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
     expect(screen.getByText('Check rooms that should be skipped when the coordinator starts an automatic away clean. Use this for closed doors, guests, or projects on the floor; manual selected-room cleans still use the Zones tab.')).toBeInTheDocument()
     const livingRoomAutoClean = screen.getByRole('button', { name: 'Living Room auto-clean enabled' })
     expect(livingRoomAutoClean).toHaveAttribute('aria-pressed', 'false')
@@ -6584,10 +6612,10 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Open Front Door camera' })).toBeInTheDocument()
     const securityGrid = screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-dynamic-grid="true"]')
     const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
-    expect(securityGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(securityGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
-    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     expect(screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-responsive-section-item="true"]')).toHaveAttribute('data-span', 'full')
@@ -7447,7 +7475,7 @@ describe('DashboardViewPage', () => {
     const quickLinks = screen.getByRole('group', { name: 'Chore quick links' })
     expect(quickLinks).toHaveAttribute('data-dynamic-grid', 'true')
     expect(quickLinks).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
-    expect(quickLinks).toHaveAttribute('data-dynamic-grid-item-sizing-min-width', '560')
+    expect(quickLinks).not.toHaveAttribute('data-dynamic-grid-item-sizing-min-width')
     expect(quickLinks.children).toHaveLength(5)
     expect(screen.getByRole('button', { name: /Groceries 2 items/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Your Chores 4 upcoming tasks · 1 task listed/i })).toBeInTheDocument()
@@ -7946,7 +7974,7 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Admin To-Do' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Groceries' })).not.toBeInTheDocument()
     expect(list).toHaveAttribute('data-row-variant', 'settings')
-    expect(within(list).getByRole('button', { name: /Review reminders/i })).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: 'Review reminders' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Add Task' }))
     const dialog = await screen.findByRole('dialog')
@@ -7968,6 +7996,29 @@ describe('DashboardViewPage', () => {
         serviceData: { item: 'Renew parking permit' },
       },
     ]))
+  })
+
+  it('opens the title-only editor only on the Settings Admin To-Do surface', async () => {
+    mockTodoItemsByEntity['todo.groceries'] = [
+      { uid: 'admin-task-1', summary: 'Raw admin title', status: 'needs_action' },
+    ]
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="to-do" />)
+
+    const list = await screen.findByLabelText('Admin To-Do todo list')
+    fireEvent.click(within(list).getByRole('button', { name: 'Edit Raw admin title' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit Task' })
+
+    expect(within(dialog).getByLabelText('Task Name')).toHaveValue('Raw admin title')
+    expect(within(dialog).getByRole('button', { name: 'Reset' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit Task' })).not.toBeInTheDocument())
+
+    cleanup()
+    mockTodoItemsByEntity['todo.shopping_list'] = [{ uid: 'grocery-1', summary: 'Milk', status: 'needs_action' }]
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="groceries" />)
+    const groceryList = await screen.findByLabelText('Grocery List todo list')
+    expect(within(groceryList).queryByRole('button', { name: 'Edit Milk' })).not.toBeInTheDocument()
   })
 
   it('renders the shared empty state when the Settings To-Do list is empty', async () => {
@@ -8024,7 +8075,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
 
     expect(mockEntities['vacuum.valetudo_exaltedsneakydeer'].state).toBe('docked')
-    expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
+    expect(await within(controlsPane).findByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
     expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
     expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toHaveAttribute('data-modal-action-button', 'true')
     expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toHaveAttribute('data-tone', 'warning')
@@ -8071,7 +8122,7 @@ describe('DashboardViewPage', () => {
     const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
 
     fireEvent.click(within(controlsPane).getByRole('button', { name: 'Dock' }))
-    expect(within(controlsPane).getByRole('heading', { name: 'Returning' })).toBeInTheDocument()
+    expect(await within(controlsPane).findByRole('heading', { name: 'Returning' })).toBeInTheDocument()
 
     act(() => {
       setMockEntityState('sensor.valetudo_exaltedsneakydeer_error', 'Brush stuck')
@@ -8138,6 +8189,9 @@ describe('DashboardViewPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Clean' }))
 
       expect(mockEntities['vacuum.valetudo_politefatherlykingfisher'].state).toBe('docked')
+      act(() => {
+        vi.advanceTimersByTime(MODAL_TAB_TEST_SETTLE_MS)
+      })
       expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
       expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
       expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeDisabled()

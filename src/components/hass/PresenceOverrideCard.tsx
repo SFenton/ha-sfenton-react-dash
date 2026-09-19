@@ -96,7 +96,7 @@ export function PresenceOverrideDetailPage({ item }: { item: PresenceOverrideCon
   }
   return (
     <section aria-label={`${item.title} presence lighting controls`} className={styles.detailPage}>
-      <DynamicGrid ariaLabel={`${item.title} presence lighting states`} className={styles.stateGrid} columns={2} gap={8}>
+      <DynamicGrid ariaLabel={`${item.title} presence lighting states`} className={styles.stateGrid} columns={2} gap={8} itemSizing="uniform">
         {PRESENCE_OVERRIDE_STATES.map((state, index) => {
           const presentation = PRESENCE_STATE_PRESENTATION[state]
           const selected = displayState === state
@@ -114,7 +114,6 @@ export function PresenceOverrideDetailPage({ item }: { item: PresenceOverrideCon
               onClick={() => selectState(state)}
               primary={presentation.label}
               secondary={presentation.description}
-              wrapText
             />
           )
         })}

@@ -23,9 +23,9 @@ export function RadioRow({ active, className, subtitle, title, type = 'button', 
       type={type}
     >
       <MaterialIcon name={active ? 'mdi:record-circle-outline' : 'mdi:checkbox-blank-circle-outline'} size={30} />
-      <span className={styles.copy}>
-        <strong>{title}</strong>
-        {hasSubtitle(subtitle) && <small>{subtitle}</small>}
+      <span className={styles.copy} data-dynamic-grid-label-container="true">
+        <strong data-dynamic-grid-label="true">{title}</strong>
+        {hasSubtitle(subtitle) && <small data-dynamic-grid-label="true">{subtitle}</small>}
       </span>
     </button>
   )

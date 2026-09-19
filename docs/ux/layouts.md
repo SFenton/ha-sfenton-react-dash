@@ -13,6 +13,12 @@ manufactures manual judgment. Pull requests retain the quality and full
 Playwright checks but intentionally skip automated layout. Do not rerun the
 broad automated corpus locally merely to permit an initial push.
 
+Post-merge layout automation is asynchronous regression detection. Do not wait
+for its completion or artifact before building, deploying, or completing a
+release. A failed run automatically files one deduplicated investigation issue
+for the merged commit; the run, artifact, and any manual review are follow-up
+evidence, not release gates.
+
 1. Read the current UX contract. Do not redesign its geometry or HA behavior.
 2. Run `npm run layout:plan -- --base <resolved-master-sha> --out artifacts/layout/<run-id>/plan.json`.
 3. Review the plan's owners, states, contexts, exclusions and blockers. Unknown new
@@ -28,10 +34,11 @@ broad automated corpus locally merely to permit an initial push.
    The external assessor blocks missing work, stale fingerprints, failed/skipped
    required checkpoints, unreviewed images and inaccessible artifacts.
 
-The full six-step workflow is the human acceptance path for layout-sensitive
-work. After merge and before deployment, inspect the `master` run artifact and
-exercise an owned preview of the exact merged head. A `non-layout` Action
-classification or a zero-item manual worklist requires no manual layout review.
+The full six-step workflow is the human acceptance path when layout review is
+separately performed or claimed complete. Inspect the matching run artifact and
+exercise an owned preview of the exact head without delaying an otherwise ready
+release. A `non-layout` Action classification or a zero-item manual worklist
+requires no manual layout review.
 
 To replay a completed candidate manually, use `layout:run -- --plan <plan> --review`.
 It reuses only fingerprint-verified build artifacts and owns a new no-proxy preview.
@@ -112,20 +119,23 @@ dimensions to positional arrays or confuse a resize with native input emulation.
 | chat | modal | empty, history-empty, conversation, history, loading, unavailable, load-error, request-save-error, save-error, pending, archive, resume, resume-ready, removed-agent, conflict, unknown, long, reset, empty-reply, agent-error, not-sent, oversized-reply, multiple-agents, unreadable, limit, history-retained, light-room-control, light-color-control, light-custom-color-control, light-brightness-control, settings | Are roles, genuine pending dots, 14-day history visibility, versioned Chat Settings, embedded room/color/brightness controls and same-sheet custom color details using the shared exterior-light picker clear, with resume warnings, errors, long messages, a usable composer above bottom tabs and one safe scroll owner? |
 | summary | modal | overdue, upcoming, expired | Does the selected incoming Summary content retain readable type and columns on rotation before refreshing a tab? |
 | filters | modal | choices | Are filter descriptions readable at the actual column width, and are options and footer usable? |
-| recipe-grocery | modal | ready, loading, success | Does the missing-ingredients action retain one stable command area while the button, spinner and success check transition, then collapse without exposing redundant visible copy? |
+| recipe-grocery | modal | ready, loading, success, exhausted | Does the missing-ingredients action retain one stable command area while the button, spinner and success check transition, and does an exhausting individual add hide that command without redundant visible copy until removal restores it? |
 | form | modal | draft | Does the draft survive resizing, and are input, close and footer controls usable during synthetic keyboard contraction? |
+| admin-todo-edit | modal | pristine, dirty, failure | Does the Admin To-Do editor open from the mock-backed todo.groceries route, retain pristine and failed drafts, keep Reset and Save aligned in one reachable horizontal footer row across phone portrait/landscape and centered desktop, and preserve overflow and safe-area clearance? |
 | remote | modal | active | Is the complete active direction pad visible without auto-scroll, operable, and unchanged on portrait return? |
 | vacuum | modal | docked, cleaning, dock-cleaning, resumable, low-battery | Does the fitted vacuum map fill the stationary left pane in short and tall landscape while the right pane scrolls naturally, while runtime-driven minimal states immediately trim tabs, keep Controls non-empty, surface only the active dock stop action, close the area editor, and preserve the correct selected tab? |
 | weather | modal | condition, precipitation, wind, pressure-unavailable, pressure-long, forecast-error-stale, forecast-empty, forecast-error-empty | Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with complete carousel pages centered and incomplete final pages aligned left, equal small-tile heights, no preview dropdown and unchanged return geometry? |
-| navigation | page-shell-grid | home, back-page | Do content, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey? |
+| navigation | page-shell-grid | home, back-page | Do content, viewer-relative room controls, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey? |
 | host | host | legacy, panel | Does the actual product bridge preserve its app during synthetic resizing and forward independent outer safe edges to the correctly sized inner viewport? |
 | preload | preload | inert | Is the hidden preload geometry inert while the visible app remains usable? |
 | wake-room | page-shell-grid | ready, no-enabled, unavailable, active | Does the standard room tile convey ready, no-enabled, unavailable and active state without moving, and open useful controls without issuing a command? |
 | wake-light | modal | alarms, defaults, empty, source-only, no-enabled, vacation, unavailable, incompatible, blocked, active, source-snoozed, recovering, spent-once, legacy-ramp | Are alarm controls, current blockers, source ownership, ramp choices and active Stop truthful, readable and reachable without changing the shared frame? |
 | wake-editor | modal | one-time, scheduled, unchanged, dirty, reverted, pending, rejected, revision-conflict, legacy-ramp | Does the one-time-first editor preserve exact dirty state, ramp selection and rejected/conflicting drafts while acceptance remains required before closing? |
 | wake-source | modal | pod-editor, pod-alarm-detail, back | Does source navigation close the old sheet before opening the authoritative Pod editor, preserve execution weekdays and linked-room meaning, and return without duplicate writes? |
+| solo-trip-settings | page-shell-grid | idle, idle-selected, modal, scheduled, activating, active, active-home-viewer, active-unknown-viewer, degraded, ending, restore-required, unavailable | Does the dedicated Solo Trip page keep both Settings-style sections visible while idle, selected, modal, scheduled, activating, active, degraded, ending, restore-required, and unavailable states remain truthful across mobile and desktop? |
+| solo-trip-bed | modal | home-side, away-side, home-viewer-home-side, home-viewer-away-side | Is the Away status below the bed power controls in stacked layouts and above Sleep Schedule in the right pane, while the home resident controls the whole bed and the traveler side remains read-only? |
 
-Source-derived inventory: 46 routes; 88
+Source-derived inventory: 48 routes; 88
 configured room/hash openers. These are not unique modal or backend-state counts.
 
 ## Device-only / outside local certification

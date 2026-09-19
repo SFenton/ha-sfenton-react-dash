@@ -134,9 +134,9 @@ export function CheckboxRow(props: CheckboxRowProps) {
   const content = (
     <>
       <MaterialIcon name={icon} size={34} />
-      <span className={styles.copy}>
-        <strong ref={titleRef}>{title}</strong>
-        {subtitleVisible && <small>{subtitle}</small>}
+      <span className={styles.copy} data-dynamic-grid-label-container="true">
+        <strong data-dynamic-grid-label="true" ref={titleRef}>{title}</strong>
+        {subtitleVisible && <small data-dynamic-grid-label="true">{subtitle}</small>}
       </span>
     </>
   )

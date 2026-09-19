@@ -1,3 +1,5 @@
+// @covers src/components/hass/EditTodoItemSheet.tsx
+// @covers src/components/hass/EditTodoItemSheet.module.css
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Locator, type Page } from './layout/fixture'
@@ -155,6 +157,7 @@ const EXPECTED_PHYSICAL_MODAL_CALLSITES = {
   'src/components/hass/CreateDonetickTaskSheet.tsx:CreateDonetickTaskSheet': 1,
   'src/components/hass/CreateGroceryItemSheet.tsx:CreateGroceryItemSheet': 1,
   'src/components/hass/CreateTodoItemSheet.tsx:CreateTodoItemSheet': 1,
+  'src/components/hass/EditTodoItemSheet.tsx:EditTodoItemSheet': 1,
   'src/components/hass/DailyReportModal.tsx:DailyReportModal': 1,
   'src/components/hass/EverShelfInventoryPanel.tsx:InventoryFilterSheet': 1,
   'src/components/hass/EverShelfInventoryPanel.tsx:InventoryItemDetailsModal': 1,
@@ -302,8 +305,22 @@ async function openRecipeModal(page: Page, kind: 'detail' | 'filter' | 'sort') {
     }).click()
     return page.getByRole('dialog', { name: 'Suggested Citrus Pantry Bowl with Roasted Garden Vegetables' })
   }
+
   await page.getByRole('button', { name: kind === 'sort' ? 'Sort' : 'Filter' }).click()
   return page.getByRole('dialog', { name: kind === 'sort' ? 'Sort Recipes' : 'Filter Recipes' })
+}
+
+async function openAdminTodoEditModal(page: Page) {
+  await gotoRoute(page, 'to-do')
+  await page.evaluate(() => {
+    const mock = window.__mockHass!
+    mock.setEntityState('todo.groceries', '1')
+    mock.setTodoItems('todo.groceries', [
+      { status: 'needs_action', summary: 'Layout validation task', uid: 'layout-admin-task' },
+    ])
+  })
+  await page.getByLabel('Admin To-Do todo list').getByRole('button', { name: 'Edit Layout validation task' }).click()
+  return page.getByRole('dialog', { name: 'Edit Task' })
 }
 
 async function openHarness(page: Page, harness: string, values: string[]) {
@@ -452,6 +469,13 @@ const MODAL_CASES: ModalCase[] = [
     id: 'create-todo-item',
     open: (page) => openButtonModal(page, 'to-do', 'Add Task', 'Add Task'),
     physicalCallsite: 'src/components/hass/CreateTodoItemSheet.tsx:CreateTodoItemSheet',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'form',
+    id: 'admin-todo-edit',
+    open: openAdminTodoEditModal,
+    physicalCallsite: 'src/components/hass/EditTodoItemSheet.tsx:EditTodoItemSheet',
   },
   {
     expectedScrollMode: 'body',

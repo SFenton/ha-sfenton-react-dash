@@ -24,10 +24,16 @@ The protected `master` workflow runs the automated portion after merge in the
 requests intentionally skip that job while retaining quality and full
 Playwright checks. The job uses `layout:verify --automated-only`, which cannot
 claim manual or full visual acceptance. Do not rerun the broad automated corpus
-locally merely to permit a push. For a layout-sensitive release, inspect the
-post-merge Action artifact and perform its requested interactions against an
-owned preview of the exact merged head before deployment. A `non-layout`
-classification or zero-item manual worklist requires no human layout review.
+locally merely to permit a push.
+
+Post-merge layout automation is asynchronous regression detection. Do not wait
+for its completion or artifact before building, deploying, or completing a
+release. A failed run automatically files one deduplicated investigation issue
+for the merged commit; the run, artifact, and any manual review are follow-up
+evidence, not release gates. When layout review is separately performed or
+claimed complete, inspect the matching Action artifact and exercise an owned
+preview of the exact head. A `non-layout` classification or zero-item manual
+worklist requires no human layout review.
 
 Use normal elapsed clocks for transition readiness. Missing selected panels,
 outgoing content, merely reachable servers, empty route filters and screenshots
@@ -48,6 +54,7 @@ from the reviewer's permitted scope; inaccessible evidence is explicitly blocked
 | Static design rules | Baseline debt does not increase for raw colors, direct safe-area `env()` use, undefined `--rd-*`, direct disclosure imports, or visual `:active` rules. | `npm run design:check` and `npm run test:design`. |
 | Unit tests | Changed primitives, semantics, service behavior, and modal lifecycle pass. | Smallest relevant Vitest selection, then repository checks when required. |
 | E2E | Affected routes, modal opener families, navigation, and action exceptions retain behavior across the canonical responsive matrix. | Smallest relevant Playwright selection, then the complete release matrix. |
+| Dynamic grids | Tile/card grids assign spans independently from every marked title/subtitle. Uniform row, status, and option grids reduce one column at a time until every marked label fits on one line, wrapping only when one column is still insufficient. | Pure sizing tests, shared primitive marker tests, and the all-route responsive audit. |
 | Centered modal geometry | All landscape dialogs share the safe-area rectangle; all tablet/desktop dialogs share the clamped 1100x760px frame. Reading measures may differ, outer frames may not. | Enumerated modal-state matrix, cross-family frame comparisons, `modal-geometry-stability.spec.ts`, `modal-rotation-regressions.spec.ts`, literal portrait metrics, and screenshots. |
 | Release boundary | Validation performs no deployment, HA mutation, commit, or push without separate authorization. | Completion report states what was not performed. |
 
@@ -257,9 +264,12 @@ owner. Exercise Security System
 through Home, Security and Quick Links, plus Guest Presence Security through
 both routes, and retain their portrait card dimensions.
 
-The centered frame consumes live `100dvh` minus the shared keyboard overlay
-inset. Test a synthetic keyboard contraction below 320px; the page's minimum
-height must not push close or footer controls below the visible viewport.
+The popup frame remains anchored to the layout viewport and paints behind the
+keyboard. Its internal content layout consumes the shared keyboard overlay
+inset and keeps close/footer/composer controls inside the visible region. Test
+a synthetic keyboard contraction below 320px, frozen close geometry, and an
+embedded outer-window pan; the page's minimum height must not push controls
+below the visible viewport.
 Keep synthetic viewport/capability fixtures explicitly labeled as such.
 
 For non-grid modals, assert compact landscape chrome, the measured

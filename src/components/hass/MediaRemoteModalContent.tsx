@@ -848,7 +848,7 @@ function HueSyncIntensityGrid({ entityId, label }: { entityId: string; label: st
   const { displayedState, options, selectOption, unavailable } = useHueSyncSelectControl(entityId)
 
   return (
-    <DynamicGrid ariaLabel={label} className={styles.hueSyncChoiceGrid} columns={2} fillRows={false} itemSizing="uniform" layout="bounded" maxCellWidth={260} maxColumns={2}>
+    <DynamicGrid ariaLabel={label} className={styles.hueSyncChoiceGrid} columns={2} fillRows={false} layout="bounded" maxCellWidth={260} maxColumns={2}>
       {options.map((option) => (
         <HueSyncSelectionTile
           disabled={unavailable}
@@ -949,7 +949,7 @@ function HueSyncTab({ config }: { config: MediaRemoteHueSyncConfig }) {
     <div className={styles.hueSyncStack} data-hue-sync-tab="true">
       <section className={styles.section}>
         <SectionHeader title={copy(MEDIA_COPY_KEYS.hueSync.powerAndSync)} />
-        <DynamicGrid className={styles.hueSyncToggleGrid} columns={2} fillRows={false} itemSizing="uniform" layout="bounded" maxCellWidth={260} maxColumns={2}>
+        <DynamicGrid className={styles.hueSyncToggleGrid} columns={2} fillRows={false} layout="bounded" maxCellWidth={260} maxColumns={2}>
           <HueSyncToggleTile
             entityId={config.powerEntityId}
             icon="mdi:power"
@@ -987,7 +987,7 @@ function HueSyncTab({ config }: { config: MediaRemoteHueSyncConfig }) {
 
       <section className={styles.section}>
         <SectionHeader title={copy(MEDIA_COPY_KEYS.hueSync.hdmiInput)} />
-        <DynamicGrid ariaLabel={copy(MEDIA_COPY_KEYS.hueSync.hdmiInput)} className={styles.hueSyncChoiceGrid} columns={2} fillRows={false} itemSizing="uniform" layout="bounded" maxCellWidth={260} maxColumns={2}>
+        <DynamicGrid ariaLabel={copy(MEDIA_COPY_KEYS.hueSync.hdmiInput)} className={styles.hueSyncChoiceGrid} columns={2} fillRows={false} layout="bounded" maxCellWidth={260} maxColumns={2}>
           {inputOptions.map((option, index) => (
             <HueSyncHdmiInputTile
               disabled={inputControl.unavailable}
@@ -1136,7 +1136,7 @@ function MediaRemoteModalTabContent({
             {effectiveActiveTab === 'devices' && config.devices?.length ? (
               <section className={styles.section}>
                 <SectionHeader title="Devices" />
-                <DynamicGrid className={styles.deviceGrid} columns={2} fillRows={false} itemSizing="uniform" layout="bounded" maxCellWidth={260} maxColumns={4}>
+                <DynamicGrid className={styles.deviceGrid} columns={2} fillRows={false} layout="bounded" maxCellWidth={260} maxColumns={4}>
                   {config.devices.map((device) => <DeviceButton device={device} key={device.title} />)}
                 </DynamicGrid>
               </section>

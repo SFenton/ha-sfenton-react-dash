@@ -80,19 +80,21 @@ export async function waitForModalReady(dialog: Locator, timeout = 5_000, readin
         if (!panel || !element.contains(panel)) return false
         const labels = panel.getAttribute('aria-labelledby')?.split(/\s+/) ?? []
         const rect = panel.getBoundingClientRect()
-        // Unavailable vacuum controls can contain only an empty layout wrapper.
-        const emptyVacuum = readiness === 'vacuum-tabs'
-          && Boolean(panel.closest('[data-scroll-region="vacuum-panel"]'))
+        const panelStyle = getComputedStyle(panel)
+        // Runtime-only states can leave Controls empty while their sole command remains on Actions.
+        const emptyVacuumControls = readiness === 'vacuum-tabs'
+          && Boolean(panel.closest('[data-scroll-region="vacuum-panel"][data-tab="controls"]'))
           && !panel.textContent?.trim()
           && !panel.querySelector('button, input, select, textarea, a, img, svg, canvas, video, [role="button"], [role="slider"], [role="checkbox"], [role="radio"], [role="switch"]')
-          && [...panel.querySelectorAll('*')].every((child) => child.getBoundingClientRect().height === 0)
-          && [...element.querySelectorAll('[data-tone="unavailable"]')].some((indicator) => {
-            const box = indicator.getBoundingClientRect()
-            return /^Status(?:Unavailable|Unknown)$/.test(indicator.textContent?.replace(/\s+/g, '') ?? '')
-              && box.width > 0 && box.height > 0 && getComputedStyle(indicator).visibility === 'visible'
-              && Number(getComputedStyle(indicator).opacity) > 0 && !indicator.closest('[inert], [aria-hidden="true"]')
-          })
-        return Boolean(tab.id && labels.includes(tab.id) && rect.width > 0 && (rect.height > 0 || emptyVacuum))
+        return Boolean(
+          tab.id
+          && labels.includes(tab.id)
+          && rect.width > 0
+          && (rect.height > 0 || emptyVacuumControls)
+          && panelStyle.visibility === 'visible'
+          && Number(panelStyle.opacity) > 0
+          && !panel.closest('[inert], [aria-hidden="true"]'),
+        )
       }),
     }
   }, { readiness, detail }), { timeout, message: 'Wait for actual incoming content, not merely selected-tab chrome' }).toEqual({
@@ -139,10 +141,15 @@ export async function actualCapabilities(page: AuditedDocument, browser: string,
   }
 }
 
-export async function modalFacts(dialog: Locator, expectedScrollMode: 'body' | 'panes' = 'body', terminal: 'controls' | 'chat-content' | string = 'controls') {
+export async function modalFacts(
+  dialog: Locator,
+  expectedScrollMode: 'body' | 'panes' = 'body',
+  terminal: 'controls' | 'chat-content' | string = 'controls',
+  readiness: ModalReadiness = 'tabs',
+) {
   const terminalKind = terminal === 'controls' || terminal === 'chat-content' ? terminal : 'read-only-content'
   const readOnlyTerminal = terminalKind === 'read-only-content' ? terminal : undefined
-  await waitForModalReady(dialog)
+  await waitForModalReady(dialog, undefined, readiness)
   await expect(dialog).toHaveAttribute('data-scroll-mode', expectedScrollMode)
   const body = dialog.locator('[data-modal-sheet-body]')
   const originalScroll = await body.evaluate((element) => element.scrollTop)

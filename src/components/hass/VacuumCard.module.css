@@ -438,6 +438,28 @@
   gap: 10px;
 }
 
+.runtimeControlsTransition {
+  min-width: 0;
+  opacity: 1;
+  transition: opacity 340ms linear;
+}
+
+.runtimeControlsTransition[data-vacuum-runtime-content-phase='shrink-fade'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.runtimeControlsTransition[data-vacuum-runtime-content-phase='expand-layout'],
+.runtimeControlsTransition[data-vacuum-runtime-content-phase='expand-pre-fade'],
+.runtimeControlsTransition[data-vacuum-runtime-content-phase='shrink-layout'] {
+  transition: none;
+}
+
+.runtimeControlsTransition[data-vacuum-runtime-content-phase='expand-pre-fade'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .cleanTargetSelector {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1126,7 +1148,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .leftPane,
-  .rightPane {
+  .rightPane,
+  .runtimeControlsTransition {
     transition: none;
   }
 }
