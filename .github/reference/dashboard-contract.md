@@ -26,15 +26,18 @@ full-known-mock fallback; it does not require every test for every non-layout
 change. Changed copy is layout-sensitive even when its character/word counts
 are unchanged.
 
-Actual manual Playwright interaction and image inspection remain mandatory for
-the plan's review items after merging and before deploying a layout-sensitive
-release.
-Use the post-merge `master` run's `layout-automation` artifact and an owned
-preview of the exact merged head before deployment. Captured files, tags,
-registration counts and filled review schemas are not visual judgment. Record
-missing or inaccessible evidence as blocked; never bypass access restrictions.
-Local validation is mock-only, no-proxy and provenance-bound, and grants no HA
-or deployment authority.
+Post-merge layout automation is asynchronous regression detection. Do not wait
+for its completion or artifact before building, deploying, or completing a
+release. A failed run automatically files one deduplicated investigation issue
+for the merged commit; the run, artifact, and any manual review are follow-up
+evidence, not release gates.
+
+When layout review is separately performed or its plan items are claimed
+complete, use the exact run's `layout-automation` artifact and an owned preview
+of the matching head. Captured files, tags, registration counts and filled
+review schemas are not visual judgment. Record missing or inaccessible evidence
+as blocked; never bypass access restrictions. Local validation is mock-only,
+no-proxy and provenance-bound, and grants no HA or deployment authority.
 
 ## Current Stack
 

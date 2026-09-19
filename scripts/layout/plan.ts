@@ -134,6 +134,12 @@ manufactures manual judgment. Pull requests retain the quality and full
 Playwright checks but intentionally skip automated layout. Do not rerun the
 broad automated corpus locally merely to permit an initial push.
 
+Post-merge layout automation is asynchronous regression detection. Do not wait
+for its completion or artifact before building, deploying, or completing a
+release. A failed run automatically files one deduplicated investigation issue
+for the merged commit; the run, artifact, and any manual review are follow-up
+evidence, not release gates.
+
 1. Read the current UX contract. Do not redesign its geometry or HA behavior.
 2. Run \`npm run layout:plan -- --base <resolved-master-sha> --out artifacts/layout/<run-id>/plan.json\`.
 3. Review the plan's owners, states, contexts, exclusions and blockers. Unknown new
@@ -149,10 +155,11 @@ broad automated corpus locally merely to permit an initial push.
    The external assessor blocks missing work, stale fingerprints, failed/skipped
    required checkpoints, unreviewed images and inaccessible artifacts.
 
-The full six-step workflow is the human acceptance path for layout-sensitive
-work. After merge and before deployment, inspect the \`master\` run artifact and
-exercise an owned preview of the exact merged head. A \`non-layout\` Action
-classification or a zero-item manual worklist requires no manual layout review.
+The full six-step workflow is the human acceptance path when layout review is
+separately performed or claimed complete. Inspect the matching run artifact and
+exercise an owned preview of the exact head without delaying an otherwise ready
+release. A \`non-layout\` Action classification or a zero-item manual worklist
+requires no manual layout review.
 
 To replay a completed candidate manually, use \`layout:run -- --plan <plan> --review\`.
 It reuses only fingerprint-verified build artifacts and owns a new no-proxy preview.

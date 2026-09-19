@@ -20,8 +20,11 @@ services. Keep entity IDs in constants and pages declarative.
 - Before a release push, require only changed-test policy and every changed or
   added test file locally. The protected pull-request workflow owns broad lint,
   unit, build, and full Playwright gates; the post-merge master workflow owns
-  automated layout. Human layout review for affected UX is post-push release
-  acceptance, not a pre-push gate.
+  automated layout. Post-merge layout automation is asynchronous regression
+  detection. Do not wait for its completion or artifact before building,
+  deploying, or completing a release. A failed run automatically files one
+  deduplicated investigation issue for the merged commit; the run, artifact,
+  and any manual review are follow-up evidence, not release gates.
 - Treat any request to start, run, serve, host, open, or preview the React app
   as a `/host-web-app` trigger even when LAN or `0.0.0.0` is not mentioned.
   Before handing off user-visible dashboard or UX work for operator review,
@@ -40,7 +43,8 @@ services. Keep entity IDs in constants and pages declarative.
 
 Local layout validation is mock-only and provenance-bound. It does not
 authorize live HA probes or certify production parity. Actual image inspection
-and manual interaction remain necessary for plan review items.
+and manual interaction remain necessary for plan review items only when that
+review is separately performed or claimed complete; they do not delay release.
 
 Start narrow: symbol lookup, exact source ranges, and targeted existing commands.
 Do not invoke tandem, the simulated user panel, or the autonomous admin
