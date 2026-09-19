@@ -79,14 +79,25 @@ operator-authorized release path.
    otherwise report it as pending. Do not use `gh run watch` or download the
    `layout-automation` artifact as a prerequisite to the remaining release
    steps.
+9. For a frontend-only merge accepted by `.github/workflows/deploy-dashboard.yml`,
+   wait for that exact merge SHA's **Deploy dashboard** workflow and inspect its
+   sanitized deployment receipt. This deployment wait is independent of the
+   post-merge layout workflow. Do not also build or deploy locally after the
+   automated receipt succeeds.
+10. If the automatic workflow fails closed because the cumulative deployed
+    range includes Home Assistant runtime, Home MCP, or custom-panel bridge
+    changes, use the restart-aware manual build/deploy path below. Never weaken
+    the automatic classifier merely to avoid the manual release.
 
 `master` is protected for administrators and requires the strict pull-request
 `Playwright gate`. The post-merge layout result is monitoring only. Force-push
 and branch deletion remain disabled.
 
-## Build the merged commit
+## Manual fallback: build the merged commit
 
-Build and deploy from an isolated, detached worktree at the merged
+Use this section only when the automatic frontend workflow is unavailable or
+correctly requires the restart-aware manual path. Build and deploy from an
+isolated, detached worktree at the merged
 `origin/master` commit so unrelated local changes cannot enter production.
 
 1. Resolve and record one exact temporary worktree path.

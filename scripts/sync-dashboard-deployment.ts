@@ -103,6 +103,20 @@ function argumentValue(name: string) {
   return process.argv.find((argument) => argument.startsWith(prefix))?.slice(prefix.length)
 }
 
+export function isSyncDashboardDeploymentEntry(
+  moduleUrl: string,
+  invokedPath: string | undefined,
+) {
+  if (!invokedPath) return false
+  const invokedUrl = pathToFileURL(resolve(invokedPath)).href
+  return (
+    moduleUrl === invokedUrl &&
+    /\/sync-dashboard-deployment\.(?:[cm]?[jt]s)$/.test(
+      new URL(moduleUrl).pathname,
+    )
+  )
+}
+
 async function main() {
   loadRuntimeEnvironment()
   const haUrl = process.env.VITE_HA_URL
@@ -118,8 +132,7 @@ async function main() {
   console.info(chalk.blue('sfenton-react-panel: registered embedded custom panel'))
 }
 
-const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : ''
-if (import.meta.url === invokedPath) {
+if (isSyncDashboardDeploymentEntry(import.meta.url, process.argv[1])) {
   main().catch((error: unknown) => {
     console.error(chalk.red(error instanceof Error ? error.message : String(error)))
     process.exitCode = 1

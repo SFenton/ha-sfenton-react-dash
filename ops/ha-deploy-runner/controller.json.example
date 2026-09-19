@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "repository": "SFenton/ha-sfenton-react-dash",
+  "repositoryId": 0,
+  "workflowPath": ".github/workflows/deploy-dashboard.yml",
+  "workflowSha256": "replace-with-workflow-sha256",
+  "runnerImage": "ha-sfenton-dashboard-runner:20260919",
+  "runnerImageId": "sha256:replace-with-local-image-id",
+  "mode": "smoke-only",
+  "stateDirectory": "/home/sfenton/.local/state/ha-dashboard-runner",
+  "pollSeconds": 10,
+  "assignmentTimeoutSeconds": 90,
+  "jobTimeoutSeconds": 1800,
+  "haHost": "192.168.1.22",
+  "haSshPort": 22,
+  "haApiPort": 8123
+}
