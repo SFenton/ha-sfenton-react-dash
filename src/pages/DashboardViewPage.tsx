@@ -2296,7 +2296,7 @@ function VacationChooserPage({ onNavigate }: { onNavigate: (path: string) => voi
         lastRow="fill-minimum"
         layout="bounded"
         maxCellWidth={320}
-        maxColumns={2}
+        maxColumns={3}
         role="navigation"
       >
         {items.map((item) => (
@@ -2555,7 +2555,7 @@ function SoloTripPage() {
               lastRow="fill-minimum"
               layout="bounded"
               maxCellWidth={240}
-              maxColumns={2}
+              maxColumns={3}
             >
               {([
                 [HOUSEHOLD_RESIDENT.STEPHEN, SOLO_TRIP_COPY_KEYS.editor.travelerStephen],

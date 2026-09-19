@@ -96,7 +96,7 @@ test('Vacation and Solo Trip schedule forms match in a fine-pointer desktop cont
 
   await navigateRoute(page, 'vacation')
   await page.getByRole('button', { name: /Solo Trip One traveler, one home resident/i }).click()
-  await page.getByRole('button', { name: 'Stephen', exact: true }).click()
+  await page.getByRole('button', { name: 'You', exact: true }).click()
   await page.evaluate(() => window.__mockHass?.calls.splice(0))
   await page.getByRole('switch', { name: 'Solo Trip Off' }).click()
   const soloTrip = page.getByRole('dialog', { name: 'Schedule Solo Trip' })

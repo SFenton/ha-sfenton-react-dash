@@ -3150,9 +3150,9 @@ test('chores render HA-supplied vacation lists exactly and omit empty sections o
   await expect(page.getByRole('heading', { name: 'Past Due' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'No Due Date' })).toBeVisible()
 
-  await page.getByRole('button', { name: /Stephen's Tasks/i }).click()
+  await page.getByRole('button', { name: /Your Chores/i }).click()
 
-  await expect(page.getByRole('heading', { name: "Stephen's Chores" })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Your Chores' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'No Chores Due' })).toBeVisible()
   // Vacation mode is on for this scenario, so the copy must credit vacation, not Stephen.
   await expect(page.getByText('Enjoy vacation!')).toBeVisible()
@@ -4849,7 +4849,7 @@ test('mobile SleepyPod target prompt keeps dial and active-stage stepper command
     mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
   })
 
-  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  await page.getByRole('button', { name: /Your Side Cooling/i }).click()
   const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
   const dial = bedDialog.getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
   const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
@@ -5430,7 +5430,7 @@ test('daily summary modal closes back to the home dashboard', async ({ page }) =
 test('header profile button opens the summary modal from any page', async ({ page }) => {
   await page.goto('/index.html?path=vacuums')
 
-  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary/ })
+  const profileButton = page.getByRole('button', { name: /^Open Your Summary/ })
   await expect(profileButton).toBeVisible()
   await profileButton.click()
 
@@ -5446,7 +5446,7 @@ test('header profile button opens the summary modal from any page', async ({ pag
 test('header profile button stays visible and opaque across route changes', async ({ page }) => {
   await page.goto('/index.html?path=overview')
 
-  const profileButton = page.getByRole('button', { name: /^Open .+'s Summary/ })
+  const profileButton = page.getByRole('button', { name: /^Open Your Summary/ })
   await expect(profileButton).toBeVisible()
 
   await page.getByRole('navigation', { name: 'Dashboard sections' }).getByRole('button', { name: 'Security' }).click()
@@ -5470,7 +5470,7 @@ test('daily summary empty tabs centre without scrolling the sheet', async ({ pag
     api.setEntityState('input_boolean.vacation_mode', 'on')
   })
 
-  await page.getByRole('button', { name: /^Open .+'s Summary/ }).click()
+  await page.getByRole('button', { name: /^Open Your Summary/ }).click()
   const dialog = page.getByRole('dialog')
 
   await expect(dialog.getByRole('heading', { level: 2, name: 'No Chores Due' })).toBeVisible()
@@ -5490,7 +5490,7 @@ test('daily summary keeps the last expired-food empty state centred while the se
   await page.setViewportSize({ width: 393, height: 852 })
   await page.goto('/index.html?path=overview&user=stephen')
 
-  await page.getByRole('button', { name: /^Open .+'s Summary/ }).click()
+  await page.getByRole('button', { name: /^Open Your Summary/ }).click()
   const dialog = page.getByRole('dialog')
   await dialog.getByRole('tablist', { name: 'Daily report sections' }).getByRole('tab', { name: /^Expired Food/ }).click()
 
@@ -5561,7 +5561,7 @@ test('daily summary keeps the last expired-food empty state centred while the se
 test('profile button badges overdue chores plus expired food, capped at 9+', async ({ page }) => {
   await page.goto('/index.html?path=overview')
 
-  const profile = page.getByRole('button', { name: /^Open .+'s Summary/ })
+  const profile = page.getByRole('button', { name: /^Open Your Summary/ })
   const badge = profile.locator('[data-count]')
 
   const setCounts = async (overdue: number, expired: number, upcoming: number) => {

@@ -273,7 +273,7 @@ async function openVacationConfirmation(page: Page) {
 async function openSoloTripEditor(page: Page) {
   await gotoRoute(page, 'vacation')
   await page.getByRole('button', { name: /Solo Trip One traveler, one home resident/i }).click()
-  await page.getByRole('button', { name: 'Stephen', exact: true }).click()
+  await page.getByRole('button', { name: 'You', exact: true }).click()
   await clearMockCalls(page)
   await page.getByRole('switch', { name: 'Solo Trip Off' }).click()
   const dialog = page.getByRole('dialog', { name: 'Schedule Solo Trip' })
@@ -1160,15 +1160,15 @@ test.describe('complete ModalSheet inventory acceptance', () => {
 
   test('reconciles physical ModalSheet nodes with expanded review surfaces', () => {
     expect(modalInventoryCounts()).toEqual({
-      directModalSheetJsxCallsites: 31,
-      expandedReviewRows: 33,
+      directModalSheetJsxCallsites: 32,
+      expandedReviewRows: 34,
       missingCenteredGeometryCallsites: [],
       optionPickerConsumerCallsites: EXPECTED_OPTION_PICKER_CONSUMERS,
       optionPickerSheetConsumers: 2,
       physicalCallsiteCounts: EXPECTED_PHYSICAL_MODAL_CALLSITES,
     })
-    expect(MODAL_CASES).toHaveLength(35)
-    expect(LANDSCAPE_INTENT_CASES).toHaveLength(54)
+    expect(MODAL_CASES).toHaveLength(36)
+    expect(LANDSCAPE_INTENT_CASES).toHaveLength(55)
     expect([...new Set(MODAL_CASES.map((modalCase) => modalCase.physicalCallsite))].sort()).toEqual(
       Object.keys(EXPECTED_PHYSICAL_MODAL_CALLSITES).sort(),
     )
