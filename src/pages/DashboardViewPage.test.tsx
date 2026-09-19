@@ -1715,6 +1715,34 @@ describe('DashboardViewPage', () => {
     expect(warning.parentElement).toHaveAttribute('data-settings-section-controls', 'true')
   })
 
+  it('routes SleepyPod power changes through the Hot Flash broker', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'off'
+    mockEntities['switch.nightcanvasrestful_left_power'].state = 'off'
+    try {
+      render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+      fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Off/i }))
+      const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+      fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'script',
+        service: 'sleepypod_hot_flash_broker',
+        serviceData: { action: 'power_heat', side: 'left' },
+      })
+      fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
+      expect(confirm).toHaveBeenCalledWith("Turn off Stephen's Bed?")
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'script',
+        service: 'sleepypod_hot_flash_broker',
+        serviceData: { action: 'power_off', side: 'left' },
+      })
+    } finally {
+      confirm.mockRestore()
+    }
+  })
+
   it.each([
     ['off', 'off'],
     ['on', 'off'],
@@ -6563,10 +6591,10 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Open Front Door camera' })).toBeInTheDocument()
     const securityGrid = screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-dynamic-grid="true"]')
     const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
-    expect(securityGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    expect(securityGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
-    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     expect(screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-responsive-section-item="true"]')).toHaveAttribute('data-span', 'full')

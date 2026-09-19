@@ -2913,6 +2913,13 @@ interface BedTemperatureScopeRequest {
   value: number
 }
 
+type CommitBedTemperatureIntent = (
+  value: number,
+  phase: SleepypodSchedulePhase,
+  returnFocus: HTMLElement | null,
+  sendCurrentTarget: boolean,
+) => boolean
+
 interface EightSleepAlarmEditorDraft {
   days: FreeSleepAlarmDay[]
   editingId: string | null
@@ -2951,6 +2958,7 @@ const FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID = 'sensor.nightcanvasrestful_schedule
 const FREE_SLEEP_SCHEDULE_SET_TOPIC = 'free-sleep/NightCanvasRestful/schedules/set'
 const SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID = 'sensor.master_bedroom_sleepypod_eight_pod_schedules'
 const SLEEPYPOD_SCHEDULE_SET_TOPIC = 'sleepypod/eight-pod/cmd/set-schedules'
+const SLEEPYPOD_HOT_FLASH_BROKER_SERVICE = 'sleepypod_hot_flash_broker'
 const FREE_SLEEP_BEDTIME_SET_TOPIC_PREFIX = 'free-sleep/NightCanvasRestful'
 const FREE_SLEEP_ALARM_DEBUG_TOPIC = 'free-sleep/NightCanvasRestful/debug/react-dash/alarm'
 const FREE_SLEEP_ALARM_DIAGNOSTICS_STORAGE_KEY = 'freeSleepAlarmDiagnostics'
@@ -3812,11 +3820,11 @@ function ThermostatDial({ actionOverride, entityId, inactiveOverride, interactiv
 
 function EightSleepThermostatHero({
   modalState,
-  onRequestTemperatureScope,
+  onCommitTemperatureIntent,
   side,
 }: {
   modalState: EightSleepBedModalState
-  onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
+  onCommitTemperatureIntent?: CommitBedTemperatureIntent
   side: EightSleepSideConfig
 }) {
   const sleepypodCopy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
@@ -3837,7 +3845,12 @@ function EightSleepThermostatHero({
   const [optimisticTargetValue, commitHeroTargetValue, cancelHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const displayedTargetValue = modalState.hotFlashActive ? sourceTargetValue : dragValue ?? optimisticTargetValue
   const scopedSleepypodTarget = controlMode === 'climate' && targetScale === 'level'
-  const canSetTarget = sideAvailable && controlsSideOn && !modalState.hotFlashActive && displayedTargetValue !== null && (!scopedSleepypodTarget || schedulePhaseAvailable)
+  const canSetTarget = sideAvailable
+    && controlsSideOn
+    && !modalState.hotFlashActive
+    && displayedTargetValue !== null
+    && (!scopedSleepypodTarget || schedulePhaseAvailable)
+    && (!scopedSleepypodTarget || !activeSchedulePhase || Boolean(onCommitTemperatureIntent))
   const [previousCanSetTarget, setPreviousCanSetTarget] = useState(canSetTarget)
   if (previousCanSetTarget !== canSetTarget) {
     setPreviousCanSetTarget(canSetTarget)
@@ -3962,17 +3975,18 @@ function EightSleepThermostatHero({
       if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
       targetSyncTimerRef.current = null
       pendingTargetValueRef.current = null
+      const accepted = onCommitTemperatureIntent?.(
+        clampedValue,
+        activeSchedulePhase,
+        targetSliderRef.current,
+        shouldSendTargetCommand,
+      ) ?? false
+      if (!accepted) return
       if (shouldSendTargetCommand) {
         pendingTargetCommandRef.current = { liveValue: liveTargetValue, value: clampedValue }
         commitHeroTargetValue(clampedValue)
         commitTargetTemperature(clampedValue)
-        callService({
-          domain: 'script',
-          service: sleepypodTonightTemperatureService(side.scheduleSide),
-          serviceData: { level: clampedValue },
-        })
       }
-      onRequestTemperatureScope?.(clampedValue, activeSchedulePhase, targetSliderRef.current)
       return
     }
     if (!shouldSendTargetCommand) return
@@ -4100,7 +4114,7 @@ function EightSleepThermostatHero({
     if (!controlsSideOnRef.current) {
       controlsSideOnRef.current = true
       commitDisplaySideOn(true)
-      if (controlMode === 'climate' && side.climateEntityId) callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'heat' } })
+      if (controlMode === 'climate') callService({ domain: 'script', service: SLEEPYPOD_HOT_FLASH_BROKER_SERVICE, serviceData: { action: 'power_heat', side: side.scheduleSide } })
       else callService({ domain: 'switch', service: 'turn_on', target: side.powerSwitchEntityId })
       return
     }
@@ -4109,7 +4123,7 @@ function EightSleepThermostatHero({
     controlsSideOnRef.current = false
     setDragValue(null)
     commitDisplaySideOn(false)
-    if (controlMode === 'climate' && side.climateEntityId) callService({ domain: 'climate', service: 'set_hvac_mode', target: side.climateEntityId, serviceData: { hvac_mode: 'off' } })
+    if (controlMode === 'climate') callService({ domain: 'script', service: SLEEPYPOD_HOT_FLASH_BROKER_SERVICE, serviceData: { action: 'power_off', side: side.scheduleSide } })
     else callService({ domain: 'switch', service: 'turn_off', target: side.powerSwitchEntityId })
   }
 
@@ -4216,7 +4230,15 @@ function EightSleepAwayModeCard({ side }: { side: EightSleepSideConfig }) {
   )
 }
 
-function EightSleepScheduleSection({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
+function EightSleepScheduleSection({
+  modalState,
+  onCommitTemperatureIntent,
+  side,
+}: {
+  modalState: EightSleepBedModalState
+  onCommitTemperatureIntent?: CommitBedTemperatureIntent
+  side: EightSleepSideConfig
+}) {
   const scheduleEntityId = modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID : FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID
   const scheduleSetTopic = modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SET_TOPIC : undefined
 
@@ -4231,6 +4253,10 @@ function EightSleepScheduleSection({ modalState, side }: { modalState: EightSlee
             icon={stage.icon}
             key={stage.key}
             label={stage.label}
+            activeSchedulePhase={modalState.activeSchedulePhase}
+            onCommitTemperatureIntent={modalState.controlMode === 'climate' && modalState.targetScale === 'level'
+              ? onCommitTemperatureIntent
+              : undefined}
             scheduleEntityId={scheduleEntityId}
             scheduleSetTopic={scheduleSetTopic}
             side={side}
@@ -4846,20 +4872,24 @@ function EightSleepAlarmDayPage({
 }
 
 function EightSleepScheduleTemperatureControl({
+  activeSchedulePhase,
   entityId,
   fallbackTemperature,
   icon,
   label,
+  onCommitTemperatureIntent,
   scheduleEntityId,
   scheduleSetTopic,
   side,
   sideTitle,
   stageKey,
 }: {
+  activeSchedulePhase: SleepypodSchedulePhase | null
   entityId: string
   fallbackTemperature: number | null
   icon: string
   label: string
+  onCommitTemperatureIntent?: CommitBedTemperatureIntent
   scheduleEntityId: string
   scheduleSetTopic?: string
   side: EightSleepSideConfig
@@ -4871,7 +4901,11 @@ function EightSleepScheduleTemperatureControl({
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const callService = useCallService()
   const valueSyncTimerRef = useRef<number | null>(null)
-  const pendingValueRef = useRef<number | null>(null)
+  const pendingValueRef = useRef<{
+    returnFocus: HTMLElement | null
+    scopedPhase: SleepypodSchedulePhase | null
+    value: number
+  } | null>(null)
   const unavailable = !entity || entity.state === 'unavailable'
   const liveValue = unavailable ? null : numberValue(entity.state)
   const min = numberValue(entity?.attributes.min) ?? FREE_SLEEP_TARGET_MIN
@@ -4891,14 +4925,23 @@ function EightSleepScheduleTemperatureControl({
     if (valueSyncTimerRef.current !== null) window.clearTimeout(valueSyncTimerRef.current)
   }, [])
 
-  const queueValueSync = (nextValue: number) => {
-    pendingValueRef.current = nextValue
+  const queueValueSync = (nextValue: number, returnFocus: HTMLElement | null) => {
+    pendingValueRef.current = {
+      returnFocus,
+      scopedPhase: activeSchedulePhase === stageKey ? activeSchedulePhase : null,
+      value: nextValue,
+    }
     if (valueSyncTimerRef.current !== null) window.clearTimeout(valueSyncTimerRef.current)
     valueSyncTimerRef.current = window.setTimeout(() => {
-      const pendingValue = pendingValueRef.current
+      const pending = pendingValueRef.current
       pendingValueRef.current = null
       valueSyncTimerRef.current = null
-      if (pendingValue === null) return
+      if (!pending) return
+      if (pending.scopedPhase) {
+        onCommitTemperatureIntent?.(pending.value, pending.scopedPhase, pending.returnFocus, true)
+        return
+      }
+      const pendingValue = pending.value
       callService({ domain: entityId.split('.')[0], service: 'set_value', target: entityId, serviceData: { value: pendingValue } })
       if (scheduleSetTopic) {
         const levels = Object.fromEntries(FREE_SLEEP_SCHEDULE_STAGES.map((stage) => {
@@ -4925,7 +4968,7 @@ function EightSleepScheduleTemperatureControl({
     const nextValue = snapNumberToStep(currentValue + delta, min, max, step)
     baseValueRef.current = nextValue
     commitDisplayValue(nextValue)
-    queueValueSync(nextValue)
+    queueValueSync(nextValue, document.activeElement instanceof HTMLElement ? document.activeElement : null)
   }
 
   return (
@@ -5153,7 +5196,16 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
     else closeDetailPage()
   }
 
-  const requestTemperatureScope = (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => {
+  const commitTemperatureIntent: CommitBedTemperatureIntent = (value, phase, returnFocus, sendCurrentTarget) => {
+    const current = scopeCommandStateRef.current
+    if (!current.sideAvailable || current.activeSchedulePhase !== phase) return false
+    if (sendCurrentTarget) {
+      callService({
+        domain: 'script',
+        service: sleepypodTonightTemperatureService(side.scheduleSide),
+        serviceData: { level: value },
+      })
+    }
     setScopeRequest({
       open: true,
       phase,
@@ -5161,6 +5213,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
       targetText: formatBedTargetValue(value, modalState),
       value,
     })
+    return true
   }
 
   const chooseTemperatureScope = (scope: SleepypodTemperatureScope) => {
@@ -5231,7 +5284,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
             onEditAlarm={openAlarmEditor}
             onOpenAlarmDay={openAlarmDay}
             onPanelElementChange={setAlarmPanelElement}
-            onRequestTemperatureScope={requestTemperatureScope}
+            onCommitTemperatureIntent={commitTemperatureIntent}
             side={side}
             tabs={tabs}
             wakeLightConfig={wakeLightConfig}
@@ -5242,7 +5295,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
             alarmPage={null}
             modalState={modalState}
             onPanelElementChange={setAlarmPanelElement}
-            onRequestTemperatureScope={requestTemperatureScope}
+            onCommitTemperatureIntent={commitTemperatureIntent}
             side={side}
             tabs={tabs}
           />
@@ -5318,7 +5371,7 @@ interface EightSleepBedModalContentProps {
   onEditAlarm?: (alarm: FreeSleepAlarmRecord) => void
   onOpenAlarmDay?: (day: FreeSleepAlarmDay) => void
   onPanelElementChange?: (element: HTMLDivElement | null) => void
-  onRequestTemperatureScope?: (value: number, phase: SleepypodSchedulePhase, returnFocus: HTMLElement | null) => void
+  onCommitTemperatureIntent?: CommitBedTemperatureIntent
   side: EightSleepSideConfig
   tabs?: typeof EIGHT_SLEEP_MODAL_TABS
   wakeLightConfig?: WakeLightConfig
@@ -5338,7 +5391,7 @@ function EightSleepBedModalContentView({
   onEditAlarm,
   onOpenAlarmDay,
   onPanelElementChange,
-  onRequestTemperatureScope,
+  onCommitTemperatureIntent,
   side,
   tabs,
   wakeLightConfig,
@@ -5448,7 +5501,7 @@ function EightSleepBedModalContentView({
     <div className={`${styles.thermostatModalBody} ${styles.eightSleepModalBody}`} data-layout="eight-sleep-modal-body" ref={modalBodyRef}>
       <div className={styles.eightSleepHeroColumn} data-scroll-region="eight-sleep-hero-column">
         <div className={`${styles.eightSleepModalHeroShell} ${styles.thermostatModalDialShell}`} data-section="eight-sleep-hero" data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
-          <EightSleepThermostatHero modalState={modalState} onRequestTemperatureScope={onRequestTemperatureScope} side={side} />
+          <EightSleepThermostatHero modalState={modalState} onCommitTemperatureIntent={onCommitTemperatureIntent} side={side} />
         </div>
         <SleepypodActiveAlarmSection
           side={side.scheduleSide}
@@ -5476,7 +5529,13 @@ function EightSleepBedModalContentView({
             <InlineAlert>Bed controls are unavailable. No changes can be made until the active bed connection recovers.</InlineAlert>
           </section>
         )}
-        {modalState.sideAvailable && effectiveActiveTab === 'schedule' && <EightSleepScheduleSection modalState={modalState} side={side} />}
+        {modalState.sideAvailable && effectiveActiveTab === 'schedule' && (
+          <EightSleepScheduleSection
+            modalState={modalState}
+            onCommitTemperatureIntent={onCommitTemperatureIntent}
+            side={side}
+          />
+        )}
         {modalState.sideAvailable && effectiveActiveTab === 'modes' && (
           <section className={styles.section}>
             <SectionHeader title="Special Modes" />

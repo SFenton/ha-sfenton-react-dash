@@ -214,7 +214,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
     <>
       <ResponsiveSectionGrid className={styles.dashboard} gap={20}>
         <Section className={styles.section} span="full" title={copy('sections.security')}>
-          <DynamicGrid className={styles.grid} columns={2} fillRows={false} layout="fill" maxCellWidth={280} maxColumns={4}>
+          <DynamicGrid className={styles.grid} columns={2} fillRows={false} itemSizing="fixed" layout="fill" maxCellWidth={280} maxColumns={4}>
             {SECURITY_CONTROL_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
           </DynamicGrid>
         </Section>
@@ -226,14 +226,14 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
         )}
 
         <Section className={styles.section} span="full" title={copy('sections.cameras')}>
-          <DynamicGrid className={styles.cameraGrid} columns={2} fillRows={false} layout="fill" maxCellWidth={280} maxColumns={4}>
+          <DynamicGrid className={styles.cameraGrid} columns={2} fillRows={false} itemSizing="fixed" layout="fill" maxCellWidth={280} maxColumns={4}>
             {CAMERA_ITEMS.map((camera) => <CameraTile camera={camera} key={camera.entityId} live={!preload} onOpen={onOpenHash} />)}
           </DynamicGrid>
         </Section>
 
         {SHOW_MACHE_SECTION && (
           <Section className={styles.section} title={copy('sections.vehicle')}>
-            <DynamicGrid className={styles.grid} columns={2} fillRows={false} layout="fill" maxCellWidth={280} maxColumns={4}>
+            <DynamicGrid className={styles.grid} columns={2} fillRows={false} itemSizing="fixed" layout="fill" maxCellWidth={280} maxColumns={4}>
               {SECURITY_MACHE_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
             </DynamicGrid>
           </Section>
