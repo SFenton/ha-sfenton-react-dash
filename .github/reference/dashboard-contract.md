@@ -258,6 +258,10 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 - Entity-aware components should be reusable and typed narrowly enough to prevent invalid service calls where practical.
 - Avoid hard-coded UI state if the corresponding Home Assistant entity state is available.
 - Keep entity IDs and route/page configuration in constants rather than scattering strings across components.
+- For SleepyPod capability or protocol decisions, read the Pod's `/api/system/version`
+  endpoint and inspect that exact revision in the deployed fork. Public upstream
+  is comparison evidence only and must not be treated as the deployed capability
+  surface.
 
 ## Home Assistant Sidebar Wrapper
 
