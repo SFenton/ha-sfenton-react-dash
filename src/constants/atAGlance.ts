@@ -95,6 +95,7 @@ export interface EntityButtonConfig {
   entityId: string
   colorEntityId?: string
   contactCount?: number
+  resident?: import('./householdResidents').HouseholdResident
   tone?: 'light' | 'climate' | 'security' | 'presence' | 'contact' | 'neutral'
 }
 
@@ -365,8 +366,8 @@ export const LIGHT_GROUPS: EntityGroupConfig[] = [
       { title: 'Window Light', entityId: 'light.master_bedroom_window_light', tone: 'light' },
       { title: 'Bathroom Light', entityId: 'light.master_bedroom_bathroom_light', tone: 'light' },
       { title: 'Door Light', entityId: 'light.master_bedroom_door_light', tone: 'light' },
-      { title: 'Stephen Nightstand', entityId: 'light.stephen_nightstand_light', tone: 'light' },
-      { title: 'Steph Nightstand', entityId: 'light.steph_nightstand_light', tone: 'light' },
+      { title: 'Stephen Nightstand', entityId: 'light.stephen_nightstand_light', resident: 'stephen', tone: 'light' },
+      { title: 'Steph Nightstand', entityId: 'light.steph_nightstand_light', resident: 'steph', tone: 'light' },
       { title: 'Closet Light', entityId: 'light.master_bedroom_closet_light', tone: 'light' },
     ],
   },

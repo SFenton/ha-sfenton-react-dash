@@ -37,7 +37,7 @@ import {
   type ValetudoMapEditorMeta,
   type ValetudoMapProvenance,
 } from './ValetudoMapCard'
-import { VacuumOutcomeDetail, VacuumOutcomeOverview } from './VacuumOutcomes'
+import { VacuumOutcomeDetail, VacuumOutcomeOverview, VacuumOutcomeProtocolNotice } from './VacuumOutcomes'
 import { vacuumWhileAwayPresentation, type VacuumOutcomeContract, type VacuumWhileAwayPresentation } from './vacuumOutcomes'
 import {
   nativeVacuumIssue,
@@ -1774,8 +1774,11 @@ function VacuumWhileAwaySection({
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
 
   if (presentation.kind === 'empty') return null
-  if (presentation.kind === 'typed' && onOpenOutcomes) {
+  if (presentation.kind === 'typed') {
     return <VacuumOutcomeOverview contract={presentation.contract} onOpen={onOpenOutcomes} vacuum={vacuum} />
+  }
+  if (presentation.kind === 'incomplete' || presentation.kind === 'malformed' || presentation.kind === 'incompatible') {
+    return <VacuumOutcomeProtocolNotice presentation={presentation} vacuum={vacuum} />
   }
   const cleaned = presentation.cleaned
   const issues = presentation.issues

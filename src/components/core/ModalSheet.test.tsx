@@ -121,17 +121,25 @@ describe('ModalSheet mounted orientation', () => {
 })
 
 describe('ModalSheet', () => {
-  it('arms keyboard geometry before a modal text input receives focus', () => {
+  it('arms keyboard geometry before a modal text input receives focus', async () => {
     render(
       <ModalSheet onClose={() => undefined} open title="Keyboard controls">
         <input aria-label="Modal text" />
       </ModalSheet>,
     )
 
-    fireEvent.pointerDown(screen.getByRole('textbox', { name: 'Modal text' }))
+    const input = screen.getByRole('textbox', { name: 'Modal text' })
+    fireEvent.pointerDown(input)
 
     expect(document.documentElement).toHaveAttribute('data-dashboard-kb-arming', 'true')
-    expect(screen.getByRole('textbox', { name: 'Modal text' })).toHaveFocus()
+    expect(input).toHaveFocus()
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('data-keyboard-lift-ready')
+    fireEvent.pointerUp(input)
+    await waitFor(() => expect(screen.getByRole('dialog')).toHaveAttribute('data-keyboard-lift-ready', 'true'))
+    fireEvent.blur(input)
+
+    fireEvent.pointerDown(input)
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('data-keyboard-lift-ready')
     clearDashboardKeyboardPrediction()
   })
 
@@ -448,8 +456,11 @@ describe('ModalSheet', () => {
     expect(modalSheetCss).toMatch(/\.backdropScrim\s*\{[^}]*inset:\s*0;[^}]*background:\s*var\(--color-modal-overlay\);/s)
     expect(modalSheetCss).toContain('background: var(--modal-surface-backing, var(--color-modal-surface))')
     expect(modalSheetCss).toMatch(/\.content,\s*\.backdropGeometryProxy\s*\{[^}]*height:\s*var\(--modal-mobile-height,\s*90dvh\);[^}]*max-height:\s*min\(\s*var\(--modal-mobile-max-height,\s*90dvh\),[^}]*--dashboard-viewport-height[^}]*--rd-safe-top/s)
-    expect(modalSheetCss).toMatch(/data-dashboard-kb-arming='true'[^}]*\.contentLayout,[\s\S]*data-dashboard-keyboard='open'[^}]*\.contentLayout,[\s\S]*data-closing='true'[^}]*\.contentLayout\s*\{[^}]*transition:\s*padding-bottom 300ms cubic-bezier\(\.32,\s*\.72,\s*0,\s*1\);/s)
-    expect(modalSheetCss).toMatch(/data-dashboard-keyboard='open'[^}]*\.contentLayout,\s*\.content\[data-closing='true'\] \.contentLayout\s*\{[^}]*box-sizing:\s*border-box;[^}]*padding-bottom:\s*var\(--modal-keyboard-inset\);/s)
+    expect(modalSheetCss).toMatch(/\.contentLayout\s*\{[^}]*transition:\s*padding-bottom 320ms cubic-bezier\(\.32,\s*\.72,\s*0,\s*1\);/s)
+    expect(modalSheetCss).toMatch(/\.content\[data-keyboard-lift-ready='true'\] \.navigation,[\s\S]*data-dashboard-keyboard='open'[^}]*\.footer\s*\{[^}]*transition:\s*padding-bottom 320ms cubic-bezier\(\.32,\s*\.72,\s*0,\s*1\);/s)
+    expect(modalSheetCss).toMatch(/data-dashboard-keyboard='open'[^}]*\.content:not\(\[data-closing='true'\]\),[\s\S]*data-dashboard-kb-arming='true'[^}]*\.content:not\(\[data-closing='true'\]\)\s*\{[^}]*--drawer-swipe-movement-y:\s*0px !important;[^}]*transform:\s*translate3d\(0,\s*0,\s*0\) !important;/s)
+    expect(modalSheetCss).toMatch(/data-dashboard-kb-arming='true'\]:not\(\[data-dashboard-kb-masked='true'\]\)[^}]*\.content\[data-keyboard-lift-ready='true'\]\s*\{[^}]*--modal-keyboard-inset:\s*var\(--dashboard-keyboard-predicted-inset,\s*0px\);/s)
+    expect(modalSheetCss).toMatch(/data-dashboard-kb-arming='true'\]:not\(\[data-dashboard-kb-masked='true'\]\)[^}]*\.content\[data-keyboard-lift-ready='true'\] \.contentLayout,[\s\S]*data-dashboard-keyboard='open'[^}]*\.contentLayout,\s*\.content\[data-closing='true'\] \.contentLayout\s*\{[^}]*box-sizing:\s*border-box;[^}]*padding-bottom:\s*var\(--modal-keyboard-inset\);/s)
     expect(modalSheetCss).toMatch(/\.overlay\[data-exposed-backdrop-bands='true'\]\[data-modal-presentation='landscape-dialog'\]\s*\{[^}]*-webkit-backdrop-filter:\s*var\(--blur-modal\);\s*backdrop-filter:\s*var\(--blur-modal\);/s)
     expect(modalSheetCss).toMatch(/margin-bottom:\s*calc\(-1 \* var\(--modal-backdrop-band-overlap\)\);[\s\S]*top:\s*var\(--modal-backdrop-band-overlap\);/)
     expect(tokensCss).toMatch(/--color-modal-surface:\s*rgba\(24,\s*24,\s*24,\s*0\.97\);/)

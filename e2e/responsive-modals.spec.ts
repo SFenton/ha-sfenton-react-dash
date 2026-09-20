@@ -548,7 +548,7 @@ test('phone landscape uses one outer frame with size-appropriate centered conten
       open: async () => {
         await page.goto('/index.html?path=overview&user=stephen#daily-report')
         await setSafeAreaInsets(page, insets)
-        return page.getByRole('dialog', { name: "Stephen's Summary" })
+        return page.getByRole('dialog', { name: "Your Summary" })
       },
     },
     {
@@ -709,7 +709,7 @@ test('Daily Summary uses compact type and responsive chore and expired-food grid
       window.location.hash = '#daily-report'
     })
 
-    const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+    const dialog = page.getByRole('dialog', { name: "Your Summary" })
     await waitForModalReady(dialog)
     await expect(dialog).toHaveAttribute('data-modal-body-tier', profile.tier)
     await expect(dialog).toHaveAttribute(
@@ -1303,7 +1303,7 @@ test('other workspace modals use body scrolling when short and named pane scroll
     {
       open: async () => {
         await page.goto('/index.html?path=master-bedroom')
-        await page.getByRole('button', { name: /Stephen's Bed/i }).click()
+        await page.getByRole('button', { name: /Your Side/i }).click()
       },
       pane: 'eight-sleep-panel',
     },

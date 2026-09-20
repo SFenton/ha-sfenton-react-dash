@@ -8,6 +8,8 @@ import {
   HOME_PANTRY_ROUTE_PATH,
   HOME_RECIPES_ROUTE_PATH,
   HOME_SPICE_RACK_ROUTE_PATH,
+  SOLO_TRIP_ROUTE_PATH,
+  VACATION_MODE_ROUTE_PATH,
 } from './routes'
 
 export type PageMeasure = 'dashboard' | 'media' | 'reading'
@@ -33,6 +35,8 @@ const READING_MEASURE_PATHS = new Set([
   'to-do',
   'unassigned-chores',
   'vacation',
+  SOLO_TRIP_ROUTE_PATH,
+  VACATION_MODE_ROUTE_PATH,
 ])
 
 const MEDIA_MEASURE_PATHS = new Set([

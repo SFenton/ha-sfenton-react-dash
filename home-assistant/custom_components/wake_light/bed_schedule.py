@@ -59,6 +59,17 @@ def alarm_ids(
     )
 
 
+def matching_alarm_count(
+    attributes: Mapping[str, Any], side: str, weekday: str, local_time: str,
+) -> int:
+    """Return the total number of existing alarms at one side/day/time."""
+    return sum(
+        1
+        for alarm in _day_alarms(attributes, side, weekday)
+        if alarm.get("time") == local_time
+    )
+
+
 def matching_alarm_ids(
     attributes: Mapping[str, Any], side: str, weekday: str, local_time: str,
 ) -> tuple[int, ...]:

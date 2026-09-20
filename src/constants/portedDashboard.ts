@@ -2,6 +2,7 @@ import type { CardColor } from '../components/core/Card'
 import { MASTER_BEDROOM_HUMIDIFIER } from './humidifiers'
 import { copy, PAGE_FOOD_COPY_KEYS, PAGE_FOOD_COPY_NAMESPACE } from '../i18n'
 import type { OptimisticActionMetadata } from './actionIntents'
+import { HOUSEHOLD_RESIDENT, HOUSEHOLD_RESIDENTS, type HouseholdResident } from './householdResidents'
 
 export type EntityBasicAction =
   | { type: 'navigate'; path: string }
@@ -78,6 +79,7 @@ export interface TodoPageConfig {
   hideListHeaders?: boolean
   showEmptyStateWhenEmpty?: boolean
   taskSource?: 'donetick'
+  resident?: HouseholdResident
 }
 
 export interface VacationChecklistItemConfig {
@@ -91,6 +93,7 @@ export interface ChoreQuickLinkConfig {
   icon: string
   color: CardColor
   countType?: 'groceries' | 'tasks'
+  resident?: HouseholdResident
 }
 
 export interface VacuumConfig {
@@ -188,14 +191,14 @@ export const SWITCH_ACTIVE_COLOR: CardColor = { r: 67, g: 160, b: 71 }
 export const CHORE_BLUE: CardColor = { r: 0, g: 154, b: 199 }
 
 export const CHORE_USER_IDS = {
-  stephen: '64089b5683944c39b4f944c8f76830b0',
-  steph: '43cb71bbd1cb4860b2a7de4c829020f0',
+  stephen: HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPHEN].haUserId,
+  steph: HOUSEHOLD_RESIDENTS[HOUSEHOLD_RESIDENT.STEPH].haUserId,
 } as const
 
 export const CHORE_QUICK_LINKS: ChoreQuickLinkConfig[] = [
   { title: 'Groceries', path: 'groceries', icon: 'mdi:clipboard-list', color: { r: 155, g: 67, b: 72 }, countType: 'groceries' },
-  { title: "Stephen's Tasks", path: 'stephens-chores', icon: 'mdi:clipboard-list', color: { r: 0, g: 96, b: 120 } },
-  { title: "Steph's Tasks", path: 'stephs-chores', icon: 'mdi:clipboard-list', color: { r: 212, g: 108, b: 0 } },
+  { title: "Stephen's Tasks", path: 'stephens-chores', icon: 'mdi:clipboard-list', color: { r: 0, g: 96, b: 120 }, resident: HOUSEHOLD_RESIDENT.STEPHEN },
+  { title: "Steph's Tasks", path: 'stephs-chores', icon: 'mdi:clipboard-list', color: { r: 212, g: 108, b: 0 }, resident: HOUSEHOLD_RESIDENT.STEPH },
   { title: 'Unassigned Tasks', path: 'unassigned-chores', icon: 'mdi:clipboard-list', color: { r: 81, g: 58, b: 126 } },
   { title: 'Home Tasks', path: 'home-improvement-chores', icon: 'mdi:clipboard-list', color: { r: 64, g: 143, b: 154 } },
 ]
@@ -459,6 +462,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyTitle: 'No Chores Due',
     emptyDescription: 'Stephen has no chores due- nice job!',
     hiddenByVacation: true,
+    resident: HOUSEHOLD_RESIDENT.STEPHEN,
     taskSource: 'donetick',
     lists: [
       { title: 'Past Due', entityId: 'todo.stephen_s_past_due', countBucket: 'overdue' },
@@ -472,6 +476,7 @@ export const TODO_PAGES: Record<string, TodoPageConfig> = {
     emptyTitle: 'No Chores Due',
     emptyDescription: 'Steph has no chores due- nice job!',
     hiddenByVacation: true,
+    resident: HOUSEHOLD_RESIDENT.STEPH,
     taskSource: 'donetick',
     lists: [
       { title: 'Past Due', entityId: 'todo.steph_s_past_due', countBucket: 'overdue' },

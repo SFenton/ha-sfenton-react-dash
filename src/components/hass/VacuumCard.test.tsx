@@ -4,6 +4,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { VACUUMS } from '../../constants/portedDashboard'
+import {
+  EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD,
+  FUTURE_VACUUM_OUTCOME_PAYLOAD,
+  MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+} from '../../test/fixtures/vacuumOutcomes'
 import { mockEntities, mockCallServiceCalls, resetMockHass, setMockCallServiceOutcome, setMockEntityState } from '../../test/mocks/hakitCoreState'
 import { VACUUM_COMMAND_NONE, VACUUM_COMMAND_NORMAL, VACUUM_COMMAND_RESTRICTED } from './vacuumStatus'
 import { VacuumRoomSourceModalContent } from './VacuumCard'
@@ -142,6 +147,38 @@ describe('VacuumRoomSourceModalContent', () => {
     expect(within(controlsPane).getByRole('combobox', { name: /Mode Vacuum/i })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('combobox', { name: /Fan Balanced/i })).toBeInTheDocument()
     expect(within(controlsPane).getByRole('heading', { name: 'Power Settings' })).toBeInTheDocument()
+  })
+
+  it('uses a supported v2 outcome instead of its misleading legacy issue strings', () => {
+    mockEntities[mainFloorVacuum.coordinatorSessionEntityId].attributes = {
+      ...MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: structuredClone(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD),
+    }
+
+    renderMainFloorRoomSource()
+
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
+    expect(document.querySelector('[data-action-kind="state"][data-icon="mdi:help-circle-outline"]')).toHaveTextContent(
+      /Sep 17, 2026\s*1 Room Unverified • 1 Room Needs Attention/,
+    )
+    expect(screen.queryByText(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])).not.toBeInTheDocument()
+    expect(screen.queryByRole('note', { name: 'Issues' })).not.toBeInTheDocument()
+  })
+
+  it('shows an incompatible report state while keeping legacy strings collapsed', () => {
+    mockEntities[mainFloorVacuum.coordinatorSessionEntityId].attributes = {
+      ...MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: structuredClone(FUTURE_VACUUM_OUTCOME_PAYLOAD),
+    }
+
+    renderMainFloorRoomSource()
+
+    expect(screen.getByText('Dashboard Update Required')).toBeInTheDocument()
+    expect(screen.getByText('This cleaning report uses an unsupported version.')).toBeInTheDocument()
+    expect(screen.getByText(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])).not.toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Show Main Floor Unstructured Report Details' }))
+    expect(screen.getByText(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])).toBeVisible()
+    expect(mockCallServiceCalls).toEqual([])
   })
 
   it('switches to minimal tabs, hides setup and power controls, and preserves runtime actions', () => {

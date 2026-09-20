@@ -1,3 +1,4 @@
+// @covers src/components/core/ModalSheet.module.css
 import { expect, test, type CDPSession, type Locator, type Page } from './layout/fixture'
 import { globalQuickLinksAction, selectQuickLinksTab } from './quick-links'
 
@@ -58,7 +59,7 @@ async function openSleepypodScopePrompt(page: Page) {
     mock.setEntityState('number.master_bedroom_sleepypod_eight_pod_left_target_level', '-2')
     mock.setEntityState('sensor.sleepypod_stephen_schedule_phase', 'bedtime')
   })
-  await page.getByRole('button', { name: /Stephen's Bed Cooling/i }).click()
+  await page.getByRole('button', { name: /Your Side Cooling/i }).click()
   const bedDialog = page.getByRole('dialog', { name: "Stephen's Bed" })
   const targetSlider = bedDialog.getByRole('slider', { name: "Stephen's Bed target level" })
   await targetSlider.press('ArrowLeft')
@@ -619,10 +620,16 @@ test.describe('mobile ModalSheet gestures', () => {
     const quickLinksBox = await quickLinks.boundingBox()
     if (!quickLinksBox) throw new Error('Quick Links opener was not measurable during modal exit')
     await page.mouse.click(quickLinksBox.x + quickLinksBox.width / 2, quickLinksBox.y + quickLinksBox.height / 2)
+    const quickLinksTab = page.getByRole('tab', { name: 'Quick Links', exact: true })
+    await expect.poll(() => quickLinksTab.evaluate((element) => {
+      const rect = element.getBoundingClientRect()
+      const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
+      return hit === element || element.contains(hit)
+    })).toBe(true)
+    expect(Date.now() - closeStartedAt).toBeLessThan(700)
     await selectQuickLinksTab(page)
     const quickLinksDialog = page.getByRole('dialog', { name: 'Quick Links' })
     await expect(quickLinksDialog).toBeVisible()
-    expect(Date.now() - closeStartedAt).toBeLessThan(700)
     await quickLinksDialog.getByRole('button', { name: 'Rooms' }).click()
     await expect(dialog).toHaveAttribute('data-state', 'open')
     await expect.poll(async () => Math.abs(await translateY(dialog))).toBeLessThanOrEqual(1)

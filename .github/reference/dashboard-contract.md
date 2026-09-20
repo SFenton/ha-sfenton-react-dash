@@ -15,26 +15,39 @@ Every UX change must satisfy the canonical viewport, resize, state, modal,
 fine-pointer desktop, preload-I/O, and mobile-baseline gates in
 `docs/ux/validation-matrix.md`.
 
-Start with `docs/ux/layouts.md` and the executable layout plan. Resolve a clean
-base commit and an explicit working tree; never substitute a stale/dirty checkout
-or an already-running unowned server. The post-merge `master` workflow runs `layout:check`, `layout:plan`,
-`layout:run`, and automated-only `layout:verify` as documented. Pull requests
-retain quality and full Playwright checks, while automated layout is intentionally
-skipped until after merge. Do not duplicate that broad automated corpus as a
-local pre-push gate. The plan selects affected scenarios or a conservative
+Start with `docs/ux/layouts.md` and the executable layout plan. Before the first
+repository code edit for each task, create a new branch-backed Git worktree from
+`master` and perform implementation, tests, and review there. Never substitute
+the primary checkout, a stale/dirty checkout, an unrelated existing worktree,
+or an already-running unowned server. The post-merge `master` workflow runs
+`layout:check`, `layout:plan`, `layout:run`, and automated-only
+`layout:verify` as documented. Pull requests retain quality and full Playwright
+checks, while automated layout is intentionally skipped until after merge. Do
+not duplicate that broad automated corpus as a local pre-push gate. The plan
+selects affected scenarios or a conservative
 full-known-mock fallback; it does not require every test for every non-layout
 change. Changed copy is layout-sensitive even when its character/word counts
 are unchanged.
 
-Actual manual Playwright interaction and image inspection remain mandatory for
-the plan's review items after merging and before deploying a layout-sensitive
-release.
-Use the post-merge `master` run's `layout-automation` artifact and an owned
-preview of the exact merged head before deployment. Captured files, tags,
-registration counts and filled review schemas are not visual judgment. Record
-missing or inaccessible evidence as blocked; never bypass access restrictions.
-Local validation is mock-only, no-proxy and provenance-bound, and grants no HA
-or deployment authority.
+Worktree cleanup is part of release completion. After successful deployment and
+production verification, remove the task's implementation worktree and every
+release-only temporary worktree unless the user explicitly asks to keep the
+implementation worktree. Do not force-remove a worktree that contains
+uncommitted changes, and do not delete its branch without separate
+authorization; report blocked cleanup explicitly.
+
+Post-merge layout automation is asynchronous regression detection. Do not wait
+for its completion or artifact before building, deploying, or completing a
+release. A failed run automatically files one deduplicated investigation issue
+for the merged commit; the run, artifact, and any manual review are follow-up
+evidence, not release gates.
+
+When layout review is separately performed or its plan items are claimed
+complete, use the exact run's `layout-automation` artifact and an owned preview
+of the matching head. Captured files, tags, registration counts and filled
+review schemas are not visual judgment. Record missing or inaccessible evidence
+as blocked; never bypass access restrictions. Local validation is mock-only,
+no-proxy and provenance-bound, and grants no HA or deployment authority.
 
 ## Current Stack
 
@@ -78,6 +91,21 @@ worktree, not just `index.html`, before calling the runtime valid.
 ## Deployment To Home Assistant
 
 The deployed Home Assistant version should be a production Vite build, not the dev server.
+
+For frontend-only merges, `.github/workflows/deploy-dashboard.yml` is the
+production owner. It starts independently on every push to `master`, builds
+without Home Assistant credentials, and uses an environment-protected,
+host-controlled one-job JIT runner to deploy and verify the exact merge SHA.
+It does not wait for the post-merge layout workflow. The automatic path must
+fail before mutation when the cumulative range since the deployed SHA contains
+Home Assistant runtime or Home MCP changes, or when the custom-panel bridge
+changed. Those changes retain the restart-aware manual release below.
+
+The CI deployment must never expose `VITE_HA_TOKEN` to the hosted build, stage
+HA packages/components, restart Home Assistant, register a persistent runner
+against this public repository, or grant HA network access before the
+controller verifies the exact GitHub job-to-runner binding. See
+`docs/deployment.md`.
 
 Prefer SMB deployment over the SSH deploy script. Use `npm run deploy` only as a fallback when the SMB share is unavailable and the required SSH env vars are configured.
 
@@ -144,11 +172,11 @@ For the preferred SMB flow:
 1. Run `npm run build`.
 2. Copy `dist/` to `\\192.168.1.22\config\www\ha-sfenton-react-dash`.
 3. Copy `home-assistant/packages/sfenton_react_panel.yaml` to `\\192.168.1.22\config\packages\sfenton_react_panel.yaml` if it changed.
-4. Back up and copy changed `home-assistant/custom_components/sfenton_react_chat/` files and `home-assistant/packages/sfenton_react_chat.yaml`, plus `home-assistant/custom_components/sfenton_home_mcp_proxy/` and `home-assistant/packages/sfenton_home_mcp_proxy.yaml`.
+4. Back up and copy changed `home-assistant/custom_components/sfenton_react_chat/` files and `home-assistant/packages/sfenton_react_chat.yaml`, plus `home-assistant/custom_components/sfenton_home_mcp_proxy/`, `home-assistant/packages/sfenton_home_mcp_proxy.yaml`, and `home-assistant/packages/solo_trip.yaml`.
 5. Configuration-check HA after staging package/component changes. On failure, restore prior files and remove only newly introduced files; do not restart invalid configuration.
-6. Restart Home Assistant only with explicit approval when the panel package/bridge, chat history, or Home MCP proxy changed.
-7. Verify the prior daily chat purge automation is absent, and verify authenticated `/api/sfenton_home_mcp` requests reach the pinned-TLS MCP container. The manual purge service may remain registered, but never invoke it during release verification without explicit deletion authorization.
-8. Build with `VITE_HOME_MCP_ENABLED=true` only after that proxy check passes, copy `dist/`, then run `npm run deploy:sync`.
+6. Restart Home Assistant only with explicit approval when the panel package/bridge, chat history, Home MCP proxy, or Household Away integration changed.
+7. Verify the prior daily chat purge automation is absent, verify authenticated `/api/sfenton_home_mcp` requests reach the pinned-TLS MCP container, and verify `sensor.household_away_status` plus `script.household_away_command` only after the native Solo Trip package passes its broker, journal, presence, and single-writer gates. The manual purge service may remain registered, but never invoke it during release verification without explicit deletion authorization.
+8. Install or update the separately owned Wake Light integration before Household Away when its source-suspension contract changed. Build with `VITE_HOME_MCP_ENABLED=true` only after the proxy check passes, copy `dist/`, then run `npm run deploy:sync`.
 
 React assets, `deploy:sync`, and HMR do not remove a previously loaded purge automation or activate a newly installed proxy. Do not enable production Home MCP routing until the pinned-TLS container and authenticated HA proxy are both healthy. See `docs/chat.md`, `home-mcp/README.md`, and the chat component README for the complete rollout and rollback contracts.
 
@@ -245,6 +273,10 @@ Do not recreate the Home Assistant sidebar or top bar for now. Focus on the dash
 - Entity-aware components should be reusable and typed narrowly enough to prevent invalid service calls where practical.
 - Avoid hard-coded UI state if the corresponding Home Assistant entity state is available.
 - Keep entity IDs and route/page configuration in constants rather than scattering strings across components.
+- For SleepyPod capability or protocol decisions, read the Pod's `/api/system/version`
+  endpoint and inspect that exact revision in the deployed fork. Public upstream
+  is comparison evidence only and must not be treated as the deployed capability
+  surface.
 
 ## Home Assistant Sidebar Wrapper
 

@@ -39,6 +39,7 @@ from .const import (
     FAILURE_MANUAL_REVOKE,
     MAX_ACTIVE_OCCURRENCES,
     MAX_ALARM_LINKS,
+    MAX_SOURCE_SUSPENSIONS,
     MAX_CANCELLATION_OCCURRENCE_REFS,
     MAX_FAILURES,
     MAX_NATIVE_ALARMS,
@@ -911,6 +912,7 @@ class SourceSnapshot:
 
     alarms: tuple[WakeLightAlarm, ...] = ()
     available: bool = False
+    schedule_available: bool = False
     last_success_at: datetime | None = None
     last_observed_at: datetime | None = None
     failure_code: str | None = None
@@ -923,6 +925,7 @@ class SourceSnapshot:
         return {
             "alarms": [alarm.to_dict() for alarm in self.alarms],
             "available": self.available,
+            "schedule_available": self.schedule_available,
             "last_success_at": iso_or_none(self.last_success_at),
             "last_observed_at": iso_or_none(self.last_observed_at),
             "failure_code": self.failure_code,
@@ -951,6 +954,10 @@ class SourceSnapshot:
         return cls(
             alarms=tuple(alarms),
             available=value.get("available") is True,
+            schedule_available=(
+                value.get("schedule_available") is True
+                or value.get("available") is True
+            ),
             last_success_at=parse_datetime(value.get("last_success_at")),
             last_observed_at=parse_datetime(value.get("last_observed_at")),
             failure_code=(
@@ -967,6 +974,39 @@ class SourceSnapshot:
                 if value.get("last_stopped_occurrence_id")
                 else None
             ),
+        )
+
+
+@dataclass(frozen=True)
+class SourceSuspension:
+    """Persisted opaque-owned suspension of one SleepyPod source side."""
+
+    source_ref: str
+    suspended: bool
+    owner_ref: str
+    updated_at: datetime
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize one suspension record."""
+        return {
+            "source_ref": self.source_ref,
+            "suspended": self.suspended,
+            "owner_ref": self.owner_ref,
+            "updated_at": iso_or_none(self.updated_at),
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> SourceSuspension | None:
+        """Restore one suspension record, dropping malformed entries."""
+        source_ref = value.get("source_ref")
+        owner_ref = value.get("owner_ref")
+        if not isinstance(source_ref, str) or not isinstance(owner_ref, str):
+            return None
+        return cls(
+            source_ref=source_ref,
+            suspended=value.get("suspended") is True,
+            owner_ref=owner_ref,
+            updated_at=parse_datetime(value.get("updated_at")) or utc_now(),
         )
 
 
@@ -1216,6 +1256,7 @@ class ProfileState:
     defaults: WakeLightDefaults
     alarms: tuple[WakeLightAlarm, ...] = ()
     alarm_links: Mapping[str, bool] = field(default_factory=dict)
+    source_suspensions: Mapping[str, SourceSuspension] = field(default_factory=dict)
     temporary_bed_alarms: tuple[TemporaryBedAlarm, ...] = ()
     source_cache: Mapping[str, SourceSnapshot] = field(default_factory=dict)
     active_run: ActiveRun | None = None
@@ -1237,6 +1278,7 @@ class ProfileState:
             revision=0,
             defaults=profile.defaults,
             alarm_links={},
+            source_suspensions={},
             source_cache={
                 source_ref: SourceSnapshot() for source_ref in profile.source_refs
             },
@@ -1387,10 +1429,19 @@ class ProfileState:
             if self.alarm_link_enabled(alarm.source_ref, day, alarm.local_time)
         )
 
+    def source_suspended(self, source_ref: str | None) -> bool:
+        """Return whether one source side is currently suspended."""
+        if not source_ref:
+            return False
+        record = self.source_suspensions.get(source_ref)
+        return record is not None and record.suspended
+
     def source_alarm_linked(self, alarm: WakeLightAlarm) -> bool:
         """Return whether one alarm still drives this wake light at all."""
         if alarm.source == ALARM_SOURCE_NATIVE or not alarm.source_ref:
             return True
+        if self.source_suspended(alarm.source_ref):
+            return False
         if alarm.kind == ALARM_KIND_WEEKLY:
             return bool(self.linked_weekdays(alarm))
         if alarm.date is None:
@@ -1436,6 +1487,9 @@ class ProfileState:
             "defaults": self.defaults.to_dict(),
             "alarms": [alarm.to_dict() for alarm in self.alarms],
             "alarm_links": dict(self.alarm_links),
+            "source_suspensions": {
+                key: value.to_dict() for key, value in self.source_suspensions.items()
+            },
             "temporary_bed_alarms": [
                 alarm.to_dict() for alarm in self.temporary_bed_alarms
             ],
@@ -1531,6 +1585,22 @@ class ProfileState:
                         defaults,
                     )
 
+        source_suspensions: dict[str, SourceSuspension] = {}
+        raw_suspensions = value.get("source_suspensions")
+        if isinstance(raw_suspensions, Mapping):
+            for source_ref, raw_suspension in raw_suspensions.items():
+                if len(source_suspensions) >= MAX_SOURCE_SUSPENSIONS:
+                    break
+                if (
+                    not isinstance(source_ref, str)
+                    or source_ref not in profile.source_refs
+                    or not isinstance(raw_suspension, Mapping)
+                ):
+                    continue
+                suspension = SourceSuspension.from_dict(raw_suspension)
+                if suspension is not None and suspension.source_ref == source_ref:
+                    source_suspensions[source_ref] = suspension
+
         active_run = None
         if isinstance(value.get("active_run"), Mapping):
             try:
@@ -1587,6 +1657,7 @@ class ProfileState:
             defaults=defaults,
             alarms=tuple(alarms),
             alarm_links=links,
+            source_suspensions=source_suspensions,
             temporary_bed_alarms=tuple(temporary_bed_alarms),
             source_cache=source_cache,
             active_run=active_run,

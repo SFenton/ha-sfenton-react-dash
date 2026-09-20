@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { AtAGlancePage } from './AtAGlancePage'
+import { AtAGlancePage, LightsSheet } from './AtAGlancePage'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
@@ -7,6 +7,9 @@ import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass, s
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { WEATHER_FORECAST_TTL_MS } from '../components/hass/useWeatherForecasts'
+import { HOUSEHOLD_RESIDENTS } from '../constants/householdResidents'
+
+// @covers src/constants/atAGlance.ts
 
 describe('AtAGlancePage', () => {
   beforeEach(() => {
@@ -31,6 +34,25 @@ describe('AtAGlancePage', () => {
     }
   }
 
+  it('personalizes resident nightstands and preserves unknown-user fallbacks', () => {
+    const masterBedroom = LIGHT_GROUPS.find((group) => group.title === 'Master Bedroom Lights')!
+    const stephenView = render(<LightsSheet directGroup={masterBedroom} />)
+    expect(screen.getByRole('button', { name: /Your Nightstand/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Steph Nightstand/i })).toBeInTheDocument()
+
+    stephenView.unmount()
+    mockState.user = { id: HOUSEHOLD_RESIDENTS.steph.haUserId, name: 'Steph' }
+    const stephView = render(<LightsSheet directGroup={masterBedroom} />)
+    expect(screen.getByRole('button', { name: /Stephen Nightstand/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Your Nightstand/i })).toBeInTheDocument()
+
+    stephView.unmount()
+    mockState.user = { id: 'unknown-user', name: 'Unknown' }
+    render(<LightsSheet directGroup={masterBedroom} />)
+    expect(screen.getByRole('button', { name: /Stephen Nightstand/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Steph Nightstand/i })).toBeInTheDocument()
+  })
+
   it('uses the shared disclosure affordance on the Home weather modal opener', async () => {
     render(<AtAGlancePage />)
 
@@ -53,7 +75,7 @@ describe('AtAGlancePage', () => {
     render(<AtAGlancePage />)
 
     const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
-    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
@@ -598,7 +620,8 @@ describe('AtAGlancePage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Chores' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: /Groceries/i })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: /Stephen's Tasks/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Your Chores/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /Steph's Chores/i })).toBeInTheDocument()
     expect(within(dialog).queryByText(/not available from Home/i)).not.toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: /Groceries/i }))

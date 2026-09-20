@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from './layout/fixture'
 import { applyHostProfile, enterState, openHost, openSurface } from './layout/app'
 import { SCENARIO_IDS, SURFACE_CONTRACTS, type ScenarioId } from './layout/contracts'
-import { journey, obligationsFor, SOURCE_ROUTES } from './layout/scenarios'
+import { journey, obligationsFor, PRELOAD_ROUTES } from './layout/scenarios'
 import { actualCapabilities, applyProfile, assertDeclaredTabs, checkpoint, closeMounted, contextForProject, modalFacts, runEnvironment, waitForModalReady, waitForNavigation, waitForRoute } from './layout/evidence'
 import { layoutProfile } from './responsive-acceptance-data'
 import { openQuickLinksTab, quickLinksLayout } from './quick-links'
@@ -12,6 +12,9 @@ import { isWakeScenario, openWakeRoomState, wakeRoomFacts, wakeStateFacts } from
 // @covers e2e/layout/app.ts
 // @covers e2e/layout/contracts.ts
 // @covers e2e/layout/scenarios.ts
+// @covers src/constants/pageLayout.ts
+// @covers src/pages/DashboardViewPage.tsx
+// @covers src/pages/DashboardViewPage.module.css
 
 async function recipeGroceryFacts(dialog: Locator, state: string) {
   const exhaustedCopy = 'All missing ingredients have already been added to groceries.'
@@ -45,6 +48,43 @@ async function recipeGroceryFacts(dialog: Locator, state: string) {
   return facts
 }
 
+async function soloTripAwayChipFacts(dialog: Locator) {
+  const chip = dialog.locator('[data-eight-sleep-away-chip="true"]')
+  const powerActions = dialog.locator('[data-eight-sleep-power-actions="true"]')
+  const panel = dialog.locator('[data-scroll-region="eight-sleep-panel"]')
+  const schedule = panel.getByRole('heading', { name: 'Sleep Schedule' })
+
+  await expect(chip).toHaveCount(1)
+  await expect(dialog.getByRole('note', { name: 'Stephen Away' })).toHaveCount(1)
+  const [chipBox, powerActionsBox, panelBox, scheduleBox] = await Promise.all([
+    chip.boundingBox(),
+    powerActions.boundingBox(),
+    panel.boundingBox(),
+    schedule.boundingBox(),
+  ])
+  if (!chipBox || !powerActionsBox || !panelBox || !scheduleBox) throw new Error('Solo Trip away-chip checkpoint requires visible geometry')
+
+  const presentation = await dialog.getAttribute('data-modal-presentation')
+  const bodyTier = await dialog.getAttribute('data-modal-body-tier')
+  const rightPane = presentation === 'dialog'
+    || (presentation === 'landscape-dialog' && (bodyTier === 'standard' || bodyTier === 'wide'))
+
+  if (rightPane) {
+    expect(Math.abs(chipBox.x - panelBox.x), 'Away chip aligns with the right pane').toBeLessThanOrEqual(1)
+    expect(Math.abs(chipBox.width - panelBox.width), 'Away chip matches the right pane width').toBeLessThanOrEqual(1)
+    expect(chipBox.y + chipBox.height, 'Away chip precedes Sleep Schedule').toBeLessThanOrEqual(scheduleBox.y + 1)
+  } else {
+    expect(chipBox.y, 'Away chip follows the Turn On/Turn Off container').toBeGreaterThanOrEqual(powerActionsBox.y + powerActionsBox.height - 1)
+    expect(chipBox.y + chipBox.height, 'Away chip precedes the stacked schedule panel').toBeLessThanOrEqual(panelBox.y + 1)
+  }
+
+  return {
+    bodyTier,
+    placement: rightPane ? 'right-pane-above-schedule' : 'below-power-controls',
+    presentation,
+  }
+}
+
 async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, state: string) {
   if (isWakeScenario(scenario)) return wakeStateFacts(dialog, scenario, state)
   if (scenario === 'vacuum') {
@@ -52,7 +92,12 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     await expect(dialog.locator('[data-layout-preparation-phase="content"]')).toHaveCount(1)
     await expect(dialog.locator('[class*="vacuumLayoutLoading"]')).toHaveCount(0)
   }
-  const preferredScrollMode = scenario === 'remote' || scenario === 'vacuum' || (scenario === 'quick-links' && state === 'rooms') ? 'panes' : 'body'
+  const preferredScrollMode = scenario === 'remote'
+    || scenario === 'vacuum'
+    || (scenario === 'quick-links' && state === 'rooms')
+    || (scenario === 'solo-trip-bed' && !state.startsWith('editor'))
+    ? 'panes'
+    : 'body'
   const facts: Record<string, unknown> = await modalFacts(
     dialog,
     preferredScrollMode,
@@ -60,6 +105,56 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     scenario === 'vacuum' ? 'vacuum-tabs' : 'tabs',
   )
   await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
+  if (scenario === 'solo-trip-bed') {
+    if (state.startsWith('editor')) {
+      const travelerChoices = dialog.getByRole('group', { name: "Who's Traveling?" }).getByRole('button')
+      await expect(travelerChoices).toHaveCount(2)
+      const schedule = dialog.getByRole('button', { name: 'Schedule Solo Trip' })
+      await expect(schedule).toBeVisible()
+      if (state === 'editor-unavailable') {
+        await expect(dialog.getByText('Solo Trip scheduling is unavailable. Complete Household Away setup, then try again.', { exact: true })).toBeVisible()
+        await expect(schedule).toBeDisabled()
+      }
+      facts.soloTrip = {
+        editor: true,
+        travelerChoices: await travelerChoices.count(),
+        unavailable: state === 'editor-unavailable',
+      }
+    } else {
+      const homeSide = state.endsWith('home-side')
+      const expectedScope = homeSide ? 'whole-bed' : 'read-only'
+      const content = dialog.locator(`[data-solo-trip-bed-scope="${expectedScope}"]`)
+      await expect(content).toBeVisible()
+      const notice = dialog.getByRole('note', { name: 'Stephen Away' })
+      await expect(notice).toBeVisible()
+      const power = dialog.getByRole('button', {
+        name: homeSide ? /Turn off Steph's Bed/ : /Stephen's Bed Power Control · Read-Only During Solo Trip/,
+      })
+      await expect(power).toBeVisible()
+      if (homeSide) {
+        await expect(power).toBeEnabled()
+        await expect(dialog.getByRole('slider', { name: "Steph's Bed target level" })).toBeEnabled()
+      } else {
+        await expect(power).toBeDisabled()
+        await expect(dialog.getByRole('slider', { name: "Stephen's Bed target level" })).toHaveCount(0)
+      }
+      const expectedNotice = state === 'home-side'
+        ? "While you are away from home and the Solo Trip setting is enabled in settings, Steph's controls and alarms will control the entire bed."
+        : state === 'away-side'
+          ? "Your bed side is view-only during an active Solo Trip. Make changes from Steph's bed side."
+          : state === 'home-viewer-home-side'
+            ? 'While Stephen is away from home and the Solo Trip setting is enabled in settings, your controls and alarms will control the entire bed.'
+            : "Stephen's bed side is view-only during an active Solo Trip. Make changes from your bed side."
+      await expect(notice).toContainText(expectedNotice)
+      facts.soloTrip = {
+        awayChip: await soloTripAwayChipFacts(dialog),
+        notice: expectedNotice,
+        scope: expectedScope,
+        statusTitle: 'Stephen Away',
+        targetControl: state === 'home-side' ? 'enabled' : 'absent',
+      }
+    }
+  }
   if (scenario === 'quick-links' && state !== 'rooms') {
     const layout = await quickLinksLayout(dialog)
     expect(layout.cards.length).toBeGreaterThan(0)
@@ -285,6 +380,138 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
   return facts
 }
 
+async function soloTripSettingsFacts(root: Locator, state: string) {
+  const facts = await root.evaluate((element) => {
+    const scroller = element.querySelector<HTMLElement>('[data-page-scroller]')
+    const rect = element.getBoundingClientRect()
+    return {
+      frame: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      scrollOwner: scroller ? getComputedStyle(scroller).overflowY : null,
+    }
+  })
+  expect(facts.pageOverflow).toBeLessThanOrEqual(1)
+  expect(['auto', 'scroll']).toContain(facts.scrollOwner)
+  const page = root.page()
+  const toggle = root.locator('button[role="switch"][aria-label^="Solo Trip"]')
+  const travelerButtons = root.getByRole('button', { name: /^(You|Steph)$/ })
+  const sectionGrid = root.locator('[data-responsive-section-grid="true"]')
+  await expect(sectionGrid).toHaveCount(1)
+  await expect(sectionGrid.locator('[data-responsive-section-item="true"]')).toHaveCount(2)
+  const sectionColumns = await sectionGrid.evaluate((element) => ({
+    columns: getComputedStyle(element).gridTemplateColumns.split(' ').length,
+    width: element.getBoundingClientRect().width,
+  }))
+  expect(sectionColumns.columns).toBe(sectionColumns.width >= 744 ? 2 : 1)
+  await expect(root.getByText('Enable or disable Solo Trip mode for the house.', { exact: true })).toBeVisible()
+  await expect(root.getByText('Select the user that will be away from home', { exact: true })).toBeVisible()
+  await expect(toggle).toHaveCount(1)
+
+  if (state === 'idle') {
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await expect(toggle).toBeDisabled()
+    await expect(travelerButtons).toHaveCount(2)
+    return { ...facts, state, toggle: 'disabled-off', travelers: 'interactive-none-selected' }
+  }
+  if (state === 'idle-selected') {
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await expect(toggle).toBeEnabled()
+    await expect(root.getByRole('button', { name: 'You', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    return { ...facts, state, toggle: 'enabled-off', travelers: 'stephen-selected' }
+  }
+  if (state === 'modal') {
+    const dialog = page.getByRole('dialog', { name: 'Schedule Solo Trip' })
+    await expect(dialog).toBeVisible()
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await expect(travelerButtons).toHaveCount(0)
+    await expect(dialog.getByLabel('Departure Date')).toBeVisible()
+    await expect(dialog.getByLabel('Return Time')).toBeVisible()
+    return { ...facts, state, modal: true, toggle: 'off-while-pending' }
+  }
+  if (state === 'unavailable') {
+    await expect(toggle).toHaveAttribute('aria-checked', 'false')
+    await expect(toggle).toBeDisabled()
+    await expect(root.getByText('Solo Trip scheduling is unavailable. Complete Household Away setup, then try again.', { exact: true })).toBeVisible()
+    await expect(travelerButtons).toHaveCount(2)
+    return { ...facts, state, toggle: 'disabled-off', setupGuidance: true }
+  }
+
+  await expect(toggle).toHaveAttribute('aria-checked', 'true')
+  await expect(root.getByText('Away', { exact: true })).toBeVisible()
+  await expect(root.getByText('Home', { exact: true })).toBeVisible()
+  await expect(root.getByLabel('Departure Date')).toBeVisible()
+  await expect(root.getByLabel('Return Time')).toBeVisible()
+  await expect(travelerButtons).toHaveCount(0)
+  const viewerState = state === 'active-home-viewer' ? 'home' : state === 'active-unknown-viewer' ? 'unknown' : 'traveler'
+  const awayTraveler = root.locator(`article[aria-label="${viewerState === 'traveler' ? 'You' : 'Stephen'} Away"]`)
+  const homeResident = root.locator(`article[aria-label="${viewerState === 'home' ? 'You' : 'Steph'} Home"]`)
+  await expect(awayTraveler).toHaveAttribute('data-disabled', 'true')
+  await expect(awayTraveler).toHaveAttribute('data-muted', 'false')
+  await expect(awayTraveler).not.toHaveAttribute('aria-pressed')
+  await expect(homeResident).toHaveAttribute('data-disabled', 'true')
+  await expect(homeResident).toHaveAttribute('data-muted', 'true')
+  await expect(homeResident).not.toHaveAttribute('aria-pressed')
+  const travelerCards = await Promise.all([awayTraveler, homeResident].map((card) => card.evaluate((element) => ({
+    backgroundColor: getComputedStyle(element).backgroundColor,
+    filter: getComputedStyle(element).filter,
+  }))))
+  expect(travelerCards).toEqual([
+    { backgroundColor: 'rgba(91, 141, 239, 0.6)', filter: 'saturate(0.45)' },
+    { backgroundColor: 'rgba(255, 255, 255, 0.1)', filter: 'saturate(0.45)' },
+  ])
+
+  if (state === 'scheduled') {
+    await expect(toggle).toBeEnabled()
+    await expect(root.getByRole('heading', { name: 'Solo Trip Scheduled' })).toBeVisible()
+    await expect(root.getByRole('button', { name: 'Change' })).toBeVisible()
+    return { ...facts, state, toggle: 'enabled-on', returnEditor: 'available', travelerCards }
+  }
+  if (state === 'activating') {
+    await expect(toggle).toBeEnabled()
+    await expect(root.getByRole('heading', { name: 'Starting Solo Trip' })).toBeVisible()
+    await expect(root.getByRole('button', { name: 'End Solo Trip Now' })).toHaveCount(0)
+    return { ...facts, state, toggle: 'enabled-on', emergencyEnd: 'toggle-only', travelerCards }
+  }
+  if (state === 'active' || state === 'active-home-viewer' || state === 'active-unknown-viewer') {
+    const status = root.getByRole('note', { name: 'Stephen Away' })
+    const description = root.getByText('Enable or disable Solo Trip mode for the house.', { exact: true })
+    await expect(toggle).toBeEnabled()
+    const activeCopy = state === 'active'
+      ? "While you are away from home and the Solo Trip setting is enabled in settings, Steph's controls and alarms will control the entire bed."
+      : 'While Stephen is away from home and the Solo Trip setting is enabled in settings, your controls and alarms will control the entire bed.'
+    await expect(status).toContainText(activeCopy)
+    await expect(status).toHaveCount(1)
+    await expect(status.getByRole('heading', { name: 'Stephen Away' })).toHaveCount(1)
+    const statusElement = await status.elementHandle()
+    if (!statusElement) throw new Error('Active Solo Trip notice is missing')
+    const statusPlacement = await description.evaluate((descriptionElement, noticeElement) => ({
+      beforeDescription: Boolean(noticeElement.compareDocumentPosition(descriptionElement) & Node.DOCUMENT_POSITION_FOLLOWING),
+      sameSection: noticeElement.closest('section') === descriptionElement.closest('section'),
+    }), statusElement)
+    expect(statusPlacement).toEqual({ beforeDescription: true, sameSection: true })
+    await expect(root.getByRole('button', { name: 'Change' })).toBeVisible()
+    return { ...facts, state, activeCopy, status: 'confirmed active before description', statusPlacement, returnEditor: 'available', travelerCards, viewerState }
+  }
+  if (state === 'degraded') {
+    await expect(toggle).toBeEnabled()
+    await expect(root.getByRole('heading', { name: 'Solo Trip Degraded' })).toBeVisible()
+    await expect(root.getByText('sleepypod_schedule_diverged', { exact: true })).toHaveCount(0)
+    await expect(root.getByRole('button', { name: 'End Solo Trip Now' })).toHaveCount(0)
+    return { ...facts, state, diagnosticsExposed: false, toggle: 'enabled-on', travelerCards }
+  }
+  if (state === 'ending') {
+    await expect(toggle).toBeDisabled()
+    await expect(root.getByRole('heading', { name: 'Ending Solo Trip' })).toBeVisible()
+    return { ...facts, state, toggle: 'disabled-on', travelerCards }
+  }
+  await expect(toggle).toBeDisabled()
+  await expect(root.getByRole('heading', { name: 'Solo Trip Needs Attention' })).toBeVisible()
+  await expect(root.getByText('sleepypod_schedule_diverged', { exact: true })).toHaveCount(0)
+  await expect(root.getByRole('button', { name: 'Keep Current Schedule' })).toBeEnabled()
+  await expect(root.getByRole('button', { name: 'Restore Saved Schedule' })).toBeEnabled()
+  return { ...facts, state, diagnosticsExposed: false, resolutionActions: 2, toggle: 'disabled-on', travelerCards }
+}
+
 async function pageFacts(page: Page, back: boolean) {
   await waitForNavigation(page)
   const facts = await page.evaluate((route) => {
@@ -400,7 +627,7 @@ for (const scenario of SCENARIO_IDS) {
         chatMessages: window.__mockHass?.chat.messages.length,
         chatSubscriptions: window.__mockHass?.chat.subscriptions(),
       }))
-      expect(facts).toEqual({ routes: SOURCE_ROUTES.length, mediaElements: 0, hidden: 'true', services: 0, chatMessages: 0, chatSubscriptions: 0 })
+      expect(facts).toEqual({ routes: PRELOAD_ROUTES.length, mediaElements: 0, hidden: 'true', services: 0, chatMessages: 0, chatSubscriptions: 0 })
       await checkpoint(page, page, testInfo, obligations[0], capabilities, { ...facts, phase: 'Initial hydration; the inert cache is intentionally removed once the app is ready' })
       await waitForRoute(page, 'overview')
       return
@@ -424,6 +651,51 @@ for (const scenario of SCENARIO_IDS) {
           await page.getByRole('button', { name: 'Go back' }).click()
           await waitForRoute(page, 'overview')
         }
+      }
+      return
+    }
+    if (scenario === 'solo-trip-settings') {
+      for (const state of SURFACE_CONTRACTS[scenario].states) {
+        const root = await openSurface(page, scenario, state)
+        let firstFrame: Record<string, number> | undefined
+        const selected = obligations.filter((entry) => entry.state === state)
+        for (const obligation of selected) {
+          await applyProfile(page, obligation.profile)
+          const facts = await soloTripSettingsFacts(root, state)
+          if (obligation.step === 0) firstFrame = facts.frame
+          const stages = journey(scenario, context)
+          if (obligation.step === stages.length - 1 && stages[0] === stages.at(-1)) {
+            for (const key of ['x', 'y', 'width', 'height'] as const) {
+              expect(Math.abs(firstFrame![key] - facts.frame[key]), 'Mounted Solo Trip settings return geometry').toBeLessThanOrEqual(1)
+            }
+          }
+          await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+        }
+      }
+      return
+    }
+    if (scenario === 'solo-trip-bed') {
+      for (const state of SURFACE_CONTRACTS[scenario].states) {
+        const dialog = await openSurface(page, scenario, state)
+        if (!state.startsWith('editor')) assertDeclaredTabs(await dialog.getByRole('tab').evaluateAll((elements) =>
+          elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '')),
+        ['^Temperature$', '^Special Modes$', '^Alarms$', '^Status$'])
+        let firstFrame: Record<string, number> | undefined
+        const selected = obligations.filter((entry) => entry.state === state)
+        for (const obligation of selected) {
+          await applyProfile(page, obligation.profile)
+          const facts = await stateFacts(page, dialog, scenario, state)
+          if (obligation.step === 0) firstFrame = facts.frame as Record<string, number>
+          const stages = journey(scenario, context)
+          if (obligation.step === stages.length - 1 && stages[0] === stages.at(-1)) {
+            const end = facts.frame as Record<string, number>
+            for (const key of ['x', 'y', 'width', 'height'] as const) {
+              expect(Math.abs(firstFrame![key] - end[key]), 'Mounted Solo Trip modal return geometry').toBeLessThanOrEqual(1)
+            }
+          }
+          await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+        }
+        await closeMounted(dialog)
       }
       return
     }

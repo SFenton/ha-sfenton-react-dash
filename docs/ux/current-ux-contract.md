@@ -53,6 +53,9 @@ the shared behavior layer rather than duplicating HA-owned side effects.
   unbroken pasted text. Do not trap overflow or grow stable composer geometry.
 - Keep card, control, modal, slider, and navigation dimensions stable while
   live entity values update.
+- Security overview controls and Home/Security camera grids keep stable equal
+  tracks. Live camera hydration, camera status, and pending door command copy
+  must not change their columns or spans after first paint.
 - Square room/admin overview tiles are presentation-specific. Portrait `sheet` uses the
   accepted fluid two-column standard cards; phone `landscape-dialog` uses
   equal-width square tracks with a 132px minimum; tablet/desktop `dialog`
@@ -67,6 +70,10 @@ the shared behavior layer rather than duplicating HA-owned side effects.
   16px padding, 32px corners and 24px glyphs, arranged from the top of the body
   using two base tracks and text-required spans. Portrait rows fill as in
   production; do not force every card to half width or vertically center the grid.
+- Room-page source sections with three or more standard cards explicitly use
+  the two-column fill policy so every occupied row consumes the available
+  width. Branded app-launch sections are the multi-track exception and may
+  center an incomplete final row.
 - Centered Quick Links uses compact 88px tiles and responsive base tracks up
   to 200px wide. Labels determine minimum spans. `fillRows="except-last"`
   fills non-final rows by assigning spare tracks to the narrowest tiles first,

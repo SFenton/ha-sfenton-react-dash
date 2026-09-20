@@ -62,7 +62,7 @@ const CASES: AdaptiveModalCase[] = [
   },
   {
     id: 'eight-sleep',
-    open: (page) => openButtonModal(page, 'master-bedroom', /Steph.s Bed Off/i),
+    open: (page) => openButtonModal(page, 'master-bedroom', /Steph's Side Off/i),
     splitPair: ['[data-scroll-region="eight-sleep-hero-column"]', '[data-scroll-region="eight-sleep-panel"]'],
     splitTiers: ['standard', 'wide'],
   },
@@ -378,6 +378,7 @@ test.describe('non-room landscape modal adaptation', () => {
       const dialog = await CASES[3].open(page)
       await setSafeAreaInsets(page, viewport.insets)
       await expect(dialog).toHaveAttribute('data-modal-presentation', /^(?:dialog|landscape-dialog)$/)
+      await expect(dialog.locator('[data-layout-preparation-phase]')).toHaveAttribute('data-layout-preparation-phase', 'content', { timeout: 15_000 })
 
       const body = dialog.locator('[data-modal-sheet-body="true"]')
       const leftPane = dialog.locator('[aria-label$="map and status"]')
@@ -409,16 +410,19 @@ test.describe('non-room landscape modal adaptation', () => {
       expect(scrollRanges[1]).toBeLessThanOrEqual(1)
       expect(scrollRanges[2]).toBeGreaterThan(1)
 
-      const before = await Promise.all([map.boundingBox(), locate.boundingBox(), rightContent.boundingBox()])
+      const before = await Promise.all([
+        locate.boundingBox(),
+        rightContent.boundingBox(),
+        rightPane.boundingBox(),
+      ])
       await expect.poll(() => rightPane.evaluate((element) => {
         element.scrollTop = element.scrollHeight
         return element.scrollTop
       })).toBeGreaterThan(0)
-      const atBottom = await Promise.all([map.boundingBox(), locate.boundingBox(), rightContent.boundingBox()])
+      const atBottom = await Promise.all([locate.boundingBox(), rightContent.boundingBox()])
 
-      expect(Math.abs((atBottom[0]?.y ?? 0) - (before[0]?.y ?? 0))).toBeLessThanOrEqual(1)
+      expect((atBottom[0]?.y ?? 0)).toBeLessThan((before[0]?.y ?? 0) - 1)
       expect((atBottom[1]?.y ?? 0)).toBeLessThan((before[1]?.y ?? 0) - 1)
-      expect((atBottom[2]?.y ?? 0)).toBeLessThan((before[2]?.y ?? 0) - 1)
       expect(await body.evaluate((element) => element.scrollTop)).toBe(0)
       expect(await leftPane.evaluate((element) => element.scrollTop)).toBe(0)
 
@@ -426,17 +430,18 @@ test.describe('non-room landscape modal adaptation', () => {
       expect(rightBox).not.toBeNull()
       await page.mouse.move((rightBox?.x ?? 0) + (rightBox?.width ?? 0) / 2, (rightBox?.y ?? 0) + (rightBox?.height ?? 0) / 2)
       await page.mouse.wheel(0, 1_000)
-      await dialog.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
-      const beyondBottom = await map.boundingBox()
-      expect(Math.abs((beyondBottom?.y ?? 0) - (before[0]?.y ?? 0))).toBeLessThanOrEqual(1)
+      expect(await leftPane.evaluate((element) => element.scrollTop)).toBe(0)
 
       await rightPane.evaluate((element) => { element.scrollTop = 0 })
       await expect.poll(() => rightPane.evaluate((element) => element.scrollTop)).toBe(0)
       await page.mouse.wheel(0, -1_000)
-      await dialog.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
-      const beyondTop = await Promise.all([map.boundingBox(), locate.boundingBox()])
-      expect(Math.abs((beyondTop[0]?.y ?? 0) - (before[0]?.y ?? 0))).toBeLessThanOrEqual(1)
-      expect(Math.abs((beyondTop[1]?.y ?? 0) - (before[1]?.y ?? 0))).toBeLessThanOrEqual(1)
+      await expect.poll(async () => {
+        const [locateBox, rightPaneBox] = await Promise.all([locate.boundingBox(), rightPane.boundingBox()])
+        return Math.abs(
+          ((locateBox?.y ?? 0) - (rightPaneBox?.y ?? 0))
+          - ((before[0]?.y ?? 0) - (before[2]?.y ?? 0)),
+        )
+      }).toBeLessThanOrEqual(1)
       expect(await body.evaluate((element) => element.scrollTop)).toBe(0)
       expect(await leftPane.evaluate((element) => element.scrollTop)).toBe(0)
 

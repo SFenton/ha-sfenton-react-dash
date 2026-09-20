@@ -8,12 +8,20 @@ import { VacuumRoomSourceModalContent } from '../components/hass/VacuumCard'
 import { DashboardViewPage } from './DashboardViewPage'
 import { CONTACT_GROUPS } from '../constants/atAGlance'
 import { MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_COMMAND_REVERT_MS, MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, MUSIC_ROOM_XBOX_HDMI_STATUS_ENTITY_ID } from '../constants/mediaRemotes'
-import { VACUUMS } from '../constants/portedDashboard'
+import { HOUSEHOLD_RESIDENTS } from '../constants/householdResidents'
+import { TODO_PAGES, VACUUMS } from '../constants/portedDashboard'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../constants/roomPages'
-import { LEGACY_VACUUM_OUTCOMES, NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../test/fixtures/vacuumOutcomes'
+import {
+  EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD,
+  LEGACY_VACUUM_OUTCOMES,
+  MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+  NINE_ROOM_VACUUM_OUTCOME_CONTRACT,
+} from '../test/fixtures/vacuumOutcomes'
 import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState } from '../test/mocks/hakitCoreState'
 
 // @covers src/constants/portedDashboard.ts
+// @covers src/constants/roomPages.ts
+// @covers src/constants/householdResidents.ts
 // @covers src/i18n/index.ts
 // @covers src/i18n/locales/en/pages/food.json
 
@@ -454,6 +462,25 @@ describe('DashboardViewPage', () => {
 
       view.unmount()
     }
+  })
+
+  it('keeps three-plus-card room sections within two columns and fills the Master Bedroom Climate rows', () => {
+    const implicitlyExpandableSections = ROOM_PAGE_ORDER.flatMap((path) =>
+      ROOM_PAGE_CONFIGS[path].sourceSections
+        .filter((section) => section.showOnRoomPage !== false)
+        .filter((section) => section.layout !== 'app-launch' && section.layout !== 'two-column-fill')
+        .filter((section) => (section.layout === 'lead-row' ? section.cards.length - 1 : section.cards.length) > 2)
+        .map((section) => `${path}:${section.title}`),
+    )
+    expect(implicitlyExpandableSections).toEqual([])
+
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+
+    const climateGrid = screen.getByRole('group', { name: 'Master Bedroom Climate' })
+    expect(climateGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+    expect(climateGrid).toHaveAttribute('data-dynamic-grid-last-row', 'fill')
+    expect(climateGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(Array.from(climateGrid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '2'])
   })
 
   it('separates room remotes, device controls, and quick app launch grids', () => {
@@ -1718,7 +1745,7 @@ describe('DashboardViewPage', () => {
     try {
       render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-      fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Off/i }))
+      fireEvent.click(screen.getByRole('button', { name: /Your Side Off/i }))
       const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
       fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
       expect(mockCallServiceCalls).toContainEqual({
@@ -1912,10 +1939,10 @@ describe('DashboardViewPage', () => {
     const navigate = vi.fn()
 
     try {
-      render(<DashboardViewPage activePath="settings" onNavigate={navigate} path="vacation" />)
+      render(<DashboardViewPage activePath="settings" onNavigate={navigate} path="vacation-mode" />)
 
-      expect(screen.getByRole('heading', { name: 'Vacation' })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Vacation Mode' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Vacation Mode Off' })).toBeInTheDocument()
+      expect(screen.getByText('Enable or disable vacation mode for the house')).toBeInTheDocument()
       expect(screen.getByText('Enable or disable vacation mode for the house')).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Vacation Dates' })).not.toBeInTheDocument()
       expect(screen.getByRole('heading', { name: 'Pre-Vacation Checklist' })).toBeInTheDocument()
@@ -1946,9 +1973,10 @@ describe('DashboardViewPage', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 5, 14, 10, 1, 0))
     setVacationChecklistMockState('on')
+    mockEntities['sensor.household_away_status'].state = 'unavailable'
 
     try {
-      render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation" />)
+      render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation-mode" />)
 
       const vacationMode = screen.getByRole('button', { name: 'Vacation Mode Off' })
       fireEvent.click(vacationMode)
@@ -1958,6 +1986,9 @@ describe('DashboardViewPage', () => {
       expect(screen.getByRole('button', { hidden: true, name: 'Vacation Mode Pending' })).toHaveAttribute('aria-pressed', 'true')
       expect(screen.queryByRole('heading', { name: 'Vacation Dates' })).not.toBeInTheDocument()
       const dialog = screen.getByRole('dialog', { name: 'Confirm Vacation' })
+      expect(dialog.querySelector('[data-schedule-confirmation-form="true"]')).toBeInTheDocument()
+      expect(dialog.querySelector('[data-schedule-confirmation-fields="true"]')).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Confirm Vacation' })).toHaveAttribute('data-variant', 'primary')
       expect(within(dialog).getByLabelText('Start Date')).toHaveValue('2026-06-14')
       expect(within(dialog).getByLabelText('Start Time')).toHaveValue('10:01')
       expect(within(dialog).getByLabelText('End Date')).toHaveValue('2026-06-15')
@@ -1981,7 +2012,7 @@ describe('DashboardViewPage', () => {
 
   it('keeps the Pre-Vacation checklist visible while checked items toggle Home Assistant booleans', () => {
     mockEntities['input_boolean.vacation_checklist_pour_boiling_water_down_the_drain'].state = 'on'
-    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation" />)
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="vacation-mode" />)
 
     expect(screen.getByRole('heading', { name: 'Pre-Vacation Checklist' })).toBeInTheDocument()
     const sprinklers = screen.getByRole('button', { name: 'Turn off outdoor sprinklers' })
@@ -2042,6 +2073,7 @@ describe('DashboardViewPage', () => {
 
   it('resets the Pre-Vacation checklist when Vacation Mode turns off', () => {
     mockEntities['input_boolean.vacation_mode'].state = 'on'
+    mockEntities['sensor.household_away_status'].state = 'unavailable'
     mockEntities['input_boolean.vacation_checklist_turn_off_outdoor_sprinklers'].state = 'on'
     mockEntities['input_boolean.vacation_checklist_pour_boiling_water_down_the_drain'].state = 'on'
     mockEntities['input_boolean.vacation_checklist_make_the_bed'].state = 'on'
@@ -2768,8 +2800,8 @@ describe('DashboardViewPage', () => {
     expect(headings.indexOf('SleepyPod')).toBeGreaterThan(-1)
     expect(headings.indexOf('SleepyPod')).toBeLessThan(headings.indexOf('Climate'))
     expect(headings.indexOf('Media')).toBeLessThan(headings.indexOf('Climate'))
-    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i })).toHaveStyle('--tile-color: rgba(25, 84, 130, 0.6)')
-    expect(screen.getByRole('button', { name: /Steph's Bed Off/i })).toHaveAttribute('data-muted', 'true')
+    expect(screen.getByRole('button', { name: /Your Side Cooling • -1/i })).toHaveStyle('--tile-color: rgba(25, 84, 130, 0.6)')
+    expect(screen.getByRole('button', { name: /Steph's Side Off/i })).toHaveAttribute('data-muted', 'true')
     expect(screen.getByRole('button', { name: /Apple TV Paused/i })).toHaveAttribute('data-muted', 'false')
 
     fireEvent.click(screen.getByLabelText(/Humidifier Unavailable/i))
@@ -2788,7 +2820,7 @@ describe('DashboardViewPage', () => {
       temperature: 70,
     })
     const climateOnly = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
-    const climateOnlyCard = screen.getByLabelText(/Stephen's Bed Off/i)
+    const climateOnlyCard = screen.getByLabelText(/Your Side Off/i)
     expect(climateOnlyCard).toHaveAttribute('data-muted', 'true')
     expect(climateOnlyCard.tagName).toBe('DIV')
     expect(screen.queryByRole('dialog', { name: "Stephen's Bed" })).not.toBeInTheDocument()
@@ -2810,7 +2842,7 @@ describe('DashboardViewPage', () => {
       step: 1,
     })
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
-    const levelOnlyCard = screen.getByLabelText(/Stephen's Bed Off/i)
+    const levelOnlyCard = screen.getByLabelText(/Your Side Off/i)
     expect(levelOnlyCard).toHaveAttribute('data-muted', 'true')
     expect(levelOnlyCard.tagName).toBe('DIV')
     expect(screen.queryByRole('dialog', { name: "Stephen's Bed" })).not.toBeInTheDocument()
@@ -2833,7 +2865,7 @@ describe('DashboardViewPage', () => {
     })
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
 
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     expect(within(dialog).getByRole('tab', { name: 'Alarms' })).toBeInTheDocument()
@@ -2884,7 +2916,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl(phase)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
@@ -2929,7 +2961,7 @@ describe('DashboardViewPage', () => {
     mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-10'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -10/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -10/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'Home' })
@@ -2952,7 +2984,7 @@ describe('DashboardViewPage', () => {
     mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-10'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -10/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -10/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'Home' })
@@ -2969,7 +3001,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('outside')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
@@ -2986,7 +3018,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('outside')
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
@@ -3009,7 +3041,7 @@ describe('DashboardViewPage', () => {
     mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '-9'
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -9/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -9/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'Home' })
@@ -3039,7 +3071,7 @@ describe('DashboardViewPage', () => {
     setupStephSleepypodLevelControl('bedtime')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Steph's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
@@ -3070,7 +3102,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('asleep')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
 
@@ -3119,7 +3151,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('bedtime')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const dial = within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
@@ -3190,7 +3222,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('asleep')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
     const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
@@ -3215,7 +3247,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('bedtime')
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
@@ -3241,7 +3273,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('bedtime')
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const targetSlider = within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(targetSlider, { key: 'ArrowLeft' })
@@ -3276,7 +3308,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('bedtime')
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
     const scopeDialog = await screen.findByRole('dialog', { name: 'Set Bed Temperature' })
@@ -3301,7 +3333,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('outside')
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const bedDialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     fireEvent.keyDown(within(bedDialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
     expect(within(bedDialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -3/i })).toBeInTheDocument()
@@ -3322,7 +3354,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('unavailable')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
 
     expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })).not.toHaveAttribute('aria-disabled')
@@ -3348,7 +3380,7 @@ describe('DashboardViewPage', () => {
     })
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
 
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const dial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -2/i })
@@ -3421,7 +3453,7 @@ describe('DashboardViewPage', () => {
     })
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Off/i }))
     let dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     const offDial = within(dialog).getByRole('region', { name: "Stephen's Bed thermostat Off" })
     expect(offDial).toHaveAttribute('aria-disabled', 'true')
@@ -3463,7 +3495,7 @@ describe('DashboardViewPage', () => {
     })
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -3/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -3/i }))
 
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     vi.useFakeTimers()
@@ -3522,7 +3554,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_boolean.stephen_alarms_enabled'].state = 'on'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
 
@@ -3600,7 +3632,7 @@ describe('DashboardViewPage', () => {
     )
     render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen.s Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Stephen\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     const dayRow = within(dialog).getByRole('button', { name: /Stephen.s Bed Monday Alarms 1 Enabled • 1 Disabled/i })
@@ -3642,7 +3674,7 @@ describe('DashboardViewPage', () => {
     })
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
 
     const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
 
@@ -3655,7 +3687,7 @@ describe('DashboardViewPage', () => {
     mockEntities['number.nightcanvasrestful_left_target_temperature'].state = '2'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    const bedCard = screen.getByRole('button', { name: /Stephen's Bed Heating • \+2/i })
+    const bedCard = screen.getByRole('button', { name: /Your Side Heating • \+2/i })
     expect(bedCard).toBeInTheDocument()
 
     fireEvent.click(bedCard)
@@ -4054,7 +4086,7 @@ describe('DashboardViewPage', () => {
   it('opens Free Sleep bed modals with MQTT status and native controls', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-surface', 'hass-popup')
@@ -4111,7 +4143,7 @@ describe('DashboardViewPage', () => {
   it('updates Free Sleep bedtime from the bed modal settings tab', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
 
     const dialog = await screen.findByRole('dialog')
     await clickModalTab(within(dialog), 'Settings')
@@ -4129,7 +4161,7 @@ describe('DashboardViewPage', () => {
   it('lets Free Sleep bed modals animate closed through the shared sheet state', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
 
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
@@ -4141,7 +4173,7 @@ describe('DashboardViewPage', () => {
     mockEntities['text.master_bedroom_eight_sleep_pod_5_left_bedtime'].state = 'unavailable'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
 
     const dialog = await screen.findByRole('dialog')
     await clickModalTab(within(dialog), 'Settings')
@@ -4161,7 +4193,7 @@ describe('DashboardViewPage', () => {
     try {
       render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-      fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+      fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
 
       const dialog = await screen.findByRole('dialog')
       scrollTo.mockClear()
@@ -4181,7 +4213,7 @@ describe('DashboardViewPage', () => {
     mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].attributes.targetTemperature = 85
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Heating • \+1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Heating • \+1/i }))
 
     const dialog = await screen.findByRole('dialog')
     const dial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+1 • 85°F/i })
@@ -4196,7 +4228,7 @@ describe('DashboardViewPage', () => {
     setupStephenSleepypodLevelControl('bedtime')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling/i }))
 
     const dialog = await screen.findByRole('dialog')
     await clickModalTab(within(dialog), 'Special Modes')
@@ -4214,7 +4246,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).queryByRole('slider', { name: "Stephen's Bed target level" })).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('Cooling Bed')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Stephen's Bed Hot Flash Mode • Cooling/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
+    expect(screen.getAllByRole('button', { name: /Your Side Hot Flash Mode • Cooling/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_stephen_hot_flash' },
     ])
@@ -4226,7 +4258,7 @@ describe('DashboardViewPage', () => {
     mockEntities['timer.eight_sleep_steph_hot_flash'].state = 'active'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed 12:34 Remaining/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side 12:34 Remaining/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Steph's Bed: Hot Flash Mode")).toBeInTheDocument()
@@ -4234,7 +4266,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Active' })).toBeInTheDocument()
     expect(within(dialog).getByText('12:34')).toBeInTheDocument()
     expect(within(dialog).queryByText('Cooling Bed')).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Steph's Bed 12:34 Remaining/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
+    expect(screen.getAllByRole('button', { name: /Steph's Side 12:34 Remaining/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
     const cancel = within(dialog).getByRole('button', { name: "Cancel Steph's Bed hot flash mode" })
     expect(cancel.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:close'))
 
@@ -4242,7 +4274,7 @@ describe('DashboardViewPage', () => {
 
     expect(within(dialog).getByText("Steph's Bed: Heating • +1")).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Hot Flash Mode Inactive' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Steph's Bed Heating • \+1/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
+    expect(screen.getAllByRole('button', { name: /Steph's Side Heating • \+1/i, hidden: true }).some((button) => button.getAttribute('data-muted') === 'false')).toBe(true)
     expect(mockCallServiceCalls).toEqual([
       { domain: 'input_button', service: 'press', target: 'input_button.eight_sleep_steph_cancel_hot_flash' },
     ])
@@ -4259,11 +4291,11 @@ describe('DashboardViewPage', () => {
       })
       render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-      expect(screen.getByRole('button', { name: /Steph's Bed 1:05 Remaining/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Steph's Side 1:05 Remaining/i })).toBeInTheDocument()
 
       act(() => vi.advanceTimersByTime(1000))
 
-      expect(screen.getByRole('button', { name: /Steph's Bed 1:04 Remaining/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Steph's Side 1:04 Remaining/i })).toBeInTheDocument()
     } finally {
       vi.clearAllTimers()
       vi.useRealTimers()
@@ -4278,7 +4310,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.eight_sleep_stephen_hot_flash_restore_at'].attributes.timestamp = (Date.now() + (14 * 60 + 34) * 1000) / 1000
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Hot Flash Mode • Cooling/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Hot Flash Mode • Cooling/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Stephen's Bed: Hot Flash Mode")).toBeInTheDocument()
@@ -4304,7 +4336,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.eight_sleep_stephen_hot_flash_restore_at'].attributes.timestamp = (Date.now() + (14 * 60 + 34) * 1000) / 1000
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed 14:34 Remaining/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side 14:34 Remaining/i }))
 
     const dialog = await screen.findByRole('dialog')
     await clickModalTab(within(dialog), 'Special Modes')
@@ -4315,7 +4347,7 @@ describe('DashboardViewPage', () => {
   it('cancels an in-flight target edit when Hot Flash mode takes ownership', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     await clickModalTab(within(dialog), 'Special Modes')
     vi.useFakeTimers()
@@ -4337,8 +4369,8 @@ describe('DashboardViewPage', () => {
   })
 
   it.each([
-    ["left", /Stephen.s Bed Cooling/, "Stephen\u0027s Bed", "Steph\u0027s Bed"],
-    ["right", /Steph.s Bed Off/, "Steph\u0027s Bed", "Stephen\u0027s Bed"],
+    ["left", /Your Side Cooling/, "Stephen\u0027s Bed", "Steph\u0027s Bed"],
+    ["right", /Steph's Side Off/, "Steph\u0027s Bed", "Stephen\u0027s Bed"],
   ] as const)("shows only the opened %s active alarm directly below its hero and in alarm detail pages", async (side, bedButtonName, sideTitle, otherSideTitle) => {
     if (side === "left") {
       setFreeSleepWakeDayAlarms("left", "sunday", [testFreeSleepAlarm("06:30"), testFreeSleepAlarm("07:15")])
@@ -4378,7 +4410,7 @@ describe('DashboardViewPage', () => {
     setFreeSleepWakeDayAlarms('right', 'saturday', [testFreeSleepAlarm('09:00')])
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
 
@@ -4401,8 +4433,8 @@ describe('DashboardViewPage', () => {
   })
 
   it.each([
-    ['left', /Stephen.s Bed Cooling • -1/i, 'Stephen\u0027s Bed', '06:45', '6:45 AM'],
-    ['right', /Steph.s Bed Off/i, 'Steph\u0027s Bed', '07:05', '7:05 AM'],
+    ['left', /Your Side Cooling • -1/i, 'Stephen\u0027s Bed', '06:45', '6:45 AM'],
+    ['right', /Steph's Side Off/i, 'Steph\u0027s Bed', '07:05', '7:05 AM'],
   ] as const)('directly disables and enables the %s single-alarm main row without opening edit', async (side, bedButtonName, sideTitle, time, displayTime) => {
     setFreeSleepWakeDayAlarms(side, 'sunday', [testFreeSleepAlarm(time)])
     render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
@@ -4458,7 +4490,7 @@ describe('DashboardViewPage', () => {
     setFreeSleepWakeDayAlarms('right', 'sunday', [firstAlarm, secondAlarm])
     render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Steph\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     const dayGroup = within(dialog).getByRole('button', { name: 'Steph\u0027s Bed Sunday Alarms 1 Enabled • 1 Disabled' })
@@ -4486,8 +4518,8 @@ describe('DashboardViewPage', () => {
   })
 
   it.each([
-    ['left', /Stephen.s Bed Cooling • -1/i, "Stephen's Bed"],
-    ['right', /Steph.s Bed Off/i, "Steph's Bed"],
+    ['left', /Your Side Cooling • -1/i, "Stephen's Bed"],
+    ['right', /Steph's Side Off/i, "Steph's Bed"],
   ] as const)('uses per-alarm state without a %s schedule master', async (_side, bedButtonName, sideTitle) => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -4501,8 +4533,8 @@ describe('DashboardViewPage', () => {
   })
 
   it.each([
-    ['left', /Stephen.s Bed Cooling • -1/i, "Stephen's Bed", '06:45'],
-    ['right', /Steph.s Bed Off/i, "Steph's Bed", '07:05'],
+    ['left', /Your Side Cooling • -1/i, "Stephen's Bed", '06:45'],
+    ['right', /Steph's Side Off/i, "Steph's Bed", '07:05'],
   ] as const)('globally adds weekday-default alarms for the %s side and restores main scroll and focus', async (side, bedButtonName, sideTitle, time) => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
@@ -4553,8 +4585,8 @@ describe('DashboardViewPage', () => {
   })
 
   it.each([
-    ['left', /Stephen.s Bed Cooling • -1/i, "Stephen's Bed", '08:10'],
-    ['right', /Steph.s Bed Off/i, "Steph's Bed", '08:20'],
+    ['left', /Your Side Cooling • -1/i, "Stephen's Bed", '08:10'],
+    ['right', /Steph's Side Off/i, "Steph's Bed", '08:20'],
   ] as const)('uses a locked day override and nested Back scroll and focus for the %s side', async (side, bedButtonName, sideTitle, time) => {
     if (side === 'left') {
       setFreeSleepWakeDayAlarms('left', 'sunday', [testFreeSleepAlarm('06:30'), testFreeSleepAlarm('07:15')])
@@ -4605,8 +4637,8 @@ describe('DashboardViewPage', () => {
   })
 
   it.each([
-    ['left', /Stephen.s Bed Cooling • -1/i, "Stephen's Bed"],
-    ['right', /Steph.s Bed Off/i, "Steph's Bed"],
+    ['left', /Your Side Cooling • -1/i, "Stephen's Bed"],
+    ['right', /Steph's Side Off/i, "Steph's Bed"],
   ] as const)('edits, deletes, normalizes, and returns through the %s day flow', async (side, bedButtonName, sideTitle) => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true).mockReturnValueOnce(false)
     if (side === 'left') {
@@ -4668,7 +4700,7 @@ describe('DashboardViewPage', () => {
     setFreeSleepWakeDayAlarms('right', 'sunday', [testFreeSleepAlarm('06:30'), testFreeSleepAlarm('07:15')])
     render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Steph\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }))
@@ -4704,7 +4736,7 @@ describe('DashboardViewPage', () => {
     setFreeSleepWakeDayAlarms('right', 'sunday', [testFreeSleepAlarm('06:30'), testFreeSleepAlarm('07:15')])
     const view = render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Steph\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }))
@@ -4744,7 +4776,7 @@ describe('DashboardViewPage', () => {
     setFreeSleepWakeDayAlarms('right', 'sunday', [laterSourceAlarm, earlierSourceAlarm])
     render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Steph\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }))
@@ -4762,7 +4794,7 @@ describe('DashboardViewPage', () => {
     setFreeSleepWakeDayAlarms('right', 'sunday', [testFreeSleepAlarm('06:30')])
     const view = render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Steph\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Steph\u0027s Bed Sunday alarm at 6:30 AM' }))
@@ -4789,7 +4821,7 @@ describe('DashboardViewPage', () => {
     setFreeSleepWakeDayAlarms('right', 'sunday', [testFreeSleepAlarm('06:30'), testFreeSleepAlarm('07:15')])
     const view = render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Steph\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph.s Bed Sunday Alarms 2 Enabled/i }))
@@ -4824,7 +4856,7 @@ describe('DashboardViewPage', () => {
     )
     const view = render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen.s Bed Cooling • -2/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -2/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Stephen\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Stephen.s Bed Saturday Alarms 2 Enabled/i }))
@@ -4865,7 +4897,7 @@ describe('DashboardViewPage', () => {
     mockEntities['sensor.master_bedroom_sleepypod_eight_pod_schedules'] = entity('sensor.master_bedroom_sleepypod_eight_pod_schedules', 'unavailable')
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
 
@@ -4895,7 +4927,7 @@ describe('DashboardViewPage', () => {
     })
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
 
@@ -4909,7 +4941,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.steph_monday_alarm_time'].state = 'unavailable'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
 
@@ -4925,7 +4957,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.steph_monday_alarm_time'].state = '06:30:00'
     render(<DashboardViewPage activePath='master-bedroom' onNavigate={() => undefined} path='master-bedroom' />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: 'Steph\u0027s Bed' })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('switch', { name: 'Turn off Steph\u0027s Bed Monday alarm at 6:30 AM' }))
@@ -4948,7 +4980,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.steph_sunday_alarm_time'].state = '06:30:00'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Sunday Alarm Enabled/i }))
@@ -4972,7 +5004,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.steph_monday_alarm_time'].state = '06:30:00'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Monday Alarm Enabled/i }))
@@ -4998,7 +5030,7 @@ describe('DashboardViewPage', () => {
     mockEntities['input_datetime.steph_monday_alarm_time'].state = '06:30:00'
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Monday Alarm Enabled/i }))
@@ -5037,7 +5069,7 @@ describe('DashboardViewPage', () => {
     )
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph.s Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Saturday Alarms 2 Enabled/i }))
@@ -5079,7 +5111,7 @@ describe('DashboardViewPage', () => {
     )
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Saturday Alarms 2 Enabled/i }))
@@ -5121,7 +5153,7 @@ describe('DashboardViewPage', () => {
     )
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog', { name: "Steph's Bed" })
     await clickModalTab(within(dialog), 'Alarms')
     fireEvent.click(within(dialog).getByRole('button', { name: /Steph's Bed Saturday Alarms 2 Enabled/i }))
@@ -5154,7 +5186,7 @@ describe('DashboardViewPage', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Steph's Bed: Off")).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Steph's Bed" }))
@@ -5164,7 +5196,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByText("Steph's Bed: Idle • 0")).toBeInTheDocument()
     expect(within(dialog).getByRole('region', { name: /Steph's Bed thermostat Idle 0/i })).toBeInTheDocument()
     expect(within(dialog).queryByText('Tap the thermostat to turn on the Pod.')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Steph's Bed Idle • 0/i, hidden: true })).toHaveAttribute('data-muted', 'false')
+    expect(screen.getByRole('button', { name: /Steph's Side Idle • 0/i, hidden: true })).toHaveAttribute('data-muted', 'false')
     expect(mockCallServiceCalls).toEqual([
       { domain: 'switch', service: 'turn_on', target: 'switch.nightcanvasrestful_right_power' },
     ])
@@ -5175,7 +5207,7 @@ describe('DashboardViewPage', () => {
   it('keeps the Free Sleep hero dial stable during brief MQTT availability blips', async () => {
     const { rerender } = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Stephen's Bed: Cooling • -1")).toBeInTheDocument()
 
@@ -5194,7 +5226,7 @@ describe('DashboardViewPage', () => {
   it('clears active and queued Free Sleep target edits when HA turns the bed side off', async () => {
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const dial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1/i })
     let slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
@@ -5258,7 +5290,7 @@ describe('DashboardViewPage', () => {
   it('drags the Free Sleep hero dial as a target level control', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const dial = within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Cooling -1/i })
     const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
@@ -5298,7 +5330,7 @@ describe('DashboardViewPage', () => {
       fireEvent.pointerUp(slider, { ...clientPoint(targetPoint), pointerId: 18 })
 
       expect(within(dialog).getByText("Stephen's Bed: Cooling • -2")).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -2/i, hidden: true })).toHaveAttribute('data-muted', 'false')
+      expect(screen.getByRole('button', { name: /Your Side Cooling • -2/i, hidden: true })).toHaveAttribute('data-muted', 'false')
 
       await waitFor(() => expect(mockCallServiceCalls).toEqual([
         { domain: 'number', service: 'set_value', target: 'number.nightcanvasrestful_left_target_temperature', serviceData: { value: -2 } },
@@ -5311,7 +5343,7 @@ describe('DashboardViewPage', () => {
   it('updates Free Sleep schedule stage temperatures through preserved helpers', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
 
     fireEvent.click(within(dialog).getByRole('button', { name: "Increase Stephen's Bed Asleep level" }))
@@ -5326,7 +5358,7 @@ describe('DashboardViewPage', () => {
   it('coalesces rapid Free Sleep schedule stage temperature taps to the final value', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const increaseAsleep = within(dialog).getByRole('button', { name: "Increase Stephen's Bed Asleep level" })
 
@@ -5348,7 +5380,7 @@ describe('DashboardViewPage', () => {
     mockEntities['number.nightcanvasrestful_right_dawn_temperature'].state = 'unknown'
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
     const dialog = await screen.findByRole('dialog')
     const asleepIncrease = within(dialog).getByRole('button', { name: "Increase Steph's Bed Asleep level" })
 
@@ -5368,7 +5400,7 @@ describe('DashboardViewPage', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const toggle = within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" })
 
@@ -5387,7 +5419,7 @@ describe('DashboardViewPage', () => {
     expect(within(offHero).queryByText('Idle')).not.toBeInTheDocument()
     expect(within(offHero).queryByText('-1')).not.toBeInTheDocument()
     expect(within(dialog).getByText('Use the power control to turn on the Pod.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stephen's Bed Off/i, hidden: true })).toHaveAttribute('data-muted', 'true')
+    expect(screen.getByRole('button', { name: /Your Side Off/i, hidden: true })).toHaveAttribute('data-muted', 'true')
 
     confirm.mockRestore()
   })
@@ -5395,7 +5427,7 @@ describe('DashboardViewPage', () => {
   it('disables Free Sleep target changes when that bed side is off', async () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Steph's Bed Off/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Steph's Side Off/i }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText("Steph's Bed: Off")).toBeInTheDocument()
@@ -5414,7 +5446,7 @@ describe('DashboardViewPage', () => {
   it('keeps Free Sleep target edits visible while stale HASS values catch up', async () => {
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     const slider = within(dialog).getByRole('slider', { name: "Stephen's Bed target level" })
     fireEvent.keyDown(slider, { key: 'ArrowLeft' })
@@ -5435,7 +5467,7 @@ describe('DashboardViewPage', () => {
   it('flushes the final Free Sleep target when the bed modal unmounts before debounce', async () => {
     const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Your Side Cooling • -1/i }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.keyDown(within(dialog).getByRole('slider', { name: "Stephen's Bed target level" }), { key: 'ArrowLeft' })
     expect(mockCallServiceCalls).toEqual([])
@@ -6552,7 +6584,7 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="office" onNavigate={() => undefined} path="office" />)
 
     expect(screen.getByRole('heading', { name: 'Office PCs' })).toBeInTheDocument()
-    const stephenPc = screen.getByRole('button', { name: /Stephen's PC On/i })
+    const stephenPc = screen.getByRole('button', { name: /Your PC On/i })
     const stephPc = screen.getByRole('button', { name: /Steph's PC Off/i })
     expect(stephenPc).toHaveAttribute('data-tone', 'switch')
     expect(stephenPc).toHaveAttribute('data-muted', 'false')
@@ -6568,6 +6600,24 @@ describe('DashboardViewPage', () => {
       { domain: 'input_button', service: 'press', target: 'input_button.stephen_s_pc_off' },
       { domain: 'input_button', service: 'press', target: 'input_button.steph_s_pc_on' },
     ])
+  })
+
+  it('personalizes bedroom sides and Office PCs for Steph and preserves names for unknown users', () => {
+    mockState.user = { id: HOUSEHOLD_RESIDENTS.steph.haUserId, name: 'Steph' }
+    const bedroom = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    expect(screen.getByRole('button', { name: /Stephen's Side Cooling • -1/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Your Side Off/i })).toBeInTheDocument()
+
+    bedroom.unmount()
+    const office = render(<DashboardViewPage activePath="office" onNavigate={() => undefined} path="office" />)
+    expect(screen.getByRole('button', { name: /Stephen's PC On/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Your PC Off/i })).toBeInTheDocument()
+
+    office.unmount()
+    mockState.user = { id: 'unknown-user', name: 'Unknown' }
+    render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    expect(screen.getByRole('button', { name: /Stephen's Bed Cooling • -1/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Steph's Bed Off/i })).toBeInTheDocument()
   })
 
   it('ports the Security page visible YAML sections and controls', () => {
@@ -6586,10 +6636,10 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('button', { name: 'Open Front Door camera' })).toBeInTheDocument()
     const securityGrid = screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-dynamic-grid="true"]')
     const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
-    expect(securityGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    expect(securityGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
-    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     expect(screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-responsive-section-item="true"]')).toHaveAttribute('data-span', 'full')
@@ -7452,11 +7502,13 @@ describe('DashboardViewPage', () => {
     expect(quickLinks).not.toHaveAttribute('data-dynamic-grid-item-sizing-min-width')
     expect(quickLinks.children).toHaveLength(5)
     expect(screen.getByRole('button', { name: /Groceries 2 items/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stephen's Tasks 4 upcoming tasks · 1 task listed/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Steph's Tasks No tasks listed/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Your Chores 4 upcoming tasks · 1 task listed/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Steph's Chores No tasks listed/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Unassigned Tasks 17 tasks listed/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Groceries 2 items/i }))
     expect(navigate).toHaveBeenCalledWith('groceries')
+    fireEvent.click(screen.getByRole('button', { name: /Your Chores 4 upcoming tasks · 1 task listed/i }))
+    expect(navigate).toHaveBeenCalledWith('stephens-chores')
 
     expect(screen.getByRole('heading', { name: 'Past Due' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Evening Tasks' })).toBeInTheDocument()
@@ -7510,6 +7562,8 @@ describe('DashboardViewPage', () => {
     mockState.user = { id: '43cb71bbd1cb4860b2a7de4c829020f0', name: 'Steph' }
     render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
 
+    expect(screen.getByRole('button', { name: /Stephen's Chores/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Your Chores/ })).toBeInTheDocument()
     const eveningList = await screen.findByLabelText('Evening Tasks todo list')
     fireEvent.click(within(eveningList).getByRole('button', { name: /Mock task one/i, pressed: false }))
 
@@ -7519,6 +7573,35 @@ describe('DashboardViewPage', () => {
       target: 'todo.steph_s_evening_with_unassigned',
       serviceData: { item: '1001--2026-06-04 17:30:00+00:00', status: 'completed' },
     })
+  })
+
+  it('keeps configured Chores quick-link labels for an unknown viewer', () => {
+    mockState.user = { id: 'unknown-user', name: 'Unknown' }
+    render(<DashboardViewPage activePath="chores" onNavigate={() => undefined} path="chores" />)
+
+    expect(screen.getByRole('button', { name: /Stephen's Tasks/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Steph's Tasks/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Your Chores/ })).not.toBeInTheDocument()
+  })
+
+  it('personalizes personal Chores page titles and the viewer empty state', async () => {
+    for (const list of TODO_PAGES['stephens-chores'].lists) {
+      mockEntities[list.entityId].state = '0'
+      mockTodoItemsByEntity[list.entityId] = []
+    }
+    const ownView = render(<DashboardViewPage activePath="stephens-chores" onNavigate={() => undefined} path="stephens-chores" />)
+    expect(screen.getByRole('heading', { name: 'Your Chores' })).toBeInTheDocument()
+    expect(await screen.findByText('You have no chores due- nice job!')).toBeInTheDocument()
+
+    ownView.unmount()
+    mockState.user = { id: HOUSEHOLD_RESIDENTS.steph.haUserId, name: 'Steph' }
+    const otherView = render(<DashboardViewPage activePath="stephens-chores" onNavigate={() => undefined} path="stephens-chores" />)
+    expect(screen.getByRole('heading', { name: "Stephen's Chores" })).toBeInTheDocument()
+
+    otherView.unmount()
+    mockState.user = { id: 'unknown-user', name: 'Unknown' }
+    render(<DashboardViewPage activePath="stephs-chores" onNavigate={() => undefined} path="stephs-chores" />)
+    expect(screen.getByRole('heading', { name: "Steph's Chores" })).toBeInTheDocument()
   })
 
   it('removes completed chore rows immediately and reloads rows when Home Assistant updates the todo entity', async () => {
@@ -7615,6 +7698,10 @@ describe('DashboardViewPage', () => {
     ['unassigned-chores', 'todo.unassigned_upcoming', 'Upcoming', 'Past Due'],
     ['home-improvement-chores', 'todo.home_improvement_s_upcoming', 'Upcoming', 'No Due Date'],
   ])('does not render empty sections on the %s subpage', async (path, emptyEntityId, emptyHeading, remainingHeading) => {
+    const remainingList = TODO_PAGES[path].lists.find((list) => list.title === remainingHeading)
+    expect(remainingList).toBeDefined()
+    mockEntities[emptyEntityId] = entity(emptyEntityId, '1')
+    mockEntities[remainingList!.entityId] = entity(remainingList!.entityId, '1')
     mockTodoItemsByEntity[emptyEntityId] = []
     render(<DashboardViewPage activePath={path} onNavigate={() => undefined} path={path} />)
 
@@ -7651,7 +7738,8 @@ describe('DashboardViewPage', () => {
     await waitFor(() => expect(screen.queryByLabelText(/todo list$/)).not.toBeInTheDocument())
     expect(screen.getByRole('heading', { name: 'No Chores Due' }).parentElement).toHaveAttribute('data-empty-layout', 'centered')
     expect(screen.getByRole('heading', { name: 'No Chores Due' }).parentElement).toHaveAttribute('data-empty-typography', 'festival')
-    expect(Array.from(screen.getByRole('main').children)[1]).toHaveAttribute('data-scroll-lock', 'true')
+    const scroller = screen.getByRole('main').querySelector('[data-page-scroller="true"]')
+    await waitFor(() => expect(scroller).toHaveAttribute('data-scroll-lock', 'true'))
     expect(screen.getByText('Steph has no chores due- nice job!')).toBeInTheDocument()
   })
 
@@ -8525,9 +8613,48 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toEqual([])
   })
 
-  it('keeps legacy while-away content in room-source modal content when typed detail has no opener', () => {
+  it('opens retained v2 uncertainty instead of the misleading legacy issue fallback', async () => {
     mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
-      ...LEGACY_VACUUM_OUTCOMES,
+      ...MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: structuredClone(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD),
+    }
+    render(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
+    const dialog = await screen.findByRole('dialog')
+    const summary = within(dialog).getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Sep 17, 2026' })
+    expect(summary).toHaveTextContent('1 Room Unverified • 1 Room Needs Attention')
+    expect(dialog).not.toHaveTextContent(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])
+
+    fireEvent.click(summary)
+
+    const office = within(dialog).getByLabelText('Office Completion Unverified')
+    expect(office).toHaveTextContent('Vacuuming completion could not be verified.')
+    expect(office).toHaveTextContent('Vacuuming remains due.')
+    expect(office).not.toHaveTextContent('Could not clean')
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps typed outcomes authoritative in room-source content when detail has no opener', () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
+      ...MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
+      while_away_outcomes: structuredClone(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD),
+    }
+    const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.coordinatorSessionEntityId)
+    if (!mainFloorVacuum) throw new Error('Expected Main Floor vacuum fixture')
+
+    render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
+
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
+    expect(document.querySelector('[data-action-kind="state"][data-icon="mdi:help-circle-outline"]')).toHaveTextContent(
+      /Sep 17, 2026\s*1 Room Unverified • 1 Room Needs Attention/,
+    )
+    expect(screen.queryByText(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
+  })
+
+  it('renders a noninteractive typed summary for room-source content without legacy arrays', () => {
+    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
       while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
     }
     const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.coordinatorSessionEntityId)
@@ -8536,21 +8663,9 @@ describe('DashboardViewPage', () => {
     render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
 
     expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
-    expect(screen.getByRole('note', { name: 'Cleaned' })).toHaveTextContent('Cleaned Gym')
-    expect(screen.getByRole('note', { name: 'Issues' })).toHaveTextContent('Could not clean Dining Room because the clean water tank is empty')
-    expect(screen.queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
-  })
-
-  it('renders no dead outcome surface for room-source content when typed data has no legacy arrays', () => {
-    mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
-      while_away_outcomes: structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT),
-    }
-    const mainFloorVacuum = VACUUMS.find((vacuum) => vacuum.coordinatorSessionEntityId)
-    if (!mainFloorVacuum) throw new Error('Expected Main Floor vacuum fixture')
-
-    render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
-
-    expect(screen.queryByRole('heading', { name: 'Main Floor Cleaning Report' })).not.toBeInTheDocument()
+    expect(document.querySelector('[data-action-kind="state"][data-icon="mdi:alert-circle"]')).toHaveTextContent(
+      /Aug 19, 2026\s*4 Rooms Completed • 4 Rooms Need Attention • 1 Error/,
+    )
     expect(screen.queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
   })
 
@@ -8607,7 +8722,7 @@ describe('DashboardViewPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('uses the complete legacy InfoBox branch when typed vacuum outcomes are incomplete', async () => {
+  it('shows an incomplete report state while keeping legacy details secondary', async () => {
     mockEntities['sensor.main_floor_vacuum_coordinator_session_state'].attributes = {
       ...LEGACY_VACUUM_OUTCOMES,
       while_away_outcomes: {
@@ -8620,9 +8735,14 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
 
     expect(within(dialog).getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('note', { name: 'Cleaned' })).toHaveTextContent('Cleaned Gym')
-    expect(within(dialog).getByRole('note', { name: 'Issues' })).toHaveTextContent('Could not clean Dining Room because the clean water tank is empty')
+    expect(within(dialog).getByText('Report Still Being Prepared')).toBeInTheDocument()
+    expect(within(dialog).getByText('Final counts are not available.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Cleaned Gym')).not.toBeVisible()
+    expect(within(dialog).getByText('Could not clean Dining Room because the clean water tank is empty')).not.toBeVisible()
     expect(within(dialog).queryByRole('button', { name: /Automatic Cleaning Report for/ })).not.toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Main Floor Unstructured Report Details' }))
+    expect(within(dialog).getByText('Cleaned Gym')).toBeVisible()
+    expect(within(dialog).getByText('Could not clean Dining Room because the clean water tank is empty')).toBeVisible()
   })
 
   it.each([

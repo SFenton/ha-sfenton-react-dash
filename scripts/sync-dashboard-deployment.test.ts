@@ -18,7 +18,10 @@ vi.mock('./lib/dashboardDeployment', async (importOriginal) => ({
   assertDashboardResourceAvailable: mocks.assertDashboardResourceAvailable,
 }))
 
-import { syncDashboardDeployment } from './sync-dashboard-deployment'
+import {
+  isSyncDashboardDeploymentEntry,
+  syncDashboardDeployment,
+} from './sync-dashboard-deployment'
 
 const inlineCardSource = "customElements.define('sfenton-react-app-card', class extends HTMLElement {})"
 const inlineCardUrl = `https://resources.example/${Buffer.from(inlineCardSource).toString('base64')}?type=module`
@@ -57,6 +60,21 @@ function resources() {
 }
 
 describe('dashboard deployment synchronization', () => {
+  it('does not execute the synchronization CLI when bundled into another entrypoint', () => {
+    expect(
+      isSyncDashboardDeploymentEntry(
+        'file:///opt/ha-dashboard/bin/deploy-dashboard-ci.mjs',
+        '/opt/ha-dashboard/bin/deploy-dashboard-ci.mjs',
+      ),
+    ).toBe(false)
+    expect(
+      isSyncDashboardDeploymentEntry(
+        'file:///repo/scripts/sync-dashboard-deployment.ts',
+        '/repo/scripts/sync-dashboard-deployment.ts',
+      ),
+    ).toBe(true)
+  })
+
   beforeEach(() => {
     mocks.assertDashboardResourceAvailable.mockResolvedValue(undefined)
     mocks.close.mockReset()

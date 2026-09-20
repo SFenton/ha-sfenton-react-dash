@@ -1,4 +1,4 @@
-import { useCallback, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { AppHeader, type AppHeaderAction } from '../components/shell/AppHeader'
 import type { PageMeasure } from '../constants/pageLayout'
 import { PageScrollerContext, PageScrollToTopContext } from '../hooks/usePageScroller'
@@ -20,9 +20,10 @@ interface PageProps {
   onProfile?: () => void
   onSettings?: () => void
   scrollLocked?: boolean
+  scrollResetKey?: string
 }
 
-export function Page({ activePath, backPath, chromeHidden = false, contentHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, measure = 'dashboard', onBack, onNavigate, onProfile, onSettings, scrollLocked = false }: PageProps) {
+export function Page({ activePath, backPath, chromeHidden = false, contentHidden = false, contentTransitionState = 'idle', title, headerQuickLinks, children, measure = 'dashboard', onBack, onNavigate, onProfile, onSettings, scrollLocked = false, scrollResetKey }: PageProps) {
   const copy = useCopy('common')
   const scrollerRef = useRef<HTMLDivElement>(null)
   const scrollToTop = useCallback(() => {
@@ -34,6 +35,10 @@ export function Page({ activePath, backPath, chromeHidden = false, contentHidden
     }
     scroller.scrollTop = 0
   }, [])
+  useEffect(() => {
+    if (scrollResetKey === undefined) return
+    scrollToTop()
+  }, [scrollResetKey, scrollToTop])
   const actions: AppHeaderAction[] = [
     ...(onSettings ? [{ icon: 'mdi:cog', label: copy('actions.settings'), onClick: onSettings }] : []),
     ...(onProfile ? [{ icon: 'mdi:account-circle', label: copy('actions.profile'), onClick: onProfile }] : []),

@@ -1,0 +1,55 @@
+version: 1
+effective_gate: binary_sensor.effective_vacation_mode
+raw_intent_owner:
+  - automation.vacation_mode_auto_disable
+  - automation.vacation_mode_default_dates
+  - automation.vacation_reset_pre_vacation_checklist
+consumers:
+  - entity_id: automation.vacation_mode_auto_disable
+    role: intent_owner
+    migration: retain_raw_input_boolean
+    live_hash: required_before_cutover
+  - entity_id: automation.master_bedroom_pbl_daytime_recovery_shadow
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.master_bedroom_pbl_two_person_shower_shadow
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.master_bedroom_pbl_departure_shower_snapshot
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.daily_summary_morning_and_evening_reports
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.master_bedroom_pbl_daytime_recovery
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.master_bedroom_pbl_two_actor_shower_evidence
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.notify_on_past_due_chores
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.pause_master_bedroom_humidifier_schedule_during_vacation
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.relay_control_mode_vacation_sync
+    role: operational_effect
+    migration: replace_vacation_mode_condition
+    live_hash: required_before_cutover
+  - entity_id: automation.vacation_mode_default_dates
+    role: intent_owner
+    migration: retain_raw_input_boolean
+    live_hash: required_before_cutover
+  - entity_id: automation.vacation_reset_pre_vacation_checklist
+    role: intent_owner
+    migration: retain_raw_input_boolean
+    live_hash: required_before_cutover

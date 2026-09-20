@@ -345,7 +345,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source'] as const
+export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source', 'solo-trip-settings', 'solo-trip-bed'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -381,7 +381,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   summary: {
     family: 'modal', states: ['overdue', 'upcoming', 'expired'],
     tabs: ['^Overdue Chores(?:,|\\s|$)', '^Upcoming Chores(?:,|\\s|$)', '^Expired Food(?:,|\\s|$)'],
-    owners: ['src/components/hass/DailyReport', 'src/components/hass/EverShelfInventoryPanel', 'src/constants/dailyReport', 'src/i18n/index.ts', 'src/i18n/locales/en/pages/food.json'],
+    owners: ['src/components/hass/DailyReport', 'src/components/hass/EverShelfInventoryPanel', 'src/constants/dailyReport', 'src/i18n/index.ts', 'src/i18n/locales/en.json', 'src/i18n/locales/en/pages/food.json'],
     legacy: ['modal-rotation-regressions.spec.ts', 'feedback-regressions.spec.ts'],
     question: 'Does the selected incoming Summary content retain readable type and columns on rotation before refreshing a tab?',
   },
@@ -404,7 +404,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   form: {
     family: 'modal', states: ['draft'],
-    owners: ['src/components/hass/CreateTodoItemSheet', 'src/components/core/NativePickerField'],
+    owners: ['src/components/hass/CreateDonetickTaskSheet', 'src/components/hass/CreateTodoItemSheet', 'src/components/hass/useDonetickTaskForm', 'src/components/core/NativePickerField'],
     legacy: ['modal-geometry-stability.spec.ts', 'react-dash.spec.ts'],
     question: 'Does the draft survive resizing, and are input, close and footer controls usable during synthetic keyboard contraction?',
   },
@@ -443,9 +443,9 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   navigation: {
     family: 'page-shell-grid', states: ['home', 'back-page'],
-    owners: ['src/pages/Page.', 'src/pages/ControlShowcasePage', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/navigationLayout'],
+    owners: ['src/pages/Page.', 'src/pages/AtAGlancePage', 'src/pages/ControlShowcasePage', 'src/i18n/locales/en/pages/chores.json', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/i18n/locales/en.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/atAGlance', 'src/constants/householdResidents', 'src/constants/navigationLayout', 'src/constants/roomPages'],
     legacy: ['adaptive-navigation.spec.ts', 'responsive-pages-all.spec.ts', 'desktop-responsive.spec.ts', 'safe-area-responsive.spec.ts'],
-    question: 'Do content, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey?',
+    question: 'Do content, viewer-relative room controls, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey?',
   },
   host: {
     family: 'host', states: ['legacy', 'panel'],
@@ -488,6 +488,41 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     legacy: ['wake-light-adaptive-navigation.spec.ts', 'wake-light-alarms.spec.ts', 'modal-geometry-stability.spec.ts'],
     question: 'Does source navigation close the old sheet before opening the authoritative Pod editor, preserve execution weekdays and linked-room meaning, and return without duplicate writes?',
   },
+  'solo-trip-settings': {
+    family: 'page-shell-grid',
+    states: ['idle', 'idle-selected', 'modal', 'scheduled', 'activating', 'active', 'active-home-viewer', 'active-unknown-viewer', 'degraded', 'ending', 'restore-required', 'unavailable'],
+    owners: [
+      'src/components/hass/householdAway/SoloTripChooserCard',
+      'src/components/hass/householdAway/SoloTripEditorModal',
+      'src/components/hass/householdAway/SoloTripStatusSection',
+      'src/components/hass/householdAway/householdAwayContract',
+      'src/components/hass/householdAway/useHouseholdAwayController',
+      'src/components/core/FieldActionButton',
+      'src/components/core/ScheduleConfirmationForm',
+      'src/pages/DashboardViewPage',
+      'src/constants/householdResidents',
+      'src/constants/routes',
+      'src/i18n/locales/en.json',
+      'src/i18n/locales/en/pages/soloTrip.json',
+    ],
+    legacy: ['responsive-pages-all.spec.ts', 'feedback-regressions.spec.ts'],
+    question: 'Does the dedicated Solo Trip page keep both Settings-style sections visible while idle, selected, modal, scheduled, activating, active, degraded, ending, restore-required, and unavailable states remain truthful across mobile and desktop?',
+  },
+  'solo-trip-bed': {
+    family: 'modal',
+    states: ['home-side', 'away-side', 'home-viewer-home-side', 'home-viewer-away-side'],
+    owners: [
+      'src/components/hass/householdAway/householdAwayLabels',
+      'src/components/hass/householdAway/useHouseholdAwayController',
+      'src/constants/householdAway',
+      'src/constants/householdResidents',
+      'src/i18n/locales/en.json',
+      'src/i18n/locales/en/pages/soloTrip.json',
+      'src/pages/DashboardViewPage',
+    ],
+    legacy: ['responsive-modal-inventory.spec.ts', 'modal-rotation-regressions.spec.ts'],
+    question: 'Is the Away status below the bed power controls in stacked layouts and above Sleep Schedule in the right pane, while the home resident controls the whole bed and the traveler side remains read-only?',
+  },
 }
 
 export const DEVICE_ONLY_GAPS = [
@@ -524,27 +559,86 @@ export const INTENTIONAL_NEW_ROUTES: Record<string, {
       temperaturePickers: 1,
     },
   },
+  'solo-trip': {
+    backLabel: 'Solo Trip',
+    heading: 'Solo Trip',
+    owner: 'solo-trip-settings',
+    referenceRoute: 'vacation',
+    root: '[data-page-content="true"]',
+    expected: {
+      actionCount: 3,
+      colorPickers: 0,
+      rgbChannels: 0,
+      sectionHeadings: ['Solo Trip', 'Away From Home'],
+      temperaturePickers: 0,
+    },
+  },
+  'vacation-mode': {
+    backLabel: 'Vacation Mode',
+    heading: 'Vacation Mode',
+    owner: 'solo-trip-settings',
+    referenceRoute: 'vacation',
+    root: '[data-page-content="true"]',
+    expected: {
+      actionCount: 6,
+      colorPickers: 0,
+      rgbChannels: 0,
+      sectionHeadings: ['Vacation Mode', 'Pre-Vacation Checklist'],
+      temperaturePickers: 0,
+    },
+  },
+}
+
+export const INTENTIONAL_ROUTE_REDESIGNS: Record<string, {
+  heading: string
+  owner: ScenarioId
+  expectedButtons: readonly RegExp[]
+}> = {
+  vacation: {
+    heading: 'Vacation',
+    owner: 'solo-trip-settings',
+    expectedButtons: [/^Vacation /, /^Solo Trip /],
+  },
 }
 
 export const INTENTIONAL_ROUTE_ADDITIONS: Record<string, {
+  description?: string
+  heading: string
   owner: ScenarioId
   section: string
   inherited: string[]
+  insertionIndex: number
+  tile: {
+    actionKind: string
+    name: string | RegExp
+    radius: string
+    variant?: string
+  }
   viewports: Record<string, {
     height: number
     shifts: Record<string, { x: number; y: number }>
+    tileHeight: number
     tileWidth: number
     width: number
   }>
 }> = {
   'master-bedroom': {
+    heading: 'Sleep & Wake',
     owner: 'wake-light',
     section: 'section-sleep-&-wake',
     inherited: ['section-sleepypod', 'section-media', 'section-climate'],
+    insertionIndex: 0,
+    tile: {
+      actionKind: 'modal',
+      name: /^Wake-Light Alarms /,
+      radius: '32px',
+      variant: 'card',
+    },
     viewports: {
       'phone-portrait': {
         height: 184,
         width: 361,
+        tileHeight: 120,
         tileWidth: 361,
         shifts: {
           'section-sleepypod': { x: 0, y: 202 },
@@ -555,6 +649,7 @@ export const INTENTIONAL_ROUTE_ADDITIONS: Record<string, {
       'phone-landscape': {
         height: 186,
         width: 401,
+        tileHeight: 120,
         tileWidth: 401,
         shifts: {
           'section-sleepypod': { x: 419, y: 0 },

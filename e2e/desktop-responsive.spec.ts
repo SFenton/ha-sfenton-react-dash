@@ -1,7 +1,11 @@
+// @covers src/constants/roomPages.ts
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
 import { RESPONSIVE_ROUTES, RESPONSIVE_ROUTE_TITLES } from './responsive-acceptance-data'
 import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from './quick-links'
+
+// @covers src/components/core/ScheduleConfirmationForm.module.css
+// @covers src/components/core/FieldActionButton.module.css
 
 const DESKTOP_VIEWPORTS = [
   { height: 900, width: 1440 },
@@ -36,6 +40,77 @@ async function visibleFocusIndicator(locator: Locator) {
   })
 }
 
+test('Vacation and Solo Trip schedule forms match in a fine-pointer desktop context', async ({ page }) => {
+  await page.setViewportSize({ height: 900, width: 1440 })
+  await page.goto('/index.html?path=vacation-mode')
+  await expect.poll(() => page.evaluate(() => ({
+    coarse: window.matchMedia('(pointer: coarse)').matches,
+    hover: window.matchMedia('(hover: hover)').matches,
+  }))).toEqual({ coarse: false, hover: true })
+  await page.evaluate(() => {
+    for (const entityId of [
+      'input_boolean.vacation_checklist_turn_off_outdoor_sprinklers',
+      'input_boolean.vacation_checklist_pour_boiling_water_down_the_drain',
+      'input_boolean.vacation_checklist_make_the_bed',
+      'input_boolean.vacation_checklist_unload_and_check_dishwasher',
+      'input_boolean.vacation_checklist_trash_and_recycles_taken_out',
+    ]) {
+      window.__mockHass?.setEntityState(entityId, 'on')
+    }
+    window.__mockHass?.calls.splice(0)
+  })
+
+  await page.getByRole('button', { name: 'Vacation Mode Off' }).click()
+  const vacation = page.getByRole('dialog', { name: 'Confirm Vacation' })
+  await expect(vacation).toBeVisible()
+
+  const formFacts = async (dialog: Locator) => {
+    const fields = dialog.locator('[data-schedule-confirmation-fields="true"]')
+    const action = dialog.locator('[data-schedule-confirmation-action="true"]')
+    await expect(fields.locator('label')).toHaveCount(4)
+    return {
+      action: await action.evaluate((element) => {
+        const rect = element.getBoundingClientRect()
+        const style = getComputedStyle(element)
+        return {
+          backgroundColor: style.backgroundColor,
+          borderRadius: style.borderRadius,
+          boxShadow: style.boxShadow,
+          height: rect.height,
+          width: rect.width,
+        }
+      }),
+      fields: await fields.evaluate((element) => {
+        const rect = element.getBoundingClientRect()
+        const style = getComputedStyle(element)
+        return {
+          columns: style.gridTemplateColumns,
+          width: rect.width,
+        }
+      }),
+    }
+  }
+
+  const vacationFacts = await formFacts(vacation)
+  await vacation.getByRole('button', { name: 'Close' }).click()
+  await expect(vacation).toHaveCount(0)
+
+  await navigateRoute(page, 'vacation')
+  await page.getByRole('button', { name: /Solo Trip One traveler, one home resident/i }).click()
+  await page.getByRole('button', { name: 'You', exact: true }).click()
+  await page.evaluate(() => window.__mockHass?.calls.splice(0))
+  await page.getByRole('switch', { name: 'Solo Trip Off' }).click()
+  const soloTrip = page.getByRole('dialog', { name: 'Schedule Solo Trip' })
+  await expect(soloTrip).toBeVisible()
+  const soloTripFacts = await formFacts(soloTrip)
+
+  expect(vacationFacts.fields.columns.split(' ').filter(Boolean)).toHaveLength(2)
+  expect(soloTripFacts.fields).toEqual(vacationFacts.fields)
+  expect(soloTripFacts.action).toEqual(vacationFacts.action)
+  expect(Math.abs(soloTripFacts.fields.width - soloTripFacts.action.width)).toBeLessThanOrEqual(1)
+  await expect.poll(() => page.evaluate(() => window.__mockHass?.calls ?? [])).toEqual([])
+})
+
 test('all routes remain contained in a fine-pointer desktop context', async ({ page }) => {
   test.setTimeout(180_000)
   await expect.poll(() => page.evaluate(() => ({
@@ -62,6 +137,23 @@ test('all routes remain contained in a fine-pointer desktop context', async ({ p
       expect(overflow.document, `${route} document overflow`).toBeLessThanOrEqual(1)
       expect(overflow.scroller, `${route} page overflow`).toBeLessThanOrEqual(1)
       expect(overflow.fallback, `${route} fallback content`).toBe(false)
+
+      if (route === 'master-bedroom') {
+        const grid = root.getByRole('group', { name: 'Master Bedroom Climate' })
+        await expect(grid).toHaveAttribute('data-dynamic-grid-columns', '2')
+        await expect.poll(() => grid.evaluate((element) => {
+          const gridBounds = element.getBoundingClientRect()
+          const cells = Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-dynamic-grid-cell="true"]'))
+            .map((cell) => ({ bounds: cell.getBoundingClientRect(), row: Math.round(cell.getBoundingClientRect().top) }))
+          const rows = [...new Set(cells.map((cell) => cell.row))]
+          return rows.every((row) => {
+            const rowCells = cells.filter((cell) => cell.row === row)
+            const left = Math.min(...rowCells.map((cell) => cell.bounds.left))
+            const right = Math.max(...rowCells.map((cell) => cell.bounds.right))
+            return Math.abs(left - gridBounds.left) <= 1 && Math.abs(right - gridBounds.right) <= 1
+          })
+        })).toBe(true)
+      }
     }
   }
 })
@@ -168,7 +260,7 @@ test('Daily Summary uses compact two-column rows in a fine-pointer desktop conte
     hover: window.matchMedia('(hover: hover)').matches,
   }))).toEqual({ coarse: false, hover: true })
 
-  const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+  const dialog = page.getByRole('dialog', { name: "Your Summary" })
   await expect(dialog).toBeVisible()
   await expect(dialog).toHaveAttribute('data-modal-body-tier', 'wide')
   await expect(dialog.locator('h2').first()).toHaveCSS('font-size', '16px')

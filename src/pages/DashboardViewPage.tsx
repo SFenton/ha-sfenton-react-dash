@@ -52,6 +52,11 @@ import {
 } from '../constants/surfaceSemantics'
 import { CircularControlDial, type CircularDialHandle, type CircularDialMarker } from '../components/hass/CircularControlDial'
 import { SleepypodActiveAlarmSection } from '../components/hass/SleepypodActiveAlarmSection'
+import { SoloTripEditorModal } from '../components/hass/householdAway/SoloTripEditorModal'
+import { SoloTripActiveNotice, SoloTripStatusSection } from '../components/hass/householdAway/SoloTripStatusSection'
+import { defaultSoloTripDraft, householdAwayBedScope, householdAwayWallClockParts, HOUSEHOLD_AWAY_MODE, HOUSEHOLD_AWAY_STATE, HOUSEHOLD_RESIDENT, validateSoloTripDraft, validateSoloTripEndDraft, type HouseholdAwayBedScope, type HouseholdAwaySnapshot, type HouseholdAwayState, type HouseholdResident, type SleepypodAlarmRow, type SoloTripDraft } from '../components/hass/householdAway/householdAwayContract'
+import { householdAwayBedDescription, householdAwayCommandError, householdAwayResidentLabel } from '../components/hass/householdAway/householdAwayLabels'
+import { useHouseholdAwayController, type HouseholdAwayController } from '../components/hass/householdAway/useHouseholdAwayController'
 import { isSleepypodAlarmActive, sleepypodAlarmState, sleepypodAlarmStatusText } from '../components/hass/sleepypodAlarmState'
 import {
   SLEEPYPOD_SCHEDULE_PHASE_ENTITY_IDS,
@@ -67,10 +72,12 @@ import { CheckboxRow } from '../components/core/CheckboxRow'
 import { Description } from '../components/core/Description'
 import { DynamicGrid } from '../components/core/DynamicGrid'
 import { EmptyState } from '../components/core/EmptyState'
+import { FieldActionButton } from '../components/core/FieldActionButton'
 import { GlassTile } from '../components/core/GlassTile'
 import { MaterialIcon } from '../components/core/Icon'
 import type { ControlSemantics } from '../components/core/controlSemantics'
 import { InlineAlert } from '../components/core/InlineAlert'
+import { InfoBox } from '../components/core/InfoBox'
 import { ModalIconTabNav } from '../components/core/ModalTabNav'
 import { modalTabId, modalTabPanelId } from '../components/core/modalTabIds'
 import { ModalSheet, type ModalCenteredGeometry } from '../components/core/ModalSheet'
@@ -80,6 +87,7 @@ import { OptionPickerDialog, type PickerOption } from '../components/core/Option
 import { ResponsiveSectionGrid, ResponsiveSectionItem } from '../components/core/ResponsiveSectionGrid'
 import { Section } from '../components/core/Section'
 import { ScheduleEditorFields } from '../components/core/ScheduleEditorFields'
+import scheduleFormStyles from '../components/core/ScheduleConfirmationForm.module.css'
 import { resolveScheduleDefaultDays } from '../components/core/scheduleDays'
 import { ScheduleCollection, ScheduleDetailFooter, ScheduleListRow } from '../components/core/ScheduleFlow'
 import { isValidScheduleTime } from '../components/core/scheduleTime'
@@ -107,8 +115,25 @@ import { useOptimisticState } from '../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../hooks/useScheduleDetailPage'
 import { useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
 import { useTodoOptimisticStatuses } from '../hooks/useTodoOptimisticStatuses'
-import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, useCopy } from '../i18n'
+import {
+  copy,
+  COMMON_COPY_NAMESPACE,
+  CORE_COPY_KEYS,
+  CORE_COPY_NAMESPACE,
+  HOUSEHOLD_COPY_KEYS,
+  PAGE_CHORES_COPY_KEYS,
+  PAGE_CHORES_COPY_NAMESPACE,
+  PAGE_SETTINGS_COPY_KEYS,
+  PAGE_SETTINGS_COPY_NAMESPACE,
+  PAGE_VACATION_COPY_KEYS,
+  PAGE_VACATION_COPY_NAMESPACE,
+  SOLO_TRIP_COPY_KEYS,
+  SOLO_TRIP_COPY_NAMESPACE,
+  useCopy,
+} from '../i18n'
 import { pageMeasureForPath } from '../constants/pageLayout'
+import { VACATION_CHOOSER_ROUTE_PATH } from '../constants/householdAway'
+import { householdResidentForHaUserId, householdResidentName } from '../constants/householdResidents'
 import {
   CLIMATE_GROUPS,
   CONTACT_GROUPS,
@@ -116,7 +141,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, SOLO_TRIP_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, VACATION_MODE_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -222,6 +247,8 @@ interface DashboardViewPageProps {
 }
 
 function routeTitle(path: string) {
+  if (path === SOLO_TRIP_ROUTE_PATH) return copy(SOLO_TRIP_COPY_NAMESPACE, SOLO_TRIP_COPY_KEYS.chooser.soloTrip)
+  if (path === VACATION_MODE_ROUTE_PATH) return copy(SOLO_TRIP_COPY_NAMESPACE, SOLO_TRIP_COPY_KEYS.chooser.vacation)
   return DASHBOARD_ROUTES.find((route) => route.path === path)?.title ?? 'Dashboard'
 }
 
@@ -492,6 +519,19 @@ function roomCardToStatusChip(card: RoomSourceCardConfig): StatusRailChip {
     tone: toneForSourceKind(card.kind),
     width: card.title.length > 10 ? 176 : 148,
   }
+}
+
+function personalizedRoomCardTitle(card: RoomSourceCardConfig, viewer: HouseholdResident | undefined) {
+  if (!viewer || !card.resident || !card.residentLabel) return card.title
+  if (card.resident === viewer) {
+    return copy(COMMON_COPY_NAMESPACE, card.residentLabel === 'bed-side' ? HOUSEHOLD_COPY_KEYS.yourSide : HOUSEHOLD_COPY_KEYS.yourPc)
+  }
+  const resident = householdResidentName(card.resident)
+  return copy(
+    COMMON_COPY_NAMESPACE,
+    card.residentLabel === 'bed-side' ? HOUSEHOLD_COPY_KEYS.residentSide : HOUSEHOLD_COPY_KEYS.residentPc,
+    { resident },
+  )
 }
 
 function RoomSectionRail({ path, title }: { path: string; title: string }) {
@@ -1127,7 +1167,9 @@ function DefaultRoomSourceCard({ card, eightSleepModalState, onOpen, preload = f
   const preserveDisabledInteraction = Boolean(card.semantics && hasInteraction)
   const activeByState = Boolean(entity && card.activeStates?.includes(entity.state))
   const sourceStateInactive = card.stateDisplay === 'climate-action-temperature' && (entity?.state === 'off' || entity?.attributes.hvac_action === 'off')
-  const inactiveMuted = eightSleepModalState ? !eightSleepModalState.controlsSideOn : sourceStateInactive || (!unavailable && !activeByState && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind))
+  const inactiveMuted = eightSleepModalState
+    ? eightSleepModalState.soloTripScope.readOnly || !eightSleepModalState.controlsSideOn
+    : sourceStateInactive || (!unavailable && !activeByState && !isActiveState(entity) && ['fan', 'grill', 'light', 'media', 'power'].includes(card.kind))
   const handleClick = !preload && (clickable || preserveDisabledInteraction)
     ? (card.action ? () => runAction(card.entityId, card.action) : () => onOpen(card))
     : undefined
@@ -1354,6 +1396,7 @@ function EmptyRoomState() {
 }
 
 function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashes = [], room }: { onNavigate: (path: string) => void; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; room: (typeof ROOM_PAGE_CONFIGS)[string] }) {
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
   const [selectedCard, setSelectedCard] = useState<RoomSourceCardConfig | null>(null)
   const eightSleepModalStates = useEightSleepBedModalStates(preload)
   const allCards = useMemo(() => [...room.overviewCards, ...room.sourceSections.flatMap((section) => section.cards)], [room.overviewCards, room.sourceSections])
@@ -1417,9 +1460,13 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
             const leadRow = section.layout === 'lead-row'
             const leadCards = leadRow ? section.cards.slice(0, 1) : section.cards
             const followUpCards = leadRow ? section.cards.slice(1) : []
-            const renderCard = (card: RoomSourceCardConfig) => (
-              <RoomSourceCard card={card} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={openSourceCard} preload={preload} />
-            )
+            const renderCard = (card: RoomSourceCardConfig) => {
+              const title = personalizedRoomCardTitle(card, viewerResident)
+              const displayCard = title === card.title ? card : { ...card, title }
+              return (
+                <RoomSourceCard card={displayCard} eightSleepModalState={card.hash ? eightSleepModalStates[card.hash] : undefined} key={`${room.path}-${section.title}-${card.title}-${card.entityId}`} onOpen={() => openSourceCard(card)} preload={preload} />
+              )
+            }
 
             return (
               <ResponsiveSectionItem key={`${room.path}-${section.title}`} span={section.span === 'full' || section.layout === 'app-launch' || pageSectionCount === 1 ? 'full' : 'auto'}>
@@ -1557,6 +1604,7 @@ function TodoPage({ path, configPath = path, onNavigate, onScrollLockChange }: {
 
 function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, path }: { config: TodoPageConfig; configPath: string; onNavigate: (path: string) => void; onScrollLockChange?: (locked: boolean) => void; path: string }) {
   const user = useUser()
+  const viewerResident = householdResidentForHaUserId(user?.id)
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const [sectionStates, setSectionStates] = useState<Record<string, { loaded: boolean; visible: boolean } | undefined>>({})
   const [editingTask, setEditingTask] = useState<DonetickTaskEditTarget | null>(null)
@@ -1574,6 +1622,9 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   const allSectionsLoaded = hideEmptyTodoSections && visibleListKeys.length > 0 && loadedSectionStates.length === visibleListKeys.length && loadedSectionStates.every((state) => state.loaded)
   const hasRenderedTaskSection = hideEmptyTodoSections ? loadedSectionStates.some((state) => state.visible) : visibleLists.length > 0
   const showTodoEmptyState = hideEmptyTodoSections && (visibleLists.length === 0 || (allSectionsLoaded && !hasRenderedTaskSection))
+  const emptyDescription = config.resident === viewerResident
+    ? copy(PAGE_CHORES_COPY_NAMESPACE, PAGE_CHORES_COPY_KEYS.personal.emptySelf)
+    : config.emptyDescription
   const lockPageScroll = path !== 'chores' && showTodoEmptyState
   const editableDonetickTasks = config.taskSource === 'donetick'
   const editableAdminTodo = isAdminTodoSurface(configPath, config)
@@ -1609,7 +1660,7 @@ function TodoPageContent({ config, configPath, onNavigate, onScrollLockChange, p
   return (
     <div className={styles.stack} data-empty-todo-page={lockPageScroll ? 'true' : undefined}>
       {configPath === 'chores' && <ChoresIntro onNavigate={onNavigate} />}
-      {showTodoEmptyState && <TodoEmptyState description={hiddenByVacation ? VACATION_EMPTY_DESCRIPTION : config.emptyDescription} title={config.emptyTitle} />}
+      {showTodoEmptyState && <TodoEmptyState description={hiddenByVacation ? VACATION_EMPTY_DESCRIPTION : emptyDescription} title={config.emptyTitle} />}
       {visibleLists.map((list) => {
         const entity = entities[list.entityId] as (typeof entities)[string] & { last_changed?: string; last_updated?: string }
         const entityVersion = `${entity?.state ?? ''}:${entity?.last_changed ?? ''}:${entity?.last_updated ?? ''}`
@@ -1697,10 +1748,19 @@ function ChoresIntro({ onNavigate }: { onNavigate: (path: string) => void }) {
   )
 }
 
+function personalizedChoreTitle(resident: HouseholdResident | undefined, fallback: string, viewer: HouseholdResident | undefined) {
+  if (!resident || !viewer) return fallback
+  return resident === viewer
+    ? copy(PAGE_CHORES_COPY_NAMESPACE, PAGE_CHORES_COPY_KEYS.quickLinks.yourChores)
+    : copy(PAGE_CHORES_COPY_NAMESPACE, PAGE_CHORES_COPY_KEYS.quickLinks.residentChores, { resident: householdResidentName(resident) })
+}
+
 function ChoreQuickLink({ item, onNavigate }: { item: (typeof CHORE_QUICK_LINKS)[number]; onNavigate: (path: string) => void }) {
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
   const counts = choreQuickLinkCounts(item.path, entities)
   const subtitle = item.countType === 'groceries' ? groceryCountSubtitle(counts.total) : choreQuickLinkSubtitle(counts)
+  const title = personalizedChoreTitle(item.resident, item.title, viewerResident)
 
   return (
     <GlassTile
@@ -1709,7 +1769,7 @@ function ChoreQuickLink({ item, onNavigate }: { item: (typeof CHORE_QUICK_LINKS)
       onClick={() => onNavigate(item.path)}
       semantics={{ kind: 'navigate' }}
       subtitle={subtitle}
-      title={item.title}
+      title={title}
     />
   )
 }
@@ -2021,7 +2081,7 @@ function isVacationChecklistComplete(stateKey: string) {
   return stateKey.split(VACATION_CHECKLIST_STATE_SEPARATOR).every((state) => state === 'on')
 }
 
-function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onEnabledChange, onPendingChange, pending = false, preChecklistComplete = true }: { disabled?: boolean; enabled: boolean; onBlockedEnable?: () => void; onEnabledChange: (enabled: boolean) => void; onPendingChange: (pending: boolean) => void; pending?: boolean; preChecklistComplete?: boolean }) {
+function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onDisable, onEnabledChange, onPendingChange, pending = false, preChecklistComplete = true }: { disabled?: boolean; enabled: boolean; onBlockedEnable?: () => void; onDisable?: () => void; onEnabledChange: (enabled: boolean) => void; onPendingChange: (pending: boolean) => void; pending?: boolean; preChecklistComplete?: boolean }) {
   const entity = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
   const callService = useCallService()
   const entityUnavailable = !entity || entity.state === 'unavailable' || entity.state === 'unknown'
@@ -2032,6 +2092,10 @@ function VacationModeCard({ disabled = false, enabled, onBlockedEnable, onEnable
     if (cardDisabled) return
     if (enabled) {
       onEnabledChange(false)
+      if (onDisable) {
+        onDisable()
+        return
+      }
       callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_MODE_ENTITY_ID })
       callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_INVALID_DATES_PENDING_ENTITY_ID })
       resetVacationChecklist(callService)
@@ -2127,16 +2191,14 @@ function VacationDateControls({ dateRange, invalidDateRange, onConfirm, onDateRa
     <>
       <Description>{VACATION_DATES_DESCRIPTION}</Description>
       {invalidDateRange && <Description className={styles.vacationDateError}>{VACATION_DATE_RANGE_ERROR}</Description>}
-      <div className={styles.vacationDateGrid}>
-        <NativePickerField className={styles.vacationDatePicker} label="Start Date" onChange={(value) => updateDateTime(VACATION_START_ENTITY_ID, value, startTime, { ...dateRange, start: { date: value, time: startTime } })} type="date" value={startDate} />
-        <NativePickerField className={styles.vacationDatePicker} label="Start Time" onChange={(value) => updateDateTime(VACATION_START_ENTITY_ID, startDate, value, { ...dateRange, start: { date: startDate, time: value } })} type="time" value={startTime} />
-        <NativePickerField className={styles.vacationDatePicker} label="End Date" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, value, endTime, { ...dateRange, end: { date: value, time: endTime } })} type="date" value={endDate} />
-        <NativePickerField className={styles.vacationDatePicker} label="End Time" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, endDate, value, { ...dateRange, end: { date: endDate, time: value } })} type="time" value={endTime} />
+      <div className={scheduleFormStyles.fields} data-schedule-confirmation-fields="true">
+        <NativePickerField className={scheduleFormStyles.picker} label="Start Date" onChange={(value) => updateDateTime(VACATION_START_ENTITY_ID, value, startTime, { ...dateRange, start: { date: value, time: startTime } })} type="date" value={startDate} />
+        <NativePickerField className={scheduleFormStyles.picker} label="Start Time" onChange={(value) => updateDateTime(VACATION_START_ENTITY_ID, startDate, value, { ...dateRange, start: { date: startDate, time: value } })} type="time" value={startTime} />
+        <NativePickerField className={scheduleFormStyles.picker} label="End Date" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, value, endTime, { ...dateRange, end: { date: value, time: endTime } })} type="date" value={endDate} />
+        <NativePickerField className={scheduleFormStyles.picker} label="End Time" onChange={(value) => updateDateTime(VACATION_END_ENTITY_ID, endDate, value, { ...dateRange, end: { date: endDate, time: value } })} type="time" value={endTime} />
       </div>
       {showConfirm && !invalidDateRange && (
-        <button className={styles.vacationConfirmButton} onClick={onConfirm} type="button">
-          Confirm Vacation
-        </button>
+        <FieldActionButton data-schedule-confirmation-action="true" label="Confirm Vacation" onClick={onConfirm} variant="primary" />
       )}
     </>
   )
@@ -2154,20 +2216,430 @@ function VacationDatesSection({ dateRange, invalidDateRange, onDateRangeChange, 
 function VacationConfirmationModal({ dateRange, invalidDateRange, onClose, onConfirm, onDateRangeChange, open }: { dateRange: VacationDateRange; invalidDateRange: boolean; onClose: () => void; onConfirm: () => void; onDateRangeChange: (dateRange: VacationDateRange) => void; open: boolean }) {
   return (
     <ModalSheet centeredGeometry={VACATION_CONFIRMATION_CENTERED_GEOMETRY} onClose={onClose} open={open} scrollResetKey={open ? 'open' : 'closed'} size="form" title="Confirm Vacation">
-      <div className={styles.vacationModalBody}>
+      <div className={scheduleFormStyles.body} data-schedule-confirmation-form="true">
         <VacationDateControls dateRange={dateRange} invalidDateRange={invalidDateRange} onConfirm={onConfirm} onDateRangeChange={onDateRangeChange} pending={true} recoveringInvalidDates={false} showConfirm />
       </div>
     </ModalSheet>
   )
 }
 
-function VacationPage() {
+function householdAwayModeEngaged(
+  snapshot: HouseholdAwaySnapshot,
+  mode: typeof HOUSEHOLD_AWAY_MODE.SOLO_TRIP | typeof HOUSEHOLD_AWAY_MODE.VACATION,
+) {
+  return snapshot.mode === mode && snapshot.state !== HOUSEHOLD_AWAY_STATE.IDLE
+}
+
+const SOLO_TRIP_COLOR: CardColor = { r: 91, g: 141, b: 239 }
+const SOLO_TRIP_TOGGLE_END_STATES: ReadonlySet<HouseholdAwayState> = new Set([
+  HOUSEHOLD_AWAY_STATE.SCHEDULED,
+  HOUSEHOLD_AWAY_STATE.ACTIVATING,
+  HOUSEHOLD_AWAY_STATE.ACTIVE,
+  HOUSEHOLD_AWAY_STATE.DEGRADED,
+])
+
+function householdAwaySetupError(copy: ReturnType<typeof useCopy>, snapshot: HouseholdAwaySnapshot) {
+  if (householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.VACATION)) return copy(SOLO_TRIP_COPY_KEYS.errors.vacationConflict)
+  if (!snapshot.available || !snapshot.commandAvailable) return copy(SOLO_TRIP_COPY_KEYS.errors.setupRequired)
+  return null
+}
+
+interface SoloTripScheduleAwaitingState {
+  endDate: string
+  endTime: string
+  startDate: string
+  startTime: string
+  traveler: HouseholdResident
+}
+
+interface SoloTripReturnAwaitingState {
+  endDate: string
+  endTime: string
+}
+
+function vacationFeaturePath(snapshot: HouseholdAwaySnapshot, vacationModeActive: boolean, recoveringInvalidDates: boolean) {
+  if (householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.VACATION) || vacationModeActive || recoveringInvalidDates) return VACATION_MODE_ROUTE_PATH
+  if (householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.SOLO_TRIP)) return SOLO_TRIP_ROUTE_PATH
+  return VACATION_CHOOSER_ROUTE_PATH
+}
+
+function VacationChooserPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  const settingsCopy = useCopy(PAGE_SETTINGS_COPY_NAMESPACE)
+  const vacationCopy = useCopy(PAGE_VACATION_COPY_NAMESPACE)
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
+  const snapshot = useHouseholdAwayController().snapshot
+  const soloTripSubtitle = !snapshot.available || !snapshot.commandAvailable
+    ? soloTripCopy(SOLO_TRIP_COPY_KEYS.chooser.setupRequiredSubtitle)
+    : soloTripCopy(SOLO_TRIP_COPY_KEYS.chooser.soloTripSubtitle)
+  const items: SettingsLinkConfig[] = [
+    {
+      title: settingsCopy(PAGE_SETTINGS_COPY_KEYS.items.vacation.title),
+      subtitle: settingsCopy(PAGE_SETTINGS_COPY_KEYS.items.vacation.subtitle),
+      icon: 'mdi:airplane',
+      path: VACATION_MODE_ROUTE_PATH,
+    },
+    {
+      title: soloTripCopy(SOLO_TRIP_COPY_KEYS.chooser.soloTrip),
+      subtitle: soloTripSubtitle,
+      icon: 'mdi:bag-suitcase',
+      path: SOLO_TRIP_ROUTE_PATH,
+    },
+  ]
+
+  return (
+    <div className={styles.stack}>
+      <DynamicGrid
+        ariaLabel={vacationCopy(PAGE_VACATION_COPY_KEYS.chooser.ariaLabel)}
+        columns={2}
+        gap={8}
+        justify="center"
+        lastRow="fill-minimum"
+        layout="bounded"
+        maxCellWidth={320}
+        maxColumns={3}
+        role="navigation"
+      >
+        {items.map((item) => (
+          <SettingsLink item={item} key={item.path} onNavigate={onNavigate} />
+        ))}
+      </DynamicGrid>
+    </div>
+  )
+}
+
+function SoloTripPage() {
+  const copy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
+  const commonCopy = useCopy(COMMON_COPY_NAMESPACE)
+  const controller = useHouseholdAwayController()
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
+  const { snapshot } = controller
+  const [selectedTraveler, setSelectedTraveler] = useState<HouseholdResident | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [scheduleDraft, setScheduleDraft] = useState<SoloTripDraft>(() => defaultSoloTripDraft())
+  const [scheduleAwaitingState, setScheduleAwaitingState] = useState<SoloTripScheduleAwaitingState | null>(null)
+  const [toggleAwaitingSnapshot, setToggleAwaitingSnapshot] = useState(false)
+  const [returnDraft, setReturnDraft] = useState({ endDate: '', endTime: '' })
+  const [returnEditing, setReturnEditing] = useState(false)
+  const [returnAwaitingState, setReturnAwaitingState] = useState<SoloTripReturnAwaitingState | null>(null)
+  const [restoreAwaitingSnapshot, setRestoreAwaitingSnapshot] = useState(false)
+  const [previousMode, setPreviousMode] = useState(snapshot.mode)
+  const engaged = householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.SOLO_TRIP)
+  const vacationEngaged = householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.VACATION)
+  const setupError = householdAwaySetupError(copy, snapshot)
+  const commandError = householdAwayCommandError(copy, controller.errorCode)
+  const authoritativeStart = householdAwayWallClockParts(snapshot.startsAt)
+  const authoritativeEnd = householdAwayWallClockParts(snapshot.endsAt)
+  const authoritativeEndDate = authoritativeEnd?.date ?? ''
+  const authoritativeEndTime = authoritativeEnd?.time ?? ''
+  const returnValidation = validateSoloTripEndDraft(returnDraft.endDate, returnDraft.endTime, snapshot.startsAt)
+  const awaitingCommand = scheduleAwaitingState !== null
+    || toggleAwaitingSnapshot
+    || returnAwaitingState !== null
+    || restoreAwaitingSnapshot
+  const toggleChecked = engaged
+  const selectionLocked = editorOpen || scheduleAwaitingState !== null || engaged || vacationEngaged
+  const knownTraveler = snapshot.traveler !== 'none' ? snapshot.traveler : selectedTraveler
+  const canEditReturn = snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+    && (snapshot.state === HOUSEHOLD_AWAY_STATE.SCHEDULED || snapshot.state === HOUSEHOLD_AWAY_STATE.ACTIVE)
+    && Boolean(authoritativeStart && authoritativeEnd)
+    && snapshot.available
+    && snapshot.commandAvailable
+
+  if (previousMode !== snapshot.mode) {
+    setPreviousMode(snapshot.mode)
+    if (
+      previousMode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+      && snapshot.mode !== HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+      && !editorOpen
+      && scheduleAwaitingState === null
+    ) {
+      setSelectedTraveler(null)
+      setReturnEditing(false)
+    }
+  }
+
+  if (
+    snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+    && snapshot.traveler !== 'none'
+    && selectedTraveler !== snapshot.traveler
+  ) {
+    setSelectedTraveler(snapshot.traveler)
+  }
+
+  const scheduleConfirmed = scheduleAwaitingState !== null
+    && snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+    && snapshot.traveler === scheduleAwaitingState.traveler
+    && authoritativeStart?.date === scheduleAwaitingState.startDate
+    && authoritativeStart?.time === scheduleAwaitingState.startTime
+    && authoritativeEndDate === scheduleAwaitingState.endDate
+    && authoritativeEndTime === scheduleAwaitingState.endTime
+  if (scheduleConfirmed) {
+    setScheduleAwaitingState(null)
+    setEditorOpen(false)
+    setScheduleDraft(defaultSoloTripDraft())
+  }
+
+  const toggleConfirmed = toggleAwaitingSnapshot
+    && (snapshot.mode !== HOUSEHOLD_AWAY_MODE.SOLO_TRIP || snapshot.state === HOUSEHOLD_AWAY_STATE.IDLE)
+  if (toggleConfirmed) setToggleAwaitingSnapshot(false)
+
+  const returnConfirmed = returnAwaitingState !== null
+    && authoritativeEndDate === returnAwaitingState.endDate
+    && authoritativeEndTime === returnAwaitingState.endTime
+  if (returnConfirmed) {
+    setReturnAwaitingState(null)
+    setReturnEditing(false)
+  }
+
+  if (restoreAwaitingSnapshot && snapshot.state !== HOUSEHOLD_AWAY_STATE.RESTORE_REQUIRED) {
+    setRestoreAwaitingSnapshot(false)
+  }
+
+  if (
+    !returnEditing
+    && authoritativeEndDate
+    && authoritativeEndTime
+    && (returnDraft.endDate !== authoritativeEndDate || returnDraft.endTime !== authoritativeEndTime)
+  ) {
+    setReturnDraft({ endDate: authoritativeEndDate, endTime: authoritativeEndTime })
+  }
+
+  const openEditor = () => {
+    if (!selectedTraveler || setupError || controller.pending || awaitingCommand) return
+    controller.clearError()
+    setScheduleDraft(defaultSoloTripDraft())
+    setEditorOpen(true)
+  }
+
+  const closeEditor = () => {
+    if (controller.pending || scheduleAwaitingState !== null) return
+    controller.clearError()
+    setScheduleDraft(defaultSoloTripDraft())
+    setEditorOpen(false)
+  }
+
+  const selectTraveler = (traveler: HouseholdResident) => {
+    if (selectionLocked) return
+    controller.clearError()
+    setSelectedTraveler(traveler)
+  }
+
+  const toggleSoloTrip = async () => {
+    if (controller.pending || awaitingCommand) return
+    controller.clearError()
+    if (!toggleChecked) {
+      openEditor()
+      return
+    }
+    if (!snapshot.available || !snapshot.commandAvailable) return
+    if (!SOLO_TRIP_TOGGLE_END_STATES.has(snapshot.state)) return
+    const result = snapshot.state === 'scheduled'
+      ? await controller.cancel()
+      : await controller.endNow()
+    if (result.status !== 'rejected') {
+      setToggleAwaitingSnapshot(true)
+    }
+  }
+
+  const resolveSoloTripRestore = async (resolveAction: 'keep_current' | 'restore_saved') => {
+    if (
+      controller.pending
+      || awaitingCommand
+      || snapshot.state !== HOUSEHOLD_AWAY_STATE.RESTORE_REQUIRED
+      || !snapshot.available
+      || !snapshot.commandAvailable
+    ) return
+    controller.clearError()
+    const result = await controller.resolveRestore(resolveAction)
+    if (result.status !== 'rejected') setRestoreAwaitingSnapshot(true)
+  }
+
+  const confirmSchedule = async () => {
+    if (!selectedTraveler || setupError || controller.pending || scheduleAwaitingState !== null) return
+    const request = { ...scheduleDraft, traveler: selectedTraveler }
+    const validation = validateSoloTripDraft(request)
+    if (!validation.valid) return
+    const result = await controller.scheduleSoloTrip(request)
+    if (result.status !== 'rejected') {
+      setScheduleAwaitingState({
+        ...request,
+      })
+    }
+  }
+
+  const beginReturnEdit = () => {
+    if (!authoritativeEnd || !canEditReturn || controller.pending || awaitingCommand) return
+    controller.clearError()
+    setReturnDraft({ endDate: authoritativeEnd.date, endTime: authoritativeEnd.time })
+    setReturnEditing(true)
+  }
+
+  const cancelReturnEdit = () => {
+    if (!authoritativeEnd || controller.pending || returnAwaitingState !== null) return
+    controller.clearError()
+    setReturnDraft({ endDate: authoritativeEnd.date, endTime: authoritativeEnd.time })
+    setReturnEditing(false)
+  }
+
+  const saveReturnEdit = async () => {
+    if (!canEditReturn || controller.pending || returnAwaitingState !== null || !returnValidation.valid) return
+    const result = await controller.updateEnd(returnDraft.endDate, returnDraft.endTime)
+    if (result.status !== 'rejected') {
+      setReturnAwaitingState({
+        endDate: returnDraft.endDate,
+        endTime: returnDraft.endTime,
+      })
+    }
+  }
+
+  const toggleDisabled = controller.pending
+    || awaitingCommand
+    || editorOpen
+    || snapshot.state === HOUSEHOLD_AWAY_STATE.ENDING
+    || snapshot.state === HOUSEHOLD_AWAY_STATE.RESTORE_REQUIRED
+    || !snapshot.available
+    || !snapshot.commandAvailable
+    || vacationEngaged
+    || (!toggleChecked && !selectedTraveler)
+  const toggleSubtitle = toggleChecked
+    ? copy(SOLO_TRIP_COPY_KEYS.page.toggleOn)
+    : setupError
+      ? snapshot.available && snapshot.commandAvailable
+        ? copy(SOLO_TRIP_COPY_KEYS.page.toggleOff)
+        : copy(SOLO_TRIP_COPY_KEYS.chooser.setupRequiredSubtitle)
+      : selectedTraveler
+        ? copy(SOLO_TRIP_COPY_KEYS.page.toggleOff)
+        : copy(SOLO_TRIP_COPY_KEYS.page.toggleDisabled)
+
+  return (
+    <div className={styles.stack}>
+      <ResponsiveSectionGrid>
+        <ResponsiveSectionItem>
+          <section className={styles.section}>
+            <SectionHeader title={copy(SOLO_TRIP_COPY_KEYS.chooser.soloTrip)} />
+            <SoloTripActiveNotice controller={controller} />
+            <Description>{copy(SOLO_TRIP_COPY_KEYS.page.soloTripDescription)}</Description>
+            <Card
+              ariaLabel={copy(SOLO_TRIP_COPY_KEYS.page.toggleAriaLabel, { state: toggleSubtitle })}
+              color={SOLO_TRIP_COLOR}
+              disabled={toggleDisabled}
+              icon={<MaterialIcon name="mdi:bag-suitcase" size={34} />}
+              muted={toggleDisabled || !toggleChecked}
+              onClick={() => void toggleSoloTrip()}
+              semantics={{ kind: 'toggle', checked: toggleChecked }}
+              size="wide"
+              subtitle={toggleSubtitle}
+              title={copy(SOLO_TRIP_COPY_KEYS.chooser.soloTrip)}
+            />
+            {setupError && <InlineAlert>{setupError}</InlineAlert>}
+          </section>
+        </ResponsiveSectionItem>
+        <ResponsiveSectionItem>
+          <section className={styles.section}>
+            <SectionHeader title={copy(SOLO_TRIP_COPY_KEYS.page.awayFromHomeTitle)} />
+            <Description>{copy(SOLO_TRIP_COPY_KEYS.page.awayFromHomeDescription)}</Description>
+            <DynamicGrid
+              ariaLabel={copy(SOLO_TRIP_COPY_KEYS.editor.traveler)}
+              columns={2}
+              gap={8}
+              justify="center"
+              lastRow="fill-minimum"
+              layout="bounded"
+              maxCellWidth={240}
+              maxColumns={3}
+            >
+              {([
+                [HOUSEHOLD_RESIDENT.STEPHEN, SOLO_TRIP_COPY_KEYS.editor.travelerStephen],
+                [HOUSEHOLD_RESIDENT.STEPH, SOLO_TRIP_COPY_KEYS.editor.travelerSteph],
+              ] as const).map(([traveler, key]) => {
+                const selected = knownTraveler === traveler
+                const homeResident = snapshot.homeResident === traveler
+                const title = viewerResident === traveler ? commonCopy(HOUSEHOLD_COPY_KEYS.you) : copy(key)
+                const subtitle = engaged
+                  ? selected
+                    ? copy(SOLO_TRIP_COPY_KEYS.page.travelerAway)
+                    : homeResident
+                      ? copy(SOLO_TRIP_COPY_KEYS.page.travelerHome)
+                      : undefined
+                  : selectionLocked && selected
+                    ? copy(SOLO_TRIP_COPY_KEYS.page.travelerSelected)
+                    : undefined
+                const interactive = !selectionLocked
+                return (
+                  <Card
+                    ariaLabel={subtitle ? copy(SOLO_TRIP_COPY_KEYS.page.memberAriaLabel, { name: title, state: subtitle }) : title}
+                    color={SOLO_TRIP_COLOR}
+                    disabled={!interactive}
+                    icon={<MaterialIcon name={selected ? 'mdi:account-arrow-right-outline' : homeResident ? 'mdi:home-account' : 'mdi:account'} size={34} />}
+                    key={traveler}
+                    muted={vacationEngaged || !selected}
+                    onClick={interactive ? () => selectTraveler(traveler) : undefined}
+                    semantics={interactive ? { kind: 'selection', selected } : undefined}
+                    size="wide"
+                    subtitle={subtitle}
+                    title={title}
+                  />
+                )
+              })}
+            </DynamicGrid>
+            {snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP && authoritativeStart && authoritativeEnd && (
+              <>
+                <div className={styles.soloTripFieldGrid}>
+                  <NativePickerField disabled label={copy(SOLO_TRIP_COPY_KEYS.editor.startDate)} onChange={() => undefined} type="date" value={authoritativeStart.date} />
+                  <NativePickerField disabled label={copy(SOLO_TRIP_COPY_KEYS.editor.startTime)} onChange={() => undefined} type="time" value={authoritativeStart.time} />
+                  <NativePickerField disabled={!returnEditing || !canEditReturn} label={copy(SOLO_TRIP_COPY_KEYS.editor.endDate)} onChange={(value) => setReturnDraft((current) => ({ ...current, endDate: value }))} type="date" value={returnEditing ? returnDraft.endDate : authoritativeEnd.date} />
+                  <NativePickerField disabled={!returnEditing || !canEditReturn} label={copy(SOLO_TRIP_COPY_KEYS.editor.endTime)} onChange={(value) => setReturnDraft((current) => ({ ...current, endTime: value }))} type="time" value={returnEditing ? returnDraft.endTime : authoritativeEnd.time} />
+                </div>
+                {returnEditing && !returnValidation.endAfterStart && <InlineAlert>{copy(SOLO_TRIP_COPY_KEYS.editor.validation.endAfterStart)}</InlineAlert>}
+                {returnEditing && commandError && <InlineAlert>{commandError}</InlineAlert>}
+                {canEditReturn && (
+                  returnEditing ? (
+                    <div className={styles.soloTripActionRow}>
+                      <FieldActionButton disabled={controller.pending || returnAwaitingState !== null || !returnValidation.valid} label={copy(SOLO_TRIP_COPY_KEYS.editor.saveReturn)} onClick={() => void saveReturnEdit()} />
+                      <FieldActionButton disabled={controller.pending || returnAwaitingState !== null} label={copy(SOLO_TRIP_COPY_KEYS.editor.cancelReturn)} onClick={cancelReturnEdit} />
+                    </div>
+                  ) : (
+                    <FieldActionButton disabled={controller.pending || awaitingCommand} label={copy(SOLO_TRIP_COPY_KEYS.editor.changeReturn)} onClick={beginReturnEdit} />
+                  )
+                )}
+              </>
+            )}
+            {engaged && (
+              <SoloTripStatusSection
+                controller={controller}
+                onResolveRestore={(resolveAction) => void resolveSoloTripRestore(resolveAction)}
+                restoreDisabled={restoreAwaitingSnapshot}
+                showConfirmedActiveNotice={false}
+                showActivatingEndNow={false}
+              />
+            )}
+          </section>
+        </ResponsiveSectionItem>
+      </ResponsiveSectionGrid>
+      <SoloTripEditorModal
+        availabilityMessage={setupError}
+        busy={scheduleAwaitingState !== null}
+        controller={controller}
+        draft={scheduleDraft}
+        onClose={closeEditor}
+        onConfirm={() => void confirmSchedule()}
+        onDraftChange={setScheduleDraft}
+        open={editorOpen}
+        selectedTraveler={selectedTraveler}
+      />
+    </div>
+  )
+}
+
+function VacationModePage() {
   const entities = useHass((state) => state.entities) as unknown as Record<string, HassEntity | undefined>
   const vacationMode = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
   const invalidDatesPending = useEntity(asEntityName(VACATION_INVALID_DATES_PENDING_ENTITY_ID), { returnNullIfNotFound: true })
   const startEntity = useEntity(asEntityName(VACATION_START_ENTITY_ID), { returnNullIfNotFound: true })
   const endEntity = useEntity(asEntityName(VACATION_END_ENTITY_ID), { returnNullIfNotFound: true })
   const callService = useCallService()
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
+  const soloTripController = useHouseholdAwayController()
   const [optimisticEnabled, commitEnabled] = useOptimisticState(isActiveState(vacationMode))
   const [checklistStateKey, commitChecklistStateKey] = useOptimisticState(vacationChecklistStateKeyFromEntities(entities))
   const [blockedEnableAttempted, setBlockedEnableAttempted] = useState(false)
@@ -2176,10 +2648,13 @@ function VacationPage() {
   const dateRange = pendingDateRange ?? vacationDateRangeFromStates(startEntity?.state, endEntity?.state)
   const invalidDateRange = isVacationDateRangeInvalid(dateRange)
   const recoveringInvalidDates = !pendingVacation && (invalidDateRange || isActiveState(invalidDatesPending))
-  const inlineDatesVisible = optimisticEnabled || recoveringInvalidDates
+  const backendVacationEngaged = soloTripController.snapshot.mode === 'vacation'
+    && soloTripController.snapshot.state !== 'idle'
+  const inlineDatesVisible = optimisticEnabled || recoveringInvalidDates || backendVacationEngaged
   const checklistStates = vacationChecklistStatesFromKey(checklistStateKey)
   const checklistComplete = isVacationChecklistComplete(checklistStateKey)
   const showPreChecklistError = blockedEnableAttempted && !checklistComplete && !inlineDatesVisible && !pendingVacation
+  const soloTripEngaged = soloTripController.snapshot.mode === 'solo_trip'
 
   const commitChecklistItemState = (entityId: string, nextState: string) => {
     const nextKey = vacationChecklistStateKeyWithItem(checklistStateKey, entityId, nextState)
@@ -2198,7 +2673,7 @@ function VacationPage() {
     if (pending) setBlockedEnableAttempted(false)
   }
 
-  const confirmVacation = () => {
+  const confirmVacation = async () => {
     const confirmedRange = pendingDateRange ?? dateRange
     callService({ domain: 'input_datetime', service: 'set_datetime', target: VACATION_START_ENTITY_ID, serviceData: inputDateTimeServiceData(confirmedRange.start.date, confirmedRange.start.time) })
     callService({ domain: 'input_datetime', service: 'set_datetime', target: VACATION_END_ENTITY_ID, serviceData: inputDateTimeServiceData(confirmedRange.end.date, confirmedRange.end.time) })
@@ -2208,23 +2683,34 @@ function VacationPage() {
     commitVacationEnabled(true)
   }
 
+  const disableVacation = () => {
+    callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_MODE_ENTITY_ID })
+    callService({ domain: 'input_boolean', service: 'turn_off', target: VACATION_INVALID_DATES_PENDING_ENTITY_ID })
+    resetVacationChecklist(callService)
+  }
+
   return (
     <div className={styles.stack}>
-      <ResponsiveSectionGrid>
-        <ResponsiveSectionItem>
-          <section className={styles.section}>
-            <SectionHeader title="Vacation Mode" />
-            <Description>{VACATION_MODE_DESCRIPTION}</Description>
-            {showPreChecklistError && <InlineAlert className={styles.vacationModeError}>{VACATION_PRE_CHECKLIST_ERROR}</InlineAlert>}
-            <VacationModeCard disabled={recoveringInvalidDates && invalidDateRange} enabled={optimisticEnabled || recoveringInvalidDates} onBlockedEnable={() => setBlockedEnableAttempted(true)} onEnabledChange={commitVacationEnabled} onPendingChange={setVacationPending} pending={pendingVacation} preChecklistComplete={checklistComplete} />
-          </section>
-        </ResponsiveSectionItem>
-        <ResponsiveSectionItem>
-          {inlineDatesVisible
-            ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onDateRangeChange={setPendingDateRange} recoveringInvalidDates={recoveringInvalidDates} />
-            : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
-        </ResponsiveSectionItem>
-      </ResponsiveSectionGrid>
+      {soloTripEngaged
+        ? <SoloTripStatusSection controller={soloTripController} />
+        : (
+            <ResponsiveSectionGrid>
+              <ResponsiveSectionItem>
+                <section className={styles.section}>
+                  <SectionHeader title="Vacation Mode" />
+                  <Description>{VACATION_MODE_DESCRIPTION}</Description>
+                  {showPreChecklistError && <InlineAlert className={styles.vacationModeError}>{VACATION_PRE_CHECKLIST_ERROR}</InlineAlert>}
+                  {soloTripController.errorCode && <InlineAlert>{householdAwayCommandError(soloTripCopy, soloTripController.errorCode)}</InlineAlert>}
+                  <VacationModeCard disabled={soloTripController.pending || (recoveringInvalidDates && invalidDateRange)} enabled={optimisticEnabled || recoveringInvalidDates || backendVacationEngaged} onBlockedEnable={() => setBlockedEnableAttempted(true)} onDisable={disableVacation} onEnabledChange={commitVacationEnabled} onPendingChange={setVacationPending} pending={pendingVacation} preChecklistComplete={checklistComplete} />
+                </section>
+              </ResponsiveSectionItem>
+              <ResponsiveSectionItem>
+                {inlineDatesVisible
+                  ? <VacationDatesSection dateRange={dateRange} invalidDateRange={invalidDateRange} onDateRangeChange={setPendingDateRange} recoveringInvalidDates={recoveringInvalidDates} />
+                  : <VacationChecklistSection onStateChange={commitChecklistItemState} states={checklistStates} />}
+              </ResponsiveSectionItem>
+            </ResponsiveSectionGrid>
+          )}
       <VacationConfirmationModal dateRange={pendingDateRange ?? dateRange} invalidDateRange={pendingVacation && invalidDateRange} onClose={() => setVacationPending(false)} onConfirm={confirmVacation} onDateRangeChange={setPendingDateRange} open={pendingVacation} />
     </div>
   )
@@ -2903,6 +3389,10 @@ interface EightSleepBedModalState {
   targetScale: 'level' | 'temperature'
   targetStep: number
   tileSubtitle: string
+  soloTripScope: HouseholdAwayBedScope
+  sendSoloTripCommand: HouseholdAwayController['sendSleepypodCommand']
+  sendSleepypodSchedule: HouseholdAwayController['sendSleepypodSchedule']
+  soloTripCommandError: string | null
 }
 
 interface BedTemperatureScopeRequest {
@@ -3462,6 +3952,7 @@ function sleepypodTemperatureAction(targetTemperature: number | null, currentTem
 }
 
 function eightSleepCardBackgroundColor(modalState: EightSleepBedModalState) {
+  if (modalState.soloTripScope.readOnly) return undefined
   if (!modalState.controlsSideOn) return undefined
   if (modalState.heroAction === 'heating') return 'rgba(136, 64, 26, 0.6)'
   if (modalState.heroAction === 'cooling') return 'rgba(25, 84, 130, 0.6)'
@@ -3469,8 +3960,9 @@ function eightSleepCardBackgroundColor(modalState: EightSleepBedModalState) {
 }
 
 function useEightSleepBedModalStates(preload = false) {
-  const stephenState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[0], preload)
-  const stephState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[1], preload)
+  const householdAway = useHouseholdAwayController()
+  const stephenState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[0], householdAway, preload)
+  const stephState = useEightSleepBedModalState(EIGHT_SLEEP_SIDE_CONFIGS[1], householdAway, preload)
 
   return {
     [EIGHT_SLEEP_SIDE_CONFIGS[0].hash]: stephenState,
@@ -3478,8 +3970,13 @@ function useEightSleepBedModalStates(preload = false) {
   }
 }
 
-function useEightSleepBedModalState(side: EightSleepSideConfig | undefined, preload = false): EightSleepBedModalState {
+function useEightSleepBedModalState(
+  side: EightSleepSideConfig | undefined,
+  householdAway: HouseholdAwayController,
+  preload = false,
+): EightSleepBedModalState {
   const sleepypodCopy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
   const climateEntity = useEntity(asEntityName(side?.climateEntityId ?? 'climate.sleepypod_unselected_side'), { returnNullIfNotFound: true })
   const hotFlashActiveEntity = useEntity(asEntityName(side?.hotFlashActiveEntityId ?? 'input_boolean.free_sleep_unselected_hot_flash_active'), { returnNullIfNotFound: true })
   const hotFlashRestoreAtEntity = useEntity(asEntityName(side?.hotFlashRestoreAtEntityId ?? 'input_datetime.sleepypod_unselected_hot_flash_restore_at'), { returnNullIfNotFound: true })
@@ -3553,6 +4050,14 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined, prel
       ? sleepypodCopy(SLEEPYPOD_HOT_FLASH_KEYS.remaining, { countdown: hotFlashCountdown })
       : sleepypodCopy(SLEEPYPOD_HOT_FLASH_KEYS.tileCooling)
     : subtitle
+  const soloTripScope = side
+    ? householdAwayBedScope(householdAway.snapshot, side.alarmOwner)
+    : householdAwayBedScope(householdAway.snapshot, HOUSEHOLD_RESIDENT.STEPHEN)
+  const scopedTileSubtitle = soloTripScope.readOnly
+    ? soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.readOnlySubtitle)
+    : soloTripScope.controlsWholeBed
+      ? soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.wholeBedState, { state: tileSubtitle })
+      : tileSubtitle
 
   useEffect(() => {
     if (preload || !hotFlashHolding) return undefined
@@ -3594,7 +4099,11 @@ function useEightSleepBedModalState(side: EightSleepSideConfig | undefined, prel
     targetMin,
     targetScale,
     targetStep,
-    tileSubtitle,
+    tileSubtitle: scopedTileSubtitle,
+    soloTripScope,
+    sendSoloTripCommand: householdAway.sendSleepypodCommand,
+    sendSleepypodSchedule: householdAway.sendSleepypodSchedule,
+    soloTripCommandError: householdAway.errorCode,
   }
 }
 
@@ -3828,6 +4337,7 @@ function EightSleepThermostatHero({
   side: EightSleepSideConfig
 }) {
   const sleepypodCopy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
   const callService = useCallService()
   const dialRef = useRef<HTMLDivElement>(null)
   const dialTapCandidateRef = useRef<{ moved: boolean; pointerId: number; startX: number; startY: number } | null>(null)
@@ -3840,12 +4350,14 @@ function EightSleepThermostatHero({
   const targetSliderRef = useRef<HTMLSpanElement>(null)
   const [dragValue, setDragValue] = useState<number | null>(null)
   const [targetDragging, setTargetDragging] = useState(false)
-  const { activeSchedulePhase, cancelTargetTemperature, commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, liveTargetValue, schedulePhaseAvailable, sideAvailable, targetMax, targetMin, targetScale, targetStep } = modalState
+  const { activeSchedulePhase, cancelTargetTemperature, commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, liveTargetValue, schedulePhaseAvailable, sendSoloTripCommand, sideAvailable, soloTripScope, targetMax, targetMin, targetScale, targetStep } = modalState
+  const soloTripInteractive = !soloTripScope.engaged || soloTripScope.controlsWholeBed
   const targetConfirmationHoldMs = controlMode === 'climate' && targetScale === 'level' ? SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS : 0
   const [optimisticTargetValue, commitHeroTargetValue, cancelHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const displayedTargetValue = modalState.hotFlashActive ? sourceTargetValue : dragValue ?? optimisticTargetValue
   const scopedSleepypodTarget = controlMode === 'climate' && targetScale === 'level'
   const canSetTarget = sideAvailable
+    && soloTripInteractive
     && controlsSideOn
     && !modalState.hotFlashActive
     && displayedTargetValue !== null
@@ -3873,13 +4385,21 @@ function EightSleepThermostatHero({
       : `${side.title} thermostat Off`
   const heroHintText = !sideAvailable
     ? 'Bed controls are unavailable.'
+    : !soloTripInteractive
+      ? soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.readOnlySubtitle)
     : !controlsSideOn
       ? 'Use the power control to turn on the Pod.'
       : scopedSleepypodTarget && !schedulePhaseAvailable
         ? 'Schedule phase is unavailable.'
         : modalState.hotFlashActive ? 'Hot Flash Mode controls the target.' : 'Tap or drag the dial to set the target.'
-  const powerButtonLabel = sideAvailable ? `${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}` : `${side.title} unavailable`
-  const powerButtonText = sideAvailable ? (controlsSideOn ? 'Turn Off' : 'Turn On') : 'Unavailable'
+  const powerButtonLabel = sideAvailable && soloTripInteractive
+    ? `${controlsSideOn ? 'Turn off' : 'Turn on'} ${side.title}`
+    : soloTripInteractive
+      ? soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.unavailablePowerLabel, { side: side.title })
+      : soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.readOnlyPowerLabel, { side: side.title })
+  const powerButtonText = sideAvailable && soloTripInteractive
+    ? (controlsSideOn ? 'Turn Off' : 'Turn On')
+    : soloTripInteractive ? 'Unavailable' : soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.readOnlySubtitle)
   const targetSliderLabel = `${side.title} target ${targetScale === 'temperature' ? 'temperature' : 'level'}`
   const sliderValue = displayedTargetValue ?? (targetScale === 'temperature' ? targetMin : 0)
 
@@ -3896,6 +4416,14 @@ function EightSleepThermostatHero({
   }, [liveTargetValue, sourceTargetValue])
 
   const sendTargetTemperatureToHass = useCallback((pendingValue: number) => {
+    if (soloTripScope.controlsWholeBed) {
+      void sendSoloTripCommand({
+        action: 'set_outside_level',
+        level: pendingValue,
+        side: side.scheduleSide,
+      })
+      return
+    }
     if (controlMode === 'climate' && targetScale === 'level') {
       callService({ domain: 'script', service: sleepypodOutsideScheduleTemperatureService(side.scheduleSide), serviceData: { level: pendingValue } })
       return
@@ -3905,7 +4433,7 @@ function EightSleepThermostatHero({
       return
     }
     callService({ domain: 'number', service: 'set_value', target: controlMode === 'climate' && side.targetLevelEntityId ? side.targetLevelEntityId : side.targetTemperatureEntityId, serviceData: { value: pendingValue } })
-  }, [callService, controlMode, side.climateEntityId, side.scheduleSide, side.targetLevelEntityId, side.targetTemperatureEntityId, targetScale])
+  }, [callService, controlMode, sendSoloTripCommand, side.climateEntityId, side.scheduleSide, side.targetLevelEntityId, side.targetTemperatureEntityId, soloTripScope.controlsWholeBed, targetScale])
 
   const flushTargetTemperatureSync = useCallback(() => {
     if (targetSyncTimerRef.current !== null) window.clearTimeout(targetSyncTimerRef.current)
@@ -4110,11 +4638,12 @@ function EightSleepThermostatHero({
   }
 
   const toggleSidePower = () => {
-    if (!sideAvailable) return
+    if (!sideAvailable || !soloTripInteractive) return
     if (!controlsSideOnRef.current) {
       controlsSideOnRef.current = true
       commitDisplaySideOn(true)
-      if (controlMode === 'climate') callService({ domain: 'script', service: SLEEPYPOD_HOT_FLASH_BROKER_SERVICE, serviceData: { action: 'power_heat', side: side.scheduleSide } })
+      if (soloTripScope.controlsWholeBed) void sendSoloTripCommand({ action: 'set_power', enabled: true, side: side.scheduleSide })
+      else if (controlMode === 'climate') callService({ domain: 'script', service: SLEEPYPOD_HOT_FLASH_BROKER_SERVICE, serviceData: { action: 'power_heat', side: side.scheduleSide } })
       else callService({ domain: 'switch', service: 'turn_on', target: side.powerSwitchEntityId })
       return
     }
@@ -4123,7 +4652,8 @@ function EightSleepThermostatHero({
     controlsSideOnRef.current = false
     setDragValue(null)
     commitDisplaySideOn(false)
-    if (controlMode === 'climate') callService({ domain: 'script', service: SLEEPYPOD_HOT_FLASH_BROKER_SERVICE, serviceData: { action: 'power_off', side: side.scheduleSide } })
+    if (soloTripScope.controlsWholeBed) void sendSoloTripCommand({ action: 'set_power', enabled: false, side: side.scheduleSide })
+    else if (controlMode === 'climate') callService({ domain: 'script', service: SLEEPYPOD_HOT_FLASH_BROKER_SERVICE, serviceData: { action: 'power_off', side: side.scheduleSide } })
     else callService({ domain: 'switch', service: 'turn_off', target: side.powerSwitchEntityId })
   }
 
@@ -4157,7 +4687,7 @@ function EightSleepThermostatHero({
       value: modalState.currentLevel,
     }] : []),
   ]
-  const dialDisabled = !sideAvailable || !controlsSideOn
+  const dialDisabled = !sideAvailable || !soloTripInteractive || !controlsSideOn
 
   return (
     <div className={styles.eightSleepThermostatHero}>
@@ -4195,8 +4725,8 @@ function EightSleepThermostatHero({
           value={sliderValue}
         />
       </div>
-      <div className={styles.eightSleepThermostatActions}>
-        <button aria-label={powerButtonLabel} className={styles.eightSleepPowerButton} data-active={controlsSideOn ? 'true' : 'false'} disabled={!sideAvailable} onClick={toggleSidePower} type="button">
+      <div className={styles.eightSleepThermostatActions} data-eight-sleep-power-actions="true">
+        <button aria-label={powerButtonLabel} className={styles.eightSleepPowerButton} data-active={controlsSideOn ? 'true' : 'false'} disabled={!sideAvailable || !soloTripInteractive} onClick={toggleSidePower} type="button">
           <MaterialIcon name="mdi:power" size={20} />
           <span>{powerButtonText}</span>
         </button>
@@ -4206,19 +4736,20 @@ function EightSleepThermostatHero({
   )
 }
 
-function EightSleepAwayModeCard({ side }: { side: EightSleepSideConfig }) {
+function EightSleepAwayModeCard({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const awayEntity = useEntity(asEntityName(side.awayModeEntityId), { returnNullIfNotFound: true })
   const callService = useCallService()
   const [displayAwayMode, commitAwayMode] = useOptimisticState(awayEntity?.state === 'on', { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
   const active = displayAwayMode
   const activeRef = useRef(active)
+  const interactive = !modalState.soloTripScope.engaged
 
   useEffect(() => {
     activeRef.current = active
   }, [active])
 
   const toggleAwayMode = () => {
-    if (!awayEntity || isUnavailable(awayEntity)) return
+    if (!interactive || !awayEntity || isUnavailable(awayEntity)) return
     const nextActive = !activeRef.current
     activeRef.current = nextActive
     commitAwayMode(nextActive)
@@ -4226,7 +4757,7 @@ function EightSleepAwayModeCard({ side }: { side: EightSleepSideConfig }) {
   }
 
   return (
-    <ThermostatGlassCard active={active} icon="mdi:bed-empty" onMainClick={toggleAwayMode} stateText={active ? 'On' : 'Off'} title="Away Mode" />
+    <ThermostatGlassCard active={active} icon="mdi:bed-empty" onMainClick={interactive ? toggleAwayMode : undefined} stateText={active ? 'On' : 'Off'} title="Away Mode" />
   )
 }
 
@@ -4253,6 +4784,7 @@ function EightSleepScheduleSection({
             icon={stage.icon}
             key={stage.key}
             label={stage.label}
+            modalState={modalState}
             activeSchedulePhase={modalState.activeSchedulePhase}
             onCommitTemperatureIntent={modalState.controlMode === 'climate' && modalState.targetScale === 'level'
               ? onCommitTemperatureIntent
@@ -4269,7 +4801,7 @@ function EightSleepScheduleSection({
   )
 }
 
-function EightSleepBedtimeSetting({ side }: { side: EightSleepSideConfig }) {
+function EightSleepBedtimeSetting({ modalState, side }: { modalState: EightSleepBedModalState; side: EightSleepSideConfig }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const bedtimeEntity = useEntity(asEntityName(side.bedtimeEntityId), { returnNullIfNotFound: true })
   const schedulesEntity = useEntity(asEntityName(FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID), { returnNullIfNotFound: true })
@@ -4280,14 +4812,16 @@ function EightSleepBedtimeSetting({ side }: { side: EightSleepSideConfig }) {
   const [displayTime, commitDisplayTime] = useOptimisticState(liveTime, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
   const pickerValue = displayTime || fallbackTime || '21:00'
   const stateText = displayTime ? formatClockTime(displayTime) : fallbackTime ? formatClockTime(fallbackTime) : schedulesEntity ? 'Mixed' : 'Set time'
+  const interactive = !modalState.soloTripScope.engaged
 
   const openPicker = () => {
+    if (!interactive) return
     openNativeTimePicker(inputRef.current)
   }
 
   const setBedtime = (nextTime: string) => {
     const normalizedTime = parsedInputTime(nextTime, '')
-    if (!normalizedTime) return
+    if (!interactive || !normalizedTime) return
     commitDisplayTime(normalizedTime)
     if (!isUnavailable(bedtimeEntity)) {
       callService({ domain: 'text', service: 'set_value', target: side.bedtimeEntityId, serviceData: { value: normalizedTime } })
@@ -4298,14 +4832,14 @@ function EightSleepBedtimeSetting({ side }: { side: EightSleepSideConfig }) {
 
   return (
     <div className={[styles.thermostatGlassCard, styles.eightSleepBedtimeCard].join(' ')} data-active="true" data-thermal-status="idle" onClick={openPicker}>
-      <button aria-label={`${side.title} bedtime ${stateText}`} className={styles.thermostatGlassMain} type="button">
+      <button aria-label={`${side.title} bedtime ${stateText}`} className={styles.thermostatGlassMain} disabled={!interactive} type="button">
         <MaterialIcon name="mdi:bed" size={34} />
         <span>
           <strong>Bedtime</strong>
           <small>{stateText}</small>
         </span>
       </button>
-      <input aria-label={`${side.title} bedtime`} className={styles.eightSleepBedtimeInput} onChange={(event) => setBedtime(event.currentTarget.value)} ref={inputRef} type="time" value={pickerValue} />
+      <input aria-label={`${side.title} bedtime`} className={styles.eightSleepBedtimeInput} disabled={!interactive} onChange={(event) => setBedtime(event.currentTarget.value)} ref={inputRef} type="time" value={pickerValue} />
     </div>
   )
 }
@@ -4344,8 +4878,11 @@ function alarmEnabledSummary(enabledCount: number, disabledCount: number) {
 }
 
 interface EightSleepAlarmsController {
+  activeAlarmCommand?: (action: 'snooze_alarm' | 'stop_alarm') => void
   alarmRecords: FreeSleepAlarmRecord[]
   available: boolean
+  editable: boolean
+  readOnly: boolean
   removeAlarm: (draft: EightSleepAlarmEditorDraft) => boolean
   saveAlarm: (draft: EightSleepAlarmEditorDraft) => boolean
   setAlarmEnabled: (alarm: FreeSleepAlarmRecord, enabled: boolean) => boolean
@@ -4355,11 +4892,15 @@ interface EightSleepAlarmsController {
 function useEightSleepAlarmsController({
   scheduleEntityId = FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID,
   scheduleSetTopic = FREE_SLEEP_SCHEDULE_SET_TOPIC,
+  sendSoloTripCommand,
   side,
+  soloTripScope,
 }: {
   scheduleEntityId?: string
   scheduleSetTopic?: string
+  sendSoloTripCommand: HouseholdAwayController['sendSleepypodCommand']
   side: EightSleepSideConfig
+  soloTripScope: HouseholdAwayBedScope
 }) {
   const scheduleEntity = useEntity(asEntityName(scheduleEntityId), { returnNullIfNotFound: true })
   const entities = useHass((state) => state.entities) as unknown as EntityActionStateMap
@@ -4378,6 +4919,7 @@ function useEightSleepAlarmsController({
       })
   ))
   const available = scheduleSideAvailable || legacyAlarmAvailable
+  const editable = available && (!soloTripScope.engaged || soloTripScope.controlsWholeBed)
   const supportsMultiplePerDay = scheduleSideAvailable
   const legacyAlarmSourceKey = legacyAlarmAvailable
     ? FREE_SLEEP_ALARM_DAY_KEYS.flatMap((day) => [
@@ -4402,7 +4944,7 @@ function useEightSleepAlarmsController({
   const pendingAlarmSourceKeyRef = useRef<string | null>(null)
   const syncAlarmRecordsRef = useRef<(records: FreeSleepAlarmRecord[]) => void>(() => undefined)
   const alarmRecordsRef = useRef(alarmRecords)
-  const availableRef = useRef(available)
+  const editableRef = useRef(editable)
   const alarmSyncSourceKeyRef = useRef(alarmSyncSourceKey)
   const sourceRecordsRef = useRef(sourceRecords)
   const lastSourceRecordKeyRef = useRef(sourceRecordKey)
@@ -4419,10 +4961,10 @@ function useEightSleepAlarmsController({
 
   useLayoutEffect(() => {
     alarmRecordsRef.current = alarmRecords
-    availableRef.current = available
+    editableRef.current = editable
     alarmSyncSourceKeyRef.current = alarmSyncSourceKey
     sourceRecordsRef.current = sourceRecords
-  }, [alarmRecords, alarmSyncSourceKey, available, sourceRecords])
+  }, [alarmRecords, alarmSyncSourceKey, available, editable, sourceRecords])
 
   useEffect(() => {
     if (lastSourceRecordKeyRef.current !== sourceRecordKey) {
@@ -4469,6 +5011,37 @@ function useEightSleepAlarmsController({
   }, [alarmSyncSourceKey, callService, rebaseLocalAlarmAcknowledgement, side.scheduleSide, sourceRecordKey, sourceRecords])
 
   const syncAlarmRecords = useCallback((sortedRecords: FreeSleepAlarmRecord[]) => {
+    if (soloTripScope.engaged) {
+      if (!soloTripScope.controlsWholeBed) return
+      const alarmRows: SleepypodAlarmRow[] = sortedRecords.map(({
+        alarmTemperature,
+        day,
+        duration,
+        enabled,
+        time,
+        vibrationIntensity,
+        vibrationPattern,
+      }) => ({
+        alarmTemperature,
+        day,
+        duration,
+        enabled,
+        time,
+        vibrationIntensity,
+        vibrationPattern,
+      }))
+      void sendSoloTripCommand({
+        action: 'replace_alarms',
+        alarmRows,
+        side: side.scheduleSide,
+      }).then((accepted) => {
+        if (accepted) return
+        alarmRecordsRef.current = sourceRecordsRef.current
+        optimisticAlarmSourceKeyRef.current = null
+        setOptimisticRecords(null)
+      })
+      return
+    }
     const publishedRecordKey = alarmRecordsStateKey(sortedRecords)
     const publishedKeys = localPublishedAlarmRecordKeysRef.current
     if (!publishedKeys.includes(publishedRecordKey)) {
@@ -4506,7 +5079,7 @@ function useEightSleepAlarmsController({
         topic: scheduleSetTopic,
       },
     })
-  }, [alarmDaySemantics, callService, legacyAlarmAvailable, schedule, scheduleSetTopic, scheduleSideAvailable, side])
+  }, [alarmDaySemantics, callService, legacyAlarmAvailable, schedule, scheduleSetTopic, scheduleSideAvailable, sendSoloTripCommand, side, soloTripScope.controlsWholeBed, soloTripScope.engaged])
 
   useLayoutEffect(() => {
     syncAlarmRecordsRef.current = syncAlarmRecords
@@ -4519,7 +5092,7 @@ function useEightSleepAlarmsController({
     pendingAlarmRecordsRef.current = null
     pendingAlarmSourceKeyRef.current = null
     alarmSyncTimerRef.current = null
-    if (pendingRecords && availableRef.current && pendingSourceKey === alarmSyncSourceKeyRef.current) {
+    if (pendingRecords && editableRef.current && pendingSourceKey === alarmSyncSourceKeyRef.current) {
       syncAlarmRecordsRef.current(pendingRecords)
     }
   }, [])
@@ -4547,14 +5120,14 @@ function useEightSleepAlarmsController({
         )
       }
       debugFreeSleepAlarm(callService, 'section-sync-timer-fire', {
-        available: availableRef.current,
+        available: editableRef.current,
         hasPendingRecords: Boolean(pendingRecords),
         records: pendingRecords ? compactAlarmRecordsForDebug(pendingRecords) : [],
         side: side.scheduleSide,
         sourceIsCurrent,
       })
       if (!pendingRecords) return
-      if (!availableRef.current || !sourceIsCurrent) {
+      if (!editableRef.current || !sourceIsCurrent) {
         alarmRecordsRef.current = sourceRecordsRef.current
         optimisticAlarmSourceKeyRef.current = null
         setOptimisticRecords(null)
@@ -4565,6 +5138,7 @@ function useEightSleepAlarmsController({
   }
 
   const setAlarmRecords = (nextRecords: FreeSleepAlarmRecord[]) => {
+    if (!editableRef.current) return
     const sortedRecords = normalizeAlarmRecordIndexes(nextRecords)
     debugFreeSleepAlarm(callService, 'section-set-alarm-records', {
       nextRecords: compactAlarmRecordsForDebug(sortedRecords),
@@ -4578,7 +5152,7 @@ function useEightSleepAlarmsController({
   }
 
   const saveAlarm = (draft: EightSleepAlarmEditorDraft) => {
-    if (!available) return false
+    if (!editable) return false
     const createdAt = Date.now()
     const currentRecords = alarmRecordsRef.current
     if (!supportsMultiplePerDay && !draft.editingId && draft.days.some((day) => currentRecords.some((alarm) => alarm.day === day))) return false
@@ -4610,7 +5184,7 @@ function useEightSleepAlarmsController({
   }
 
   const setAlarmEnabled = (alarm: FreeSleepAlarmRecord, enabled: boolean) => {
-    if (!availableRef.current) return false
+    if (!editableRef.current) return false
     if (optimisticRecords && optimisticAlarmSourceKeyRef.current !== alarmSyncSourceKeyRef.current) {
       const sourceWasLocalAcknowledgement = rebaseLocalAlarmAcknowledgement(
         alarmRecordsStateKey(sourceRecordsRef.current),
@@ -4648,7 +5222,7 @@ function useEightSleepAlarmsController({
   }
 
   const removeAlarm = (draft: EightSleepAlarmEditorDraft) => {
-    if (!available) return false
+    if (!editable) return false
     const deletedAlarm = alarmRecordsRef.current.find((alarm) => alarm.id === draft.editingId)
     if (!deletedAlarm) return false
     debugFreeSleepAlarm(callService, 'section-handle-alarm-delete', {
@@ -4660,8 +5234,15 @@ function useEightSleepAlarmsController({
   }
 
   return {
+    activeAlarmCommand: soloTripScope.controlsWholeBed
+      ? (action: 'snooze_alarm' | 'stop_alarm') => {
+          void sendSoloTripCommand({ action, side: side.scheduleSide })
+        }
+      : undefined,
     alarmRecords,
     available,
+    editable,
+    readOnly: soloTripScope.engaged && !soloTripScope.controlsWholeBed,
     removeAlarm,
     saveAlarm,
     setAlarmEnabled,
@@ -4673,10 +5254,12 @@ function useEightSleepAlarmsController({
  * Expose the master bedroom bed schedule to the wake light modal.
  *
  * The wake light modal can add a wake time to either side of the bed. Home Assistant still owns
- * the resulting schedule: React only publishes one side-scoped set-schedules payload per side and
- * signals wake-light link changes through the wake_light command service.
+ * the resulting schedule: React routes one side-scoped set-schedules payload per side through the
+ * native Solo Trip command when required and signals wake-light link changes through wake_light.
  */
 function useWakeLightBedProvisioning(config: WakeLightConfig): WakeLightBedProvisioning {
+  const householdAway = useHouseholdAwayController()
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
   const callService = useCallService()
   const scheduleEntity = useEntity(asEntityName(config.sleepypodScheduleEntityId), { returnNullIfNotFound: true })
   const schedule = useMemo(
@@ -4687,21 +5270,28 @@ function useWakeLightBedProvisioning(config: WakeLightConfig): WakeLightBedProvi
   )
   const targets = useMemo(() => config.sourceBindings.map((binding) => {
     const sideConfig = EIGHT_SLEEP_SIDE_CONFIGS.find((candidate) => candidate.scheduleSide === binding.side)
-    const available = Boolean(sideConfig && schedule?.[binding.side])
+    const scope = sideConfig ? householdAwayBedScope(householdAway.snapshot, sideConfig.alarmOwner) : null
+    const available = Boolean(sideConfig && schedule?.[binding.side] && !scope?.readOnly)
     return {
       available,
       side: binding.side,
       slots: available && sideConfig && schedule
         ? alarmRecordsFromSchedule(schedule, sideConfig, 'execution').map(({ day, time }) => ({ day, time }))
         : [],
-      title: sideConfig?.title ?? '',
+      title: sideConfig
+        ? scope?.controlsWholeBed
+          ? soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.wholeBedTitle, { bedTitle: sideConfig.title })
+          : sideConfig.title
+        : '',
     }
-  }), [config.sourceBindings, schedule])
+  }), [config.sourceBindings, householdAway.snapshot, schedule, soloTripCopy])
 
   const createAlarms: WakeLightBedProvisioning['createAlarms'] = (side, days, time) => {
     const sideConfig = EIGHT_SLEEP_SIDE_CONFIGS.find((candidate) => candidate.scheduleSide === side)
     const normalizedTime = normalizedBedAlarmTime(time)
     if (!sideConfig || !schedule?.[side] || !normalizedTime || !days.length) return
+    const scope = householdAwayBedScope(householdAway.snapshot, sideConfig.alarmOwner)
+    if (scope.readOnly) return
     const createdAt = Date.now()
     const nextRecords = normalizeAlarmRecordIndexes([
       ...alarmRecordsFromSchedule(schedule, sideConfig, 'execution'),
@@ -4714,6 +5304,27 @@ function useWakeLightBedProvisioning(config: WakeLightConfig): WakeLightBedProvi
         time: normalizedTime,
       })),
     ])
+    if (scope.controlsWholeBed) {
+      const alarmRows: SleepypodAlarmRow[] = nextRecords.map(({
+        alarmTemperature,
+        day,
+        duration,
+        enabled,
+        time: alarmTime,
+        vibrationIntensity,
+        vibrationPattern,
+      }) => ({
+        alarmTemperature,
+        day,
+        duration,
+        enabled,
+        time: alarmTime,
+        vibrationIntensity,
+        vibrationPattern,
+      }))
+      void householdAway.sendSleepypodCommand({ action: 'replace_alarms', alarmRows, side })
+      return
+    }
     callService({
       domain: 'mqtt',
       service: 'publish',
@@ -4755,7 +5366,7 @@ function EightSleepAlarmToggle({
   return (
     <ToggleControl
       checked={alarm.enabled}
-      disabled={!controller.available}
+      disabled={!controller.editable}
       label={label}
       onChange={(enabled) => controller.setAlarmEnabled(alarm, enabled)}
     />
@@ -4773,16 +5384,18 @@ function EightSleepAlarmsSection({
   onOpenDay: (day: FreeSleepAlarmDay) => void
   side: EightSleepSideConfig
 }) {
-  const { alarmRecords, available } = controller
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
+  const { alarmRecords, available, editable } = controller
   const dayGroups = alarmDayGroups(alarmRecords)
 
   return (
     <ScheduleCollection
-      addAction={{ disabled: !available, focusKey: 'add-alarm', label: 'Add Alarm', onClick: onAddAlarm }}
+      addAction={{ disabled: !editable, focusKey: 'add-alarm', label: 'Add Alarm', onClick: onAddAlarm }}
       empty={dayGroups.length === 0}
       emptyText='No alarms yet. Add one to choose days and a time.'
       error={!available ? 'Home Assistant alarm schedule data is unavailable.' : undefined}
       itemsTitle='Alarms'
+      readOnlyText={available && !editable ? soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.readOnlySubtitle) : undefined}
     >
       {dayGroups.map((group) => {
         const label = alarmDayGroupLabel(group.day, group.alarms.length)
@@ -4792,7 +5405,7 @@ function EightSleepAlarmsSection({
           <ScheduleListRow
             accessibleLabel={[side.title, label, summary].join(' ')}
             active={group.enabledCount > 0}
-            disabled={!available}
+            disabled={!editable}
             focusKey={'alarm-day-' + group.day}
             icon={group.enabledCount > 0 ? 'mdi:alarm-check' : 'mdi:alarm-off'}
             key={group.day}
@@ -4822,12 +5435,15 @@ function EightSleepAlarmDayPage({
   onEditAlarm: (alarm: FreeSleepAlarmRecord) => void
   side: EightSleepSideConfig
 }) {
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
   const alarms = controller.alarmRecords.filter((alarm) => alarm.day === day)
   const canAddAlarm = controller.supportsMultiplePerDay || alarms.length === 0
 
   return (
     <div className={styles.eightSleepAlarmDetailPage}>
       <SleepypodActiveAlarmSection
+        command={controller.activeAlarmCommand}
+        readOnly={controller.readOnly}
         side={side.scheduleSide}
         sideTitle={side.title}
         snoozeButtonEntityId={side.alarmSnoozeButtonEntityId}
@@ -4837,7 +5453,7 @@ function EightSleepAlarmDayPage({
       <ScheduleCollection
         addAction={canAddAlarm ? {
           autoFocus: alarms.length === 0,
-          disabled: !controller.available,
+          disabled: !controller.editable,
           focusKey: 'add-' + day + '-alarm',
           label: 'Add Alarm',
           onClick: onAddAlarm,
@@ -4846,7 +5462,9 @@ function EightSleepAlarmDayPage({
         emptyText={'No ' + alarmDayLabel(day) + ' alarms are configured.'}
         error={!controller.available ? 'Home Assistant alarm schedule data is unavailable.' : undefined}
         itemsTitle='Alarms'
-        readOnlyText={!canAddAlarm ? 'Fallback alarm helpers support one alarm per day.' : undefined}
+        readOnlyText={!controller.editable
+          ? soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.readOnlySubtitle)
+          : !canAddAlarm ? 'Fallback alarm helpers support one alarm per day.' : undefined}
       >
         {alarms.map((alarm, index) => {
           const scheduleState = alarm.enabled ? 'Enabled' : 'Disabled'
@@ -4855,7 +5473,7 @@ function EightSleepAlarmDayPage({
               accessibleLabel={side.title + ' ' + alarmDayLabel(day) + ' alarm at ' + formatClockTime(alarm.time) + ', ' + scheduleState}
               active={alarm.enabled}
               autoFocus={index === 0}
-              disabled={!controller.available}
+              disabled={!controller.editable}
               focusKey={alarm.id}
               icon={alarm.enabled ? 'mdi:alarm-check' : 'mdi:alarm-off'}
               key={alarm.id}
@@ -4877,6 +5495,7 @@ function EightSleepScheduleTemperatureControl({
   fallbackTemperature,
   icon,
   label,
+  modalState,
   onCommitTemperatureIntent,
   scheduleEntityId,
   scheduleSetTopic,
@@ -4889,6 +5508,7 @@ function EightSleepScheduleTemperatureControl({
   fallbackTemperature: number | null
   icon: string
   label: string
+  modalState: EightSleepBedModalState
   onCommitTemperatureIntent?: CommitBedTemperatureIntent
   scheduleEntityId: string
   scheduleSetTopic?: string
@@ -4914,7 +5534,9 @@ function EightSleepScheduleTemperatureControl({
   const [displayValue, commitDisplayValue] = useOptimisticState(liveValue, { clearOn: 'confirmation', revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const baseValue = displayValue ?? fallbackTemperature
   const baseValueRef = useRef(baseValue)
-  const canChange = !unavailable && baseValue !== null
+  const canChange = !unavailable
+    && baseValue !== null
+    && (!modalState.soloTripScope.engaged || modalState.soloTripScope.controlsWholeBed)
   const stateText = formatEightSleepTargetLevel(displayValue)
 
   useEffect(() => {
@@ -4937,6 +5559,15 @@ function EightSleepScheduleTemperatureControl({
       pendingValueRef.current = null
       valueSyncTimerRef.current = null
       if (!pending) return
+      if (modalState.soloTripScope.controlsWholeBed) {
+        void modalState.sendSoloTripCommand({
+          action: 'set_stage_level',
+          level: pending.value,
+          phase: stageKey,
+          side: side.scheduleSide,
+        })
+        return
+      }
       if (pending.scopedPhase) {
         onCommitTemperatureIntent?.(pending.value, pending.scopedPhase, pending.returnFocus, true)
         return
@@ -4950,11 +5581,12 @@ function EightSleepScheduleTemperatureControl({
           return [stage.key, numberValue(entities[stageEntityId]?.state) ?? fallbackTemperature ?? 0]
         })) as Record<FreeSleepScheduleStage, number>
         const schedule = scheduleFromEntityAttributes(scheduleEntity?.attributes as Record<string, unknown> | undefined)
+        const payload = sleepypodSchedulePayload(side, schedule, levels)
         callService({
           domain: 'mqtt',
           service: 'publish',
           serviceData: {
-            payload: JSON.stringify(sleepypodSchedulePayload(side, schedule, levels)),
+            payload: JSON.stringify(payload),
             topic: scheduleSetTopic,
           },
         })
@@ -4989,26 +5621,28 @@ function EightSleepHotFlashButton({ modalState, side }: { modalState: EightSleep
   const copy = useCopy(SLEEPYPOD_COPY_NAMESPACE)
   const callService = useCallService()
   const unavailable = !modalState.hotFlashAvailable
+  const readOnly = modalState.soloTripScope.readOnly
   const active = modalState.hotFlashActive
   const holding = modalState.hotFlashHolding
   const stateText = unavailable ? 'Unavailable' : active ? 'Active' : 'Inactive'
   const countdown = modalState.hotFlashCountdown
 
   const activate = () => {
-    if (unavailable) return
+    if (unavailable || readOnly) return
     modalState.commitHotFlashActive(true)
     modalState.commitDisplaySideOn(true)
     callService({ domain: 'input_button', service: 'press', target: side.hotFlashButtonEntityId })
   }
 
   const cancel = () => {
+    if (readOnly) return
     modalState.commitHotFlashActive(false)
     callService({ domain: 'input_button', service: 'press', target: side.hotFlashCancelButtonEntityId })
   }
 
   return (
-    <ThermostatGlassCard active={active} icon="mdi:snowflake" onMainClick={activate} pressed={active} stateText={stateText} title="Hot Flash Mode">
-      {active && (
+    <ThermostatGlassCard active={active} icon="mdi:snowflake" onMainClick={readOnly ? undefined : activate} pressed={active} stateText={stateText} title="Hot Flash Mode">
+      {active && !readOnly && (
         <div className={styles.eightSleepHotFlashStatus}>
           <span className={styles.eightSleepHotFlashPhase}>
             {holding ? countdown ?? copy(SLEEPYPOD_HOT_FLASH_KEYS.cooling) : copy(SLEEPYPOD_HOT_FLASH_KEYS.cooling)}
@@ -5032,13 +5666,16 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   wakeLightConfig: WakeLightConfig
 }) {
   const callService = useCallService()
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
   const wakeLightController = useWakeLightController(wakeLightConfig)
   const [activeTab, setActiveTab] = useState<EightSleepModalTab>(initialTab ?? 'schedule')
   const [alarmPage, setAlarmPage] = useState<EightSleepAlarmDetailPage | null>(null)
   const alarmController = useEightSleepAlarmsController({
     scheduleEntityId: modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SENSOR_ENTITY_ID : FREE_SLEEP_SCHEDULE_SENSOR_ENTITY_ID,
     scheduleSetTopic: modalState.controlMode === 'climate' ? SLEEPYPOD_SCHEDULE_SET_TOPIC : FREE_SLEEP_SCHEDULE_SET_TOPIC,
+    sendSoloTripCommand: modalState.sendSoloTripCommand,
     side,
+    soloTripScope: modalState.soloTripScope,
   })
   const [scopeRequest, setScopeRequest] = useState<BedTemperatureScopeRequest>({
     open: false,
@@ -5061,7 +5698,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
     && !alarmController.supportsMultiplePerDay
     && alarmEditor.days.some((day) => alarmController.alarmRecords.some((alarm) => alarm.day === day)),
   )
-  const alarmEditorInvalid = Boolean(alarmEditor && (!alarmController.available || alarmEditorStale || alarmEditorLegacyConflict || alarmEditor.days.length === 0 || !isValidScheduleTime(alarmEditor.time)))
+  const alarmEditorInvalid = Boolean(alarmEditor && (!alarmController.editable || alarmEditorStale || alarmEditorLegacyConflict || alarmEditor.days.length === 0 || !isValidScheduleTime(alarmEditor.time)))
   const {
     bodyElementRef,
     closeAllDetailPages,
@@ -5080,8 +5717,8 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   const [previousOpen, setPreviousOpen] = useState(open)
   const tabs = modalState.controlMode === 'climate' ? SLEEPYPOD_MODAL_TABS : EIGHT_SLEEP_MODAL_TABS
   const renderedActiveTab = tabs.some((tab) => tab.tab === activeTab) ? activeTab : tabs[0].tab
-  const scopePromptOpen = open && scopeRequest.open && modalState.sideAvailable && modalState.activeSchedulePhase === scopeRequest.phase
-  const scopeRequestInvalid = scopeRequest.open && (!modalState.sideAvailable || modalState.activeSchedulePhase !== scopeRequest.phase)
+  const scopePromptOpen = open && scopeRequest.open && modalState.sideAvailable && !modalState.soloTripScope.readOnly && modalState.activeSchedulePhase === scopeRequest.phase
+  const scopeRequestInvalid = scopeRequest.open && (!modalState.sideAvailable || modalState.soloTripScope.readOnly || modalState.activeSchedulePhase !== scopeRequest.phase)
   if (previousOpen !== open) {
     setPreviousOpen(open)
     if (!open) {
@@ -5090,7 +5727,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
     }
   } else if (scopeRequestInvalid) {
     setScopeRequest((current) => ({ ...current, open: false }))
-  } else if (alarmPage && !modalState.sideAvailable) {
+  } else if (alarmPage && (!modalState.sideAvailable || modalState.soloTripScope.readOnly)) {
     resetDetailPage()
   }
 
@@ -5131,6 +5768,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   }
 
   const openGlobalAlarmEditor = () => {
+    if (!alarmController.editable) return
     const defaultDayOptions = alarmController.supportsMultiplePerDay
       ? FREE_SLEEP_ALARM_DAY_OPTIONS
       : FREE_SLEEP_ALARM_DAY_OPTIONS.filter((option) => !alarmController.alarmRecords.some((alarm) => alarm.day === option.value))
@@ -5142,6 +5780,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   }
 
   const openDayAlarmEditor = (day: FreeSleepAlarmDay) => {
+    if (!alarmController.editable) return
     openDetailPage({
       draft: createAlarmDraft(resolveScheduleDefaultDays(FREE_SLEEP_ALARM_DAY_OPTIONS, [day]), `Add ${side.title} ${alarmDayLabel(day)} Alarm`),
       kind: 'editor',
@@ -5150,6 +5789,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   }
 
   const openAlarmEditor = (alarm: FreeSleepAlarmRecord) => {
+    if (!alarmController.editable) return
     const source = wakeLightSourceForSide(wakeLightConfig, side.scheduleSide)
     const linkKey = source ? wakeLightAlarmLinkKey(source.id, alarm.day, alarm.time) : null
     openDetailPage({
@@ -5171,7 +5811,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   }
 
   const saveAlarm = async () => {
-    if (!alarmEditor || alarmEditorInvalid) return
+    if (!alarmController.editable || !alarmEditor || alarmEditorInvalid) return
     const source = wakeLightSourceForSide(wakeLightConfig, side.scheduleSide)
     if (!source) return
     const linkKeys = alarmEditor.days.map(day => wakeLightAlarmLinkKey(source.id, day, alarmEditor.time))
@@ -5180,7 +5820,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   }
 
   const deleteAlarm = async () => {
-    if (!alarmEditor?.editingId) return
+    if (!alarmController.editable || !alarmEditor?.editingId) return
     const alarmToDelete = alarmController.alarmRecords.find((alarm) => alarm.id === alarmEditor.editingId)
     if (!alarmToDelete) return
     if (!window.confirm(`Delete alarm set for ${formatClockTime(alarmToDelete.time)} on ${alarmDayLabel(alarmToDelete.day)}?`)) return
@@ -5200,11 +5840,19 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
     const current = scopeCommandStateRef.current
     if (!current.sideAvailable || current.activeSchedulePhase !== phase) return false
     if (sendCurrentTarget) {
-      callService({
-        domain: 'script',
-        service: sleepypodTonightTemperatureService(side.scheduleSide),
-        serviceData: { level: value },
-      })
+      if (modalState.soloTripScope.controlsWholeBed) {
+        void modalState.sendSoloTripCommand({
+          action: 'set_tonight_level',
+          level: value,
+          side: side.scheduleSide,
+        })
+      } else {
+        callService({
+          domain: 'script',
+          service: sleepypodTonightTemperatureService(side.scheduleSide),
+          serviceData: { level: value },
+        })
+      }
     }
     setScopeRequest({
       open: true,
@@ -5224,6 +5872,15 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
     }
     closeScopePrompt()
     if (scope === 'tonight') return
+    if (modalState.soloTripScope.controlsWholeBed) {
+      void modalState.sendSoloTripCommand({
+        action: 'set_stage_level',
+        level: current.request.value,
+        phase: current.request.phase,
+        side: side.scheduleSide,
+      })
+      return
+    }
     callService({
       domain: 'input_number',
       service: 'set_value',
@@ -5236,8 +5893,11 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
   const alarmDayCount = alarmDayPage
     ? alarmController.alarmRecords.filter((alarm) => alarm.day === alarmDayPage.day).length
     : 0
+  const scopedSideTitle = modalState.soloTripScope.controlsWholeBed
+    ? soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.wholeBedTitle, { bedTitle: side.title })
+    : side.title
   const modalTitle = alarmEditor?.title
-    ?? (alarmDayPage ? `${side.title} ${alarmDayGroupLabel(alarmDayPage.day, alarmDayCount)}` : side.title)
+    ?? (alarmDayPage ? `${side.title} ${alarmDayGroupLabel(alarmDayPage.day, alarmDayCount)}` : scopedSideTitle)
   const backLabel = alarmPage?.kind === 'editor' && alarmPage.lockedDay
     ? `Back to ${alarmDayLabel(alarmPage.lockedDay)} alarms`
     : 'Back to alarms'
@@ -5250,7 +5910,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
         centeredGeometry={EIGHT_SLEEP_CENTERED_GEOMETRY}
         footer={alarmEditor ? (
           <ScheduleDetailFooter
-            deleteAction={alarmEditor.editingId ? { disabled: !alarmController.available || alarmEditorStale, icon: 'mdi:delete', label: 'Delete Alarm', onClick: () => void deleteAlarm() } : undefined}
+            deleteAction={alarmEditor.editingId ? { disabled: !alarmController.editable || alarmEditorStale, icon: 'mdi:delete', label: 'Delete Alarm', onClick: () => void deleteAlarm() } : undefined}
             primaryAction={{
               disabled: alarmEditorInvalid || !wakeLightController.snapshot.available || wakeLightController.configurationPending,
               icon: alarmEditor.editingId ? 'mdi:content-save' : 'mdi:plus',
@@ -5292,6 +5952,7 @@ function EightSleepBedModal({ initialTab, modalState, onClose, onCloseComplete, 
         ) : (
           <EightSleepBedModalContentView
             activeTab={renderedActiveTab}
+            alarmController={alarmController}
             alarmPage={null}
             modalState={modalState}
             onPanelElementChange={setAlarmPanelElement}
@@ -5397,6 +6058,8 @@ function EightSleepBedModalContentView({
   wakeLightConfig,
   wakeLightError,
 }: EightSleepBedModalContentProps) {
+  const soloTripCopy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
   const modalBodyRef = useRef<HTMLDivElement | null>(null)
   const modalPanelRef = useRef<HTMLDivElement | null>(null)
   const { displayedTab: effectiveActiveTab, transitionState } = useSmoothDisplayedModalTab(activeTab)
@@ -5419,6 +6082,8 @@ function EightSleepBedModalContentView({
       disabled: alarmController.alarmRecords.some((alarm) => alarm.day === option.value),
     }))
     : FREE_SLEEP_ALARM_DAY_OPTIONS
+  const travelerLabel = householdAwayResidentLabel(soloTripCopy, modalState.soloTripScope.traveler)
+  const showSoloTripAwayChip = modalState.soloTripScope.controlsWholeBed || modalState.soloTripScope.readOnly
 
   useEffect(() => {
     const scrollContainers = [
@@ -5435,6 +6100,8 @@ function EightSleepBedModalContentView({
     return (
       <div className={styles.eightSleepAlarmEditor}>
         <SleepypodActiveAlarmSection
+          command={alarmController?.activeAlarmCommand}
+          readOnly={alarmController?.readOnly}
           side={side.scheduleSide}
           sideTitle={side.title}
           snoozeButtonEntityId={side.alarmSnoozeButtonEntityId}
@@ -5456,7 +6123,7 @@ function EightSleepBedModalContentView({
           {alarmEditor.editingId && (
             <ToggleSetting
               checked={alarmEditor.enabled}
-              disabled={!alarmController?.available || alarmEditorStale}
+              disabled={!alarmController?.editable || alarmEditorStale}
               icon={alarmEditor.enabled ? 'mdi:alarm-check' : 'mdi:alarm-off'}
               label="Alarm Enabled"
               onChange={(enabled) => onAlarmEditorChange?.({ ...alarmEditor, enabled })}
@@ -5466,7 +6133,7 @@ function EightSleepBedModalContentView({
             <SleepypodAlarmWakeLightToggle
               checked={alarmEditor.wakeLightEnabled}
               config={wakeLightConfig}
-              disabled={alarmEditorStale}
+              disabled={!alarmController?.editable || alarmEditorStale}
               localTime={alarmEditor.time}
               onChange={(wakeLightEnabled) => onAlarmEditorChange?.({ ...alarmEditor, wakeLightEnabled })}
               side={side.scheduleSide}
@@ -5474,7 +6141,9 @@ function EightSleepBedModalContentView({
             />
           )}
           {wakeLightError && <InlineAlert>{wakeLightError}</InlineAlert>}
+          {modalState.soloTripCommandError && <InlineAlert>{householdAwayCommandError(soloTripCopy, modalState.soloTripCommandError)}</InlineAlert>}
           {!alarmController?.available && <InlineAlert>Home Assistant alarm schedule data is unavailable.</InlineAlert>}
+          {alarmController?.available && !alarmController.editable && <InlineAlert>{soloTripCopy(SOLO_TRIP_COPY_KEYS.bed.readOnlySubtitle)}</InlineAlert>}
           {alarmEditorStale && <InlineAlert>This alarm changed in Home Assistant. Go back and reopen it.</InlineAlert>}
           {alarmEditorLegacyConflict && <InlineAlert>Fallback alarm helpers support one alarm per day. Choose a day without an alarm.</InlineAlert>}
           {alarmEditor.days.length === 0 && <InlineAlert>Select at least one day.</InlineAlert>}
@@ -5498,12 +6167,20 @@ function EightSleepBedModalContentView({
 
 
   return (
-    <div className={`${styles.thermostatModalBody} ${styles.eightSleepModalBody}`} data-layout="eight-sleep-modal-body" ref={modalBodyRef}>
+    <div
+      className={`${styles.thermostatModalBody} ${styles.eightSleepModalBody}`}
+      data-layout="eight-sleep-modal-body"
+      data-solo-trip-away-chip={showSoloTripAwayChip ? 'true' : undefined}
+      data-solo-trip-bed-scope={modalState.soloTripScope.controlsWholeBed ? 'whole-bed' : modalState.soloTripScope.readOnly ? 'read-only' : 'personal'}
+      ref={modalBodyRef}
+    >
       <div className={styles.eightSleepHeroColumn} data-scroll-region="eight-sleep-hero-column">
         <div className={`${styles.eightSleepModalHeroShell} ${styles.thermostatModalDialShell}`} data-section="eight-sleep-hero" data-thermostat-modal-dial-shell="true" style={THERMOSTAT_MODAL_DIAL_SHELL_STYLE}>
           <EightSleepThermostatHero modalState={modalState} onCommitTemperatureIntent={onCommitTemperatureIntent} side={side} />
         </div>
         <SleepypodActiveAlarmSection
+          command={alarmController?.activeAlarmCommand}
+          readOnly={alarmController?.readOnly}
           side={side.scheduleSide}
           sideTitle={side.title}
           snoozeButtonEntityId={side.alarmSnoozeButtonEntityId}
@@ -5511,6 +6188,16 @@ function EightSleepBedModalContentView({
           stopButtonEntityId={side.alarmStopButtonEntityId}
         />
       </div>
+      {showSoloTripAwayChip && (
+        <div className={styles.eightSleepAwayChip} data-eight-sleep-away-chip="true">
+          <InfoBox
+            title={soloTripCopy(SOLO_TRIP_COPY_KEYS.status.activeTitle, { traveler: travelerLabel })}
+            tone={modalState.soloTripScope.controlsWholeBed ? 'success' : 'neutral'}
+          >
+            {householdAwayBedDescription(soloTripCopy, modalState.soloTripScope, viewerResident)}
+          </InfoBox>
+        </div>
+      )}
       <div
         aria-label={`${side.title} ${selectedTabLabel}`}
         aria-labelledby={modalTabId(tabIdPrefix, effectiveActiveTab)}
@@ -5527,6 +6214,11 @@ function EightSleepBedModalContentView({
         {!modalState.sideAvailable && (
           <section className={styles.section}>
             <InlineAlert>Bed controls are unavailable. No changes can be made until the active bed connection recovers.</InlineAlert>
+          </section>
+        )}
+        {modalState.soloTripCommandError && (
+          <section className={styles.section}>
+            <InlineAlert>{householdAwayCommandError(soloTripCopy, modalState.soloTripCommandError)}</InlineAlert>
           </section>
         )}
         {modalState.sideAvailable && effectiveActiveTab === 'schedule' && (
@@ -5563,11 +6255,11 @@ function EightSleepBedModalContentView({
             <section className={styles.section}>
               <SectionHeader title="Bedtime" />
               <Description className={styles.thermostatDescription}>Choose when this side starts bedtime mode. Free Sleep will prime one hour before the earlier side bedtime.</Description>
-              <EightSleepBedtimeSetting side={side} />
+              <EightSleepBedtimeSetting modalState={modalState} side={side} />
             </section>
             <section className={styles.section}>
               <SectionHeader title="Controls" />
-              <EightSleepAwayModeCard side={side} />
+              <EightSleepAwayModeCard modalState={modalState} side={side} />
             </section>
           </>
         )}
@@ -6736,34 +7428,44 @@ function FallbackPage({ title }: { title: string }) {
   return <Notice>{title} is not available in the React dashboard yet.</Notice>
 }
 
-function Content({ inventoryControls, onNavigate, onRecipesInitialResolved, onScrollLockChange, path, preload = false, preloadHash, preloadHashes, recipeControls, recipesInitiallyAppGated = false }: { inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onRecipesInitialResolved?: () => void; onScrollLockChange?: (locked: boolean) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; recipeControls: RecipeControls; recipesInitiallyAppGated?: boolean }) {
-  const roomTitle = dashboardRoomNameFromPath(path)
-  if (roomTitle) return <RoomPage onNavigate={onNavigate} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={roomTitle} />
-  const todoConfigPath = todoPageConfigPath(path)
-  if (TODO_PAGES[todoConfigPath]) return <TodoPage configPath={todoConfigPath} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={path} />
-  if (path === 'settings') return <SettingsPage onNavigate={onNavigate} />
-  if (path === 'special-device-modes') return <SpecialDeviceModesPage preload={preload} />
-  if (path === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
-  if (path === 'vacation') return <VacationPage />
-  if (path === 'vacuums') return <VacuumPage preload={preload} />
-  if (path === 'media') return <MediaPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
-  if (path === 'admin') return <AdminPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
-  if (path === THERMOSTAT_ROUTE_PATH) return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
-  if (path === 'custom-lights') return <CustomLightsPage />
-  if (path === LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH) return <ControlShowcasePage />
-  if (path === HOME_SPRINKLERS_ROUTE_PATH) return <SprinklersPage preload={preload} />
-  if (path === HOME_FOOD_ROUTE_PATH) return <FoodHubPage onNavigate={onNavigate} preload={preload} />
-  if (path === HOME_RECIPES_ROUTE_PATH) return <RecipesPage controls={recipeControls} initiallyAppGated={recipesInitiallyAppGated} onInitialResolved={onRecipesInitialResolved} preload={preload} />
-  if (EVERSHELF_INVENTORY_PAGES[path]) return <EverShelfInventoryPage controls={inventoryControls} path={path} />
-  if (CONTROL_PAGES[path]) return <ControlPage onNavigate={onNavigate} path={path} />
+function Content({ effectivePath, inventoryControls, onNavigate, onRecipesInitialResolved, onScrollLockChange, path, preload = false, preloadHash, preloadHashes, recipeControls, recipesInitiallyAppGated = false }: { effectivePath: string; inventoryControls: EverShelfInventoryControls; onNavigate: (path: string) => void; onRecipesInitialResolved?: () => void; onScrollLockChange?: (locked: boolean) => void; path: string; preload?: boolean; preloadHash?: string; preloadHashes?: string[]; recipeControls: RecipeControls; recipesInitiallyAppGated?: boolean }) {
+  const roomTitle = dashboardRoomNameFromPath(effectivePath)
+  if (roomTitle) return <RoomPage onNavigate={onNavigate} path={effectivePath} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={roomTitle} />
+  const todoConfigPath = todoPageConfigPath(effectivePath)
+  if (TODO_PAGES[todoConfigPath]) return <TodoPage configPath={todoConfigPath} onNavigate={onNavigate} onScrollLockChange={onScrollLockChange} path={effectivePath} />
+  if (effectivePath === 'settings') return <SettingsPage onNavigate={onNavigate} />
+  if (effectivePath === 'special-device-modes') return <SpecialDeviceModesPage preload={preload} />
+  if (effectivePath === 'guests-staying-over') return <GuestControlsPage onNavigate={onNavigate} />
+  if (effectivePath === VACATION_CHOOSER_ROUTE_PATH) return <VacationChooserPage onNavigate={onNavigate} />
+  if (effectivePath === VACATION_MODE_ROUTE_PATH) return <VacationModePage />
+  if (effectivePath === SOLO_TRIP_ROUTE_PATH) return <SoloTripPage />
+  if (effectivePath === 'vacuums') return <VacuumPage preload={preload} />
+  if (effectivePath === 'media') return <MediaPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (effectivePath === 'admin') return <AdminPage onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (effectivePath === THERMOSTAT_ROUTE_PATH) return <ThermostatPage preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} />
+  if (effectivePath === 'custom-lights') return <CustomLightsPage />
+  if (effectivePath === LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH) return <ControlShowcasePage />
+  if (effectivePath === HOME_SPRINKLERS_ROUTE_PATH) return <SprinklersPage preload={preload} />
+  if (effectivePath === HOME_FOOD_ROUTE_PATH) return <FoodHubPage onNavigate={onNavigate} preload={preload} />
+  if (effectivePath === HOME_RECIPES_ROUTE_PATH) return <RecipesPage controls={recipeControls} initiallyAppGated={recipesInitiallyAppGated} onInitialResolved={onRecipesInitialResolved} preload={preload} />
+  if (EVERSHELF_INVENTORY_PAGES[effectivePath]) return <EverShelfInventoryPage controls={inventoryControls} path={effectivePath} />
+  if (CONTROL_PAGES[effectivePath]) return <ControlPage onNavigate={onNavigate} path={effectivePath} />
   return <FallbackPage title={routeTitle(path)} />
 }
 
 export function DashboardViewPage({ activePath, appChromeHidden = false, initialContentTransitionState = 'idle', inventoryControls: providedInventoryControls, loadingPhase, onBack, onNavigate, onRecipesInitialResolved, path, preload = false, preloadHash, preloadHashes, recipeControls: providedRecipeControls, recipesInitiallyAppGated = false, withShell = true }: DashboardViewPageProps) {
-  const roomTitle = dashboardRoomNameFromPath(path)
-  const todoConfig = TODO_PAGES[todoPageConfigPath(path)]
-  const title = path === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? todoConfig?.title ?? CONTROL_PAGES[path]?.title ?? routeTitle(path)
-  const backPath = fallbackBackPathForRoute(path)
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
+  const vacationMode = useEntity(asEntityName(VACATION_MODE_ENTITY_ID), { returnNullIfNotFound: true })
+  const invalidDatesPending = useEntity(asEntityName(VACATION_INVALID_DATES_PENDING_ENTITY_ID), { returnNullIfNotFound: true })
+  const householdAway = useHouseholdAwayController()
+  const effectivePath = path === 'vacation'
+    ? vacationFeaturePath(householdAway.snapshot, isActiveState(vacationMode), isActiveState(invalidDatesPending))
+    : path
+  const roomTitle = dashboardRoomNameFromPath(effectivePath)
+  const todoConfig = TODO_PAGES[todoPageConfigPath(effectivePath)]
+  const todoTitle = todoConfig ? personalizedChoreTitle(todoConfig.resident, todoConfig.title, viewerResident) : undefined
+  const title = effectivePath === 'guests-staying-over' ? 'Guest Controls' : roomTitle ?? todoTitle ?? CONTROL_PAGES[effectivePath]?.title ?? routeTitle(effectivePath)
+  const backPath = fallbackBackPathForRoute(effectivePath)
   const [pageScrollLock, setPageScrollLock] = useState<{ locked: boolean; path: string }>({ locked: false, path })
   const pageScrollLocked = pageScrollLock.path === path && pageScrollLock.locked
   const fallbackInventoryControls = useEverShelfInventoryControls(path, !preload && Boolean(EVERSHELF_INVENTORY_PAGES[path]))
@@ -6778,15 +7480,15 @@ export function DashboardViewPage({ activePath, appChromeHidden = false, initial
   const page = path === 'security' ? (
     <SecurityPage activePath={activePath} backPath={backPath} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} loadingPhase={loadingPhase} onBack={onBack} onNavigate={onNavigate} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} title={title} />
   ) : (
-    <Page activePath={activePath} backPath={backPath} chromeHidden={pageChromeHidden} contentHidden={appChromeHidden} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={path} title={roomTitle} /> : undefined} measure={pageMeasureForPath(path)} onBack={onBack} onNavigate={onNavigate} scrollLocked={pageScrollLocked} title={title}>
-      {loadingPhase ? <DashboardPageLoading placement="viewport" phase={loadingPhase} /> : <Content inventoryControls={inventoryControls} onNavigate={onNavigate} onRecipesInitialResolved={onRecipesInitialResolved} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} recipeControls={recipeControls} recipesInitiallyAppGated={recipesInitiallyAppGated} />}
+    <Page activePath={activePath} backPath={backPath} chromeHidden={pageChromeHidden} contentHidden={appChromeHidden} contentTransitionState={loadingPhase ? 'idle' : initialContentTransitionState} headerQuickLinks={roomTitle ? <RoomSectionRail path={effectivePath} title={roomTitle} /> : undefined} measure={pageMeasureForPath(effectivePath)} onBack={onBack} onNavigate={onNavigate} scrollLocked={pageScrollLocked} scrollResetKey={effectivePath} title={title}>
+      {loadingPhase ? <DashboardPageLoading placement="viewport" phase={loadingPhase} /> : <Content effectivePath={effectivePath} inventoryControls={inventoryControls} onNavigate={onNavigate} onRecipesInitialResolved={onRecipesInitialResolved} onScrollLockChange={handlePageScrollLockChange} path={path} preload={preload} preloadHash={preloadHash} preloadHashes={preloadHashes} recipeControls={recipeControls} recipesInitiallyAppGated={recipesInitiallyAppGated} />}
     </Page>
   )
 
   if (!withShell || preload) return page
 
   return (
-    <AppShell activePath={activePath} bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={pageChromeHidden} floatingAction={!preload && hasDashboardFloatingAction(path) ? <DashboardFloatingAction inventoryControls={inventoryControls} path={path} recipeControls={recipeControls} /> : undefined} onNavigate={onNavigate} pageMeasure={pageMeasureForPath(path)}>
+    <AppShell activePath={activePath} bottomNav={<BottomNav activePath={activePath} onNavigate={onNavigate} />} chromeHidden={pageChromeHidden} floatingAction={!preload && hasDashboardFloatingAction(effectivePath) ? <DashboardFloatingAction inventoryControls={inventoryControls} path={effectivePath} recipeControls={recipeControls} /> : undefined} onNavigate={onNavigate} pageMeasure={pageMeasureForPath(effectivePath)}>
       {page}
     </AppShell>
   )

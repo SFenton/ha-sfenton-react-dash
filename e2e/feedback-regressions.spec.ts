@@ -3,8 +3,11 @@
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
 // @covers src/components/core/ModalSheet.tsx
+// @covers src/constants/roomPages.ts
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
+import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../src/constants/roomPages'
+import { MOBILE_GEOMETRY_PROFILES } from './responsive-acceptance-data'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
 import { waitForModalReady, waitForNavigation } from './layout/evidence'
 import { openQuickLinksTab } from './quick-links'
@@ -254,7 +257,7 @@ test('Summary tabs switch without a blank flash or desktop dialog resize', async
   await page.setViewportSize(DESKTOP)
   await page.goto('/index.html?path=overview&user=stephen#daily-report')
 
-  const dialog = page.getByRole('dialog', { name: "Stephen's Summary" })
+  const dialog = page.getByRole('dialog', { name: "Your Summary" })
   const nav = dialog.getByRole('tablist', { name: 'Daily report sections' })
   const panel = dialog.getByRole('tabpanel')
   await expect(dialog).toBeVisible()
@@ -412,6 +415,22 @@ function activeRoute(page: Page, path: string) {
   return page.locator('[data-route-path="' + path + '"]:visible').last()
 }
 
+async function expectDynamicGridRowsToFill(grid: Locator) {
+  await expect.poll(() => grid.evaluate((element) => {
+    const gridBounds = element.getBoundingClientRect()
+    const cells = Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-dynamic-grid-cell="true"]'))
+      .map((cell) => ({ bounds: cell.getBoundingClientRect(), row: Math.round(cell.getBoundingClientRect().top) }))
+    const rows = [...new Set(cells.map((cell) => cell.row))]
+
+    return rows.every((row) => {
+      const rowCells = cells.filter((cell) => cell.row === row)
+      const left = Math.min(...rowCells.map((cell) => cell.bounds.left))
+      const right = Math.max(...rowCells.map((cell) => cell.bounds.right))
+      return Math.abs(left - gridBounds.left) <= 1 && Math.abs(right - gridBounds.right) <= 1
+    })
+  })).toBe(true)
+}
+
 async function setMockStates(page: Page, states: Record<string, string>) {
   await page.evaluate((entries) => {
     const mock = (window as unknown as {
@@ -429,9 +448,16 @@ async function openTheaterRemote(page: Page) {
   return dialog
 }
 
-test('Home cameras and Security tiles use content-aware spans at every tier', async ({ page }) => {
+// @covers src/components/hass/SecurityDashboard.tsx
+test('Home cameras and Security tiles keep stable equal tracks at every tier', async ({ page }) => {
   test.setTimeout(120_000)
-  for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
+  const gridViewports = [
+    PAGE_LAYOUT_VIEWPORTS[0],
+    { appColumns: 2, cameraColumns: 2, choreColumns: 2, customColumns: 2, height: 874, remoteColumns: 2, securityCellWidth: 180, width: 402 },
+    ...PAGE_LAYOUT_VIEWPORTS.slice(1),
+  ] as const
+
+  for (const viewport of gridViewports) {
     await page.setViewportSize(viewport)
     await page.goto('/at-a-glance/security?feedback-layout=' + viewport.width)
     const root = activeRoute(page, 'security')
@@ -443,8 +469,8 @@ test('Home cameras and Security tiles use content-aware spans at every tier', as
       .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
     await expect(controlGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
     await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
-    await expect(controlGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
-    await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    await expect(controlGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
+    await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     await expect(controlGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     await expect(cameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
 
@@ -465,8 +491,8 @@ test('Home cameras and Security tiles use content-aware spans at every tier', as
         })),
       )
       for (const cell of cells) {
-        const expectedWidth = viewport.securityCellWidth * cell.span + 10 * (cell.span - 1)
-        expect(Math.abs(cell.width - expectedWidth)).toBeLessThanOrEqual(1)
+        expect(cell.span).toBe(1)
+        expect(Math.abs(cell.width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
       }
     }
 
@@ -483,7 +509,7 @@ test('Home cameras and Security tiles use content-aware spans at every tier', as
     const homeCameraGrid = homeRoot.getByRole('button', { name: 'Open Front Door camera' })
       .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-columns', String(viewport.cameraColumns))
-    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
+    await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     await expect(homeCameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
@@ -494,8 +520,94 @@ test('Home cameras and Security tiles use content-aware spans at every tier', as
       })),
     )
     for (const cell of homeCells) {
-      const expectedWidth = viewport.securityCellWidth * cell.span + 10 * (cell.span - 1)
-      expect(Math.abs(cell.width - expectedWidth)).toBeLessThanOrEqual(1)
+      expect(cell.span).toBe(1)
+      expect(Math.abs(cell.width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
+    }
+  }
+})
+
+test('camera tracks do not resize while streams hydrate on phone portrait', async ({ page }) => {
+  await page.setViewportSize({ width: 402, height: 874 })
+  await page.route('**/webrtc/webrtc-camera.js*', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1_200))
+    await route.fallback()
+  })
+  await page.goto('/at-a-glance/security?feedback-camera-hydration=402')
+
+  const root = activeRoute(page, 'security')
+  const cameraGrid = root.getByRole('button', { name: 'Open Front Door camera' })
+    .locator('xpath=ancestor::*[@data-dynamic-grid="true"][1]')
+  const readGeometry = () => cameraGrid.evaluate((grid) => ({
+    box: {
+      height: Number(grid.getBoundingClientRect().height.toFixed(2)),
+      width: Number(grid.getBoundingClientRect().width.toFixed(2)),
+    },
+    cells: Array.from(grid.children).map((cell) => {
+      const rect = cell.getBoundingClientRect()
+      return {
+        height: Number(rect.height.toFixed(2)),
+        span: cell.getAttribute('data-dynamic-grid-span'),
+        width: Number(rect.width.toFixed(2)),
+        x: Number(rect.x.toFixed(2)),
+        y: Number(rect.y.toFixed(2)),
+      }
+    }),
+  }))
+
+  await expect(cameraGrid.locator('[data-loaded="false"]')).toHaveCount(4)
+  const loadingGeometry = await readGeometry()
+  await expect(cameraGrid.locator('[data-loaded="true"]')).toHaveCount(4)
+  expect(await readGeometry()).toEqual(loadingGeometry)
+})
+
+test('room source grids stay within two columns and fill every row', async ({ page }) => {
+  test.setTimeout(120_000)
+
+  for (const profileName of ['island-phone-landscape-left', 'island-phone-landscape-right', 'rectangular-phone-landscape']) {
+    const profile = MOBILE_GEOMETRY_PROFILES.find((candidate) => candidate.name === profileName)!
+    await page.setViewportSize(profile.viewport)
+    await page.goto('/index.html?path=master-bedroom&feedback-room-grid=' + profile.name)
+    await setSafeAreaInsets(page, profile.insets)
+    const root = activeRoute(page, 'master-bedroom')
+    await expect(root.getByRole('heading', { level: 1, name: 'Master Bedroom' })).toBeVisible()
+    const climateGrid = root.getByRole('group', { name: 'Master Bedroom Climate' })
+
+    await expect(climateGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+    await expectDynamicGridRowsToFill(climateGrid)
+  }
+
+  for (const viewport of PAGE_LAYOUT_VIEWPORTS) {
+    await page.setViewportSize(viewport)
+    await page.goto('/index.html?path=master-bedroom&feedback-room-grid=' + viewport.width)
+    const root = activeRoute(page, 'master-bedroom')
+    await expect(root.getByRole('heading', { level: 1, name: 'Master Bedroom' })).toBeVisible()
+    const climateGrid = root.getByRole('group', { name: 'Master Bedroom Climate' })
+
+    await expect(climateGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+    await expect(climateGrid).toHaveAttribute('data-dynamic-grid-last-row', 'fill')
+    await expect(climateGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    await expectDynamicGridRowsToFill(climateGrid)
+  }
+
+  await page.setViewportSize({ width: 1920, height: 1080 })
+  for (const path of ROOM_PAGE_ORDER) {
+    const room = ROOM_PAGE_CONFIGS[path]
+    await page.goto('/index.html?path=' + path + '&feedback-room-grid-audit=1920')
+    const root = activeRoute(page, path)
+    await expect(root.getByRole('heading', { level: 1, name: room.title })).toBeVisible()
+
+    for (const section of room.sourceSections.filter((candidate) => candidate.showOnRoomPage !== false && candidate.layout !== 'app-launch')) {
+      const grids = [
+        root.getByRole('group', { name: `${room.title} ${section.title}`, exact: true }),
+        ...(section.layout === 'lead-row'
+          ? [root.getByRole('group', { name: `${room.title} ${section.title} Controls`, exact: true })]
+          : []),
+      ]
+
+      for (const grid of grids) {
+        await expect.poll(async () => Number(await grid.getAttribute('data-dynamic-grid-columns'))).toBeLessThanOrEqual(2)
+        await expectDynamicGridRowsToFill(grid)
+      }
     }
   }
 })
@@ -1009,7 +1121,7 @@ test('Daily Summary keeps its host height through task and inventory detail page
   for (const viewport of [TABLET_PORTRAIT, TABLET_LANDSCAPE, DESKTOP]) {
     await page.setViewportSize(viewport)
     await page.goto(`/index.html?path=overview&user=stephen&feedback-summary=${viewport.width}#daily-report`)
-    const summary = page.getByRole('dialog', { name: "Stephen's Summary" })
+    const summary = page.getByRole('dialog', { name: "Your Summary" })
     await expect(summary).toBeVisible()
     const expectedHeight = Math.min(760, viewport.height - 64)
     expect(Math.abs(((await summary.boundingBox())?.height ?? 0) - expectedHeight)).toBeLessThanOrEqual(1)

@@ -1,0 +1,102 @@
+name: Deploy dashboard
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build dashboard artifact
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Build production dashboard without credentials
+        env:
+          VITE_HA_TOKEN: ''
+          VITE_HOME_MCP_ENABLED: 'false'
+        run: npm run build:release
+      - name: Create deployment manifest
+        env:
+          VITE_HA_TOKEN: ''
+        run: npm run deploy:ci:prepare -- --dist dist --manifest deployment-manifest.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dashboard-production-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            dist
+            deployment-manifest.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+
+  controller-smoke:
+    name: Controller smoke
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ format('ha-deploy-smoke-{0}-{1}', github.run_id, github.run_attempt) }}
+    timeout-minutes: 10
+    steps:
+      - name: Wait for exact runner binding
+        run: node /opt/ha-dashboard/bin/deploy-dashboard-ci.mjs wait-authorized --mode smoke
+      - name: Prove the smoke runner has no deployment secrets or HA route
+        run: node /opt/ha-dashboard/bin/deploy-dashboard-ci.mjs smoke --receipt controller-smoke-receipt.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: controller-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: controller-smoke-receipt.json
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    name: Deploy dashboard
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: build
+    environment: production
+    runs-on: ${{ format('ha-deploy-production-{0}-{1}', github.run_id, github.run_attempt) }}
+    timeout-minutes: 30
+    concurrency:
+      group: ha-dashboard-production
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - name: Wait for exact runner binding and HA capability grant
+        run: node /opt/ha-dashboard/bin/deploy-dashboard-ci.mjs wait-authorized --mode production
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: dashboard-production-${{ github.sha }}-${{ github.run_attempt }}
+          path: .ha-deploy-artifact
+      - name: Deploy and verify both Home Assistant dashboard hosts
+        env:
+          HA_DEPLOY_FOLDER_NAME: ha-sfenton-react-dash
+          HA_DEPLOY_SSH_HOST: ha-ssh-proxy
+          HA_DEPLOY_SSH_HOST_KEY_SHA256: ${{ vars.HA_DEPLOY_SSH_HOST_KEY_SHA256 }}
+          HA_DEPLOY_SSH_PORT: '2222'
+          HA_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.HA_DEPLOY_SSH_PRIVATE_KEY }}
+          HA_DEPLOY_SSH_USERNAME: root
+          HA_DEPLOY_TOKEN: ${{ secrets.HA_DEPLOY_TOKEN }}
+          HA_DEPLOY_URL: http://ha-api-proxy:8123
+        run: >-
+          node /opt/ha-dashboard/bin/deploy-dashboard-ci.mjs deploy
+          --dist .ha-deploy-artifact/dist
+          --manifest .ha-deploy-artifact/deployment-manifest.json
+          --receipt .ha-deploy-artifact/deployment-receipt.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: dashboard-deployment-receipt-${{ github.sha }}-${{ github.run_attempt }}
+          path: .ha-deploy-artifact/deployment-receipt.json
+          if-no-files-found: warn
+          retention-days: 30
