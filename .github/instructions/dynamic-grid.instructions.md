@@ -55,9 +55,12 @@ assembling an undocumented page-local prop combination.
   bounded card width.
 - `lastRow="center"` is an explicit exception for collections such as branded
   app launchers. Never use centering to disguise an accidental incomplete row.
-- `fillRows="except-last"` fills complete leading rows while preserving the
-  final row's measured minimum spans. `fillRows={false}` preserves natural
-  one-track placement.
+- `fillRows` governs intermediate rows, while `lastRow` governs only the final
+  row. Both `fillRows={true}` and `fillRows="except-last"` fill intermediate
+  rows; the latter defaults the final row to start alignment. `fillRows={false}`
+  preserves measured minimum spans unless the explicit final-row policy fills
+  that row. An expanded `lastRow="fill-minimum"` grid still fills intermediate
+  rows while leaving only its final row at measured minimum spans.
 - `itemSizing="content-aware"` lets each item span independently according to
   marked text. `uniform` changes the column count for the collection.
   `fixed` deliberately ignores live text when calculating geometry.

@@ -8,6 +8,7 @@ describe('text-aware leading-row fill', () => {
     expect(packDynamicGridSpans([1, 2, 2, 1, 1, 2], 4, 'except-last')).toEqual([2, 2, 2, 1, 1, 2])
     expect(packDynamicGridSpans([2, 1, 2], 4, 'except-last')).toEqual([2, 2, 2])
     expect(packDynamicGridSpans([2, 2], 3, 'except-last')).toEqual([3, 2])
+    expect(packDynamicGridSpans([1, 1, 2, 2, 1], 3, 'except-last')).toEqual([1, 2, 3, 2, 1])
   })
 
   it('does not inflate a final-only row or reorder uneven rows', () => {
@@ -401,6 +402,68 @@ describe('DynamicGrid', () => {
       expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
       expect(grid.firstElementChild).toHaveAttribute('data-dynamic-grid-span', '1')
       expect(grid.style.getPropertyValue('--dynamic-grid-max-width')).toBe('320px')
+    })
+  })
+
+  it('fills expanded intermediate rows without shrinking measured content spans', async () => {
+    const availableWidth = 800
+    const labelContainerWidth = 240
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return availableWidth
+      if (this.querySelector?.('[data-dynamic-grid="true"]')) return availableWidth
+      if (this.dataset.dynamicGridLabelContainer === 'true') return labelContainerWidth
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
+      return Number(this.dataset.naturalContainerWidth ?? this.dataset.naturalWidth ?? 0)
+    })
+
+    const items = [100, 100, 300, 300, 100].map((naturalWidth, index) => (
+      <button key={`${naturalWidth}-${index}`} type="button">
+        <span data-dynamic-grid-label-container="true" data-natural-container-width={naturalWidth}>
+          <span data-dynamic-grid-label="true" data-natural-width={naturalWidth}>Link {index + 1}</span>
+        </span>
+      </button>
+    ))
+    const view = render(
+      <div>
+        <DynamicGrid
+          ariaLabel="Expanded links"
+          columns={2}
+          lastRow="fill-minimum"
+          layout="bounded"
+          maxCellWidth={300}
+          maxColumns={3}
+        >
+          {items}
+        </DynamicGrid>
+      </div>,
+    )
+
+    const grid = screen.getByRole('group', { name: 'Expanded links' })
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '3')
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '2', '3', '2', '1'])
+    })
+
+    view.rerender(
+      <div>
+        <DynamicGrid
+          ariaLabel="Expanded links"
+          columns={2}
+          fillRows={false}
+          lastRow="fill-minimum"
+          layout="bounded"
+          maxCellWidth={300}
+          maxColumns={3}
+        >
+          {items}
+        </DynamicGrid>
+      </div>,
+    )
+
+    await waitFor(() => {
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '2', '2', '1'])
     })
   })
 })
