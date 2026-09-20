@@ -2,9 +2,15 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { vi } from 'vitest'
 import { PageScrollToTopContext, PageScrollerContext } from '../../../hooks/usePageScroller'
-import { mockState, resetMockHass } from '../../../test/mocks/hakitCoreState'
+import {
+  mockState,
+  resetMockHass,
+  setMockConnectionStatus,
+  setMockRecipeQueryAvailable,
+  type MockConnectionStatus,
+} from '../../../test/mocks/hakitCoreState'
 import type { RecipeBrowseCriteria } from './recipeTypes'
-import { RECIPE_HYDRATION_SETTLE_MS, useRecipeCollection } from './useRecipeCollection'
+import { RECIPE_HYDRATION_SETTLE_MS, RECIPE_RECOVERY_RETRY_MS, useRecipeCollection } from './useRecipeCollection'
 
 function criteria(q = ''): RecipeBrowseCriteria {
   return {
@@ -44,6 +50,13 @@ function browse(items: unknown[], options: { cursor?: string | null; hasMore?: b
       ranking_status: 'ready',
     },
   }
+}
+
+async function flushMicrotasks() {
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
 }
 
 describe('useRecipeCollection', () => {
@@ -125,6 +138,320 @@ describe('useRecipeCollection', () => {
       expect(result.current.items.map((item) => item.id)).toEqual([1])
       expect(result.current.initialResolved).toBe(true)
     } finally {
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('retries an unavailable collection exactly 5 seconds after settlement and stays serial', async () => {
+    vi.useFakeTimers()
+    const originalCallService = mockState.helpers.callService
+    const originalFetch = globalThis.fetch
+    const fetchMock = vi.fn(async () => ({
+      json: async () => ({ message: 'Service evershelf.recipe_query not found', success: false }),
+      ok: false,
+      status: 503,
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    let attempts = 0
+    let active = 0
+    let maximumActive = 0
+    mockState.helpers.callService = (params) => {
+      if (params.domain !== 'evershelf' || params.service !== 'recipe_query') return originalCallService(params)
+      attempts += 1
+      active += 1
+      maximumActive = Math.max(maximumActive, active)
+      if (attempts === 1) {
+        active -= 1
+        return Promise.reject(new Error('Service evershelf.recipe_query not found'))
+      }
+      active -= 1
+      return Promise.resolve(browse([rawCard(2)]))
+    }
+
+    try {
+      const { result } = renderHook(() => useRecipeCollection(criteria()))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(result.current.recovery).toBe(true)
+      expect(attempts).toBe(1)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RECIPE_RECOVERY_RETRY_MS - 1)
+      })
+      expect(attempts).toBe(1)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1)
+      })
+      expect(attempts).toBe(2)
+      expect(maximumActive).toBe(1)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(400)
+      })
+      expect(result.current.recovery).toBe(false)
+      expect(result.current.error).toBeNull()
+      expect(result.current.items.map((item) => item.id)).toEqual([2])
+    } finally {
+      vi.unstubAllGlobals()
+      globalThis.fetch = originalFetch
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('ends recovery on a connected non-classified retry error without scheduling another retry', async () => {
+    vi.useFakeTimers()
+    const originalCallService = mockState.helpers.callService
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      json: async () => ({ message: 'Service evershelf.recipe_query not found', success: false }),
+      ok: false,
+      status: 503,
+    })))
+    let attempts = 0
+    mockState.helpers.callService = (params) => {
+      if (params.domain !== 'evershelf' || params.service !== 'recipe_query') return originalCallService(params)
+      attempts += 1
+      return attempts === 1
+        ? Promise.reject(new Error('Service evershelf.recipe_query not found'))
+        : Promise.reject(new Error('Connected recipe query failure'))
+    }
+
+    try {
+      const { result } = renderHook(() => useRecipeCollection(criteria()))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(result.current.recovery).toBe(true)
+      expect(attempts).toBe(1)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RECIPE_RECOVERY_RETRY_MS)
+      })
+      expect(attempts).toBe(2)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(400)
+      })
+      expect(result.current.recovery).toBe(false)
+      expect(result.current.error).toBe('Connected recipe query failure')
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RECIPE_RECOVERY_RETRY_MS)
+      })
+      expect(attempts).toBe(2)
+    } finally {
+      vi.unstubAllGlobals()
+      globalThis.fetch = originalFetch
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('lets service registration preempt recovery and complete with an empty collection', async () => {
+    vi.useFakeTimers()
+    const originalCallService = mockState.helpers.callService
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      json: async () => ({ message: 'Service evershelf.recipe_query not found', success: false }),
+      ok: false,
+      status: 503,
+    })))
+    let attempts = 0
+    mockState.helpers.callService = (params) => {
+      if (params.domain !== 'evershelf' || params.service !== 'recipe_query') return originalCallService(params)
+      attempts += 1
+      return attempts === 1
+        ? Promise.reject(new Error('Service evershelf.recipe_query not found'))
+        : Promise.resolve(browse([]))
+    }
+
+    try {
+      const { result } = renderHook(() => useRecipeCollection(criteria()))
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(result.current.recovery).toBe(true)
+      expect(attempts).toBe(1)
+
+      await act(async () => {
+        setMockRecipeQueryAvailable(true)
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(attempts).toBe(2)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(400)
+      })
+      expect(result.current.recovery).toBe(false)
+      expect(result.current.error).toBeNull()
+      expect(result.current.items).toEqual([])
+    } finally {
+      act(() => setMockRecipeQueryAvailable(false))
+      vi.unstubAllGlobals()
+      globalThis.fetch = originalFetch
+      vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it.each<MockConnectionStatus>(['pending', 'disconnected', 'pending-suspension', 'suspended'])(
+    'does not call recipe services while connection is %s',
+    async (status) => {
+      const originalCallService = mockState.helpers.callService
+      const callService = vi.fn((params: Record<string, unknown>) => (
+        params.domain === 'evershelf' && params.service === 'recipe_query'
+          ? Promise.resolve(browse([rawCard(1)]))
+          : originalCallService(params)
+      ))
+      mockState.helpers.callService = callService
+      setMockConnectionStatus(status)
+
+      try {
+        const { result, unmount } = renderHook(() => useRecipeCollection(criteria()))
+        await flushMicrotasks()
+        expect(callService).not.toHaveBeenCalled()
+        expect(result.current.recovery).toBe(true)
+
+        await act(async () => {
+          setMockConnectionStatus('connected')
+          await Promise.resolve()
+        })
+        expect(callService).toHaveBeenCalledTimes(1)
+        unmount()
+      } finally {
+        setMockConnectionStatus('connected')
+        mockState.helpers.callService = originalCallService
+      }
+    },
+  )
+
+  it('coalesces simultaneous connection and service readiness signals into one recovery call', async () => {
+    const originalCallService = mockState.helpers.callService
+    let resolveRequest: ((value: unknown) => void) | undefined
+    let attempts = 0
+    let active = 0
+    let maximumActive = 0
+    mockState.helpers.callService = (params) => {
+      if (params.domain !== 'evershelf' || params.service !== 'recipe_query') return originalCallService(params)
+      attempts += 1
+      active += 1
+      maximumActive = Math.max(maximumActive, active)
+      return new Promise((resolve) => {
+        resolveRequest = (value) => {
+          active -= 1
+          resolve(value)
+        }
+      })
+    }
+    setMockConnectionStatus('disconnected')
+
+    let unmount: (() => void) | undefined
+    try {
+      const rendered = renderHook(() => useRecipeCollection(criteria()))
+      unmount = rendered.unmount
+      await flushMicrotasks()
+      expect(rendered.result.current.recovery).toBe(true)
+      expect(attempts).toBe(0)
+
+      await act(async () => {
+        setMockConnectionStatus('connected')
+        setMockRecipeQueryAvailable(true)
+        await Promise.resolve()
+      })
+      expect(attempts).toBe(1)
+      expect(maximumActive).toBe(1)
+
+      await act(async () => resolveRequest?.(browse([rawCard(3)])))
+      await waitFor(() => expect(rendered.result.current.criteriaPhase).toBe('idle'))
+    } finally {
+      unmount?.()
+      act(() => {
+        setMockRecipeQueryAvailable(false)
+        setMockConnectionStatus('connected')
+      })
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('defers hidden recovery until visibility is restored and keeps preload inert', async () => {
+    const originalVisibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+    const originalCallService = mockState.helpers.callService
+    const callService = vi.fn((params: Record<string, unknown>) => (
+      params.domain === 'evershelf' && params.service === 'recipe_query'
+        ? Promise.resolve(browse([rawCard(1)]))
+        : originalCallService(params)
+    ))
+    mockState.helpers.callService = callService
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+
+    try {
+      const hidden = renderHook(() => useRecipeCollection(criteria()))
+      await flushMicrotasks()
+      expect(callService).not.toHaveBeenCalled()
+      expect(hidden.result.current.recovery).toBe(true)
+
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+        await Promise.resolve()
+      })
+      expect(callService).toHaveBeenCalledTimes(1)
+      hidden.unmount()
+
+      const addEventListener = vi.spyOn(document, 'addEventListener')
+      vi.useFakeTimers()
+      const preload = renderHook(() => useRecipeCollection(criteria(), { preload: true }))
+      expect(preload.result.current.initialResolved).toBe(true)
+      expect(addEventListener.mock.calls.some(([event]) => event === 'visibilitychange')).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
+      preload.unmount()
+      addEventListener.mockRestore()
+      vi.useRealTimers()
+    } finally {
+      mockState.helpers.callService = originalCallService
+      if (originalVisibilityDescriptor) Object.defineProperty(document, 'visibilityState', originalVisibilityDescriptor)
+      else Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    }
+  })
+
+  it('cancels a pending recovery timer when the generation is replaced or unmounted', async () => {
+    vi.useFakeTimers()
+    const originalCallService = mockState.helpers.callService
+    const originalFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      json: async () => ({ message: 'Service evershelf.recipe_query not found', success: false }),
+      ok: false,
+      status: 503,
+    })))
+    let attempts = 0
+    mockState.helpers.callService = (params) => {
+      if (params.domain !== 'evershelf' || params.service !== 'recipe_query') return originalCallService(params)
+      attempts += 1
+      return Promise.reject(new Error('Service evershelf.recipe_query not found'))
+    }
+
+    try {
+      const { rerender, unmount } = renderHook(({ value }) => useRecipeCollection(value), {
+        initialProps: { value: criteria('first') },
+      })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(attempts).toBe(1)
+      rerender({ value: criteria('second') })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500)
+      })
+      expect(attempts).toBe(2)
+      unmount()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(RECIPE_RECOVERY_RETRY_MS)
+      })
+      expect(attempts).toBe(2)
+    } finally {
+      vi.unstubAllGlobals()
+      globalThis.fetch = originalFetch
+      vi.useRealTimers()
       mockState.helpers.callService = originalCallService
     }
   })

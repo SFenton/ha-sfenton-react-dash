@@ -52,6 +52,8 @@ const mockConnectionListeners = new Map<string, Set<() => void>>()
 let mockHassRevision = 0
 let mockDonetickTaskLoadDelayMs = 0
 let mockRecipeQueryDelayMs = 0
+let mockRecipeQueryUnavailableFailures = 0
+let recipeQueryFailureConfig: string | null | undefined
 const pendingWakeCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
 const pendingHouseholdAwayCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
 let mockWakeEpisodeSequence = 0
@@ -190,6 +192,22 @@ export function setMockConnectionStatus(status: MockConnectionStatus) {
   notifyMockHass()
 }
 
+export function setMockRecipeQueryAvailable(available: boolean) {
+  const currentServices = mockState.services
+  const currentEvershelf = isRecord(currentServices.evershelf) ? currentServices.evershelf : {}
+  const nextServices = { ...currentServices }
+  if (available) {
+    nextServices.evershelf = { ...currentEvershelf, recipe_query: {} }
+  } else {
+    const nextEvershelf = { ...currentEvershelf }
+    delete nextEvershelf.recipe_query
+    if (Object.keys(nextEvershelf).length > 0) nextServices.evershelf = nextEvershelf
+    else delete nextServices.evershelf
+  }
+  mockState.services = nextServices
+  notifyMockHass()
+}
+
 export function setMockUser(user: MockHassState['user']) {
   mockState.user = user
   notifyMockHass()
@@ -220,6 +238,19 @@ function configuredRecipeQueryDelayMs() {
   if (typeof window === 'undefined') return 0
   const configured = Number(new URLSearchParams(window.location.search).get('__mockRecipeQueryDelayMs') ?? 0)
   return Number.isFinite(configured) ? Math.max(0, configured) : 0
+}
+
+function consumeConfiguredRecipeQueryUnavailableFailure() {
+  if (typeof window === 'undefined') return false
+  const configured = new URLSearchParams(window.location.search).get('__mockRecipeQueryUnavailableFailures')
+  if (configured !== recipeQueryFailureConfig) {
+    recipeQueryFailureConfig = configured
+    const count = Number(configured ?? 0)
+    mockRecipeQueryUnavailableFailures = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0
+  }
+  if (mockRecipeQueryUnavailableFailures <= 0) return false
+  mockRecipeQueryUnavailableFailures -= 1
+  return true
 }
 
 function configuredRecipeDetailDelayMs() {
@@ -1070,6 +1101,7 @@ export type MockHassDebugApi = {
   reset: () => void
   setCallServiceOutcome: (domain: string, service: string, outcome: MockCallServiceOutcome) => void
   setConnectionStatus: (status: MockConnectionStatus) => void
+  setRecipeQueryAvailable: (available: boolean) => void
   setUser: (user: MockHassState['user']) => void
   setHumidifierSchedule: (schedule: Record<string, unknown>) => void
   setDailyWeatherForecast: (index: number, patch: Record<string, unknown>) => void
@@ -1136,6 +1168,7 @@ function exposeMockHassDebugApi() {
     getEntity: entityId => mockEntities[entityId] ? structuredClone(mockEntities[entityId]) : null,
     setCallServiceOutcome: setMockCallServiceOutcome,
     setConnectionStatus: setMockConnectionStatus,
+    setRecipeQueryAvailable: setMockRecipeQueryAvailable,
     setDailyWeatherForecast: setMockDailyWeatherForecast,
     setHourlyWeatherForecast: setMockHourlyWeatherForecast,
     setUser: setMockUser,
@@ -1907,6 +1940,8 @@ export function resetMockHass() {
   for (const location of Object.keys(mockInventoryItemsByLocation)) delete mockInventoryItemsByLocation[location]
   mockDonetickTaskLoadDelayMs = 0
   mockRecipeQueryDelayMs = 0
+  mockRecipeQueryUnavailableFailures = 0
+  recipeQueryFailureConfig = undefined
   mockDailyWeatherForecast = initialMockDailyWeatherForecast.map((forecast) => ({ ...forecast }))
   mockHourlyWeatherForecast = createMockHourlyWeatherForecast()
   mockState.connectionStatus = 'connected'
@@ -2232,6 +2267,9 @@ export const mockState: MockHassState = {
         })
       }
       if (params.domain === 'evershelf' && params.service === 'recipe_query' && params.returnResponse === true) {
+        if (consumeConfiguredRecipeQueryUnavailableFailure()) {
+          return Promise.reject(new Error('Service evershelf.recipe_query not found'))
+        }
         const serviceData = params.serviceData as { cursor?: string; kind?: string; limit?: number; q?: string; sort?: string } | undefined
         if (serviceData?.kind === 'recommendations') {
           const recommendationCount = Math.max(1, Math.min(100, Number(serviceData.limit ?? 30)))

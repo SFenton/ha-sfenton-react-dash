@@ -4351,6 +4351,18 @@
       "words": 3
     },
     {
+      "characters": 15,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "b77cd08796f958d9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Loading Recipes",
+      "words": 2
+    },
+    {
       "characters": 6,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -4753,6 +4765,30 @@
       ],
       "value": "No meaningful {{type}} is expected.",
       "words": 5
+    },
+    {
+      "characters": 16,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "a94a5e20ee3fee6a",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "No Recipes Found",
+      "words": 3
+    },
+    {
+      "characters": 39,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "d806468d6d146739",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "No recipes matched the current filters.",
+      "words": 6
     },
     {
       "characters": 127,
@@ -5535,6 +5571,18 @@
       "words": 6
     },
     {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "4113534c4b87ff15",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Recipes",
+      "words": 1
+    },
+    {
       "characters": 9,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/vacuum.json",
@@ -5669,6 +5717,18 @@
       "placeholders": [],
       "value": "Reset Count",
       "words": 2
+    },
+    {
+      "characters": 5,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "d096d2a7670d9884",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Retry",
+      "words": 1
     },
     {
       "characters": 18,
@@ -7839,6 +7899,18 @@
       "words": 2
     },
     {
+      "characters": 52,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "76655bac53a2d8a4",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Try a different search or loosen the recipe filters.",
+      "words": 9
+    },
+    {
       "characters": 108,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -8033,6 +8105,18 @@
       "placeholders": [],
       "value": "Unable to load Pirate Weather hourly forecast.",
       "words": 7
+    },
+    {
+      "characters": 22,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "0369b3c37c4d6dca",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unable to Load Recipes",
+      "words": 4
     },
     {
       "characters": 35,
@@ -9637,6 +9721,18 @@
       "placeholders": [],
       "value": "Loading Food & Recipes",
       "words": 4
+    },
+    {
+      "characters": 15,
+      "context": "loading-label",
+      "file": "src/i18n/locales/en/pages/food.json",
+      "id": "f1e2794937ef976f",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Loading recipes",
+      "words": 2
     },
     {
       "characters": 23,
@@ -13670,20 +13766,6 @@
       "words": 3
     },
     {
-      "characters": 15,
-      "context": "accessibility",
-      "file": "src/pages/RecipesPage.tsx",
-      "id": "9e724795cd30b2ac",
-      "lines": [
-        86
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Loading recipes",
-      "words": 2
-    },
-    {
       "characters": 34,
       "context": "accessibility",
       "file": "src/components/hass/WeatherSummary.tsx",
@@ -14042,20 +14124,6 @@
       "placeholders": [],
       "value": "Recipe results",
       "words": 2
-    },
-    {
-      "characters": 7,
-      "context": "accessibility",
-      "file": "src/pages/RecipesPage.tsx",
-      "id": "b148731a87a4dd4b",
-      "lines": [
-        73
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Recipes",
-      "words": 1
     },
     {
       "characters": 37,
@@ -16565,7 +16633,7 @@
       "file": "src/pages/RecipesPage.tsx",
       "id": "a4bd31dbbdce14ce",
       "lines": [
-        96
+        100
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -19334,20 +19402,6 @@
       "words": 1
     },
     {
-      "characters": 5,
-      "context": "button-action",
-      "file": "src/pages/RecipesPage.tsx",
-      "id": "24a674009c01cd93",
-      "lines": [
-        93
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Retry",
-      "words": 1
-    },
-    {
       "characters": 4,
       "context": "button-action",
       "file": "src/components/hass/EverShelfInventoryPanel.tsx",
@@ -20109,20 +20163,6 @@
       "words": 1
     },
     {
-      "characters": 39,
-      "context": "description",
-      "file": "src/pages/RecipesPage.tsx",
-      "id": "333dfdf8d70e5b73",
-      "lines": [
-        98
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "No recipes matched the current filters.",
-      "words": 6
-    },
-    {
       "characters": 4,
       "context": "description",
       "file": "src/components/hass/recipes/recipeTypes.ts",
@@ -20796,20 +20836,6 @@
       "placeholders": [],
       "value": "Trigger the dock to empty the robot dustbin into its dust bag.",
       "words": 12
-    },
-    {
-      "characters": 52,
-      "context": "description",
-      "file": "src/pages/RecipesPage.tsx",
-      "id": "c17c4bcf7cbc0029",
-      "lines": [
-        98
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Try a different search or loosen the recipe filters.",
-      "words": 9
     },
     {
       "characters": 41,
@@ -26917,20 +26943,6 @@
       "placeholders": [],
       "value": "Loading Home dashboard content",
       "words": 4
-    },
-    {
-      "characters": 15,
-      "context": "label",
-      "file": "src/pages/RecipesPage.tsx",
-      "id": "1f346dcc714edcb9",
-      "lines": [
-        134
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Loading Recipes",
-      "words": 2
     },
     {
       "characters": 12,
@@ -34600,20 +34612,6 @@
       "words": 3
     },
     {
-      "characters": 16,
-      "context": "title",
-      "file": "src/pages/RecipesPage.tsx",
-      "id": "18504c3242013e3c",
-      "lines": [
-        99
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "No Recipes Found",
-      "words": 3
-    },
-    {
       "characters": 12,
       "context": "title",
       "file": "src/constants/portedDashboard.ts",
@@ -36866,20 +36864,6 @@
       "origin": "legacy",
       "placeholders": [],
       "value": "Unable to Load Recipe",
-      "words": 4
-    },
-    {
-      "characters": 22,
-      "context": "title",
-      "file": "src/pages/RecipesPage.tsx",
-      "id": "608d3c29c5deb2a6",
-      "lines": [
-        92
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Unable to Load Recipes",
       "words": 4
     },
     {
@@ -41192,10 +41176,10 @@
     }
   ],
   "summary": {
-    "catalogRecords": 935,
+    "catalogRecords": 943,
     "documentRecords": 1,
-    "legacyOccurrences": 2473,
-    "legacyRecords": 2044,
+    "legacyOccurrences": 2465,
+    "legacyRecords": 2036,
     "totalRecords": 2980
   },
   "version": 1

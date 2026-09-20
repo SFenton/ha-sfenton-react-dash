@@ -42,8 +42,19 @@ export const PAGE_VACATION_COPY_KEYS = {
   },
 } as const
 export const PAGE_FOOD_COPY_KEYS = {
+  groceryEmptyDescription: 'groceries.emptyDescription',
   groceries: {
     emptyDescription: 'groceries.emptyDescription',
+  },
+  recipes: {
+    filterEmptyDescription: 'recipes.filterEmptyDescription',
+    label: 'recipes.label',
+    loading: 'recipes.loading',
+    noResultsTitle: 'recipes.noResultsTitle',
+    pageLoading: 'recipes.pageLoading',
+    retry: 'recipes.retry',
+    searchEmptyDescription: 'recipes.searchEmptyDescription',
+    unableToLoad: 'recipes.unableToLoad',
   },
   delete: {
     description: 'delete.description',
@@ -56,6 +67,8 @@ export const PAGE_FOOD_COPY_KEYS = {
     updateError: 'inventory.updateError',
   },
 } as const
+export const FOOD_COPY_NAMESPACE = PAGE_FOOD_COPY_NAMESPACE
+export const FOOD_COPY_KEYS = PAGE_FOOD_COPY_KEYS
 export const CHAT_COPY_NAMESPACE = 'modalChat' as const
 export const CHAT_COPY_KEYS = {
   launcher: 'launcher',

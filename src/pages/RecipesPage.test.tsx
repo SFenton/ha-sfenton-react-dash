@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { mockState, resetMockHass } from '../test/mocks/hakitCoreState'
+import { mockState, resetMockHass, setMockConnectionStatus } from '../test/mocks/hakitCoreState'
 import { useRecipeControls } from '../components/hass/recipes/useRecipeControls'
 import { DASHBOARD_LOADING_EXIT_MS, DASHBOARD_MIN_LOADING_MS, DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from '../constants/loading'
 import { RecipesPage } from './RecipesPage'
@@ -107,7 +107,7 @@ describe('RecipesPage', () => {
     }
   })
 
-  it('reveals a handled initial error only after the page gate exits', async () => {
+  it('shows the terminal error title once without exposing backend diagnostics', async () => {
     vi.useFakeTimers()
     let rejectInitial: ((reason?: unknown) => void) | undefined
     const originalCallService = mockState.helpers.callService
@@ -139,9 +139,39 @@ describe('RecipesPage', () => {
       })
 
       expect(screen.queryByRole('status', { name: 'Loading Recipes' })).not.toBeInTheDocument()
-      expect(screen.getByText('Initial recipe failure')).toBeInTheDocument()
+      expect(screen.getAllByRole('heading', { name: 'Unable to Load Recipes' })).toHaveLength(1)
+      expect(screen.queryByText('Initial recipe failure')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
     } finally {
       vi.useRealTimers()
+      mockState.helpers.callService = originalCallService
+    }
+  })
+
+  it('keeps recovery on one loading status without terminal error controls', async () => {
+    const originalCallService = mockState.helpers.callService
+    mockState.helpers.callService = (params) => (
+      params.domain === 'evershelf' && params.service === 'recipe_query'
+        ? Promise.resolve({ response: { items: [rawCard(1)], total: 1 } })
+        : originalCallService(params)
+    )
+    setMockConnectionStatus('disconnected')
+
+    try {
+      render(<Harness initiallyAppGated />)
+      const loading = screen.getByRole('status', { name: 'Loading recipes' })
+      expect(loading).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Unable to Load Recipes' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+      expect(loading.closest('[data-recovery="true"]')).toHaveAttribute('aria-busy', 'true')
+
+      await act(async () => {
+        setMockConnectionStatus('connected')
+        await Promise.resolve()
+      })
+      await screen.findByRole('button', { name: 'Open Recipe 1 recipe details' })
+      expect(screen.queryByRole('status', { name: 'Loading recipes' })).not.toBeInTheDocument()
+    } finally {
       mockState.helpers.callService = originalCallService
     }
   })
@@ -164,7 +194,9 @@ describe('RecipesPage', () => {
       })
 
       expect(screen.queryByRole('status', { name: 'Loading Recipes' })).not.toBeInTheDocument()
-      expect(screen.getByRole('status', { name: 'Loading recipes' })).toBeInTheDocument()
+      const loading = screen.getByRole('status', { name: 'Loading recipes' })
+      expect(loading).toBeInTheDocument()
+      expect(loading.closest('[data-criteria-phase]')).toHaveAttribute('aria-busy', 'true')
     } finally {
       vi.useRealTimers()
       mockState.helpers.callService = originalCallService

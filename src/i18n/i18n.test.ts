@@ -1,7 +1,17 @@
 import i18n from './init'
 import { copy, copyRef, resolveCopy } from './copy'
+import {
+  FOOD_COPY_KEYS,
+  FOOD_COPY_NAMESPACE,
+  PAGE_FOOD_COPY_KEYS,
+  PAGE_FOOD_COPY_NAMESPACE,
+  WAKE_LIGHT_COPY_KEYS,
+  WAKE_LIGHT_COPY_NAMESPACE,
+} from './index'
 import { formatList, formatNumber } from './formatters'
 
+// @covers src/i18n/index.ts
+// @covers src/i18n/locales/en/pages/food.json
 describe('copy runtime', () => {
   it('resolves modular English keys', () => {
     expect(copy('common', 'actions.apply')).toBe('Apply')
@@ -36,5 +46,20 @@ describe('copy runtime', () => {
   it('uses shared locale-aware formatters', () => {
     expect(formatNumber(1234)).toBe('1,234')
     expect(formatList(['Lights', 'Climate', 'Security'])).toBe('Lights, Climate, and Security')
+  })
+
+  it('keeps the legacy food page i18n exports stable', () => {
+    expect(PAGE_FOOD_COPY_NAMESPACE).toBe('pageFood')
+    expect(PAGE_FOOD_COPY_KEYS.groceryEmptyDescription).toBe('groceries.emptyDescription')
+  })
+
+  it('resolves visible Recipes page copy from the food catalog', () => {
+    expect(FOOD_COPY_NAMESPACE).toBe('pageFood')
+    expect(copy(FOOD_COPY_NAMESPACE, FOOD_COPY_KEYS.recipes.loading)).toBe('Loading recipes')
+  })
+
+  it('keeps wake-light i18n exports available', () => {
+    expect(WAKE_LIGHT_COPY_NAMESPACE).toBe('modalWakeLight')
+    expect(WAKE_LIGHT_COPY_KEYS.tile.unavailable).toBe('tile.unavailable')
   })
 })

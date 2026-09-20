@@ -27,11 +27,15 @@
   top: 0;
   display: grid;
   width: 100%;
-  height: min(100%, calc(100dvh - var(--bottom-nav-height) - 122px));
+  height: calc(100dvh - var(--bottom-nav-height) - 122px);
   min-height: 180px;
   place-items: center;
   opacity: 1;
   z-index: 1;
+}
+
+.resultsRegion[data-height-frozen='true'] .criteriaLoading {
+  height: min(100%, calc(100dvh - var(--bottom-nav-height) - 122px));
 }
 
 .resultsRegion[data-criteria-phase='spinner-exiting'] .criteriaLoading {
@@ -57,6 +61,15 @@
   align-content: center;
   justify-items: center;
   gap: 14px;
+}
+
+.errorState h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.02;
+  text-align: center;
 }
 
 .errorState button {
