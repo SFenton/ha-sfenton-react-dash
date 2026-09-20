@@ -259,19 +259,25 @@ export async function acquireProductionLease(
     const current = JSON.parse(
       (await client.readFile(paths.owner)).toString('utf8'),
     ) as ReturnType<typeof productionLeaseRecord>
-    if (
+    const sameOwner =
       current.workflowId === identity.workflowId &&
-      current.authorizationHash === identity.authorizationHash &&
-      Date.parse(current.expiresAt) > now
-    ) {
+      current.authorizationHash === identity.authorizationHash
+    const expired = Date.parse(current.expiresAt) <= now
+    if (sameOwner && !expired) return
+    if (sameOwner && expired) {
+      await client.writeFile(
+        paths.owner,
+        `${JSON.stringify(productionLeaseRecord(identity, now))}\n`,
+      )
+      await assertProductionLease(client, configRoot, identity, now)
       return
     }
-    assert(
-      Date.parse(current.expiresAt) <= now,
-      `Production lease is held by workflow ${current.workflowId}`,
-    )
-    if (await client.exists(paths.owner)) await client.unlink(paths.owner)
-    await client.rmdir(paths.directory)
+    if (expired) {
+      throw new Error(
+        `Production lease is expired under foreign workflow ${current.workflowId}; operator recovery is required`,
+      )
+    }
+    throw new Error(`Production lease is held by workflow ${current.workflowId}`)
   }
   try {
     await client.mkdir(paths.directory)

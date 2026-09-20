@@ -19,13 +19,20 @@ import {
   captureProduction,
   deployProduction,
   productionManifest,
+  productionStateHash,
   rollbackProduction,
   verifyProduction,
   verifyProductionRollback,
+  type ProductionAdapter,
   type ProductionFile,
+  type ProductionMetadata,
   type ProductionSnapshot,
 } from './release-machine/production'
 import { HomeAssistantProductionAdapter } from './release-machine/productionHomeAssistant'
+import {
+  legacyCardResourceUrl,
+  legacyDashboardUrl,
+} from './lib/dashboardDeployment'
 
 const execFileAsync = promisify(execFile)
 
@@ -37,6 +44,7 @@ export const PANEL_BRIDGE_PATH = 'sfenton-react-panel.js'
 export const DEPLOYMENT_RECORD_PATH = 'deployment.json'
 export const CONTROLLER_AUTHORIZATION_PATH =
   '/run/ha-dashboard/authorization.json'
+const DEPLOYMENT_RECORD_VERSION = 2 as const
 
 const BLOCKED_AUTOMATIC_PATH_PREFIXES = [
   'home-assistant/',
@@ -59,18 +67,69 @@ export type DeploymentArtifactManifest = {
 }
 
 export type DeploymentReceipt = {
-  version: 1
-  status: 'success' | 'failed'
+  version: 2
+  status: 'success' | 'failed' | 'rejected'
+  disposition?:
+    | 'forward'
+    | 'already-current'
+    | 'superseded'
+    | 'full-rerun-required'
   sourceSha: string
   previousSha?: string
+  deployedSha?: string
   runId: string
   runAttempt: number
-  manifestHash: string
+  manifestHash?: string
+  deploymentHash?: string
   deployedAt?: string
   verifiedPaths?: string[]
   panelRegistered?: boolean
+  leaseReleased: boolean
+  mutationState: 'none' | 'attempted' | 'rolled-back' | 'deployed'
   rollback: 'not-required' | 'verified' | 'failed'
   error?: string
+}
+
+export type DeploymentRecordV1 = {
+  version: 1
+  repository: typeof DASHBOARD_REPOSITORY
+  sourceSha: string
+  runId: string
+  runAttempt: number
+  buildFlags: BuildFlags
+}
+
+export type DeploymentRecordV2 = {
+  version: typeof DEPLOYMENT_RECORD_VERSION
+  repository: typeof DASHBOARD_REPOSITORY
+  sourceSha: string
+  runId: string
+  runAttempt: number
+  manifestHash: string
+  buildFlags: BuildFlags
+  deployedAt: string
+  hosts: {
+    legacyWrapperUrl: string
+    legacyCardResourceUrl: string
+    panelRegistered: true
+  }
+  files: Array<{
+    path: string
+    size: number
+    sha256: string
+  }>
+  deploymentHash: string
+}
+
+export type DeploymentLineage = {
+  masterSha: string
+  deployedSha: string
+  candidateSha: string
+  candidateIsMasterAncestor: boolean
+  deployedIsMasterAncestor: boolean
+  deployedIsCandidateAncestor: boolean
+  candidateIsDeployedAncestor: boolean
+  pathsFromDeployedToCandidate: string[]
 }
 
 type DeploymentAuthorization = {
@@ -79,6 +138,9 @@ type DeploymentAuthorization = {
   runAttempt: number
   runnerId: number
   runnerName: string
+  decision: 'allow' | 'reject'
+  disposition?: 'full-rerun-required'
+  reason?: string
 }
 
 type PrepareArtifactOptions = {
@@ -92,8 +154,26 @@ type PrepareArtifactOptions = {
 type VerifyHttpOptions = {
   fetchImpl?: typeof fetch
   haUrl: string
-  manifest: DeploymentArtifactManifest
+  sourceSha: string
+  files: readonly ProductionFile[]
   root: string
+}
+
+type AutomaticDeploymentAdapter = ProductionAdapter & {
+  acquireLease(): Promise<void>
+  reconcileAssets(): Promise<void>
+  finalizeRelease(): Promise<void>
+}
+
+type DeployDashboardOptions = {
+  adapter?: AutomaticDeploymentAdapter
+  authorizationPath?: string
+  fetchImpl?: typeof fetch
+  now?: () => Date
+  resolveLineage?: (
+    deployedVersion: string,
+    candidateSha: string,
+  ) => Promise<DeploymentLineage>
 }
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -108,6 +188,27 @@ function manifestPayload(
   manifest: Omit<DeploymentArtifactManifest, 'manifestHash'>,
 ) {
   return JSON.stringify(manifest)
+}
+
+function deploymentRecordV2Hash(
+  record: Omit<DeploymentRecordV2, 'deploymentHash'>,
+) {
+  return sha256(JSON.stringify(record))
+}
+
+function canonicalDeploymentRecordFiles(files: readonly ProductionFile[]) {
+  return files
+    .filter((file) => file.path !== DEPLOYMENT_RECORD_PATH)
+    .map((file) => ({ path: file.path, size: file.size, sha256: file.sha256 }))
+    .sort((left, right) => left.path.localeCompare(right.path))
+}
+
+function expectedDeploymentHosts(sourceSha: string) {
+  return {
+    legacyWrapperUrl: legacyDashboardUrl(sourceSha),
+    legacyCardResourceUrl: legacyCardResourceUrl(sourceSha),
+    panelRegistered: true as const,
+  }
 }
 
 function normalizedPath(path: string) {
@@ -279,11 +380,11 @@ async function git(
   return stdout.trim()
 }
 
-export async function resolveDeploymentRange(
+export async function resolveDeploymentLineage(
   deployedVersion: string,
   candidateSha: string,
   repositoryUrl = DASHBOARD_REPOSITORY_URL,
-) {
+): Promise<DeploymentLineage> {
   validateSha(candidateSha, 'candidateSha')
   const repository = await mkdtemp(join(tmpdir(), 'dashboard-deploy-git-'))
   try {
@@ -304,36 +405,27 @@ export async function resolveDeploymentRange(
       'rev-parse',
       'refs/remotes/origin/master',
     ])
-    await git([
-      '-C',
-      repository,
-      'merge-base',
-      '--is-ancestor',
-      candidateSha,
-      masterSha,
-    ]).catch(() => {
-      throw new Error(
-        `Deployment ${candidateSha} is not an ancestor of master ${masterSha}`,
-      )
-    })
     const deployedSha = await git([
       '-C',
       repository,
       'rev-parse',
       `${deployedVersion}^{commit}`,
     ])
-    await git([
-      '-C',
-      repository,
-      'merge-base',
-      '--is-ancestor',
-      deployedSha,
-      candidateSha,
-    ]).catch(() => {
-      throw new Error(
-        `Deployed revision ${deployedSha} is not an ancestor of ${candidateSha}`,
-      )
-    })
+    const isAncestor = async (ancestor: string, descendant: string) => {
+      try {
+        await git([
+          '-C',
+          repository,
+          'merge-base',
+          '--is-ancestor',
+          ancestor,
+          descendant,
+        ])
+        return true
+      } catch {
+        return false
+      }
+    }
     const output = await git([
       '-C',
       repository,
@@ -342,12 +434,191 @@ export async function resolveDeploymentRange(
       `${deployedSha}..${candidateSha}`,
     ])
     return {
+      masterSha,
       candidateSha,
       deployedSha,
-      paths: output ? output.split('\n').filter(Boolean) : [],
+      candidateIsMasterAncestor: await isAncestor(candidateSha, masterSha),
+      deployedIsMasterAncestor: await isAncestor(deployedSha, masterSha),
+      deployedIsCandidateAncestor: await isAncestor(deployedSha, candidateSha),
+      candidateIsDeployedAncestor: await isAncestor(candidateSha, deployedSha),
+      pathsFromDeployedToCandidate: output ? output.split('\n').filter(Boolean) : [],
     }
   } finally {
     await rm(repository, { recursive: true, force: true })
+  }
+}
+
+export function readDeploymentRecordCandidate(content: string) {
+  const parsed = JSON.parse(content) as Record<string, unknown>
+  if (parsed.version === 1) return parsed as unknown as DeploymentRecordV1
+  if (parsed.version === DEPLOYMENT_RECORD_VERSION) {
+    return parsed as unknown as DeploymentRecordV2
+  }
+  throw new Error('Unsupported deployment.json version')
+}
+
+async function readDeploymentRecordIfPresent(root: string) {
+  try {
+    return readDeploymentRecordCandidate(
+      await readFile(resolve(root, DEPLOYMENT_RECORD_PATH), 'utf8'),
+    )
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return undefined
+    }
+    throw error
+  }
+}
+
+export function classifyDeploymentDisposition(lineage: DeploymentLineage) {
+  assert(
+    lineage.candidateIsMasterAncestor,
+    `Candidate ${lineage.candidateSha} is not on current master ${lineage.masterSha}`,
+  )
+  if (lineage.candidateSha === lineage.deployedSha) {
+    return 'already-current' as const
+  }
+  if (lineage.deployedIsCandidateAncestor) {
+    return 'forward' as const
+  }
+  if (lineage.candidateIsDeployedAncestor && lineage.deployedIsMasterAncestor) {
+    return 'superseded' as const
+  }
+  throw new Error(
+    `Candidate ${lineage.candidateSha} diverges from deployed ${lineage.deployedSha}; refusing non-monotonic deployment`,
+  )
+}
+
+export function planDeploymentAction(
+  lineage: DeploymentLineage,
+  currentRecord?: DeploymentRecordV1 | DeploymentRecordV2,
+) {
+  const disposition = classifyDeploymentDisposition(lineage)
+  if (!currentRecord || currentRecord.version === 1) {
+    if (disposition === 'superseded') {
+      throw new Error(
+        'Superseded no-op is blocked because production still uses deployment.json v1 or is missing deployment.json; deploy a forward v2 record first',
+      )
+    }
+    return { disposition, requiresForwardDeployment: true }
+  }
+  return {
+    disposition,
+    requiresForwardDeployment: disposition === 'forward',
+  }
+}
+
+export function createDeploymentRecordV2(input: {
+  sourceSha: string
+  runId: string
+  runAttempt: number
+  manifestHash: string
+  files: readonly ProductionFile[]
+  deployedAt: string
+}) {
+  validateSha(input.sourceSha, 'deployment record sourceSha')
+  assert(input.runId.length > 0, 'Deployment record runId is invalid')
+  assert(
+    Number.isInteger(input.runAttempt) && input.runAttempt > 0,
+    'Deployment record runAttempt is invalid',
+  )
+  assert(
+    /^[a-f0-9]{64}$/.test(input.manifestHash),
+    'Deployment record manifest hash is invalid',
+  )
+  assert(
+    Number.isFinite(Date.parse(input.deployedAt)),
+    'Deployment record deployedAt is invalid',
+  )
+  const base: Omit<DeploymentRecordV2, 'deploymentHash'> = {
+    version: DEPLOYMENT_RECORD_VERSION,
+    repository: DASHBOARD_REPOSITORY,
+    sourceSha: input.sourceSha,
+    runId: input.runId,
+    runAttempt: input.runAttempt,
+    manifestHash: input.manifestHash,
+    buildFlags: { homeMcpEnabled: false },
+    deployedAt: input.deployedAt,
+    hosts: expectedDeploymentHosts(input.sourceSha),
+    files: canonicalDeploymentRecordFiles(input.files),
+  }
+  const deploymentHash = deploymentRecordV2Hash(base)
+  return { ...base, deploymentHash }
+}
+
+export function verifyDeploymentRecordV2(
+  record: DeploymentRecordV2,
+  files: readonly ProductionFile[],
+  metadata: ProductionMetadata,
+) {
+  assert(
+    record.version === DEPLOYMENT_RECORD_VERSION,
+    'Deployment record version is invalid',
+  )
+  validateSha(record.sourceSha, 'deployment record sourceSha')
+  assert(
+    typeof record.runId === 'string' && record.runId.length > 0,
+    'Deployment record runId is invalid',
+  )
+  assert(
+    Number.isInteger(record.runAttempt) && record.runAttempt > 0,
+    'Deployment record runAttempt is invalid',
+  )
+  assert(
+    typeof record.deployedAt === 'string' &&
+      Number.isFinite(Date.parse(record.deployedAt)),
+    'Deployment record deployedAt is invalid',
+  )
+  assert(
+    record.repository === DASHBOARD_REPOSITORY,
+    'Deployment record repository is invalid',
+  )
+  assert(
+    /^[a-f0-9]{64}$/.test(record.manifestHash),
+    'Deployment record manifest hash is invalid',
+  )
+  assert(
+    record.buildFlags?.homeMcpEnabled === false,
+    'Deployment record build flags are invalid',
+  )
+  assert(
+    /^[a-f0-9]{64}$/.test(record.deploymentHash),
+    'Deployment record hash is invalid',
+  )
+  const { deploymentHash, ...payload } = record
+  assert(
+    deploymentHash === deploymentRecordV2Hash(payload),
+    'Deployment record hash is invalid',
+  )
+  const expectedFiles = canonicalDeploymentRecordFiles(files)
+  assert(
+    JSON.stringify(expectedFiles) === JSON.stringify(record.files),
+    'Deployment record files do not match current published bytes',
+  )
+  const expectedHosts = expectedDeploymentHosts(record.sourceSha)
+  assert(
+    JSON.stringify(record.hosts) === JSON.stringify(expectedHosts),
+    'Deployment record host metadata is invalid',
+  )
+  assert(
+    deploymentVersionFromWrapper(metadata.legacyWrapperUrl) === record.sourceSha,
+    'Deployment record source SHA does not match the deployed wrapper version',
+  )
+  assert(
+    metadata.legacyWrapperUrl === expectedHosts.legacyWrapperUrl &&
+      metadata.legacyCardResourceUrl === expectedHosts.legacyCardResourceUrl &&
+      metadata.panelRegistered === true,
+    'Deployment record host metadata does not match current production metadata',
+  )
+}
+
+export function verifyCurrentDeploymentRecord(
+  record: DeploymentRecordV1 | DeploymentRecordV2 | undefined,
+  files: readonly ProductionFile[],
+  metadata: ProductionMetadata,
+) {
+  if (record?.version === DEPLOYMENT_RECORD_VERSION) {
+    verifyDeploymentRecordV2(record, files, metadata)
   }
 }
 
@@ -382,12 +653,13 @@ function publicAssetUrl(haUrl: string, path: string, version: string) {
 export async function verifyPublishedDashboardAssets({
   fetchImpl = fetch,
   haUrl,
-  manifest,
+  sourceSha,
+  files,
   root,
 }: VerifyHttpOptions) {
-  for (const file of manifest.files) {
+  for (const file of files) {
     const response = await fetchImpl(
-      publicAssetUrl(haUrl, file.path, manifest.sourceSha),
+      publicAssetUrl(haUrl, file.path, sourceSha),
       {
         cache: 'no-store',
         headers: {
@@ -407,7 +679,7 @@ export async function verifyPublishedDashboardAssets({
       `Published dashboard asset ${file.path} does not match the build`,
     )
   }
-  return manifest.files.map((file) => file.path)
+  return files.map((file) => file.path)
 }
 
 async function writeReceipt(path: string, receipt: DeploymentReceipt) {
@@ -444,6 +716,19 @@ export async function waitForControllerAuthorization(
           authorization.runnerName.length > 0,
         'Controller authorization runner binding is invalid',
       )
+      assert(
+        authorization.decision === 'allow' ||
+          authorization.decision === 'reject',
+        'Controller authorization decision is invalid',
+      )
+      if (authorization.decision === 'reject') {
+        assert(
+          authorization.disposition === 'full-rerun-required' &&
+            typeof authorization.reason === 'string' &&
+            authorization.reason.length > 0,
+          'Controller rejection authorization is invalid',
+        )
+      }
       return authorization
     } catch (error) {
       if (
@@ -457,6 +742,41 @@ export async function waitForControllerAuthorization(
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 500))
   }
   throw new Error('Timed out waiting for the host controller authorization')
+}
+
+export async function admitAuthorizedWorkflow(
+  mode: DeploymentAuthorization['mode'],
+  options: {
+    authorizationPath?: string
+    receiptPath: string
+    runAttempt: number
+    runId: string
+    sourceSha: string
+    timeoutMs?: number
+  },
+) {
+  validateSha(options.sourceSha, 'workflow sourceSha')
+  assert(options.runId.length > 0, 'Workflow run ID is required')
+  assert(
+    Number.isInteger(options.runAttempt) && options.runAttempt > 0,
+    'Workflow run attempt is invalid',
+  )
+  const authorization = await waitForControllerAuthorization(mode, options)
+  if (authorization.decision === 'allow') return authorization
+  const receipt: DeploymentReceipt = {
+    version: 2,
+    status: 'rejected',
+    disposition: authorization.disposition ?? 'full-rerun-required',
+    sourceSha: options.sourceSha,
+    runId: options.runId,
+    runAttempt: options.runAttempt,
+    leaseReleased: true,
+    mutationState: 'none',
+    rollback: 'not-required',
+    error: authorization.reason ?? 'Deployment admission was rejected',
+  }
+  await writeReceipt(options.receiptPath, receipt)
+  throw new Error(receipt.error)
 }
 
 async function canConnect(host: string, port: number) {
@@ -501,6 +821,7 @@ export async function deployDashboardArtifact(
   artifactRoot: string,
   manifestPath: string,
   receiptPath: string,
+  options: DeployDashboardOptions = {},
 ) {
   const manifest = await readAndVerifyDeploymentArtifact(
     artifactRoot,
@@ -512,42 +833,130 @@ export async function deployDashboardArtifact(
   )
   assert(runId === manifest.runId, 'Workflow run does not match the artifact')
   assert(runAttempt === manifest.runAttempt, 'Workflow attempt does not match the artifact')
-  await waitForControllerAuthorization('production', { runId, runAttempt })
+  const authorization = await waitForControllerAuthorization('production', {
+    authorizationPath: options.authorizationPath,
+    runId,
+    runAttempt,
+  })
+  assert(
+    authorization.decision === 'allow',
+    authorization.reason ?? 'Deployment admission was rejected before deploy',
+  )
 
   const working = await mkdtemp(join(tmpdir(), 'dashboard-ci-deploy-'))
   const backup = join(working, 'backup')
   const verification = join(working, 'verification')
   const publish = join(working, 'publish')
-  const adapter = HomeAssistantProductionAdapter.fromCiEnvironment(
-    verification,
-    `${runId}-${runAttempt}`,
-    manifest.manifestHash,
-  )
+  const adapter =
+    options.adapter ??
+    HomeAssistantProductionAdapter.fromCiEnvironment(
+      verification,
+      `${runId}-${runAttempt}`,
+      manifest.manifestHash,
+    )
   let snapshot: ProductionSnapshot | undefined
   let deploymentStarted = false
   let publishFiles: ProductionFile[] = []
   let previousSha: string | undefined
+  let deployedSha: string | undefined
   let rollback: DeploymentReceipt['rollback'] = 'not-required'
+  let disposition: DeploymentReceipt['disposition']
+  let leaseAcquired = false
+  let leaseReleased = false
+  let mutationState: DeploymentReceipt['mutationState'] = 'none'
   try {
-    const metadata = await adapter.readMetadata()
-    const range = await resolveDeploymentRange(
-      deploymentVersionFromWrapper(metadata.legacyWrapperUrl),
-      manifest.sourceSha,
-    )
-    previousSha = range.deployedSha
-    assertAutomaticDeploymentPaths(range.paths)
-
     await adapter.acquireLease()
+    leaseAcquired = true
     await adapter.reconcileAssets()
     snapshot = await captureProduction(adapter, backup)
+    const currentRecord = await readDeploymentRecordIfPresent(
+      join(backup, 'assets'),
+    )
+    verifyCurrentDeploymentRecord(
+      currentRecord,
+      snapshot.files,
+      snapshot.metadata,
+    )
+    const lineage = await (
+      options.resolveLineage ?? resolveDeploymentLineage
+    )(
+      deploymentVersionFromWrapper(snapshot.metadata.legacyWrapperUrl),
+      manifest.sourceSha,
+    )
+    previousSha = lineage.deployedSha
+    deployedSha = lineage.deployedSha
+
+    const action = planDeploymentAction(lineage, currentRecord)
+    disposition = action.disposition
+
+    if (!action.requiresForwardDeployment) {
+      assert(
+        currentRecord?.version === DEPLOYMENT_RECORD_VERSION,
+        'No-op verification requires deployment.json v2',
+      )
+      const deploymentRecord = currentRecord
+      const verified = await verifyProduction(adapter, {
+        version: 1,
+        releaseVersion: deploymentRecord.sourceSha,
+        files: snapshot.files,
+        metadata: snapshot.metadata,
+        deploymentHash: productionStateHash(snapshot.files, snapshot.metadata),
+      })
+      const verifiedPaths = await verifyPublishedDashboardAssets({
+        fetchImpl: options.fetchImpl,
+        haUrl: process.env.HA_DEPLOY_URL!,
+        sourceSha: deploymentRecord.sourceSha,
+        files: snapshot.files,
+        root: join(backup, 'assets'),
+      })
+      await adapter.finalizeRelease()
+      leaseReleased = true
+      const receipt: DeploymentReceipt = {
+        version: 2,
+        status: 'success',
+        disposition,
+        sourceSha: manifest.sourceSha,
+        previousSha,
+        deployedSha: deploymentRecord.sourceSha,
+        runId,
+        runAttempt,
+        manifestHash: manifest.manifestHash,
+        deploymentHash: deploymentRecord.deploymentHash,
+        deployedAt: deploymentRecord.deployedAt,
+        verifiedPaths,
+        panelRegistered: verified.metadata.panelRegistered,
+        leaseReleased,
+        mutationState,
+        rollback,
+      }
+      await writeReceipt(receiptPath, receipt)
+      return receipt
+    }
+
     assertPanelBridgeUnchanged(snapshot.files, manifest.files)
+    assertAutomaticDeploymentPaths(lineage.pathsFromDeployedToCandidate)
     publishFiles = await createPublishDirectory(
       join(backup, 'assets'),
       resolve(artifactRoot),
       manifest.files,
       publish,
     )
+    const deployedAt = (options.now?.() ?? new Date()).toISOString()
+    const record = createDeploymentRecordV2({
+      sourceSha: manifest.sourceSha,
+      runId,
+      runAttempt,
+      manifestHash: manifest.manifestHash,
+      files: publishFiles,
+      deployedAt,
+    })
+    await writeFile(
+      join(publish, DEPLOYMENT_RECORD_PATH),
+      `${JSON.stringify(record, null, 2)}\n`,
+    )
+    publishFiles = await productionManifest(publish)
     deploymentStarted = true
+    mutationState = 'attempted'
     const deployment = await deployProduction(
       adapter,
       publish,
@@ -556,29 +965,46 @@ export async function deployDashboardArtifact(
       snapshot,
     )
     const verified = await verifyProduction(adapter, deployment)
-    const verifiedPaths = await verifyPublishedDashboardAssets({
-      haUrl: process.env.HA_DEPLOY_URL!,
-      manifest,
-      root: resolve(artifactRoot),
-    })
-    await adapter.finalizeRelease()
-    const receipt: DeploymentReceipt = {
+    verifyDeploymentRecordV2(record, verified.files, verified.metadata)
+    const reverified = await verifyProduction(adapter, {
       version: 1,
+      releaseVersion: record.sourceSha,
+      files: publishFiles,
+      metadata: verified.metadata,
+      deploymentHash: productionStateHash(publishFiles, verified.metadata),
+    })
+    const verifiedPaths = await verifyPublishedDashboardAssets({
+      fetchImpl: options.fetchImpl,
+      haUrl: process.env.HA_DEPLOY_URL!,
+      sourceSha: manifest.sourceSha,
+      files: publishFiles,
+      root: publish,
+    })
+    mutationState = 'deployed'
+    await adapter.finalizeRelease()
+    leaseReleased = true
+    const receipt: DeploymentReceipt = {
+      version: 2,
       status: 'success',
+      disposition,
       sourceSha: manifest.sourceSha,
       previousSha,
+      deployedSha: manifest.sourceSha,
       runId,
       runAttempt,
       manifestHash: manifest.manifestHash,
-      deployedAt: new Date().toISOString(),
+      deploymentHash: record.deploymentHash,
+      deployedAt: record.deployedAt,
       verifiedPaths,
-      panelRegistered: verified.metadata.panelRegistered,
+      panelRegistered: reverified.metadata.panelRegistered,
+      leaseReleased,
+      mutationState,
       rollback,
     }
     await writeReceipt(receiptPath, receipt)
     return receipt
   } catch (error) {
-    if (snapshot && deploymentStarted) {
+    if (snapshot && deploymentStarted && !leaseReleased) {
       try {
         await rollbackProduction(adapter, backup, {
           releaseVersion: manifest.sourceSha,
@@ -586,17 +1012,23 @@ export async function deployDashboardArtifact(
         })
         await verifyProductionRollback(adapter, snapshot)
         rollback = 'verified'
+        mutationState = 'rolled-back'
         await adapter.finalizeRelease()
+        leaseReleased = true
       } catch (rollbackError) {
         rollback = 'failed'
+        mutationState = 'attempted'
         await writeReceipt(receiptPath, {
-          version: 1,
+          version: 2,
           status: 'failed',
           sourceSha: manifest.sourceSha,
           previousSha,
+          deployedSha,
           runId,
           runAttempt,
           manifestHash: manifest.manifestHash,
+          leaseReleased,
+          mutationState,
           rollback,
           error: error instanceof Error ? error.message : String(error),
         })
@@ -606,17 +1038,45 @@ export async function deployDashboardArtifact(
           { cause: rollbackError },
         )
       }
-    } else {
-      await adapter.finalizeRelease().catch(() => undefined)
+    } else if (leaseAcquired && !leaseReleased) {
+      try {
+        await adapter.finalizeRelease()
+        leaseReleased = true
+      } catch (finalizationError) {
+        await writeReceipt(receiptPath, {
+          version: 2,
+          status: 'failed',
+          sourceSha: manifest.sourceSha,
+          previousSha,
+          deployedSha,
+          runId,
+          runAttempt,
+          manifestHash: manifest.manifestHash,
+          disposition,
+          leaseReleased,
+          mutationState,
+          rollback,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        throw new AggregateError(
+          [error, finalizationError],
+          'Dashboard deployment failed during lease finalization',
+          { cause: finalizationError },
+        )
+      }
     }
     await writeReceipt(receiptPath, {
-      version: 1,
+      version: 2,
       status: 'failed',
       sourceSha: manifest.sourceSha,
       previousSha,
+      deployedSha,
       runId,
       runAttempt,
       manifestHash: manifest.manifestHash,
+      disposition,
+      leaseReleased,
+      mutationState,
       rollback,
       error: error instanceof Error ? error.message : String(error),
     })
@@ -649,6 +1109,17 @@ async function main() {
     await waitForControllerAuthorization(mode, {
       runId: process.env.GITHUB_RUN_ID || '',
       runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT || 0),
+    })
+    return
+  }
+  if (command === 'admit') {
+    const mode = argument('mode')
+    assert(mode === 'production' || mode === 'smoke', 'Authorization mode is invalid')
+    await admitAuthorizedWorkflow(mode, {
+      receiptPath: argument('receipt') || 'deployment-receipt.json',
+      runId: process.env.GITHUB_RUN_ID || '',
+      runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT || 0),
+      sourceSha: process.env.GITHUB_SHA || '',
     })
     return
   }

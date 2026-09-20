@@ -253,6 +253,36 @@ describe('Home Assistant production metadata adapter', () => {
     ).resolves.toBeUndefined()
   })
 
+  it('blocks automatic takeover of an expired foreign production lease', async () => {
+    const fake = scp()
+    const holder = {
+      workflowId: 'release-holder',
+      authorizationHash: 'c'.repeat(64),
+    }
+    const contender = {
+      workflowId: 'release-contender',
+      authorizationHash: 'd'.repeat(64),
+    }
+    const now = Date.parse('2026-09-10T12:00:00.000Z')
+    await acquireProductionLease(fake, '/config', holder, now)
+    const ownerPath =
+      '/config/www/.ha-sfenton-react-dash.release-lock/owner.json'
+    fake.files.set(
+      ownerPath,
+      Buffer.from(
+        JSON.stringify({
+          version: 1,
+          workflowId: holder.workflowId,
+          authorizationHash: holder.authorizationHash,
+          expiresAt: new Date(now - 60_000).toISOString(),
+        }),
+      ),
+    )
+    await expect(
+      acquireProductionLease(fake, '/config', contender, now),
+    ).rejects.toThrow('expired under foreign workflow')
+  })
+
   it('restores the prior asset directory after an interrupted swap', async () => {
     const fake = scp()
     const paths = {

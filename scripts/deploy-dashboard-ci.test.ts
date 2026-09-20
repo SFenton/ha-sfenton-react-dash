@@ -11,17 +11,25 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import {
+  admitAuthorizedWorkflow,
   artifactManifestHash,
   assertAutomaticDeploymentPaths,
   assertPanelBridgeUnchanged,
+  classifyDeploymentDisposition,
+  createDeploymentRecordV2,
   createPublishDirectory,
+  deployDashboardArtifact,
   deploymentVersionFromWrapper,
+  planDeploymentAction,
   prepareDeploymentArtifact,
   readAndVerifyDeploymentArtifact,
-  resolveDeploymentRange,
+  resolveDeploymentLineage,
+  verifyCurrentDeploymentRecord,
+  verifyDeploymentRecordV2,
   verifyPublishedDashboardAssets,
   waitForControllerAuthorization,
 } from './deploy-dashboard-ci'
+import { LocalProductionAdapter } from './release-machine/production'
 
 const execFileAsync = promisify(execFile)
 
@@ -130,7 +138,7 @@ describe('dashboard CI deployment', () => {
     ).not.toThrow()
   })
 
-  it('accepts an older queued master commit while master advances', async () => {
+  it('tracks deployment lineage while master advances', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dashboard-range-test-'))
     const remote = join(root, 'remote.git')
     const checkout = join(root, 'checkout')
@@ -157,11 +165,15 @@ describe('dashboard CI deployment', () => {
       await git('push', 'origin', 'master')
 
       await expect(
-        resolveDeploymentRange(base, queued, remote),
-      ).resolves.toEqual({
+        resolveDeploymentLineage(base, queued, remote),
+      ).resolves.toMatchObject({
         candidateSha: queued,
         deployedSha: base,
-        paths: ['queued.txt'],
+        candidateIsMasterAncestor: true,
+        deployedIsMasterAncestor: true,
+        deployedIsCandidateAncestor: true,
+        candidateIsDeployedAncestor: false,
+        pathsFromDeployedToCandidate: ['queued.txt'],
       })
     } finally {
       await rm(root, { recursive: true, force: true })
@@ -222,6 +234,7 @@ describe('dashboard CI deployment', () => {
         runId: '123',
         runAttempt: 1,
       })
+
       const fetchImpl = vi.fn<typeof fetch>(async (input) => {
         const url = new URL(String(input))
         const path = decodeURIComponent(
@@ -233,13 +246,133 @@ describe('dashboard CI deployment', () => {
         verifyPublishedDashboardAssets({
           fetchImpl,
           haUrl: 'http://ha-api-proxy:8123',
-          manifest: prepared,
+          sourceSha: prepared.sourceSha,
+          files: prepared.files,
           root: dist,
         }),
       ).resolves.toHaveLength(prepared.files.length)
       expect(fetchImpl).toHaveBeenCalledTimes(prepared.files.length)
     } finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rolls back the production transaction when published HTTP bytes fail verification', async () => {
+    const candidate = await fixture()
+    const production = join(candidate.root, 'production')
+    const assets = join(production, 'assets')
+    const authorizationPath = join(candidate.root, 'authorization.json')
+    const receiptPath = join(candidate.root, 'receipt.json')
+    const baseSha = 'a'.repeat(40)
+    const candidateSha = 'b'.repeat(40)
+    await mkdir(join(assets, 'assets'), { recursive: true })
+    await writeFile(join(assets, 'index.html'), 'prior dashboard')
+    await writeFile(join(assets, 'assets/app-old.js'), 'prior app')
+    await writeFile(join(assets, 'sfenton-react-app-card.js'), 'card')
+    await writeFile(join(assets, 'sfenton-react-panel.js'), 'panel')
+    await writeFile(
+      join(assets, 'deployment.json'),
+      `${JSON.stringify({
+        version: 1,
+        repository: 'SFenton/ha-sfenton-react-dash',
+        sourceSha: baseSha,
+        runId: '100',
+        runAttempt: 1,
+        buildFlags: { homeMcpEnabled: false },
+      })}\n`,
+    )
+    await writeFile(
+      join(production, 'metadata.json'),
+      `${JSON.stringify({
+        legacyWrapperUrl:
+          `/local/ha-sfenton-react-dash/index.html?v=${baseSha}`,
+        legacyCardResourceUrl:
+          `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${baseSha}`,
+        panelRegistered: true,
+      })}\n`,
+    )
+    const manifest = await prepareDeploymentArtifact({
+      distDirectory: candidate.dist,
+      manifestPath: candidate.manifest,
+      sourceSha: candidateSha,
+      runId: '123',
+      runAttempt: 2,
+    })
+    await writeFile(authorizationPath, JSON.stringify({
+      mode: 'production',
+      runId: '123',
+      runAttempt: 2,
+      runnerId: 42,
+      runnerName: 'runner-42',
+      decision: 'allow',
+    }))
+    const local = new LocalProductionAdapter(production)
+    let leaseHeld = false
+    const adapter = Object.assign(local, {
+      async acquireLease() {
+        leaseHeld = true
+      },
+      async reconcileAssets() {},
+      async finalizeRelease() {
+        leaseHeld = false
+      },
+    })
+    const previousRunId = process.env.GITHUB_RUN_ID
+    const previousRunAttempt = process.env.GITHUB_RUN_ATTEMPT
+    const previousHaUrl = process.env.HA_DEPLOY_URL
+    process.env.GITHUB_RUN_ID = '123'
+    process.env.GITHUB_RUN_ATTEMPT = '2'
+    process.env.HA_DEPLOY_URL = 'http://ha-api-proxy:8123'
+    try {
+      await expect(
+        deployDashboardArtifact(
+          candidate.dist,
+          candidate.manifest,
+          receiptPath,
+          {
+            adapter,
+            authorizationPath,
+            fetchImpl: vi.fn<typeof fetch>(async () =>
+              new Response('stale', { status: 503 })),
+            now: () => new Date('2026-09-19T21:00:00.000Z'),
+            resolveLineage: async () => ({
+              masterSha: candidateSha,
+              deployedSha: baseSha,
+              candidateSha,
+              candidateIsMasterAncestor: true,
+              deployedIsMasterAncestor: true,
+              deployedIsCandidateAncestor: true,
+              candidateIsDeployedAncestor: false,
+              pathsFromDeployedToCandidate: ['src/App.tsx'],
+            }),
+          },
+        ),
+      ).rejects.toThrow('returned HTTP 503')
+      expect(await readFile(join(assets, 'index.html'), 'utf8'))
+        .toBe('prior dashboard')
+      expect(
+        JSON.parse(await readFile(join(production, 'metadata.json'), 'utf8')),
+      ).toMatchObject({
+        legacyWrapperUrl:
+          `/local/ha-sfenton-react-dash/index.html?v=${baseSha}`,
+      })
+      expect(JSON.parse(await readFile(receiptPath, 'utf8'))).toMatchObject({
+        status: 'failed',
+        sourceSha: manifest.sourceSha,
+        disposition: 'forward',
+        leaseReleased: true,
+        mutationState: 'rolled-back',
+        rollback: 'verified',
+      })
+      expect(leaseHeld).toBe(false)
+    } finally {
+      if (previousRunId === undefined) delete process.env.GITHUB_RUN_ID
+      else process.env.GITHUB_RUN_ID = previousRunId
+      if (previousRunAttempt === undefined) delete process.env.GITHUB_RUN_ATTEMPT
+      else process.env.GITHUB_RUN_ATTEMPT = previousRunAttempt
+      if (previousHaUrl === undefined) delete process.env.HA_DEPLOY_URL
+      else process.env.HA_DEPLOY_URL = previousHaUrl
+      await rm(candidate.root, { recursive: true, force: true })
     }
   })
 
@@ -266,6 +399,7 @@ describe('dashboard CI deployment', () => {
         runAttempt: 2,
         runnerId: 42,
         runnerName: 'runner-42',
+        decision: 'allow',
       }))
       await expect(
         waitForControllerAuthorization('production', {
@@ -286,5 +420,266 @@ describe('dashboard CI deployment', () => {
     } finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('writes a sanitized rejection receipt during workflow admission', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dashboard-admit-test-'))
+    const authorizationPath = join(root, 'authorization.json')
+    const receiptPath = join(root, 'receipt.json')
+    try {
+      await writeFile(authorizationPath, JSON.stringify({
+        mode: 'production',
+        runId: '123',
+        runAttempt: 2,
+        runnerId: 42,
+        runnerName: 'runner-42',
+        decision: 'reject',
+        disposition: 'full-rerun-required',
+        reason: 'rerun all jobs',
+      }))
+      await expect(
+        admitAuthorizedWorkflow('production', {
+          authorizationPath,
+          receiptPath,
+          runId: '123',
+          runAttempt: 2,
+          sourceSha: 'a'.repeat(40),
+          timeoutMs: 20,
+        }),
+      ).rejects.toThrow('rerun all jobs')
+      expect(
+        JSON.parse(await readFile(receiptPath, 'utf8')),
+      ).toMatchObject({
+        status: 'rejected',
+        disposition: 'full-rerun-required',
+        sourceSha: 'a'.repeat(40),
+        leaseReleased: true,
+        mutationState: 'none',
+      })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('creates and verifies a v2 deployment record with canonical host metadata', () => {
+    const files = [
+      { path: 'index.html', size: 1, sha256: 'a'.repeat(64) },
+      { path: 'deployment.json', size: 2, sha256: 'b'.repeat(64) },
+    ]
+    const record = createDeploymentRecordV2({
+      sourceSha: 'a'.repeat(40),
+      runId: '123',
+      runAttempt: 2,
+      manifestHash: 'c'.repeat(64),
+      files,
+      deployedAt: '2026-09-19T21:00:00.000Z',
+    })
+    expect(record.hosts).toEqual({
+      legacyWrapperUrl:
+        `/local/ha-sfenton-react-dash/index.html?v=${'a'.repeat(40)}`,
+      legacyCardResourceUrl:
+        `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${'a'.repeat(40)}`,
+      panelRegistered: true,
+    })
+    expect(() =>
+      verifyDeploymentRecordV2(record, files, {
+        legacyWrapperUrl:
+          `/local/ha-sfenton-react-dash/index.html?v=${'a'.repeat(40)}`,
+        legacyCardResourceUrl:
+          `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${'a'.repeat(40)}`,
+        panelRegistered: true,
+      }),
+    ).not.toThrow()
+    expect(() =>
+      verifyDeploymentRecordV2(
+        { ...record, deploymentHash: 'd'.repeat(64) },
+        files,
+        {
+          legacyWrapperUrl:
+            `/local/ha-sfenton-react-dash/index.html?v=${'a'.repeat(40)}`,
+          legacyCardResourceUrl:
+            `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${'a'.repeat(40)}`,
+          panelRegistered: true,
+        },
+      ),
+    ).toThrow('Deployment record hash is invalid')
+    expect(() =>
+      verifyDeploymentRecordV2(
+        {
+          ...record,
+          manifestHash: 'invalid',
+          deploymentHash: record.deploymentHash,
+        },
+        files,
+        {
+          legacyWrapperUrl:
+            `/local/ha-sfenton-react-dash/index.html?v=${'a'.repeat(40)}`,
+          legacyCardResourceUrl:
+            `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${'a'.repeat(40)}`,
+          panelRegistered: true,
+        },
+      ),
+    ).toThrow('manifest hash is invalid')
+    expect(() =>
+      verifyDeploymentRecordV2(
+        record,
+        files,
+        {
+          legacyWrapperUrl:
+            `/local/ha-sfenton-react-dash/index.html?v=${'b'.repeat(40)}`,
+          legacyCardResourceUrl:
+            `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${'a'.repeat(40)}`,
+          panelRegistered: true,
+        },
+      ),
+    ).toThrow('source SHA')
+    expect(() =>
+      verifyDeploymentRecordV2(
+        record,
+        files,
+        {
+          legacyWrapperUrl:
+            `/local/ha-sfenton-react-dash/index.html?v=${'a'.repeat(40)}`,
+          legacyCardResourceUrl: '/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=other',
+          panelRegistered: true,
+        },
+      ),
+    ).toThrow('host metadata')
+    expect(() =>
+      verifyCurrentDeploymentRecord(
+        record,
+        [
+          { path: 'index.html', size: 1, sha256: 'd'.repeat(64) },
+          files[1],
+        ],
+        {
+          legacyWrapperUrl:
+            `/local/ha-sfenton-react-dash/index.html?v=${'a'.repeat(40)}`,
+          legacyCardResourceUrl:
+            `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${'a'.repeat(40)}`,
+          panelRegistered: true,
+        },
+      ),
+    ).toThrow('do not match current published bytes')
+  })
+
+  it('classifies lineage dispositions and migration-only behavior', () => {
+    const base = {
+      masterSha: 'm'.repeat(40),
+      deployedSha: 'd'.repeat(40),
+      candidateSha: 'c'.repeat(40),
+      candidateIsMasterAncestor: true,
+      deployedIsMasterAncestor: true,
+      deployedIsCandidateAncestor: false,
+      candidateIsDeployedAncestor: false,
+      pathsFromDeployedToCandidate: [],
+    }
+    expect(
+      classifyDeploymentDisposition({
+        ...base,
+        candidateSha: base.deployedSha,
+      }),
+    ).toBe('already-current')
+    expect(
+      classifyDeploymentDisposition({
+        ...base,
+        deployedIsCandidateAncestor: true,
+      }),
+    ).toBe('forward')
+    expect(
+      classifyDeploymentDisposition({
+        ...base,
+        candidateIsDeployedAncestor: true,
+      }),
+    ).toBe('superseded')
+    expect(() =>
+      classifyDeploymentDisposition({
+        ...base,
+        candidateIsMasterAncestor: false,
+      }),
+    ).toThrow('not on current master')
+
+    expect(
+      planDeploymentAction(
+        {
+          ...base,
+          candidateSha: base.deployedSha,
+        },
+        undefined,
+      ),
+    ).toEqual({
+      disposition: 'already-current',
+      requiresForwardDeployment: true,
+    })
+    expect(
+      planDeploymentAction(
+        {
+          ...base,
+          deployedIsCandidateAncestor: true,
+          pathsFromDeployedToCandidate: ['src/App.tsx'],
+        },
+        {
+          version: 2,
+          repository: 'SFenton/ha-sfenton-react-dash',
+          sourceSha: base.deployedSha,
+          runId: '1',
+          runAttempt: 1,
+          manifestHash: 'f'.repeat(64),
+          buildFlags: { homeMcpEnabled: false },
+          deployedAt: '2026-09-19T21:00:00.000Z',
+          hosts: {
+            legacyWrapperUrl:
+              `/local/ha-sfenton-react-dash/index.html?v=${base.deployedSha}`,
+            legacyCardResourceUrl:
+              `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${base.deployedSha}`,
+            panelRegistered: true,
+          },
+          files: [],
+          deploymentHash: 'e'.repeat(64),
+        },
+      ),
+    ).toEqual({
+      disposition: 'forward',
+      requiresForwardDeployment: true,
+    })
+    expect(
+      planDeploymentAction(
+        {
+          ...base,
+          candidateSha: base.deployedSha,
+        },
+        {
+          version: 2,
+          repository: 'SFenton/ha-sfenton-react-dash',
+          sourceSha: base.deployedSha,
+          runId: '1',
+          runAttempt: 1,
+          manifestHash: 'f'.repeat(64),
+          buildFlags: { homeMcpEnabled: false },
+          deployedAt: '2026-09-19T21:00:00.000Z',
+          hosts: {
+            legacyWrapperUrl:
+              `/local/ha-sfenton-react-dash/index.html?v=${base.deployedSha}`,
+            legacyCardResourceUrl:
+              `/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=${base.deployedSha}`,
+            panelRegistered: true,
+          },
+          files: [],
+          deploymentHash: 'e'.repeat(64),
+        },
+      ),
+    ).toEqual({
+      disposition: 'already-current',
+      requiresForwardDeployment: false,
+    })
+    expect(() =>
+      planDeploymentAction(
+        {
+          ...base,
+          candidateIsDeployedAncestor: true,
+        },
+        undefined,
+      ),
+    ).toThrow('deploy a forward v2 record first')
   })
 })
