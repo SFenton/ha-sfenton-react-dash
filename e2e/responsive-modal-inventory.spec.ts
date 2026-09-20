@@ -155,7 +155,7 @@ const EXPECTED_PHYSICAL_MODAL_CALLSITES = {
   'src/components/hass/CreateGroceryItemSheet.tsx:CreateGroceryItemSheet': 1,
   'src/components/hass/CreateTodoItemSheet.tsx:CreateTodoItemSheet': 1,
   'src/components/hass/EditTodoItemSheet.tsx:EditTodoItemSheet': 1,
-  'src/components/hass/DailyReportModal.tsx:DailyReportModal': 1,
+  'src/components/hass/DailyReportModal.tsx:DailyReportModalView': 1,
   'src/components/hass/EverShelfInventoryPanel.tsx:InventoryFilterSheet': 1,
   'src/components/hass/EverShelfInventoryPanel.tsx:InventoryItemDetailsModal': 1,
   'src/components/hass/EverShelfInventoryPanel.tsx:InventorySortSheet': 1,
@@ -457,7 +457,7 @@ const MODAL_CASES: ModalCase[] = [
     expectedSize: 'standard',
     id: 'daily-report',
     open: (page) => openHashModal(page, 'overview&user=stephen', '#daily-report', "Stephen's Summary"),
-    physicalCallsite: 'src/components/hass/DailyReportModal.tsx:DailyReportModal',
+    physicalCallsite: 'src/components/hass/DailyReportModal.tsx:DailyReportModalView',
     selectTabs: [/^Overdue Chores/, 'Upcoming Chores', /^Expired Food/],
   },
   {

@@ -2,15 +2,17 @@ import { useEffect, useState } from 'react'
 import { ModalSheet } from '../core/ModalSheet'
 import { SectionHeader } from '../core/SectionHeader'
 import { DailyReportModalContent, DailyReportModalNav } from './DailyReportModalContent'
-import { DAILY_REPORT_CENTERED_GEOMETRY, DAILY_REPORT_MODAL_STYLE, useDailyReportContext } from './dailyReportModal'
+import { DAILY_REPORT_CENTERED_GEOMETRY, DAILY_REPORT_MODAL_STYLE, useDailyReportContext, type DailyReportContext } from './dailyReportModal'
 import { DonetickTaskFormBody, DonetickTaskFormFooter } from './DonetickTaskFormPage'
 import {
   EverShelfInventoryDetailsPage,
   EverShelfInventoryDetailsPageHost,
+  type EverShelfInventoryDetailsController,
   type EverShelfInventoryDetailsTarget,
 } from './EverShelfInventoryPanel'
 import { useDonetickTaskForm } from './useDonetickTaskForm'
 import type { DonetickTaskEditTarget } from './donetickTaskForm'
+import type { DonetickTaskFormController } from './useDonetickTaskForm'
 import {
   DAILY_REPORT_AUTO_TAB,
   DAILY_REPORT_HASH,
@@ -38,6 +40,81 @@ function clearTabRequest() {
   replaceDashboardUrl(`${pathname}${query ? `?${query}` : ''}${DAILY_REPORT_HASH}`)
 }
 
+function DailyReportModalView({ activeTab, context, editingTask, inventoryDetails, inventoryDetailsTarget, onCloseHash, onEditTask, onOpenInventoryDetails, onSetActiveTab, onSetEditingTask, onSetInventoryDetailsTarget, open, reloadVersion, taskForm }: {
+  activeTab: DailyReportTab
+  context: DailyReportContext
+  editingTask: DonetickTaskEditTarget | null
+  inventoryDetails: EverShelfInventoryDetailsController
+  inventoryDetailsTarget: EverShelfInventoryDetailsTarget | null
+  onCloseHash: () => void
+  onEditTask: (target: DonetickTaskEditTarget) => void
+  onOpenInventoryDetails: (target: EverShelfInventoryDetailsTarget) => void
+  onSetActiveTab: (tab: DailyReportTab) => void
+  onSetEditingTask: (target: DonetickTaskEditTarget | null) => void
+  onSetInventoryDetailsTarget: (target: EverShelfInventoryDetailsTarget | null) => void
+  open: boolean
+  reloadVersion: number
+  taskForm: DonetickTaskFormController
+}) {
+  const editingTaskPage = Boolean(editingTask)
+  const editingInventoryPage = Boolean(inventoryDetailsTarget)
+  const detailPage = editingTaskPage || editingInventoryPage
+  const detailDismissalBlocked = editingTaskPage
+    ? taskForm.busy
+    : editingInventoryPage
+      ? inventoryDetails.dismissalBlocked
+      : false
+
+  useEffect(() => {
+    if (!open && inventoryDetailsTarget && !inventoryDetails.retainsDismissedView) onSetInventoryDetailsTarget(null)
+  }, [inventoryDetails.retainsDismissedView, inventoryDetailsTarget, onSetInventoryDetailsTarget, open])
+
+  const modalOpen = open
+    || Boolean(editingTaskPage && (taskForm.busy || taskForm.error))
+    || Boolean(editingInventoryPage && inventoryDetails.retainsDismissedView)
+  const showSummary = () => {
+    if (detailDismissalBlocked) return
+    onSetEditingTask(null)
+    onSetInventoryDetailsTarget(null)
+  }
+
+  return (
+    <ModalSheet
+      backLabel={editingInventoryPage ? 'Back to expired food' : 'Back to daily summary'}
+      bodyHeader={!detailPage && context.user ? <SectionHeader className={styles.summarySectionHeader} title={dailyReportTabLabel(activeTab)} /> : undefined}
+      centeredGeometry={DAILY_REPORT_CENTERED_GEOMETRY}
+      contentStyle={DAILY_REPORT_MODAL_STYLE}
+      footer={editingTaskPage
+        ? <DonetickTaskFormFooter controller={taskForm} />
+        : undefined}
+      navigation={!detailPage && context.user
+        ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={onSetActiveTab} />
+        : undefined}
+      onBack={detailPage ? showSummary : undefined}
+      onClose={() => {
+        if (detailDismissalBlocked) return
+        onSetEditingTask(null)
+        onSetInventoryDetailsTarget(null)
+        onCloseHash()
+      }}
+      open={modalOpen}
+      scrollResetKey={editingTaskPage
+        ? `task-${editingTask?.taskId ?? ''}`
+        : editingInventoryPage
+          ? `inventory-${inventoryDetailsTarget?.item.inventory_id ?? inventoryDetailsTarget?.item.id ?? 'item'}`
+          : activeTab}
+      size="standard"
+      title={editingTaskPage ? 'Edit Task' : editingInventoryPage ? inventoryDetails.title : context.title}
+    >
+      {editingTaskPage
+        ? <DonetickTaskFormBody controller={taskForm} />
+        : editingInventoryPage
+          ? <EverShelfInventoryDetailsPage controller={inventoryDetails} />
+          : <DailyReportModalContent activeTab={activeTab} context={context} onEditTask={onEditTask} onOpenInventoryDetails={onOpenInventoryDetails} reloadVersion={reloadVersion} />}
+    </ModalSheet>
+  )
+}
+
 /** App-level summary modal. Rendered once by the shell so any route can open `#daily-report`. */
 export function DailyReportModal() {
   const { closeHash, hash } = useHashModal({ appLevel: true })
@@ -48,8 +125,6 @@ export function DailyReportModal() {
   const [consumedTabUrl, setConsumedTabUrl] = useState<string | undefined>()
   const [editingTask, setEditingTask] = useState<DonetickTaskEditTarget | null>(null)
   const [inventoryDetailsTarget, setInventoryDetailsTarget] = useState<EverShelfInventoryDetailsTarget | null>(null)
-  const [inventoryDetailsBusy, setInventoryDetailsBusy] = useState(false)
-  const [inventoryDetailsError, setInventoryDetailsError] = useState<string | null>(null)
   const [todoReloadVersion, setTodoReloadVersion] = useState(0)
   const open = hash === DAILY_REPORT_HASH
 
@@ -82,7 +157,6 @@ export function DailyReportModal() {
 
   const finishInventoryDetails = () => {
     setInventoryDetailsTarget(null)
-    setInventoryDetailsError(null)
   }
 
   const taskForm = useDonetickTaskForm({
@@ -94,8 +168,6 @@ export function DailyReportModal() {
   })
 
   if (!open && editingTask && !taskForm.busy && !taskForm.error) setEditingTask(null)
-  if (!open && inventoryDetailsTarget && !inventoryDetailsBusy && !inventoryDetailsError) setInventoryDetailsTarget(null)
-
   const openTaskEditor = (target: DonetickTaskEditTarget) => {
     setInventoryDetailsTarget(null)
     setEditingTask(target)
@@ -103,71 +175,33 @@ export function DailyReportModal() {
 
   const openInventoryDetails = (target: EverShelfInventoryDetailsTarget) => {
     setEditingTask(null)
-    setInventoryDetailsBusy(false)
-    setInventoryDetailsError(null)
     setInventoryDetailsTarget(target)
   }
 
   return (
     <EverShelfInventoryDetailsPageHost
       active={Boolean(inventoryDetailsTarget)}
-      onBusyChange={setInventoryDetailsBusy}
       onComplete={finishInventoryDetails}
-      onErrorChange={setInventoryDetailsError}
       target={inventoryDetailsTarget}
     >
-      {(inventoryDetails) => {
-        const editingTaskPage = Boolean(editingTask)
-        const editingInventoryPage = Boolean(inventoryDetailsTarget)
-        const detailPage = editingTaskPage || editingInventoryPage
-        const detailBusy = editingTaskPage ? taskForm.busy : editingInventoryPage ? inventoryDetails.busy : false
-        const modalOpen = open
-          || Boolean(editingTaskPage && (taskForm.busy || taskForm.error))
-          || Boolean(editingInventoryPage && (inventoryDetailsBusy || inventoryDetailsError))
-        const showSummary = () => {
-          if (detailBusy) return
-          setEditingTask(null)
-          setInventoryDetailsTarget(null)
-          setInventoryDetailsError(null)
-        }
-
-        return (
-          <ModalSheet
-            backLabel={editingInventoryPage ? 'Back to expired food' : 'Back to daily summary'}
-            bodyHeader={!detailPage && context.user ? <SectionHeader className={styles.summarySectionHeader} title={dailyReportTabLabel(activeTab)} /> : undefined}
-            centeredGeometry={DAILY_REPORT_CENTERED_GEOMETRY}
-            contentStyle={DAILY_REPORT_MODAL_STYLE}
-            footer={editingTaskPage
-              ? <DonetickTaskFormFooter controller={taskForm} />
-              : undefined}
-            navigation={!detailPage && context.user
-              ? <DailyReportModalNav activeTab={activeTab} counts={{ 'expired-food': context.expiredFoodCount, overdue: context.overdueCount }} onTabChange={setActiveTab} />
-              : undefined}
-            onBack={detailPage ? showSummary : undefined}
-            onClose={() => {
-              if (detailBusy) return
-              setEditingTask(null)
-              setInventoryDetailsTarget(null)
-              setInventoryDetailsError(null)
-              closeHash()
-            }}
-            open={modalOpen}
-            scrollResetKey={editingTaskPage
-              ? `task-${editingTask?.taskId ?? ''}`
-              : editingInventoryPage
-                ? `inventory-${inventoryDetailsTarget?.item.inventory_id ?? inventoryDetailsTarget?.item.id ?? 'item'}`
-                : activeTab}
-            size="standard"
-            title={editingTaskPage ? 'Edit Task' : editingInventoryPage ? inventoryDetails.title : context.title}
-          >
-            {editingTaskPage
-              ? <DonetickTaskFormBody controller={taskForm} />
-              : editingInventoryPage
-                ? <EverShelfInventoryDetailsPage controller={inventoryDetails} />
-                : <DailyReportModalContent activeTab={activeTab} context={context} onEditTask={openTaskEditor} onOpenInventoryDetails={openInventoryDetails} reloadVersion={todoReloadVersion} />}
-          </ModalSheet>
-        )
-      }}
+      {(inventoryDetails) => (
+        <DailyReportModalView
+          activeTab={activeTab}
+          context={context}
+          editingTask={editingTask}
+          inventoryDetails={inventoryDetails}
+          inventoryDetailsTarget={inventoryDetailsTarget}
+          onCloseHash={closeHash}
+          onEditTask={openTaskEditor}
+          onOpenInventoryDetails={openInventoryDetails}
+          onSetActiveTab={setActiveTab}
+          onSetEditingTask={setEditingTask}
+          onSetInventoryDetailsTarget={setInventoryDetailsTarget}
+          open={open}
+          reloadVersion={todoReloadVersion}
+          taskForm={taskForm}
+        />
+      )}
     </EverShelfInventoryDetailsPageHost>
   )
 }

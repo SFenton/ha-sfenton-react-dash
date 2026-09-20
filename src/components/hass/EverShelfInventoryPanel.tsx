@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { useHass } from '@hakit/core'
 import { EmptyState, type EmptyStateLayout } from '../core/EmptyState'
 import { CheckboxRow } from '../core/CheckboxRow'
@@ -14,6 +14,7 @@ import { NumberStepper } from '../core/Stepper'
 import { RadioRow } from '../core/RadioRow'
 import { SurfaceAccessory } from '../core/SurfaceAccessory'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
+import { useOptimisticState } from '../../hooks/useOptimisticState'
 import type { EverShelfInventoryControls, InventoryFilterMode, InventorySortDirection, InventorySortMode } from './EverShelfInventoryControls'
 import { daysUntilDate, parseIsoDateOnly } from './expiryDate'
 import { copy, PAGE_FOOD_COPY_KEYS, PAGE_FOOD_COPY_NAMESPACE } from '../../i18n'
@@ -68,10 +69,13 @@ export type EverShelfInventoryDisplayItem = EverShelfInventoryItem & {
 
 export interface EverShelfInventoryDetailsTarget {
   item: EverShelfInventoryDisplayItem
+  location: EverShelfInventoryLocation
   locationLabel: string
+  onInventoryChanged?: InventoryRefresh
 }
 
 type CallService = (params: Record<string, unknown>) => Promise<unknown> | unknown
+export type InventoryRefresh = () => Promise<EverShelfInventoryItem[]>
 
 interface ExpiryInfo {
   label: string
@@ -86,6 +90,8 @@ type InventorySearchLoadPhase = 'exiting' | 'loading' | 'idle'
 const SORT_FILTER_COLOR = { r: 42, g: 126, b: 180 }
 const SORT_FILTER_ACTIVE_COLOR = { r: 155, g: 110, b: 64 }
 const INVENTORY_LOADING_EXIT_MS = 500
+const PREPARED_OPTIMISTIC_REVERT_MS = 10_000
+const PREPARED_REFRESH_RETRY_MS = 1_000
 const INVENTORY_SEARCH_LOG_PREFIX = '[EverShelfInventorySearch]'
 const HASS_GROCERY_LIST_ENTITY_ID = 'todo.shopping_list'
 const INVENTORY_QUANTITY_MAX = 999
@@ -272,6 +278,11 @@ function groupedInventoryItems(items: EverShelfInventoryItem[]): EverShelfInvent
     const expiryDate = soonestExpiryDate(rows)
     return [{ ...item, expiration_date: null, expires_at: null, expiry_date: expiryDate ?? null }]
   })
+}
+
+function inventoryDisplayItemForGroup(items: EverShelfInventoryItem[], groupKey: string) {
+  return groupedInventoryItems(items.filter((item) => itemGroupingKey(item) === groupKey))
+    .find((item) => itemGroupingKey(item) === groupKey) ?? null
 }
 
 function formatDisplayDate(value: Date) {
@@ -743,10 +754,12 @@ export interface EverShelfInventoryDetailsController {
   busy: boolean
   busyAction: string | null
   deleteBatch: (batch: InventoryBatch) => void
+  dismissalBlocked: boolean
   error: string | null
   expiryDrafts: Record<string, string>
   multipleBatches: boolean
   quantityDrafts: Record<string, number>
+  retainsDismissedView: boolean
   resetDraft: (batch: InventoryBatch) => void
   saveBatch: (batch: InventoryBatch) => void
   setExpiryDraft: (batchKey: string, value: string) => void
@@ -845,41 +858,252 @@ function inventoryBatchesAfterDelete(batches: InventoryBatch[], steps: Inventory
   })
 }
 
-function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, onComplete, onErrorChange, onInventoryChanged }: { active: boolean; item: EverShelfInventoryDisplayItem | null; locationLabel: string; onBusyChange?: (busy: boolean) => void; onComplete: () => void; onErrorChange?: (error: string | null) => void; onInventoryChanged: () => void }): EverShelfInventoryDetailsController {
+function inventoryBatchToken(batches: InventoryBatch[]) {
+  return JSON.stringify(
+    batches
+      .map((batch) => [batch.key, batch.quantity] as const)
+      .sort((left, right) => left[0].localeCompare(right[0]) || left[1] - right[1]),
+  )
+}
+
+function inventoryBatchesAfterPreparedToggle(batches: InventoryBatch[], sourceBatch: InventoryBatch, steps: { inventoryId: number; quantity: number }[], nextPrepared: boolean) {
+  const movedQuantity = steps.reduce((total, step) => total + step.quantity, 0)
+  const remainingQuantity = sourceBatch.quantity - movedQuantity
+  const destinationSample = { ...sourceBatch.sample, prepared_food: nextPrepared }
+  const destinationKey = itemBatchKey(destinationSample)
+  const existingDestination = batches.find((batch) => batch.key === destinationKey)
+  const destinationQuantity = (existingDestination?.quantity ?? 0) + movedQuantity
+  const destinationBatch: InventoryBatch = {
+    addressable: false,
+    expiryDate: sourceBatch.expiryDate,
+    key: destinationKey,
+    locationLabel: sourceBatch.locationLabel,
+    preparedFood: nextPrepared,
+    quantity: destinationQuantity,
+    rows: [],
+    sample: existingDestination?.sample ?? destinationSample,
+  }
+  const sourceBatchProjection = remainingQuantity > 0
+    ? {
+      ...sourceBatch,
+      addressable: false,
+      quantity: remainingQuantity,
+      rows: [],
+    }
+    : null
+
+  return batches.flatMap((batch) => {
+    if (batch.key === sourceBatch.key) {
+      const projected = sourceBatchProjection ? [projectedBatch(sourceBatchProjection)] : []
+      return existingDestination ? projected : [...projected, destinationBatch]
+    }
+    if (batch.key === destinationKey) return [destinationBatch]
+    return [batch]
+  })
+}
+
+function projectedBatch(batch: InventoryBatch) {
+  return {
+    ...batch,
+    addressable: false,
+    rows: [],
+  }
+}
+
+type PreparedOperation = {
+  epoch: number
+  generation: number
+  identity: string
+  projectedBatches: InventoryBatch[]
+  sourceRevision: number
+  token: string
+}
+
+type DetailErrorSource = 'delete' | 'edit' | 'prepared-mutation' | 'prepared-read' | 'prepared-timeout' | null
+type InventoryTargetContext = { epoch: number; identity: string | null }
+type InventoryAuthorityContext = { key: string | null; revision: number }
+type InventoryDetailsContext = { active: boolean; identity: string | null; revision: number }
+
+function useInventoryItemDetails({ active, item, location, locationLabel, onBusyChange, onComplete, onDismissalBlockedChange, onErrorChange, onInventoryChanged }: { active: boolean; item: EverShelfInventoryDisplayItem | null; location: EverShelfInventoryLocation; locationLabel: string; onBusyChange?: (busy: boolean) => void; onComplete: () => void; onDismissalBlockedChange?: (blocked: boolean) => void; onErrorChange?: (error: string | null) => void; onInventoryChanged?: InventoryRefresh }): EverShelfInventoryDetailsController {
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const title = item ? itemName(item) : 'Inventory Item'
-  const sourceBatches = useMemo(() => inventoryBatches(item, locationLabel), [item, locationLabel])
-  const [optimisticBatches, setOptimisticBatches] = useState<InventoryBatch[] | null>(null)
-  const batches = optimisticBatches ?? sourceBatches
+  const [errorSource, setErrorSource] = useState<DetailErrorSource>(null)
+  const requestedTargetIdentity = item ? `${location}\u0000${itemGroupingKey(item)}` : null
+  const [targetContextState, dispatchTargetContext] = useReducer(
+    (current: InventoryTargetContext, next: InventoryTargetContext) => current.epoch === next.epoch && current.identity === next.identity ? current : next,
+    {
+      epoch: requestedTargetIdentity === null ? 0 : 1,
+      identity: requestedTargetIdentity,
+    },
+  )
+  const targetContextNeedsCommit = requestedTargetIdentity !== null && requestedTargetIdentity !== targetContextState.identity
+  const targetEpoch = targetContextNeedsCommit ? targetContextState.epoch + 1 : targetContextState.epoch
+  const targetIdentity = requestedTargetIdentity ?? targetContextState.identity
+  const propBatches = useMemo(() => inventoryBatches(item, locationLabel), [item, locationLabel])
+  const propAuthorityKey = item
+    ? `${requestedTargetIdentity}\u0000${itemInstancesKey(item)}\u0000${inventoryBatchToken(propBatches)}`
+    : null
+  const [authorityContextState, dispatchAuthorityContext] = useReducer(
+    (current: InventoryAuthorityContext, next: InventoryAuthorityContext) => current.revision === next.revision && current.key === next.key ? current : next,
+    { key: propAuthorityKey, revision: 0 },
+  )
+  const authorityContextNeedsCommit = propAuthorityKey !== null && propAuthorityKey !== authorityContextState.key
+  const sourceRevision = authorityContextNeedsCommit ? authorityContextState.revision + 1 : authorityContextState.revision
+
+  useEffect(() => {
+    if (!targetContextNeedsCommit || requestedTargetIdentity === null) return
+    dispatchTargetContext({ epoch: targetEpoch, identity: targetIdentity })
+  }, [requestedTargetIdentity, targetContextNeedsCommit, targetEpoch, targetIdentity])
+
+  useEffect(() => {
+    if (!authorityContextNeedsCommit || propAuthorityKey === null) return
+    dispatchAuthorityContext({ key: propAuthorityKey, revision: sourceRevision })
+  }, [authorityContextNeedsCommit, propAuthorityKey, sourceRevision])
+
+  const [reconciledTarget, setReconciledTarget] = useState<{ epoch: number; identity: string; item: EverShelfInventoryDisplayItem; sourceRevision: number } | null>(null)
+  const reconciledSelection = Boolean(
+    reconciledTarget
+    && reconciledTarget.epoch === targetEpoch
+    && reconciledTarget.identity === targetIdentity
+    && reconciledTarget.sourceRevision === sourceRevision,
+  )
+  const authorityItem = reconciledSelection ? reconciledTarget?.item ?? item : item
+  const sourceBatches = useMemo(() => inventoryBatches(authorityItem, locationLabel), [authorityItem, locationLabel])
+  const sourceToken = inventoryBatchToken(sourceBatches)
+  const [optimisticToken, commitOptimisticToken, resetOptimisticToken] = useOptimisticState(sourceToken, {
+    clearOn: 'confirmation',
+    revertMs: PREPARED_OPTIMISTIC_REVERT_MS,
+  })
+  const [preparedOperation, setPreparedOperation] = useState<PreparedOperation | null>(null)
+  const [localBatchOverride, setLocalBatchOverride] = useState<InventoryBatch[] | null>(null)
+  const currentPreparedOperation = preparedOperation
+    && preparedOperation.epoch === targetEpoch
+    && preparedOperation.identity === targetIdentity
+    && preparedOperation.sourceRevision === sourceRevision
+    && preparedOperation.token === optimisticToken
+    ? preparedOperation
+    : null
+  const batches = currentPreparedOperation?.projectedBatches ?? localBatchOverride ?? sourceBatches
   const multipleBatches = batches.length > 1
   const [expiryDrafts, setExpiryDrafts] = useState<Record<string, string>>({})
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, number>>({})
-  const updateError = (nextError: string | null) => {
+  const mountedRef = useRef(false)
+  const preparedActionGenerationRef = useRef(0)
+  const preparedStatusRef = useRef<'pending' | 'completed' | 'timed-out' | null>(null)
+  const preparedDeadlineTimerRef = useRef<number | null>(null)
+  const readRetryTimerRef = useRef<number | null>(null)
+  const readRetryResolverRef = useRef<(() => void) | null>(null)
+  const errorSourceRef = useRef<DetailErrorSource>(null)
+  const latestContextRef = useRef<InventoryTargetContext & { revision: number } | null>(null)
+  const previousContextRef = useRef<InventoryDetailsContext | null>(null)
+  const draftSourceKeyRef = useRef<string | null>(null)
+  const clearPreparedDeadline = () => {
+    if (preparedDeadlineTimerRef.current === null) return
+    window.clearTimeout(preparedDeadlineTimerRef.current)
+    preparedDeadlineTimerRef.current = null
+  }
+  const cancelReadRetry = () => {
+    if (readRetryTimerRef.current !== null) {
+      window.clearTimeout(readRetryTimerRef.current)
+      readRetryTimerRef.current = null
+    }
+    const resolve = readRetryResolverRef.current
+    readRetryResolverRef.current = null
+    resolve?.()
+  }
+  const updateError = useCallback((nextError: string | null, source: DetailErrorSource = null) => {
+    if (!mountedRef.current) return
+    const nextSource = nextError ? source : null
+    errorSourceRef.current = nextSource
+    setErrorSource(nextSource)
     setError(nextError)
     onErrorChange?.(nextError)
-  }
+  }, [onErrorChange])
 
-  // Reopening the same item keeps this component mounted, so every batch draft and the busy/error
-  // state is rebuilt from the latest Home Assistant data whenever the sheet opens.
-  const draftKey = active ? `${itemInstancesKey(item)}|${sourceBatches.map((batch) => `${batch.key}:${batch.quantity}`).join('|')}` : 'closed'
-  const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey)
-  if (appliedDraftKey !== draftKey) {
-    setAppliedDraftKey(draftKey)
-    if (active) {
-      setBusyAction(null)
-      setError(null)
-      setOptimisticBatches(null)
-      setExpiryDrafts(Object.fromEntries(sourceBatches.map((batch) => [batch.key, batch.expiryDate])))
-      setQuantityDrafts(Object.fromEntries(sourceBatches.map((batch) => [batch.key, batch.quantity])))
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      preparedActionGenerationRef.current += 1
+      clearPreparedDeadline()
+      cancelReadRetry()
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    latestContextRef.current = { epoch: targetEpoch, identity: targetIdentity, revision: sourceRevision }
+  }, [sourceRevision, targetEpoch, targetIdentity])
+
+  useEffect(() => {
+    const previous = previousContextRef.current
+    const targetChanged = previous !== null && previous.identity !== targetIdentity
+    const authorityChanged = previous !== null && previous.revision !== sourceRevision
+    const reopened = previous !== null && active && !previous.active
+    previousContextRef.current = { active, identity: targetIdentity, revision: sourceRevision }
+
+    if (targetChanged || authorityChanged) {
+      preparedActionGenerationRef.current += 1
+      clearPreparedDeadline()
+      cancelReadRetry()
+      preparedStatusRef.current = null
+      setPreparedOperation(null)
+      setLocalBatchOverride(null)
+      setReconciledTarget(null)
+      resetOptimisticToken()
+      setBusyAction(null)
+      onBusyChange?.(false)
+      onDismissalBlockedChange?.(false)
+      if (targetChanged) updateError(null)
+    }
+
+    if (!item || currentPreparedOperation) return
+    const draftSourceKey = `${targetIdentity}\u0000${sourceRevision}\u0000${sourceToken}`
+    if (draftSourceKeyRef.current === draftSourceKey && !reopened) return
+    draftSourceKeyRef.current = draftSourceKey
+    setExpiryDrafts(Object.fromEntries(sourceBatches.map((batch) => [batch.key, batch.expiryDate])))
+    setQuantityDrafts(Object.fromEntries(sourceBatches.map((batch) => [batch.key, batch.quantity])))
+  }, [active, currentPreparedOperation, item, onBusyChange, onDismissalBlockedChange, resetOptimisticToken, sourceBatches, sourceRevision, sourceToken, targetIdentity, updateError])
 
   const busy = busyAction !== null
+  const dismissalBlocked = busyAction?.startsWith('edit-') === true || busyAction?.startsWith('delete-') === true
+  const retainsDismissedView = dismissalBlocked || (
+    error !== null
+    && (errorSource === 'delete' || errorSource === 'edit')
+  )
+  const title = item ? itemName(item) : authorityItem ? itemName(authorityItem) : 'Inventory Item'
+
+  const reportUpdateError = (caughtError: unknown, source: DetailErrorSource = null) => {
+    updateError(caughtError instanceof Error ? caughtError.message : copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.inventory.updateError), source)
+  }
+
+  const readAuthoritativeInventory = async () => {
+    const result = await Promise.resolve(callService({
+      domain: 'evershelf',
+      service: 'list_inventory',
+      serviceData: location === 'all' ? {} : { location },
+      returnResponse: true,
+    }))
+    const response = inventoryResponseFromResult(result)
+    return resolvedInventoryItems(response.inventory, callService, location)
+  }
+
+  const refreshVisibleInventory = async () => {
+    if (!mountedRef.current || !onInventoryChanged) return
+    await onInventoryChanged()
+  }
+
+  const notifyInventoryChanged = () => {
+    if (!mountedRef.current || !onInventoryChanged) return
+    void onInventoryChanged().catch((caughtError: unknown) => reportUpdateError(caughtError))
+  }
 
   const finishAction = () => {
-    onInventoryChanged()
+    if (!mountedRef.current) return
+    setBusyAction(null)
+    onBusyChange?.(false)
+    onDismissalBlockedChange?.(false)
+    notifyInventoryChanged()
     onComplete()
   }
 
@@ -931,32 +1155,37 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
     if (!batch.addressable) return
     const expiryDraft = expiryDrafts[batch.key] ?? batch.expiryDate
     if (!validExpiryInput(expiryDraft)) {
-      updateError('Use YYYY-MM-DD or clear the date.')
+      updateError('Use YYYY-MM-DD or clear the date.', 'edit')
       return
     }
     const quantityDelta = (quantityDrafts[batch.key] ?? batch.quantity) - batch.quantity
     const expiryChanged = expiryDraft !== batch.expiryDate
     if (quantityDelta === 0 && !expiryChanged) return
     if (quantityDelta > 0 && itemLocation(batch.sample) === null) {
-      updateError(`Home Assistant did not report a storage location for ${title}, so more cannot be added.`)
+      updateError(`Home Assistant did not report a storage location for ${title}, so more cannot be added.`, 'edit')
       return
     }
     setBusyAction(`edit-${batch.key}`)
     onBusyChange?.(true)
+    onDismissalBlockedChange?.(true)
     updateError(null)
     void applyInventoryChanges(batch, quantityDelta, expiryChanged, expiryDraft.trim())
       .then(finishAction)
       .catch((caughtError: unknown) => {
         setBusyAction(null)
-        updateError(caughtError instanceof Error ? caughtError.message : 'Unable to update item')
+        onDismissalBlockedChange?.(false)
+        reportUpdateError(caughtError, 'edit')
       })
-      .finally(() => onBusyChange?.(false))
+      .finally(() => {
+        onBusyChange?.(false)
+        onDismissalBlockedChange?.(false)
+      })
   }
 
-  // Home Assistant owns the split: EverShelf moves the chosen number of units onto their own
-  // inventory row and regroups the product's taxonomy from there.
+  // Home Assistant owns the split. The projection only makes the user's intent visible until the
+  // direct, unfiltered inventory read confirms the same semantic batch token.
   const togglePreparedFood = (batch: InventoryBatch) => {
-    if (!batch.addressable) return
+    if (!batch.addressable || busy) return
     const nextPrepared = !batch.preparedFood
     const qualifier = batchQualifier(batch.expiryDate, multipleBatches, batch.preparedFood)
     let quantity = batch.quantity
@@ -970,25 +1199,238 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
       quantity = promptResult.quantity
     }
 
-    setBusyAction(`prepared-${batch.key}`)
-    onBusyChange?.(true)
-    updateError(null)
+    const groupKey = itemGroupingKey(authorityItem ?? batch.sample)
+    const capturedEpoch = targetEpoch
+    const capturedIdentity = targetIdentity
+    const capturedSourceRevision = sourceRevision
+    if (capturedIdentity === null) return
+    const actionGeneration = preparedActionGenerationRef.current + 1
+    preparedActionGenerationRef.current = actionGeneration
+    preparedStatusRef.current = 'pending'
+    const actionKey = `prepared-${batch.key}`
     const steps = inventoryPreparedSteps(batch.rows, quantity)
-    void steps
-      .reduce(
-        (chain, step) => chain.then(() => Promise.resolve(callService({
-          domain: 'evershelf',
-          service: 'set_inventory_prepared_food',
-          serviceData: { inventory_id: step.inventoryId, prepared_food: nextPrepared, quantity: step.quantity },
-        }))).then(() => undefined),
-        Promise.resolve(),
-      )
-      .then(finishAction)
-      .catch((caughtError: unknown) => {
-        setBusyAction(null)
-        updateError(caughtError instanceof Error ? caughtError.message : 'Unable to update prepared food')
+    const projectedBatches = inventoryBatchesAfterPreparedToggle(batches, batch, steps, nextPrepared)
+    const projectedToken = inventoryBatchToken(projectedBatches)
+    const deadline = Date.now() + PREPARED_OPTIMISTIC_REVERT_MS
+    const isOriginCurrent = () => (
+      mountedRef.current
+      && latestContextRef.current?.epoch === capturedEpoch
+      && latestContextRef.current.identity === capturedIdentity
+      && latestContextRef.current.revision === capturedSourceRevision
+      && preparedActionGenerationRef.current === actionGeneration
+    )
+    const hasTimedOut = () => preparedStatusRef.current === 'timed-out'
+    const isPreparedComplete = () => preparedStatusRef.current === 'completed'
+    const clearProjection = () => {
+      clearPreparedDeadline()
+      setPreparedOperation(null)
+      setLocalBatchOverride(null)
+      setExpiryDrafts(Object.fromEntries(sourceBatches.map((nextBatch) => [nextBatch.key, nextBatch.expiryDate])))
+      setQuantityDrafts(Object.fromEntries(sourceBatches.map((nextBatch) => [nextBatch.key, nextBatch.quantity])))
+      resetOptimisticToken()
+    }
+    const finishBusy = () => {
+      if (!isOriginCurrent()) return
+      setBusyAction((current) => current === actionKey ? null : current)
+      onBusyChange?.(false)
+      onDismissalBlockedChange?.(false)
+    }
+    const installAuthority = (refreshedItems: EverShelfInventoryItem[]) => {
+      if (!isOriginCurrent()) return null
+      const refreshedItem = inventoryDisplayItemForGroup(refreshedItems, groupKey)
+      if (!refreshedItem) return null
+      const refreshedBatches = inventoryBatches(refreshedItem, locationLabel)
+      setReconciledTarget({
+        epoch: capturedEpoch,
+        identity: capturedIdentity,
+        item: refreshedItem,
+        sourceRevision: capturedSourceRevision,
       })
-      .finally(() => onBusyChange?.(false))
+      setPreparedOperation(null)
+      setLocalBatchOverride(null)
+      setExpiryDrafts(Object.fromEntries(refreshedBatches.map((nextBatch) => [nextBatch.key, nextBatch.expiryDate])))
+      setQuantityDrafts(Object.fromEntries(refreshedBatches.map((nextBatch) => [nextBatch.key, nextBatch.quantity])))
+      resetOptimisticToken()
+      return refreshedItem
+    }
+    const finishWithAuthority = (refreshedItems: EverShelfInventoryItem[], clearPureTimeoutError: boolean) => {
+      const refreshedItem = installAuthority(refreshedItems)
+      if (!refreshedItem) return null
+      const confirmed = inventoryBatchToken(inventoryBatches(refreshedItem, locationLabel)) === projectedToken
+      preparedStatusRef.current = 'completed'
+      clearPreparedDeadline()
+      cancelReadRetry()
+      finishBusy()
+      if (clearPureTimeoutError && confirmed && errorSourceRef.current === 'prepared-timeout') updateError(null)
+      return { confirmed, item: refreshedItem }
+    }
+    const finishWithoutTarget = (message: string, source: DetailErrorSource) => {
+      if (!isOriginCurrent()) return
+      clearPreparedDeadline()
+      cancelReadRetry()
+      clearProjection()
+      preparedStatusRef.current = 'completed'
+      finishBusy()
+      updateError(message, source)
+    }
+    const waitForRetry = (delayMs: number) => new Promise<void>((resolve) => {
+      cancelReadRetry()
+      readRetryResolverRef.current = resolve
+      readRetryTimerRef.current = window.setTimeout(() => {
+        readRetryTimerRef.current = null
+        readRetryResolverRef.current = null
+        resolve()
+      }, delayMs)
+    })
+    let mutationSettled = false
+    let authorityReadSucceeded = false
+    let latestAuthorityItems: EverShelfInventoryItem[] | null = null
+    const markTimedOut = () => {
+      if (!isOriginCurrent() || preparedStatusRef.current !== 'pending') return
+      preparedStatusRef.current = 'timed-out'
+      clearProjection()
+      updateError(copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.inventory.preparedFoodUpdateError), 'prepared-timeout')
+      if (mutationSettled && authorityReadSucceeded && latestAuthorityItems) finishWithAuthority(latestAuthorityItems, true)
+    }
+    const readUntilAuthority = async () => {
+      while (isOriginCurrent() && preparedStatusRef.current !== 'completed') {
+        try {
+          const refreshedItems = await readAuthoritativeInventory()
+          if (!isOriginCurrent()) return null
+          authorityReadSucceeded = true
+          latestAuthorityItems = refreshedItems
+          const refreshedItem = inventoryDisplayItemForGroup(refreshedItems, groupKey)
+          if (refreshedItem) return { item: refreshedItem, items: refreshedItems }
+          if (hasTimedOut() || Date.now() >= deadline) {
+            markTimedOut()
+            return { item: null, items: refreshedItems }
+          }
+        } catch {
+          if (!isOriginCurrent()) return null
+        }
+        await waitForRetry(PREPARED_REFRESH_RETRY_MS)
+      }
+      return null
+    }
+    const readUntilConfirmed = async () => {
+      let latestItem: EverShelfInventoryDisplayItem | null = null
+      while (isOriginCurrent() && preparedStatusRef.current !== 'completed') {
+        let refreshedItems: EverShelfInventoryItem[]
+        try {
+          refreshedItems = await readAuthoritativeInventory()
+        } catch (caughtError: unknown) {
+          if (!isOriginCurrent()) return { item: latestItem, items: null, status: 'stale' as const }
+          if (!hasTimedOut()) {
+            updateError(
+              caughtError instanceof Error
+                ? caughtError.message
+                : copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.inventory.preparedFoodUpdateError),
+              'prepared-read',
+            )
+          }
+          if (Date.now() >= deadline) markTimedOut()
+          await waitForRetry(PREPARED_REFRESH_RETRY_MS)
+          continue
+        }
+        if (!isOriginCurrent()) return { item: latestItem, items: null, status: 'stale' as const }
+        authorityReadSucceeded = true
+        latestAuthorityItems = refreshedItems
+        latestItem = inventoryDisplayItemForGroup(refreshedItems, groupKey)
+        if (isPreparedComplete()) return { item: latestItem, items: refreshedItems, status: 'stale' as const }
+        const refreshedToken = latestItem
+          ? inventoryBatchToken(inventoryBatches(latestItem, locationLabel))
+          : null
+        if (refreshedToken === projectedToken) return { item: latestItem, items: refreshedItems, status: 'confirmed' as const }
+        if (hasTimedOut()) return { item: latestItem, items: refreshedItems, status: 'late' as const }
+        const remaining = deadline - Date.now()
+        if (remaining <= 0) {
+          markTimedOut()
+          return { item: latestItem, items: refreshedItems, status: 'late' as const }
+        }
+        await waitForRetry(Math.min(PREPARED_REFRESH_RETRY_MS, remaining))
+        if (!isOriginCurrent()) return { item: latestItem, items: null, status: 'stale' as const }
+      }
+      return { item: latestItem, items: null, status: 'stale' as const }
+    }
+
+    clearPreparedDeadline()
+    setPreparedOperation({
+      epoch: capturedEpoch,
+      generation: actionGeneration,
+      identity: capturedIdentity,
+      projectedBatches,
+      sourceRevision: capturedSourceRevision,
+      token: projectedToken,
+    })
+    setLocalBatchOverride(null)
+    setExpiryDrafts(Object.fromEntries(projectedBatches.map((nextBatch) => [nextBatch.key, nextBatch.expiryDate])))
+    setQuantityDrafts(Object.fromEntries(projectedBatches.map((nextBatch) => [nextBatch.key, nextBatch.quantity])))
+    commitOptimisticToken(projectedToken, { revertMs: PREPARED_OPTIMISTIC_REVERT_MS })
+    setBusyAction(actionKey)
+    onBusyChange?.(true)
+    onDismissalBlockedChange?.(false)
+    updateError(null)
+    preparedDeadlineTimerRef.current = window.setTimeout(markTimedOut, Math.max(0, deadline - Date.now()))
+
+    const runPreparedOperation = async () => {
+      let mutationError: unknown = null
+      try {
+        for (const step of steps) {
+          await callService({
+            domain: 'evershelf',
+            service: 'set_inventory_prepared_food',
+            serviceData: { inventory_id: step.inventoryId, prepared_food: nextPrepared, quantity: step.quantity },
+          })
+        }
+      } catch (caughtError: unknown) {
+        mutationError = caughtError
+      }
+
+      if (!isOriginCurrent()) return
+      mutationSettled = true
+
+      if (mutationError !== null) {
+        const mutationMessage = mutationError instanceof Error
+          ? mutationError.message
+          : copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.inventory.preparedFoodUpdateError)
+        updateError(mutationMessage, 'prepared-mutation')
+        const authority = await readUntilAuthority()
+        if (!isOriginCurrent() || !authority) return
+        const completion = finishWithAuthority(authority.items, false)
+        if (!completion) {
+          finishWithoutTarget(mutationMessage, 'prepared-mutation')
+          return
+        }
+        updateError(mutationMessage, 'prepared-mutation')
+        try {
+          await refreshVisibleInventory()
+        } catch {
+          // The direct read is the authority; a filtered parent refresh cannot invalidate it.
+        }
+        return
+      }
+
+      const result = await readUntilConfirmed()
+      if (!isOriginCurrent() || result.status === 'stale' || !result.items) return
+      const completion = finishWithAuthority(result.items, result.status === 'late')
+      if (!completion) {
+        finishWithoutTarget(
+          copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.inventory.preparedFoodUpdateError),
+          'prepared-read',
+        )
+        return
+      }
+      if (result.status === 'confirmed') {
+        updateError(null)
+        try {
+          await refreshVisibleInventory()
+        } catch (caughtError: unknown) {
+          if (isOriginCurrent()) reportUpdateError(caughtError, 'prepared-read')
+        }
+      }
+    }
+
+    void runPreparedOperation()
   }
 
   const deleteBatch = (batch: InventoryBatch) => {
@@ -1000,7 +1442,7 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
       const promptResult = promptDeleteQuantity(displayTitle, batch.locationLabel, batch.quantity)
       if (promptResult.status === 'cancelled') return
       if (promptResult.status === 'invalid') {
-        updateError(copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.delete.quantityError, { quantity: formatQuantity(batch.quantity) }))
+        updateError(copy(PAGE_FOOD_COPY_NAMESPACE, PAGE_FOOD_COPY_KEYS.delete.quantityError, { quantity: formatQuantity(batch.quantity) }), 'delete')
         return
       }
       quantityToDelete = promptResult.quantity
@@ -1012,25 +1454,34 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
       : batch.rows.map((row) => ({ inventoryId: row.inventoryId }))
     setBusyAction(`delete-${batch.key}`)
     onBusyChange?.(true)
+    onDismissalBlockedChange?.(true)
     updateError(null)
     void runDeleteSteps(deleteSteps)
       .then(() => {
-        onInventoryChanged()
+        notifyInventoryChanged()
         if (quantityToDelete >= totalQuantity) {
+          setBusyAction(null)
+          onBusyChange?.(false)
+          onDismissalBlockedChange?.(false)
           onComplete()
           return
         }
         const nextBatches = inventoryBatchesAfterDelete(batches, deleteSteps)
-        setOptimisticBatches(nextBatches)
+        setLocalBatchOverride(nextBatches)
         setExpiryDrafts(Object.fromEntries(nextBatches.map((batch) => [batch.key, batch.expiryDate])))
         setQuantityDrafts(Object.fromEntries(nextBatches.map((batch) => [batch.key, batch.quantity])))
         setBusyAction(null)
+        onDismissalBlockedChange?.(false)
       })
       .catch((caughtError: unknown) => {
         setBusyAction(null)
-        updateError(caughtError instanceof Error ? caughtError.message : 'Unable to delete item')
+        onDismissalBlockedChange?.(false)
+        updateError(caughtError instanceof Error ? caughtError.message : 'Unable to delete item', 'delete')
       })
-      .finally(() => onBusyChange?.(false))
+      .finally(() => {
+        onBusyChange?.(false)
+        onDismissalBlockedChange?.(false)
+      })
   }
 
   return {
@@ -1038,10 +1489,12 @@ function useInventoryItemDetails({ active, item, locationLabel, onBusyChange, on
     busy,
     busyAction,
     deleteBatch,
+    dismissalBlocked,
     error,
     expiryDrafts,
     multipleBatches,
     quantityDrafts,
+    retainsDismissedView,
     resetDraft,
     saveBatch,
     setExpiryDraft: (batchKey, value) => setExpiryDrafts((current) => ({ ...current, [batchKey]: value })),
@@ -1108,7 +1561,7 @@ export function EverShelfInventoryDetailsPage({ controller }: { controller: Ever
                 <CheckboxRow
                   active={batch.preparedFood}
                   alignWrappedToIconTop
-                  aria-busy={busyAction === `prepared-${batch.key}` ? 'true' : undefined}
+                  aria-busy={busyAction?.startsWith('prepared-') ? 'true' : undefined}
                   aria-label={`Prepared Food Item for ${title}${qualifier}`}
                   className={styles.instancePreparedRow}
                   disabled={disabled}
@@ -1132,23 +1585,26 @@ export function EverShelfInventoryDetailsPage({ controller }: { controller: Ever
   )
 }
 
-export function EverShelfInventoryDetailsPageHost({ active, children, target, onBusyChange, onComplete, onErrorChange, onInventoryChanged = () => undefined }: { active: boolean; children: (controller: EverShelfInventoryDetailsController) => ReactNode; target: EverShelfInventoryDetailsTarget | null; onBusyChange?: (busy: boolean) => void; onComplete: () => void; onErrorChange?: (error: string | null) => void; onInventoryChanged?: () => void }) {
+export function EverShelfInventoryDetailsPageHost({ active, children, target, onBusyChange, onComplete, onDismissalBlockedChange, onErrorChange, onInventoryChanged }: { active: boolean; children: (controller: EverShelfInventoryDetailsController) => ReactNode; target: EverShelfInventoryDetailsTarget | null; onBusyChange?: (busy: boolean) => void; onComplete: () => void; onDismissalBlockedChange?: (blocked: boolean) => void; onErrorChange?: (error: string | null) => void; onInventoryChanged?: InventoryRefresh }) {
   const controller = useInventoryItemDetails({
     active,
     item: target?.item ?? null,
+    location: target?.location ?? 'all',
     locationLabel: target?.locationLabel ?? 'inventory',
     onBusyChange,
     onComplete,
+    onDismissalBlockedChange,
     onErrorChange,
-    onInventoryChanged,
+    onInventoryChanged: onInventoryChanged ?? target?.onInventoryChanged,
   })
   return children(controller)
 }
 
-function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryDisplayItem | null; locationLabel: string; onClose: () => void; onInventoryChanged: () => void; open: boolean }) {
+function InventoryItemDetailsModal({ item, location, locationLabel, onClose, onInventoryChanged, open }: { item: EverShelfInventoryDisplayItem | null; location: EverShelfInventoryLocation; locationLabel: string; onClose: () => void; onInventoryChanged: InventoryRefresh; open: boolean }) {
   const controller = useInventoryItemDetails({
     active: open && item !== null,
     item,
+    location,
     locationLabel,
     onComplete: onClose,
     onInventoryChanged,
@@ -1156,7 +1612,7 @@ function InventoryItemDetailsModal({ item, locationLabel, onClose, onInventoryCh
 
   return (
     <ModalSheet centeredGeometry={INVENTORY_DETAILS_CENTERED_GEOMETRY} onClose={() => {
-      if (!controller.busy) onClose()
+      if (!controller.dismissalBlocked) onClose()
     }} open={open && item !== null} size="form" title={controller.title}>
       <EverShelfInventoryDetailsPage controller={controller} />
     </ModalSheet>
@@ -1309,12 +1765,12 @@ export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list',
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [items, setItems] = useState<EverShelfInventoryItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [reloadNonce, setReloadNonce] = useState(0)
   const [settledSearchQuery, setSettledSearchQuery] = useState('')
   const [searchLoadPhase, setSearchLoadPhase] = useState<InventorySearchLoadPhase>('idle')
   const itemsRef = useRef<EverShelfInventoryItem[] | null>(null)
-  const loadScopeRef = useRef({ location, reloadNonce })
+  const loadScopeRef = useRef({ location })
   const rawSearchQueryRef = useRef(controls.searchQuery.trim())
+  const refreshRequestRef = useRef(0)
   const requestIdRef = useRef(0)
   const searchFinishTimerRef = useRef<number | null>(null)
 
@@ -1326,6 +1782,25 @@ export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list',
     rawSearchQueryRef.current = controls.searchQuery.trim()
   }, [controls.searchQuery])
 
+  const loadInventoryItems = useCallback(async (searchQuery: string) => {
+    const serviceData = {
+      ...(location === 'all' ? {} : { location }),
+      ...(searchQuery ? { q: searchQuery } : {}),
+    }
+    const result = await Promise.resolve(
+      callService({
+        domain: 'evershelf',
+        service: 'list_inventory',
+        serviceData,
+        returnResponse: true,
+      }),
+    )
+    const response = inventoryResponseFromResult(result)
+    const searchItems = inventoryItemsFromSearchResponse(response, searchQuery)
+    const nextItems = await resolvedInventoryItems(searchItems, callService, location)
+    return { nextItems, response }
+  }, [callService, location])
+
   useEffect(() => {
     let cancelled = false
     let finishTimer: number | null = null
@@ -1333,9 +1808,9 @@ export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list',
     requestIdRef.current = requestId
     const searchQuery = controls.debouncedSearchQuery.trim()
     const previousScope = loadScopeRef.current
-    const searchOnlyLoad = itemsRef.current !== null && previousScope.location === location && previousScope.reloadNonce === reloadNonce
+    const searchOnlyLoad = itemsRef.current !== null && previousScope.location === location
     const initialLoad = !searchOnlyLoad
-    loadScopeRef.current = { location, reloadNonce }
+    loadScopeRef.current = { location }
 
     if (searchFinishTimerRef.current !== null) {
       window.clearTimeout(searchFinishTimerRef.current)
@@ -1347,7 +1822,6 @@ export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list',
       initialLoad,
       location,
       query: searchQuery,
-      reloadNonce,
     })
 
     if (initialLoad) {
@@ -1423,26 +1897,8 @@ export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list',
       }, 190)
     }
 
-    const serviceData = {
-      ...(location === 'all' ? {} : { location }),
-      ...(searchQuery ? { q: searchQuery } : {}),
-    }
-    void Promise.resolve(
-      callService({
-        domain: 'evershelf',
-        service: 'list_inventory',
-        serviceData,
-        returnResponse: true,
-      }),
-    )
-      .then(async (result) => {
-        if (cancelled || requestIdRef.current !== requestId) {
-          logInventorySearch('response-stale', { id: requestId, query: searchQuery })
-          return
-        }
-        const response = inventoryResponseFromResult(result)
-        const searchItems = inventoryItemsFromSearchResponse(response, searchQuery)
-        const nextItems = await resolvedInventoryItems(searchItems, callService, location)
+    void loadInventoryItems(searchQuery)
+      .then(({ nextItems, response }) => {
         if (cancelled || requestIdRef.current !== requestId) {
           logInventorySearch('response-stale', { id: requestId, query: searchQuery })
           return
@@ -1479,11 +1935,38 @@ export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list',
       }
       logInventorySearch('request-cleanup', { id: requestId, query: searchQuery })
     }
-  }, [callService, controls.debouncedSearchQuery, location, reloadNonce, setInventoryItemCount, setInventoryLoadPhase])
+  }, [controls.debouncedSearchQuery, loadInventoryItems, location, setInventoryItemCount, setInventoryLoadPhase])
 
   const loadedItems = useMemo(() => items ?? [], [items])
   const displayItems = useMemo(() => groupedInventoryItems(loadedItems), [loadedItems])
-  const reloadInventory = useCallback(() => setReloadNonce((current) => current + 1), [])
+  const refreshInventory = useCallback(async (): Promise<EverShelfInventoryItem[]> => {
+    const refreshId = refreshRequestRef.current + 1
+    refreshRequestRef.current = refreshId
+    requestIdRef.current += 1
+    if (searchFinishTimerRef.current !== null) {
+      window.clearTimeout(searchFinishTimerRef.current)
+      searchFinishTimerRef.current = null
+    }
+    const searchQuery = controls.debouncedSearchQuery.trim()
+    try {
+      const { nextItems } = await loadInventoryItems(searchQuery)
+      if (refreshRequestRef.current === refreshId) {
+        setError(null)
+        setItems(nextItems)
+        setInventoryItemCount(nextItems.length)
+        setSettledSearchQuery(searchQuery)
+        setSearchLoadPhase('idle')
+      }
+      return nextItems
+    } catch (caughtError: unknown) {
+      if (refreshRequestRef.current === refreshId) {
+        setError(caughtError instanceof Error ? caughtError.message : 'Unable to load inventory')
+        setSettledSearchQuery(searchQuery)
+        setSearchLoadPhase('idle')
+      }
+      throw caughtError
+    }
+  }, [controls.debouncedSearchQuery, loadInventoryItems, setInventoryItemCount])
   const removeDeletedItems = useCallback((steps: InventoryDeleteStep[]) => {
     setItems((currentItems) => {
       if (currentItems === null) return currentItems
@@ -1516,7 +1999,7 @@ export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list',
   )
   const openItemDetails = (item: EverShelfInventoryDisplayItem) => {
     if (onOpenDetails) {
-      onOpenDetails({ item, locationLabel: LOCATION_DELETE_LABELS[location] })
+      onOpenDetails({ item, location, locationLabel: LOCATION_DELETE_LABELS[location], onInventoryChanged: refreshInventory })
       return
     }
     setDetailsItem(item)
@@ -1565,7 +2048,7 @@ export function EverShelfInventoryPanel({ controls, emptyState, layout = 'list',
           </>
         )}
       </article>
-      {!onOpenDetails && <InventoryItemDetailsModal key={itemInstancesKey(detailsItem)} item={detailsItem} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsOpen(false)} onInventoryChanged={reloadInventory} open={detailsOpen} />}
+      {!onOpenDetails && <InventoryItemDetailsModal item={detailsItem} location={location} locationLabel={LOCATION_DELETE_LABELS[location]} onClose={() => setDetailsOpen(false)} onInventoryChanged={refreshInventory} open={detailsOpen} />}
     </>
   )
 }
