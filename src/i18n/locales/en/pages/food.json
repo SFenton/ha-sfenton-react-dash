@@ -13,7 +13,9 @@
     "expiringSoon_other": "{{count}} Expiring Soon",
     "items_one": "{{count}} Item",
     "items_other": "{{count}} Items",
-    "summary": "{{items}} • {{expiring}}"
+    "preparedFoodUpdateError": "Unable to update prepared food",
+    "summary": "{{items}} • {{expiring}}",
+    "updateError": "Unable to update item"
   },
   "loading": "Loading Food & Recipes",
   "sections": {
