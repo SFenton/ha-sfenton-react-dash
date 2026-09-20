@@ -51,6 +51,10 @@ export const PAGE_FOOD_COPY_KEYS = {
     multipleDescription: 'delete.multipleDescription',
     quantityError: 'delete.quantityError',
   },
+  inventory: {
+    preparedFoodUpdateError: 'inventory.preparedFoodUpdateError',
+    updateError: 'inventory.updateError',
+  },
 } as const
 export const CHAT_COPY_NAMESPACE = 'modalChat' as const
 export const CHAT_COPY_KEYS = {
