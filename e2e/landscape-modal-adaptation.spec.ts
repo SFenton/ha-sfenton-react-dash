@@ -378,6 +378,7 @@ test.describe('non-room landscape modal adaptation', () => {
       const dialog = await CASES[3].open(page)
       await setSafeAreaInsets(page, viewport.insets)
       await expect(dialog).toHaveAttribute('data-modal-presentation', /^(?:dialog|landscape-dialog)$/)
+      await expect(dialog.locator('[data-layout-preparation-phase]')).toHaveAttribute('data-layout-preparation-phase', 'content', { timeout: 15_000 })
 
       const body = dialog.locator('[data-modal-sheet-body="true"]')
       const leftPane = dialog.locator('[aria-label$="map and status"]')
