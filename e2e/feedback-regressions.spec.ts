@@ -2,6 +2,8 @@
 // @covers src/components/hass/TodoListPanel.tsx
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
+// @covers src/components/core/DynamicGrid.tsx
+// @covers src/components/core/dynamicGridLayout.ts
 // @covers src/components/core/ModalSheet.tsx
 // @covers src/constants/roomPages.ts
 import { expect, test, type Locator, type Page } from './layout/fixture'
@@ -431,6 +433,43 @@ async function expectDynamicGridRowsToFill(grid: Locator) {
   })).toBe(true)
 }
 
+async function expectDynamicGridIntermediateRowsToFill(grid: Locator) {
+  await expect.poll(() => grid.evaluate((element) => {
+    const gridBounds = element.getBoundingClientRect()
+    const columnGap = Number.parseFloat(getComputedStyle(element).columnGap)
+    const cells = Array.from(element.querySelectorAll<HTMLElement>(':scope > [data-dynamic-grid-cell="true"]'))
+      .map((cell, index) => ({ bounds: cell.getBoundingClientRect(), index, row: Math.round(cell.getBoundingClientRect().top) }))
+    const rowTops = [...new Set(cells.map((cell) => cell.row))].sort((left, right) => left - right)
+    const rows = rowTops.map((row) => cells
+      .filter((cell) => cell.row === row)
+      .sort((left, right) => left.bounds.left - right.bounds.left))
+    const readingOrder = rows.flatMap((row) => row.map((cell) => cell.index))
+    const gapsMatch = rows.every((row) => row.slice(1).every((cell, index) =>
+      Math.abs(cell.bounds.left - row[index].bounds.right - columnGap) <= 1))
+    const rowsFill = rows.slice(0, -1).every((row) => {
+      const first = row[0]
+      const last = row.at(-1)
+      if (!first || !last) return false
+      return Math.abs(first.bounds.left - gridBounds.left) <= 1
+        && Math.abs(last.bounds.right - gridBounds.right) <= 1
+    })
+    const finalRow = rows.at(-1)
+    const finalRowStartsLeft = !finalRow?.length || Math.abs(finalRow[0].bounds.left - gridBounds.left) <= 1
+
+    return {
+      finalRowStartsLeft,
+      gapsMatch,
+      orderMatchesDom: readingOrder.every((index, position) => index === position),
+      rowsFill,
+    }
+  })).toEqual({
+    finalRowStartsLeft: true,
+    gapsMatch: true,
+    orderMatchesDom: true,
+    rowsFill: true,
+  })
+}
+
 async function setMockStates(page: Page, states: Record<string, string>) {
   await page.evaluate((entries) => {
     const mock = (window as unknown as {
@@ -654,6 +693,7 @@ test('Chores uses content-aware Quick Links and reflows task rows without reorde
     expect(quickLinkLayout).toHaveLength(5)
     expect(quickLinkLayout.every(({ labelsFit, span }) => labelsFit && span >= 1 && span <= viewport.choreColumns)).toBe(true)
     if (viewport.width === 393) expect(quickLinkLayout.every(({ span }) => span === 2)).toBe(true)
+    await expectDynamicGridIntermediateRowsToFill(quickLinks)
 
     const list = root.getByLabel('Past Due todo list')
     await expect(list).toHaveAttribute('data-layout', 'responsive-grid')
@@ -663,6 +703,26 @@ test('Chores uses content-aware Quick Links and reflows task rows without reorde
     )
     expect(columns).toBe(viewport.width === 393 ? 1 : 2)
     expect(await list.locator('li').allTextContents()).toEqual(['First layout task', 'Second layout task'])
+  }
+})
+
+test('expanded fill-minimum grids fill intermediate rows across dashboard consumers', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.setViewportSize({ width: 1920, height: 1080 })
+
+  for (const path of ['chores', 'vacuums', 'guests-staying-over', 'solo-trip']) {
+    await page.goto(`/index.html?path=${path}&feedback-expanded-row-fill=1920`)
+    const root = activeRoute(page, path)
+    const grids = root.locator([
+      '[data-dynamic-grid-fill-rows="true"]',
+      '[data-dynamic-grid-layout="bounded"]',
+      '[data-dynamic-grid-last-row="fill-minimum"]',
+    ].join(''))
+    await expect(grids.first()).toBeVisible()
+
+    for (let index = 0; index < await grids.count(); index += 1) {
+      await expectDynamicGridIntermediateRowsToFill(grids.nth(index))
+    }
   }
 })
 

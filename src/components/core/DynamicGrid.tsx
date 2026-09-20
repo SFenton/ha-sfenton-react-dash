@@ -312,7 +312,7 @@ function measuredLayout(
   const fillFinalRow = lastRow === 'fill'
     || (lastRow === 'fill-minimum' && !expanded)
   const rowFill = fillFinalRow ? 'all' : 'except-last'
-  const fillMeasuredRows = fillRows === 'except-last' || fillFinalRow
+  const fillMeasuredRows = fillRows !== false || fillFinalRow
   const spans = itemSizing !== 'content-aware'
     ? (
       fillMeasuredRows
