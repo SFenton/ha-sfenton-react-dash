@@ -727,9 +727,6 @@ def schedule_solo_trip(
     end_dt = datetime.fromisoformat(ends_at)
     if end_dt <= start_dt:
         return _reject(journal, request, "invalid_dates")
-    current_minute = now.replace(second=0, microsecond=0)
-    if start_dt < current_minute:
-        return _reject(journal, request, "start_in_past")
     updated = deepcopy(dict(journal))
     updated["generation"] += 1
     updated["revision"] += 1

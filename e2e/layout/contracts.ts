@@ -490,7 +490,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   'solo-trip-settings': {
     family: 'page-shell-grid',
-    states: ['idle', 'idle-selected', 'modal', 'scheduled', 'activating', 'active', 'active-home-viewer', 'active-unknown-viewer', 'degraded', 'ending', 'restore-required', 'unavailable'],
+    states: ['idle', 'idle-selected', 'modal', 'scheduled', 'invalid-return', 'activating', 'active', 'active-home-viewer', 'active-unknown-viewer', 'degraded', 'ending', 'restore-required', 'unavailable'],
     owners: [
       'src/components/hass/householdAway/SoloTripChooserCard',
       'src/components/hass/householdAway/SoloTripEditorModal',
@@ -506,7 +506,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
       'src/i18n/locales/en/pages/soloTrip.json',
     ],
     legacy: ['responsive-pages-all.spec.ts', 'feedback-regressions.spec.ts'],
-    question: 'Does the dedicated Solo Trip page keep both Settings-style sections visible while idle, selected, modal, scheduled, activating, active, degraded, ending, restore-required, and unavailable states remain truthful across mobile and desktop?',
+    question: 'Does the Vacation chooser follow the Settings link columns, and does Solo Trip keep both sections, the active Away chip, and inline return-only fields truthful across idle, selected, modal, scheduled, activating, active, degraded, ending, restore-required, and unavailable states?',
   },
   'solo-trip-bed': {
     family: 'modal',

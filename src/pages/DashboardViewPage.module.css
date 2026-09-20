@@ -268,22 +268,11 @@
   gap: 10px;
 }
 
-.soloTripActionRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
 .vacationDateError {
   color: #ffb4b4;
 }
 
 @media (max-width: 520px) {
-  .soloTripActionRow {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .soloTripFieldGrid {
     grid-template-columns: minmax(0, 1fr);
   }
