@@ -65,7 +65,7 @@ describe('DailyReportModal prepared inventory dismissal', () => {
     expect(screen.getByRole('dialog', { name: 'Canned Beans' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to expired food' }))
-    expect(screen.getByRole('dialog', { name: "Stephen's Summary" })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Your Summary' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Open expired food detail' }))
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
