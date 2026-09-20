@@ -19,6 +19,10 @@
   opacity: 0;
 }
 
+.overlay[data-rapid-reopen='true'] {
+  opacity: 1;
+}
+
 .overlay[data-swiping] {
   transition-duration: 0ms;
 }
@@ -122,8 +126,7 @@
 .overlay[data-exposed-backdrop-bands='true'][data-swiping],
 .overlay[data-exposed-backdrop-bands='true'][data-starting-style],
 .overlay[data-exposed-backdrop-bands='true'][data-ending-style],
-.overlay[data-exposed-backdrop-bands='true'][data-closing='true'],
-.overlay[data-exposed-backdrop-bands='true'][data-rapid-reopen='true'] {
+.overlay[data-exposed-backdrop-bands='true'][data-closing='true'] {
   background: var(--color-modal-overlay);
   -webkit-backdrop-filter: var(--blur-modal);
   backdrop-filter: var(--blur-modal);
@@ -133,12 +136,10 @@
 .overlay[data-exposed-backdrop-bands='true'][data-starting-style] .overlayBand,
 .overlay[data-exposed-backdrop-bands='true'][data-ending-style] .overlayBand,
 .overlay[data-exposed-backdrop-bands='true'][data-closing='true'] .overlayBand,
-.overlay[data-exposed-backdrop-bands='true'][data-rapid-reopen='true'] .overlayBand,
 .overlay[data-exposed-backdrop-bands='true'][data-swiping] .backdropScrim,
 .overlay[data-exposed-backdrop-bands='true'][data-starting-style] .backdropScrim,
 .overlay[data-exposed-backdrop-bands='true'][data-ending-style] .backdropScrim,
-.overlay[data-exposed-backdrop-bands='true'][data-closing='true'] .backdropScrim,
-.overlay[data-exposed-backdrop-bands='true'][data-rapid-reopen='true'] .backdropScrim {
+.overlay[data-exposed-backdrop-bands='true'][data-closing='true'] .backdropScrim {
   visibility: hidden;
 }
 
@@ -204,6 +205,12 @@
   --modal-keyboard-inset: var(--dashboard-keyboard-overlay-inset, 0px);
 }
 
+:global(html[data-dashboard-kb-arming='true']:not([data-dashboard-kb-masked='true'])) .content[data-keyboard-lift-ready='true'] {
+  --modal-keyboard-inset: var(--dashboard-keyboard-predicted-inset, 0px);
+}
+
+:global(html[data-dashboard-kb-arming='true']:not([data-dashboard-kb-masked='true'])) .content[data-keyboard-lift-ready='true'][data-modal-presentation='sheet'] .navigation,
+:global(html[data-dashboard-kb-arming='true']:not([data-dashboard-kb-masked='true'])) .content[data-keyboard-lift-ready='true'][data-modal-presentation='sheet'] .footer,
 :global(html[data-dashboard-keyboard='open']) .content[data-modal-presentation='sheet'] .navigation,
 :global(html[data-dashboard-keyboard='open']) .content[data-modal-presentation='sheet'] .footer {
   padding-bottom: 8px;
@@ -250,13 +257,18 @@
 }
 
 .content[data-rapid-reopen='true'][data-state='open'] {
-  transform: none;
-  transition: none;
+  transform: translate3d(0, 0, 0);
 }
 
 .content[data-swiping] {
   user-select: none;
   transition-duration: 0ms;
+}
+
+:global(html[data-dashboard-keyboard='open']) .content:not([data-closing='true']),
+:global(html[data-dashboard-kb-arming='true']) .content:not([data-closing='true']) {
+  --drawer-swipe-movement-y: 0px !important;
+  transform: translate3d(0, 0, 0) !important;
 }
 
 .content[data-ending-style] {
@@ -281,14 +293,10 @@
   height: 100%;
   flex: 1 1 auto;
   flex-direction: column;
+  transition: padding-bottom 320ms cubic-bezier(.32, .72, 0, 1);
 }
 
-:global(html[data-dashboard-kb-arming='true']) .contentLayout,
-:global(html[data-dashboard-keyboard='open']) .contentLayout,
-.content[data-closing='true'] .contentLayout {
-  transition: padding-bottom 300ms cubic-bezier(.32, .72, 0, 1);
-}
-
+:global(html[data-dashboard-kb-arming='true']:not([data-dashboard-kb-masked='true'])) .content[data-keyboard-lift-ready='true'] .contentLayout,
 :global(html[data-dashboard-keyboard='open']) .contentLayout,
 .content[data-closing='true'] .contentLayout {
   box-sizing: border-box;
@@ -514,6 +522,13 @@
   background: linear-gradient(to top, var(--color-modal-footer) 72%, var(--color-modal-footer-transparent));
 }
 
+.content[data-keyboard-lift-ready='true'] .navigation,
+.content[data-keyboard-lift-ready='true'] .footer,
+:global(html[data-dashboard-keyboard='open']) .navigation,
+:global(html[data-dashboard-keyboard='open']) .footer {
+  transition: padding-bottom 320ms cubic-bezier(.32, .72, 0, 1);
+}
+
 @media (forced-colors: active) {
   .overlay[data-exposed-backdrop-bands='true'] {
     background: var(--color-modal-overlay);
@@ -528,7 +543,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .contentLayout {
+  .contentLayout,
+  .navigation,
+  .footer {
     transition-duration: 1ms;
   }
 }
