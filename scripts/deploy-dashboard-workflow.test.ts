@@ -50,8 +50,16 @@ describe('dashboard deployment workflow', () => {
 
     expect(deploy).toContain('environment: production')
     expect(deploy).toContain("format('ha-deploy-production-{0}-{1}'")
+    expect(deploy).toContain('deploy-dashboard-ci.mjs admit')
+    expect(deploy.indexOf('deploy-dashboard-ci.mjs admit')).toBeLessThan(
+      deploy.indexOf('actions/download-artifact'),
+    )
+    expect(deploy.indexOf('actions/download-artifact')).toBeLessThan(
+      deploy.indexOf('HA_DEPLOY_TOKEN: ${{ secrets.HA_DEPLOY_TOKEN }}'),
+    )
     expect(deploy).toContain('HA_DEPLOY_TOKEN: ${{ secrets.HA_DEPLOY_TOKEN }}')
     expect(deploy).toContain('HA_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.HA_DEPLOY_SSH_PRIVATE_KEY }}')
+    expect(deploy).toContain('if: always()')
     expect(deploy).not.toContain('actions/checkout')
     expect(deploy).not.toContain('npm ci')
   })

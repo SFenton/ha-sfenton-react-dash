@@ -14,6 +14,9 @@ The workflow separates build and deployment:
 - `Deploy dashboard` uses a unique per-run label and a one-job JIT runner.
   The runner is absent until the host controller validates the exact workflow,
   event, branch, SHA, job, workflow digest, and local runner-image digest.
+- The deploy workflow's first runner step is an admission gate that runs before
+  artifact download and before any HA-secret-bearing step. Rejected production
+  attempts write a sanitized receipt and fail without HA proxy access.
 - The runner initially has only an allowlisted GitHub proxy. The controller
   grants access to HA-specific SSH and API proxies only after GitHub reports
   that the expected job is bound to the generated runner ID and name.
@@ -32,18 +35,40 @@ mount, or access to the operator's home directory.
 The automatic path publishes frontend assets only. It:
 
 1. verifies the artifact manifest and full source SHA;
-2. verifies the currently deployed wrapper SHA is an ancestor of the candidate;
-3. processes every queued master push in FIFO order, even when a newer merge
-   has already advanced `master`, and checks the complete
-   deployed-to-candidate range;
-4. refuses Home Assistant runtime changes under `home-assistant/`, Home MCP
+2. uses attempt-scoped run/job discovery (paginated, deduplicated, and
+   exact-label) and rejects ambiguous runnable states instead of choosing by
+   timestamp;
+   waiting/requested/pending jobs behind the concurrency holder are
+   non-runnable, while any other matching status fails closed;
+3. classifies each candidate under the production lease with monotonic
+   dispositions:
+   - `forward`: deployed SHA is an ancestor of candidate and candidate is on
+     current `master`;
+   - `already-current`: candidate equals deployed;
+   - `superseded`: candidate is an ancestor of a verified deployed SHA that is
+     still on current `master`;
+   - divergent/unverifiable states fail closed;
+4. treats successful `already-current`/`superseded` outcomes as verified no-op
+   completions (no asset or metadata mutation) and emits truthful v2 receipts;
+5. requires a successful same-attempt build for the active deploy attempt.
+   Unsupported deploy-only/partial reruns are rejected as
+   `full-rerun-required`; operators must re-run all jobs for the workflow run;
+6. refuses Home Assistant runtime changes under `home-assistant/`, Home MCP
    changes under `home-mcp/`, or a changed `sfenton-react-panel.js` bridge;
-5. captures production, acquires the durable release lease, overlays the new
-   build while retaining prior hashed assets, and uses the tested transactional
-   directory swap;
-6. updates the legacy wrapper and card resource to the full commit SHA;
-7. verifies exact remote and HTTP bytes plus the embedded panel registration;
-8. rolls back assets and metadata on failure.
+7. captures production, acquires the durable release lease before reading
+   disposition state, overlays the new build while retaining prior hashed
+   assets, and uses the tested transactional directory swap;
+8. writes a durable deployment record (`deployment.json` v2) only after
+   verified deployment. The record includes full SHA provenance, canonical
+   deployed file hashes (excluding `deployment.json`), exact host metadata, and
+   a canonical deployment hash;
+9. treats v1 deployment records as migration-only:
+   - forward deploys upgrade to v2;
+   - equal SHA on v1 requires a real re-attestation/deployment;
+   - older candidates against v1 fail closed until a forward v2 deployment exists;
+10. updates the legacy wrapper and card resource to the full commit SHA;
+11. verifies exact remote and HTTP bytes plus the embedded panel registration;
+12. rolls back assets and metadata on failure.
 
 Blocked Home Assistant runtime changes use the restart-aware manual release;
 the automatic job never stages HA packages/components and never restarts HA.
@@ -105,10 +130,18 @@ from an unchecked `ssh-keyscan`.
 
 ## Verification and recovery
 
-Successful runs upload a sanitized deployment receipt keyed by the full merge
-SHA and run attempt. A receipt proves the artifact manifest, exact remote and
-HTTP bytes, wrapper/resource versions, panel registration, and rollback status.
-It contains no token, host name, IP address, browser storage, or screenshot.
+Runs upload a sanitized deployment receipt keyed by the full merge SHA and run
+attempt whenever admission or deployment reaches receipt generation. Receipts
+are v2 and include disposition
+(`forward`/`already-current`/`superseded`/`full-rerun-required`), deployment
+hash provenance when available, exact verification scope, and rollback status.
+They contain no token, host name, IP address, browser storage, or screenshot.
+
+Controller startup is fail-closed. It uses an exclusive process lock and an
+active-operation journal. On restart it can clean a proven unassigned pre-HA
+attempt and terminal exact resources; it blocks on ambiguity, post-HA
+uncertainty, unresolved lease ownership, or incomplete cleanup until operator
+recovery.
 
 An incomplete rollback deliberately leaves the remote lease, journal, and
 backup in place. Do not delete them blindly; inspect the failed run and recover

@@ -100,6 +100,12 @@ It does not wait for the post-merge layout workflow. The automatic path must
 fail before mutation when the cumulative range since the deployed SHA contains
 Home Assistant runtime or Home MCP changes, or when the custom-panel bridge
 changed. Those changes retain the restart-aware manual release below.
+Rapid merges converge monotonically rather than by merge-order FIFO: queued
+deploy jobs may settle as `forward`, verified `already-current`, or verified
+`superseded` outcomes under the production lease. Unsupported deploy-only or
+partial reruns must fail as `full-rerun-required` before HA mutation, and
+older v1 deployment records must be migrated through a forward v2 deployment
+before no-op supersession is allowed.
 
 The CI deployment must never expose `VITE_HA_TOKEN` to the hosted build, stage
 HA packages/components, restart Home Assistant, register a persistent runner

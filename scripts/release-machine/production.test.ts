@@ -11,6 +11,7 @@ import {
   LocalProductionAdapter,
   captureProduction,
   deployProduction,
+  productionStateHash,
   rollbackProduction,
   verifyProduction,
   verifyManualProductionAttestation,
@@ -93,6 +94,19 @@ describe('transactional production release', () => {
     )
   })
 
+  it('uses one canonical production-state hash for captures and deployments', async () => {
+    const { adapter, backup, build } = await fixture()
+    const snapshot = await captureProduction(adapter, backup)
+    expect(
+      productionStateHash(snapshot.files, snapshot.metadata),
+    ).toBe(snapshot.snapshotHash)
+
+    const deployment = await deployProduction(adapter, build, 'abc123')
+    expect(
+      productionStateHash(deployment.files, deployment.metadata),
+    ).toBe(deployment.deploymentHash)
+  })
+
   it('refuses to overwrite production that changed after deployment', async () => {
     const { adapter, assets, backup, build } = await fixture()
     await captureProduction(adapter, backup)
@@ -101,6 +115,24 @@ describe('transactional production release', () => {
     await expect(
       rollbackProduction(adapter, backup, { deployment }),
     ).rejects.toThrow('automatic rollback is unsafe')
+  })
+
+  it('rolls back an attempted release that added new hashed assets', async () => {
+    const { adapter, assets, backup, build } = await fixture()
+    await writeFile(join(build, 'new-hash.js'), 'new asset')
+    const snapshot = await captureProduction(adapter, backup)
+    const deployment = await deployProduction(adapter, build, 'abc123')
+
+    await rollbackProduction(adapter, backup, {
+      releaseVersion: 'abc123',
+      expectedFiles: deployment.files,
+    })
+
+    await expect(
+      verifyProductionRollback(adapter, snapshot),
+    ).resolves.toMatchObject({ verified: true })
+    await expect(readFile(join(assets, 'new-hash.js'), 'utf8'))
+      .rejects.toThrow()
   })
 
   it('refuses deployment when production changed after capture', async () => {

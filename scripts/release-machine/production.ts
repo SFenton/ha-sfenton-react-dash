@@ -108,7 +108,7 @@ export async function productionManifest(directory: string) {
   return files
 }
 
-function snapshotHash(
+export function productionStateHash(
   files: ProductionFile[],
   metadata: ProductionMetadata,
 ) {
@@ -133,7 +133,7 @@ export async function captureProduction(
     version: 1,
     files,
     metadata,
-    snapshotHash: snapshotHash(files, metadata),
+    snapshotHash: productionStateHash(files, metadata),
   }
   await writeFile(
     join(backupDirectory, 'snapshot.json'),
@@ -155,7 +155,7 @@ export async function deployProduction(
       adapter.readMetadata(),
     ])
     assert(
-      snapshotHash(currentFiles, currentMetadata) ===
+      productionStateHash(currentFiles, currentMetadata) ===
         expectedSnapshot.snapshotHash,
       'Production changed after capture; deployment is unsafe',
     )
@@ -174,7 +174,7 @@ export async function deployProduction(
     releaseVersion,
     files: expectedFiles,
     metadata,
-    deploymentHash: snapshotHash(expectedFiles, metadata),
+    deploymentHash: productionStateHash(expectedFiles, metadata),
   }
   return deployment
 }
@@ -189,7 +189,7 @@ export async function verifyProduction(
   ])
   assert(metadata.panelRegistered, 'Custom panel is not registered')
   assert(
-    snapshotHash(files, metadata) === deployment.deploymentHash,
+    productionStateHash(files, metadata) === deployment.deploymentHash,
     'Production state does not match the deployed release',
   )
   assert(
@@ -220,7 +220,7 @@ export async function rollbackProduction(
       adapter.readMetadata(),
     ])
     assert(
-      snapshotHash(files, metadata) === guard.deployment.deploymentHash,
+      productionStateHash(files, metadata) === guard.deployment.deploymentHash,
       'Production changed after this release; automatic rollback is unsafe',
     )
   } else if (guard?.releaseVersion) {
@@ -229,7 +229,8 @@ export async function rollbackProduction(
       adapter.readMetadata(),
     ])
     const metadataIsCaptured =
-      snapshotHash([], metadata) === snapshotHash([], snapshot.metadata)
+      productionStateHash([], metadata) ===
+      productionStateHash([], snapshot.metadata)
     const metadataIsThisRelease =
       metadata.legacyWrapperUrl.includes(
         encodeURIComponent(guard.releaseVersion),
@@ -242,22 +243,9 @@ export async function rollbackProduction(
       'Production metadata changed after this release attempt; automatic rollback is unsafe',
     )
     if (guard.expectedFiles) {
-      const captured = new Map(
-        snapshot.files.map((file) => [file.path, file.sha256]),
-      )
-      const attempted = new Map(
-        guard.expectedFiles.map((file) => [file.path, file.sha256]),
-      )
       assert(
-        files.length === snapshot.files.length &&
-          files.every((file) => {
-            const capturedHash = captured.get(file.path)
-            const attemptedHash = attempted.get(file.path)
-            return (
-              file.sha256 === capturedHash ||
-              file.sha256 === attemptedHash
-            )
-          }),
+        JSON.stringify(files) === JSON.stringify(snapshot.files) ||
+          JSON.stringify(files) === JSON.stringify(guard.expectedFiles),
         'Production assets changed outside this release attempt; automatic rollback is unsafe',
       )
     }
@@ -277,7 +265,7 @@ export async function verifyProductionRollback(
     adapter.readMetadata(),
   ])
   assert(
-    snapshotHash(files, metadata) === snapshot.snapshotHash,
+    productionStateHash(files, metadata) === snapshot.snapshotHash,
     'Production rollback did not restore the captured state',
   )
   return { files, metadata, verified: true as const }

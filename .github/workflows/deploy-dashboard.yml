@@ -72,8 +72,11 @@ jobs:
       cancel-in-progress: false
       queue: max
     steps:
-      - name: Wait for exact runner binding and HA capability grant
-        run: node /opt/ha-dashboard/bin/deploy-dashboard-ci.mjs wait-authorized --mode production
+      - name: Admit exact runner binding and deployment authorization
+        run: >-
+          node /opt/ha-dashboard/bin/deploy-dashboard-ci.mjs admit
+          --mode production
+          --receipt .ha-deploy-artifact/deployment-receipt.json
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: dashboard-production-${{ github.sha }}-${{ github.run_attempt }}
