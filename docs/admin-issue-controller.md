@@ -24,6 +24,9 @@ with no network, a read-only root filesystem, dropped capabilities,
 Git metadata. The extension accepts only an immutable Docker image ID.
 The controller rejects changes outside the auto-deployed dashboard surfaces:
 `src/`, `public/`, `e2e/`, and the root `index.html`.
+Repository env and package-credential files are masked with `/dev/null`, and
+build caches use per-command tmpfs mounts, so model commands cannot read local
+tokens or persist a cache that influences trusted validation.
 
 The controller passes `GH_TOKEN` to Copilot only so the CLI can authenticate
 its model session. The variable is declared secret and is not requested by the

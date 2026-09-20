@@ -519,6 +519,8 @@ describe('admin issue controller security configuration', () => {
     expect(extension).toContain('".github"')
     expect(extension).toContain('"node_modules"')
     expect(extension).toContain('"scripts/lib/hassAdminTodo.ts"')
+    expect(extension).toContain('src=/dev/null,dst=/workspace/${relativePath},readonly')
+    expect(extension).toContain('/workspace/.cache:rw,nosuid,nodev')
     expect(extension).toContain('readonly')
     expect(extension).toContain('/^sha256:[a-f0-9]{64}$/')
     expect(extension).not.toContain('process.env,')

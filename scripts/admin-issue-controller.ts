@@ -9,6 +9,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -145,9 +146,22 @@ const STATE_VERSION = 1 as const
 const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
-const PROTECTED_WORKER_PATHS = [
+const MASKED_WORKSPACE_FILES = [
   '.env',
   '.env.development',
+  '.env.development.local',
+  '.env.emulator',
+  '.env.local',
+  '.env.production',
+  '.env.production.local',
+  '.env.test',
+  '.env.test.local',
+  '.envrc',
+  '.npmrc',
+  '.yarnrc',
+  '.yarnrc.yml',
+] as const
+const PROTECTED_WORKER_PATHS = [
   '.gitattributes',
   '.git',
   '.gitignore',
@@ -174,6 +188,15 @@ const PROTECTED_WORKER_PATHS = [
   'vite.config.ts',
   'vitest.config.ts',
 ]
+
+function isMaskedWorkspaceFile(path: string) {
+  return !path.includes('/') && (
+    path.startsWith('.env') ||
+    path === '.npmrc' ||
+    path === '.yarnrc' ||
+    path === '.yarnrc.yml'
+  )
+}
 
 function now() {
   return new Date().toISOString()
@@ -1180,8 +1203,10 @@ async function changedFiles(worktreePath: string) {
         '--exclude-standard',
         '--',
         '.github',
-        '.env',
-        '.env.development',
+        '.env*',
+        '.npmrc',
+        '.yarnrc',
+        '.yarnrc.yml',
         '.gitattributes',
         '.gitignore',
         '.gitmodules',
@@ -1220,6 +1245,7 @@ function assertProtectedPathsUntouched(files: string[]) {
     if (
       normalized.startsWith('/') ||
       normalized.split('/').includes('..') ||
+      isMaskedWorkspaceFile(normalized) ||
       PROTECTED_WORKER_PATHS.some(
         (protectedPath) =>
           normalized === protectedPath.replace(/\/$/, '') || normalized.startsWith(protectedPath),
@@ -1287,6 +1313,14 @@ async function runWorkspaceContainer(
   const containerName = `admin-issue-validate-${process.pid}-${Date.now()}`
   const uid = process.getuid?.() ?? 1000
   const gid = process.getgid?.() ?? 1000
+  const maskedWorkspaceFiles = new Set<string>(MASKED_WORKSPACE_FILES)
+  for (const entry of readdirSync(worktreePath)) {
+    if (isMaskedWorkspaceFile(entry)) maskedWorkspaceFiles.add(entry)
+  }
+  const maskedMounts = [...maskedWorkspaceFiles].flatMap((path) => [
+    '--mount',
+    `type=bind,src=/dev/null,dst=/workspace/${path},readonly`,
+  ])
   const readOnlyMounts = [...new Set([...PROTECTED_WORKER_PATHS, 'node_modules'])]
     .map((path) => path.replace(/\/$/, ''))
     .filter((path) => existsSync(join(worktreePath, path)))
@@ -1326,8 +1360,11 @@ async function runWorkspaceContainer(
         `/home/worker:rw,nosuid,nodev,size=128m,uid=${uid},gid=${gid}`,
         '--tmpfs',
         `/workspace/node_modules/.vite-temp:rw,nosuid,nodev,size=256m,uid=${uid},gid=${gid}`,
+        '--tmpfs',
+        `/workspace/.cache:rw,nosuid,nodev,size=256m,uid=${uid},gid=${gid}`,
         '--mount',
         `type=bind,src=${worktreePath},dst=/workspace`,
+        ...maskedMounts,
         ...readOnlyMounts,
         '--mount',
         `type=bind,src=${gitCommonDirectory},dst=${gitCommonDirectory},readonly`,

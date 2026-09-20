@@ -1,13 +1,26 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { access, realpath } from "node:fs/promises";
+import { access, readdir, realpath } from "node:fs/promises";
 import { isAbsolute } from "node:path";
 import { joinSession } from "@github/copilot-sdk/extension";
 
 const MAX_OUTPUT_BYTES = 512 * 1024;
-const READ_ONLY_WORKSPACE_PATHS = [
+const MASKED_WORKSPACE_FILES = [
   ".env",
   ".env.development",
+  ".env.development.local",
+  ".env.emulator",
+  ".env.local",
+  ".env.production",
+  ".env.production.local",
+  ".env.test",
+  ".env.test.local",
+  ".envrc",
+  ".npmrc",
+  ".yarnrc",
+  ".yarnrc.yml",
+];
+const READ_ONLY_WORKSPACE_PATHS = [
   ".git",
   ".github",
   ".gitattributes",
@@ -35,6 +48,13 @@ const READ_ONLY_WORKSPACE_PATHS = [
   "vite.config.ts",
   "vitest.config.ts",
 ];
+
+function isMaskedWorkspaceFile(path) {
+  return path.startsWith(".env") ||
+    path === ".npmrc" ||
+    path === ".yarnrc" ||
+    path === ".yarnrc.yml";
+}
 
 function requiredEnvironment(name) {
   const value = process.env[name]?.trim();
@@ -92,6 +112,14 @@ async function runIsolated(command, timeoutSeconds) {
   const name = `admin-issue-worker-${randomUUID()}`;
   const uid = process.getuid();
   const gid = process.getgid();
+  const maskedWorkspaceFiles = new Set(MASKED_WORKSPACE_FILES);
+  for (const entry of await readdir(workspace)) {
+    if (isMaskedWorkspaceFile(entry)) maskedWorkspaceFiles.add(entry);
+  }
+  const maskedMounts = [...maskedWorkspaceFiles].flatMap((relativePath) => [
+    "--mount",
+    `type=bind,src=/dev/null,dst=/workspace/${relativePath},readonly`,
+  ]);
   const readOnlyMounts = [];
   for (const relativePath of READ_ONLY_WORKSPACE_PATHS) {
     const source = `${workspace}/${relativePath}`;
@@ -133,6 +161,7 @@ async function runIsolated(command, timeoutSeconds) {
     "/workspace",
     "--mount",
     `type=bind,src=${workspace},dst=/workspace`,
+    ...maskedMounts,
     ...readOnlyMounts,
     "--mount",
     `type=bind,src=${gitCommonDirectory},dst=${gitCommonDirectory},readonly`,
@@ -142,6 +171,8 @@ async function runIsolated(command, timeoutSeconds) {
     `/home/worker:rw,nosuid,nodev,size=128m,uid=${uid},gid=${gid}`,
     "--tmpfs",
     `/workspace/node_modules/.vite-temp:rw,nosuid,nodev,size=256m,uid=${uid},gid=${gid}`,
+    "--tmpfs",
+    `/workspace/.cache:rw,nosuid,nodev,size=256m,uid=${uid},gid=${gid}`,
     "--env",
     "CI=1",
     "--env",
