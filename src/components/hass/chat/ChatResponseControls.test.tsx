@@ -78,6 +78,31 @@ describe('ChatResponseControls', () => {
     expect(active.sendControl).toHaveBeenNthCalledWith(2, 'fixture-brightness', 'Turn the Front Left in the Living Room to 40%.', 'fixture-result')
   })
 
+  it('keeps structured long-target color continuations within the message limit', () => {
+    const control: ChatResponseControl = {
+      id: 'long-color',
+      kind: 'color-picker',
+      room: 'Music Room',
+      rooms: ['Music Room'],
+      subject: 'selected Music Room lights',
+      palette: ['warm white'],
+      supportsCustomRgb: true,
+      colorMode: 'rgb',
+      entityIds: [],
+      minTemperatureKelvin: 2000,
+      maxTemperatureKelvin: 6500,
+    }
+    const active = client()
+    render(<ChatResponseControls client={active} controls={[control]} ownerResultId="long-result" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Send Color' }))
+    expect(active.sendControl).toHaveBeenCalledWith(
+      'long-color',
+      'Turn the selected Music Room lights to warm white.',
+      'long-result',
+    )
+    expect((active.sendControl as ReturnType<typeof vi.fn>).mock.calls[0][1].length).toBeLessThanOrEqual(180)
+  })
+
   it('keeps color and brightness inputs adjustable after their send action is locked', () => {
     const controls: ChatResponseControl[] = [
       { id: 'color-one', kind: 'color-picker', room: 'Music Room', rooms: ['Music Room'], palette: ['red', 'blue'], supportsCustomRgb: true, colorMode: 'rgb', entityIds: [], minTemperatureKelvin: 2000, maxTemperatureKelvin: 6500 },

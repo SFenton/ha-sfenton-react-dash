@@ -28,6 +28,8 @@ export interface ChatSkillContext {
   roomId: string | null
   entityIds: string[]
   lightNames: string[]
+  roomIds?: string[]
+  roomLightNames?: Record<string, string[]>
   lastAction?: 'on' | 'off' | 'up' | 'down' | 'brightness' | 'color' | 'state' | 'count' | 'list' | 'rooms-on' | 'lights-on' | 'color-state' | 'brightness-state' | 'history' | 'reason' | 'pbl' | 'pbl-rules' | 'set'
   lastState?: 'on' | 'off' | 'mixed' | 'unavailable'
   targetState?: LightPolarity
@@ -129,6 +131,20 @@ function parseSkillContext(value: unknown): ChatSkillContext | null {
   const entityIds = stringArray(value.entityIds)
   const lightNames = stringArray(value.lightNames)
   if (!entityIds || !lightNames) return null
+  const roomIds = value.roomIds === undefined ? undefined : stringArray(value.roomIds, 20)
+  if (value.roomIds !== undefined && (!roomIds || new Set(roomIds).size !== roomIds.length)) return null
+  let roomLightNames: Record<string, string[]> | undefined
+  if (value.roomLightNames !== undefined) {
+    if (!object(value.roomLightNames) || !roomIds?.length) return null
+    roomLightNames = {}
+    for (const [roomId, names] of Object.entries(value.roomLightNames)) {
+      const parsedNames = stringArray(names)
+      if (!roomIds.includes(roomId) || !parsedNames?.length || new Set(parsedNames).size !== parsedNames.length) return null
+      roomLightNames[roomId] = parsedNames
+    }
+    if (!Object.keys(roomLightNames).length) return null
+  }
+  if (value.roomId !== null && (roomIds?.length || roomLightNames)) return null
   const lastAction = typeof value.lastAction === 'string' && /^(?:on|off|up|down|brightness|color|state|count|list|rooms-on|lights-on|color-state|brightness-state|history|reason|pbl|pbl-rules|set)$/.test(value.lastAction)
     ? value.lastAction : undefined
   const lastState = typeof value.lastState === 'string' && /^(?:on|off|mixed|unavailable)$/.test(value.lastState)
@@ -141,6 +157,8 @@ function parseSkillContext(value: unknown): ChatSkillContext | null {
     roomId: value.roomId,
     entityIds,
     lightNames,
+    ...(roomIds?.length ? { roomIds } : {}),
+    ...(roomLightNames && Object.keys(roomLightNames).length ? { roomLightNames } : {}),
     ...(lastAction ? { lastAction } : {}),
     ...(lastState ? { lastState } : {}),
     ...(requestedPolarity ? { targetState: requestedPolarity } : {}),
@@ -319,6 +337,8 @@ export function visibleChatHistoryThreads(threads: readonly ChatThread[], now: n
 
 export function chatImprovementConversation(thread: ChatThread): ChatImprovementConversation | null {
   if (!thread.turns.length || thread.turns.some((turn) => !turn.result || turn.state !== 'answered')) return null
+  const contextsByResultId = new Map(thread.turns.flatMap((turn) =>
+    turn.result ? [[turn.result.id, turn.result.skillContext ?? null] as const] : []))
   return {
     version: 1,
     threadId: thread.record.id,
@@ -335,7 +355,9 @@ export function chatImprovementConversation(thread: ChatThread): ChatImprovement
         : turn.result?.response ?? 'empty',
       parsedAsLights: turn.result?.skillContext?.domain === 'lights',
       handledByHomeMcp: turn.result?.handledByHomeMcp === true,
-      contextBefore: index > 0 ? thread.turns[index - 1].result?.skillContext ?? null : null,
+      contextBefore: turn.request.sourceResultId
+        ? contextsByResultId.get(turn.request.sourceResultId) ?? null
+        : index > 0 ? thread.turns[index - 1].result?.skillContext ?? null : null,
       contextAfter: turn.result?.skillContext ?? null,
     })),
   }

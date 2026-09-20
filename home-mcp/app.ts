@@ -14,6 +14,7 @@ import {
   parseLightUtterance,
   SINGLE_ROOM_DETAIL_RESPONSE,
   type LightAction,
+  type LightContext,
   type LightOperation,
   type LightSkillResponse,
 } from './light-skill'
@@ -133,6 +134,7 @@ interface LightOperationResult {
   unsupported?: boolean
   history?: unknown
   logbook?: unknown
+  logbookUnavailable?: boolean
   resultingBrightness?: number[]
 }
 
@@ -327,19 +329,55 @@ export function validateLightPlanForExecution(plan: LightSkillResponse) {
       context: null,
     })
   }
+  if (canonicalOperations.length > 1
+    && readActions.size === 1
+    && new Set(canonicalOperations.map((operation) => operation.room.id)).size !== canonicalOperations.length) {
+    return responseWithContext({
+      status: 'unsupported',
+      text: 'Combine fixtures from the same room into one light query.',
+      controls: [],
+      context: null,
+    })
+  }
+  const requestedContext = canonicalizeLightContext(plan.context)
   const last = canonicalOperations.at(-1)!
   const contextAction = globalRead ? last.action : null
+  const selectedRoomIds = requestedContext?.roomLightNames
+    ? Object.keys(requestedContext.roomLightNames)
+    : []
+  const preserveMultiContext = Boolean(requestedContext?.roomIds?.length && requestedContext.roomLightNames
+    && canonicalOperations.length === selectedRoomIds.length
+    && new Set(canonicalOperations.map((operation) => operation.room.id)).size === selectedRoomIds.length
+    && canonicalOperations.every((operation) => {
+      const expectedNames = requestedContext.roomLightNames?.[operation.room.id]
+      const actualNames = operation.lightNames.length
+        ? operation.lightNames
+        : operation.room.lights.map((light) => light.name)
+      return expectedNames && expectedNames.length === actualNames.length
+        && expectedNames.every((name) => actualNames.includes(name))
+    })
+    && selectedRoomIds.every((roomId) => canonicalOperations.some((operation) => operation.room.id === roomId)))
+  const context: LightContext = preserveMultiContext
+    ? {
+        ...requestedContext!,
+        lastAction: last.action,
+      }
+    : {
+        domain: 'lights',
+        roomId: contextAction ? null : last.room.id,
+        entityIds: contextAction ? [] : last.entityIds,
+        lightNames: contextAction ? [] : last.lightNames,
+        lastAction: contextAction ?? last.action,
+        ...(!contextAction && last.targetState ? { targetState: last.targetState } : {}),
+      }
+  if (!READ_LIGHT_ACTIONS.has(last.action)) {
+    delete context.targetState
+    delete context.historyBefore
+  }
   return {
     ...plan,
     operations: canonicalOperations,
-    context: {
-      domain: 'lights' as const,
-      roomId: contextAction ? null : last.room.id,
-      entityIds: contextAction ? [] : last.entityIds,
-      lightNames: contextAction ? [] : last.lightNames,
-      lastAction: contextAction ?? last.action,
-      ...(!contextAction && last.targetState ? { targetState: last.targetState } : {}),
-    },
+    context,
   }
 }
 
@@ -385,11 +423,12 @@ async function executeLightOperation(fetchImpl: typeof fetch, hassUrl: string, t
     const query = new URLSearchParams({ filter_entity_id: targets.join(','), minimal_response: '', no_attributes: '', end_time: end })
     const history = await hassRequest(fetchImpl, hassUrl, token, `/api/history/period/${encodeURIComponent(start)}?${query}`)
     let logbook: unknown = null
+    let logbookUnavailable = false
     if (operation.action === 'reason') {
       const logQuery = new URLSearchParams({ entity: targets.join(','), end_time: end })
-      try { logbook = await hassRequest(fetchImpl, hassUrl, token, `/api/logbook/${encodeURIComponent(start)}?${logQuery}`) } catch { /* History remains useful without logbook enrichment. */ }
+      try { logbook = await hassRequest(fetchImpl, hassUrl, token, `/api/logbook/${encodeURIComponent(start)}?${logQuery}`) } catch { logbookUnavailable = true }
     }
-    return { operation, states: [], succeeded: targets, failed: [], history, logbook }
+    return { operation, states: [], succeeded: targets, failed: [], history, logbook, logbookUnavailable }
   }
 
   const before = await readStates(fetchImpl, hassUrl, token, targets)
@@ -489,7 +528,17 @@ function operationSuccessText(operation: LightOperation, resultingBrightness?: n
   return `I turned the ${selected}${roomSuffix} to ${values[0]}%.`
 }
 
-function roomStateText(summaries: Array<{ room: string; state: 'on' | 'off' | 'mixed' | 'unavailable' }>) {
+function roomStateText(summaries: Array<{
+  room: string
+  lightNames: string[]
+  fixtureStates: Array<{ name: string; state: 'on' | 'off' | 'unavailable' }>
+  state: 'on' | 'off' | 'mixed' | 'unavailable'
+}>) {
+  if (summaries.some((summary) => summary.lightNames.length)) {
+    return `${summaries.flatMap((summary) => summary.fixtureStates.length
+      ? summary.fixtureStates.map((fixture) => `${fixture.name} in the ${summary.room} is ${fixture.state}`)
+      : [`${summary.room} lights are ${summary.state === 'mixed' ? 'partly on' : summary.state}`]).join('; ')}.`
+  }
   const groups = new Map<string, string[]>()
   for (const summary of summaries) {
     const label = summary.state === 'mixed' ? 'partly on' : summary.state
@@ -507,6 +556,30 @@ function roomStateText(summaries: Array<{ room: string; state: 'on' | 'off' | 'm
 
 function unavailableText(room: string, subject = 'lights') {
   return `I could not read the ${room} ${subject} from Home Assistant.`
+}
+
+function roomOverviewText(activeRooms: string[], uncertainRooms: string[]) {
+  const activeText = activeRooms.length === 1
+    ? `The ${activeRooms[0]} lights are on.`
+    : activeRooms.length > 1
+      ? `These rooms have lights on:\n${activeRooms.map((room) => `• ${room}`).join('\n')}`
+      : 'No readable configured rooms have lights on.'
+  const uncertainty = uncertainRooms.length
+    ? `\n\n${formatNames(uncertainRooms)} could not be fully checked because some light states could not be read.`
+    : ''
+  const followUp = activeRooms.length === 1
+    ? `\n\nWould you like to know more about the ${activeRooms[0]}?`
+    : activeRooms.length > 1
+      ? '\n\nWould you like to know more about a particular room?'
+      : ''
+  return `${activeText}${uncertainty}${followUp}`
+}
+
+function roomDetailFollowUpText(canChangeColor: boolean) {
+  const actions = canChangeColor
+    ? 'when these lights last turned on, change their color, turn them off, or tell you why they are on'
+    : 'when these lights last turned on, turn them off, or tell you why they are on'
+  return `I can tell you ${actions}. What would you like to do next?`
 }
 
 function operationRetryMessage(operation: LightOperation) {
@@ -628,45 +701,41 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
   const failures = results.flatMap((result) => result.failed)
   const successes = results.flatMap((result) => result.succeeded)
   const first = results[0]
-  if (first.operation.action === 'lights-on') {
+  if (first.operation.action === 'lights-on' || first.operation.action === 'rooms-on') {
     const active = results.flatMap((result) => {
-      const names = result.states.filter((state) => state.state === 'on').map((state) =>
+      const onStates = result.states.filter((state) => state.state === 'on')
+      const names = onStates.map((state) =>
         result.operation.room.lights.find((light) => light.entityId === state.entity_id)?.name ?? state.entity_id)
-      return names.length ? [{ room: result.operation.room.name, names }] : []
+      return names.length ? [{
+        roomId: result.operation.room.id,
+        room: result.operation.room.name,
+        names,
+        entityIds: onStates.map((state) => state.entity_id),
+      }] : []
     })
-    const unavailableCount = results.reduce((count, result) =>
-      count + result.states.filter((state) => !readableState(state)).length, 0)
-    const clauses = active.map(({ room, names }) =>
-      `${formatNames(names)} ${names.length === 1 ? 'is' : 'are'} on in the ${room}.`)
-    const availableText = clauses.length ? clauses.join(' ') : 'No readable configured lights are on.'
-    const text = unavailableCount
-      ? `${availableText} I could not read ${unavailableCount} ${unavailableCount === 1 ? 'other light' : 'other lights'}.`
-      : availableText
-    return responseWithContext({
-      status: 'answer',
-      text,
-      controls: [],
-      context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [], lastAction: 'lights-on' },
-      data: { lights: active, unavailableCount },
-    })
-  }
-  if (first.operation.action === 'rooms-on') {
-    const activeRooms = results.filter((result) => result.states.some((state) => state.state === 'on')).map((result) => result.operation.room.name)
     const uncertainRooms = results.filter((result) =>
       !result.states.some((state) => state.state === 'on')
       && result.states.some((state) => !readableState(state))).map((result) => result.operation.room.name)
-    const availableText = activeRooms.length
-      ? `${formatNames(activeRooms)} ${activeRooms.length === 1 ? 'has' : 'have'} lights on.`
-      : 'No readable configured rooms have lights on.'
-    const text = uncertainRooms.length
-      ? `${availableText} ${formatNames(uncertainRooms)} could not be fully checked because some light states could not be read. Try again.`
-      : availableText
+    const activeRoomNames = active.map((room) => room.room)
     return responseWithContext({
       status: 'answer',
-      text,
+      text: roomOverviewText(activeRoomNames, uncertainRooms),
       controls: [],
-      context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [], lastAction: 'rooms-on' },
-      data: { rooms: activeRooms, uncertainRooms },
+      context: {
+        domain: 'lights',
+        roomId: null,
+        entityIds: [],
+        lightNames: [],
+        ...(active.length ? {
+          roomIds: active.map((room) => room.roomId),
+        } : {}),
+        lastAction: first.operation.action,
+      },
+      data: {
+        rooms: active,
+        uncertainRooms,
+        ...(first.operation.action === 'lights-on' ? { lights: active } : {}),
+      },
     })
   }
   if (first.operation.action === 'state') {
@@ -676,12 +745,26 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
       return {
         operation: result.operation,
         room: result.operation.room.name,
+        lightNames: result.operation.lightNames,
+        fixtureStates: result.operation.lightNames.map((name, index) => {
+          const state = result.states.find((candidate) => candidate.entity_id === result.operation.entityIds[index])
+          const fixtureState: 'on' | 'off' | 'unavailable' =
+            state && readableState(state) && (state.state === 'on' || state.state === 'off')
+              ? state.state
+              : 'unavailable'
+          return {
+            name,
+            state: fixtureState,
+          }
+        }),
         state: available < result.states.length ? 'unavailable' as const : on === 0 ? 'off' as const : on === available ? 'on' as const : 'mixed' as const,
       }
     })
     const single = summaries[0]
     const text = summaries.length === 1
-      ? single.state === 'unavailable' ? unavailableText(single.room)
+      ? single.lightNames.length && (single.state === 'mixed' || single.state === 'unavailable')
+        ? roomStateText([single])
+        : single.state === 'unavailable' ? unavailableText(single.room)
         : single.state === 'mixed' ? `Some ${single.room} lights are on and some are off.`
           : (() => {
               const subject = single.operation.lightNames.length
@@ -694,14 +777,88 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
       : roomStateText(summaries)
     const context = summaries.length === 1
       ? { ...plan.context!, lastAction: 'state' as const, lastState: summaries[0].state }
-      : { domain: 'lights' as const, roomId: null, entityIds: [], lightNames: [], lastAction: 'state' as const }
+      : (() => {
+          const targetStates = new Set(summaries.map((summary) => summary.operation.targetState).filter(Boolean))
+          const observedState = summaries.some((summary) => summary.state === 'unavailable')
+            ? 'unavailable' as const
+            : summaries.every((summary) => summary.state === 'on')
+              ? 'on' as const
+              : summaries.every((summary) => summary.state === 'off')
+                ? 'off' as const
+                : 'mixed' as const
+          const allFixtureScoped = summaries.every((summary) => summary.lightNames.length)
+          return {
+            domain: 'lights' as const,
+            roomId: null,
+            entityIds: [],
+            lightNames: [],
+            roomIds: summaries.map((summary) => summary.operation.room.id),
+            ...(allFixtureScoped ? {
+              roomLightNames: Object.fromEntries(summaries
+                .map((summary) => [summary.operation.room.id, summary.lightNames])),
+            } : {}),
+            lastAction: 'state' as const,
+            lastState: observedState,
+            ...(targetStates.size === 1 ? { targetState: [...targetStates][0] as 'on' | 'off' } : {}),
+          }
+        })()
     return responseWithContext({ status: 'answer', text, controls: [], context, data: { states: results.map((result) => result.states) } })
   }
   if (first.operation.action === 'count' || first.operation.action === 'list') {
+    if (first.operation.action === 'list' && plan.data?.queryMode === 'lights-on-detail') {
+      const summaries = results.map((result, index) => {
+        const available = result.states.filter(readableState)
+        const onStates = available.filter((state) => state.state === 'on')
+        const names = onStates.map((state) =>
+          result.operation.room.lights.find((light) => light.entityId === state.entity_id)?.name ?? state.entity_id)
+        const unavailableCount = result.states.length - available.length
+        const heading = results.length > 1 && index === results.length - 1 ? 'And these' : 'These'
+        const base = names.length
+          ? `${heading} lights are on in the ${result.operation.room.name}:\n${names.map((name) => `• ${name}`).join('\n')}`
+          : unavailableCount
+            ? `I could not fully check the ${result.operation.room.name} lights.`
+            : `No ${result.operation.room.name} lights are on.`
+        const text = names.length && unavailableCount
+          ? `${base}\nI could not read ${unavailableCount} other ${unavailableCount === 1 ? 'light' : 'lights'} in the ${result.operation.room.name}. This list may be incomplete.`
+          : base
+        return {
+          roomId: result.operation.room.id,
+          room: result.operation.room.name,
+          names,
+          entityIds: onStates.map((state) => state.entity_id),
+          text,
+          unavailableCount,
+        }
+      })
+      const active = summaries.filter((summary) => summary.names.length)
+      const context = {
+        domain: 'lights' as const,
+        roomId: null,
+        entityIds: [],
+        lightNames: [],
+        roomIds: summaries.map((summary) => summary.roomId),
+        ...(active.length ? {
+          roomLightNames: Object.fromEntries(active.map((summary) => [summary.roomId, summary.names])),
+        } : {}),
+        lastAction: 'list' as const,
+        lastState: active.length
+          ? 'on' as const
+          : summaries.some((summary) => summary.unavailableCount) ? 'unavailable' as const : 'off' as const,
+      }
+      return responseWithContext({
+        status: 'answer',
+        text: `${summaries.map((summary) => summary.text).join('\n\n')}${active.length ? `\n\n${roomDetailFollowUpText(active.every((summary) =>
+          HOUSE_LIGHT_ROOMS.find((room) => room.id === summary.roomId)?.color !== 'none'))}` : ''}`,
+        controls: [],
+        context,
+        data: { queryMode: 'lights-on-detail', rooms: summaries },
+      })
+    }
     if (first.operation.action === 'list' && results.length > 1) {
       const summaries = results.map((result) => {
         const available = result.states.filter(readableState)
         if (!available.length) return {
+          roomId: result.operation.room.id,
           room: result.operation.room.name,
           names: [] as string[],
           text: unavailableText(result.operation.room.name),
@@ -723,6 +880,7 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
               ? `No readable ${result.operation.room.name} lights are on.`
               : `No ${result.operation.room.name} lights are on.`
         return {
+          roomId: result.operation.room.id,
           room: result.operation.room.name,
           names,
           text: unavailableCount
@@ -731,17 +889,53 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
           unavailableCount,
         }
       })
+      const allFixtureScoped = results.every((result) => result.operation.lightNames.length)
+      const totalAvailable = results.reduce((total, result) => total + result.states.filter(readableState).length, 0)
+      const totalOn = summaries.reduce((total, summary) => total + summary.names.length, 0)
       return responseWithContext({
         status: 'answer',
         text: summaries.map((summary) => summary.text).join(' '),
         controls: [],
-        context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [], lastAction: 'list' },
+        context: {
+          domain: 'lights',
+          roomId: null,
+          entityIds: [],
+          lightNames: [],
+          roomIds: summaries.map((summary) => summary.roomId),
+          ...(allFixtureScoped ? {
+            roomLightNames: Object.fromEntries(results.map((result) => [
+              result.operation.room.id,
+              result.operation.lightNames,
+            ])),
+          } : {}),
+          lastAction: 'list',
+          lastState: summaries.some((summary) => summary.unavailableCount)
+            ? 'unavailable'
+            : totalOn === 0 ? 'off' : totalOn === totalAvailable ? 'on' : 'mixed',
+        },
         data: { rooms: summaries },
       })
     }
     const available = first.states.filter(readableState)
     if (!available.length) {
-      return responseWithContext({ status: 'answer', text: unavailableText(first.operation.room.name), controls: [], context: { ...plan.context!, lastAction: first.operation.action, lastState: 'unavailable' }, data: { states: first.states } })
+      const selectedSubject = first.operation.lightNames.length
+        ? `${formatNames(first.operation.lightNames)} in the ${first.operation.room.name}`
+        : `${first.operation.room.name} lights`
+      const context = first.operation.action === 'list'
+        ? {
+            domain: 'lights' as const,
+            roomId: null,
+            entityIds: [],
+            lightNames: [],
+            roomIds: [first.operation.room.id],
+            ...(first.operation.lightNames.length ? {
+              roomLightNames: { [first.operation.room.id]: first.operation.lightNames },
+            } : {}),
+            lastAction: 'list' as const,
+            lastState: 'unavailable' as const,
+          }
+        : { ...plan.context!, lastAction: first.operation.action, lastState: 'unavailable' as const }
+      return responseWithContext({ status: 'answer', text: `I could not read the ${selectedSubject} from Home Assistant.`, controls: [], context, data: { states: first.states } })
     }
     const onStates = available.filter((state) => state.state === 'on')
     const names = onStates.map((state) => first.operation.room.lights.find((light) => light.entityId === state.entity_id)?.name ?? state.entity_id)
@@ -758,10 +952,29 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
           ? `No readable ${first.operation.room.name} lights are on.`
           : `No ${first.operation.room.name} lights are on.`
     const text = first.operation.action === 'count'
-      ? `${onStates.length} of ${available.length} ${first.operation.room.name} lights ${onStates.length === 1 ? 'is' : 'are'} on.`
+      ? `${onStates.length} of ${available.length} ${first.operation.lightNames.length ? `selected ${first.operation.room.name}` : first.operation.room.name} lights ${onStates.length === 1 ? 'is' : 'are'} on.`
       : listText
     const completeText = unavailableCount ? `${text} I could not read ${unavailableCount} other ${unavailableCount === 1 ? 'light' : 'lights'}.` : text
-    const context = { ...plan.context!, lastAction: first.operation.action, lastState: unavailableCount ? 'unavailable' as const : onStates.length === 0 ? 'off' as const : onStates.length === available.length ? 'on' as const : 'mixed' as const }
+    const lastState = unavailableCount ? 'unavailable' as const : onStates.length === 0 ? 'off' as const : onStates.length === available.length ? 'on' as const : 'mixed' as const
+    const retainedState = first.operation.action === 'list' && !first.operation.lightNames.length && names.length
+      ? 'on' as const
+      : lastState
+    const context = first.operation.action === 'list'
+      ? {
+          domain: 'lights' as const,
+          roomId: null,
+          entityIds: [],
+          lightNames: [],
+          roomIds: [first.operation.room.id],
+          ...((first.operation.lightNames.length || names.length) ? {
+            roomLightNames: {
+              [first.operation.room.id]: first.operation.lightNames.length ? first.operation.lightNames : names,
+            },
+          } : {}),
+          lastAction: 'list' as const,
+          lastState: retainedState,
+        }
+      : { ...plan.context!, lastAction: first.operation.action, lastState: retainedState }
     return responseWithContext({ status: 'answer', text: completeText, controls: [], context, data: { states: first.states, on: names } })
   }
   if (first.operation.action === 'brightness-state') {
@@ -771,13 +984,19 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
       const brightness = brightnessFromState(state)!
       return `${name} is at ${brightness}%`
     })
-    const text = descriptions.length ? `${descriptions.join('; ')}.` : `I could not read the ${first.operation.room.name} light brightness.`
+    const subject = first.operation.lightNames.length
+      ? `${formatNames(first.operation.lightNames)} in the ${first.operation.room.name}`
+      : `${first.operation.room.name} lights`
+    const text = descriptions.length ? `${descriptions.join('; ')}.` : `I could not read the brightness of the ${subject}.`
     return responseWithContext({ status: 'answer', text, controls: [], context: { ...plan.context!, lastAction: 'brightness-state' }, data: { states: first.states } })
   }
   if (first.operation.action === 'color-state') {
     const available = first.states.filter(readableState)
+    const subject = first.operation.lightNames.length
+      ? `${formatNames(first.operation.lightNames)} in the ${first.operation.room.name}`
+      : `${first.operation.room.name} lights`
     if (!available.length) {
-      return responseWithContext({ status: 'answer', text: unavailableText(first.operation.room.name, 'light colors'), controls: [], context: { ...plan.context!, lastAction: 'color-state', lastState: 'unavailable' }, data: { states: first.states } })
+      return responseWithContext({ status: 'answer', text: `I could not read the colors of the ${subject}.`, controls: [], context: { ...plan.context!, lastAction: 'color-state', lastState: 'unavailable' }, data: { states: first.states } })
     }
     const onStates = first.states.filter((state) => state.state === 'on')
     const describe = (state: HassState) => {
@@ -789,7 +1008,9 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
     }
     const unavailableCount = first.states.length - available.length
     const text = !onStates.length
-      ? unavailableCount ? `The available ${first.operation.room.name} lights are off.` : `The ${first.operation.room.name} lights are off.`
+      ? unavailableCount
+        ? `The available ${subject} ${first.operation.lightNames.length === 1 ? 'is' : 'are'} off.`
+        : `The ${subject} ${first.operation.lightNames.length === 1 ? 'is' : 'are'} off.`
       : `${onStates.map(describe).join('; ')}.`
     const completeText = unavailableCount ? `${text} I could not read ${unavailableCount} other ${unavailableCount === 1 ? 'light' : 'lights'}.` : text
     return responseWithContext({ status: 'answer', text: completeText, controls: [], context: { ...plan.context!, lastAction: 'color-state' }, data: { states: first.states } })
@@ -808,43 +1029,108 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
     return responseWithContext({ status: 'answer', text, controls: [], context: { ...plan.context!, lastAction: 'pbl', lastState: active ? 'on' : 'off' }, data: { state: first.states[0] } })
   }
   if (first.operation.action === 'history') {
-    const groups = Array.isArray(first.history) ? first.history as Array<Array<{ state?: string; last_changed?: string }>> : []
+    const groups = Array.isArray(first.history) ? first.history as Array<Array<{ entity_id?: string; state?: string; last_changed?: string }>> : []
     const desiredState = first.operation.targetState ?? 'off'
-    const latest = groups.flat().filter((state) => state.state === desiredState && state.last_changed).sort((a, b) => String(b.last_changed).localeCompare(String(a.last_changed)))[0]
+    const targets = operationTargets(first.operation)
+    const events = targets.map((entityId, index) => {
+      const group = groups.find((candidate) => candidate.some((state) => state.entity_id === entityId))
+        ?? (groups.length === targets.length ? groups[index] : targets.length === 1 ? groups[0] : [])
+      const latest = group.filter((state) => state.state === desiredState && state.last_changed)
+        .sort((a, b) => String(b.last_changed).localeCompare(String(a.last_changed)))[0]
+      const name = first.operation.room.lights.find((light) => light.entityId === entityId)?.name
+        ?? first.operation.lightNames[index] ?? entityId
+      return { name, lastChanged: latest?.last_changed }
+    })
     const subject = first.operation.lightNames.length
       ? `${formatNames(first.operation.lightNames)} in the ${first.operation.room.name}`
       : `${first.operation.room.name} lights`
-    const text = latest?.last_changed
-      ? `The ${subject} last turned ${desiredState} at ${new Date(latest.last_changed).toLocaleString('en-US')}.`
-      : `I couldn’t find a ${desiredState} event for the ${subject} in that history window.`
+    const text = events.length === 1
+      ? events[0].lastChanged
+        ? `The ${subject} last turned ${desiredState} at ${new Date(events[0].lastChanged).toLocaleString('en-US')}.`
+        : `I couldn’t find a ${desiredState} event for the ${subject} in that history window.`
+      : `The selected ${first.operation.room.name} lights last turned ${desiredState} at:\n${events.map((event) =>
+          `• ${event.name}: ${event.lastChanged ? new Date(event.lastChanged).toLocaleString('en-US') : `no ${desiredState} event found`}`).join('\n')}`
+    const historyContext = { ...plan.context! }
+    delete historyContext.historyBefore
     return responseWithContext({
       status: 'answer',
       text,
       controls: [],
-      context: { ...plan.context!, lastAction: 'history', targetState: desiredState, historyBefore: latest?.last_changed },
+      context: {
+        ...historyContext,
+        lastAction: 'history',
+        targetState: desiredState,
+        ...(events.length === 1 && events[0].lastChanged ? { historyBefore: events[0].lastChanged } : {}),
+      },
       data: { history: first.history },
     })
   }
   if (first.operation.action === 'reason') {
     const desiredState = first.operation.targetState ?? 'on'
     const entries = Array.isArray(first.logbook) ? first.logbook as Array<Record<string, unknown>> : []
-    const evidence = entries.find((entry) => entry.state === desiredState || String(entry.message ?? '').toLowerCase().includes(`turned ${desiredState}`))
-    const source = typeof evidence?.name === 'string' ? evidence.name : typeof evidence?.message === 'string' ? evidence.message : null
+    const targets = operationTargets(first.operation)
+    const logbookTime = (entry: Record<string, unknown>) => typeof entry.when === 'number'
+      ? entry.when
+      : typeof entry.when === 'string' && !Number.isNaN(Date.parse(entry.when))
+        ? Date.parse(entry.when)
+        : 0
+    const logbookSource = (entry: Record<string, unknown>) => typeof entry.context_name === 'string'
+      ? entry.context_name
+      : typeof entry.context_domain === 'string' && typeof entry.context_service === 'string'
+        ? `${entry.context_domain}.${entry.context_service}`
+        : typeof entry.context_user_id === 'string'
+          ? 'a Home Assistant user'
+          : typeof entry.context_entity_id === 'string'
+            ? entry.context_entity_id.startsWith('automation.')
+              ? 'a Home Assistant automation'
+              : entry.context_entity_id.startsWith('script.')
+                ? 'a Home Assistant script'
+                : 'another Home Assistant entity'
+            : null
+    const evidence = targets.map((entityId, index) => {
+      const matching = entries
+        .filter((entry) =>
+          (targets.length === 1 || entry.entity_id === entityId)
+          && (entry.state === desiredState || String(entry.message ?? '').toLowerCase().includes(`turned ${desiredState}`)))
+        .map((entry) => ({ entry, source: logbookSource(entry) }))
+        .filter((candidate): candidate is { entry: Record<string, unknown>; source: string } => candidate.source !== null)
+        .sort((left, right) => logbookTime(right.entry) - logbookTime(left.entry))[0]
+      const name = first.operation.room.lights.find((light) => light.entityId === entityId)?.name
+        ?? first.operation.lightNames[index] ?? entityId
+      return { name, source: matching?.source ?? null }
+    })
     const subject = first.operation.lightNames.length
       ? `${formatNames(first.operation.lightNames)} in the ${first.operation.room.name}`
       : `${first.operation.room.name} lights`
-    const text = source
-      ? `The latest Home Assistant record links the ${subject} turning ${desiredState} to ${source}.`
-      : `I can see the ${subject} history, but Home Assistant did not record a reliable cause for turning ${desiredState}.`
+    if (first.logbookUnavailable) {
+      const text = `I could read the ${subject} history, but I could not check Home Assistant’s cause records.`
+      return responseWithContext({
+        status: 'answer',
+        text,
+        controls: [],
+        context: { ...plan.context!, lastAction: 'reason', lastState: desiredState, targetState: desiredState },
+        data: { history: first.history, logbookAvailable: false, causalClaim: false },
+      })
+    }
+    const text = evidence.length === 1
+      ? evidence[0].source
+        ? `A Home Assistant record links the ${subject} turning ${desiredState} to ${evidence[0].source}.`
+        : `I can see the ${subject} history, but Home Assistant did not record a reliable cause for turning ${desiredState}.`
+      : `Home Assistant records for the selected ${first.operation.room.name} lights:\n${evidence.map((item) =>
+          `• ${item.name}: ${item.source ?? 'no reliable cause recorded'}`).join('\n')}`
     return responseWithContext({ status: 'answer', text, controls: [], context: { ...plan.context!, lastAction: 'reason', lastState: desiredState, targetState: desiredState }, data: { history: first.history, logbook: first.logbook, causalClaim: false } })
   }
   if (!successes.length) {
     const text = 'I was unable to complete the requested light changes. Would you like me to try again?'
-    return responseWithContext({ status: 'failed', text, controls: retryControls(results), context: plan.context, data: { failures } })
+    const context = plan.context ? { ...plan.context } : null
+    if (context) delete context.lastState
+    return responseWithContext({ status: 'failed', text, controls: retryControls(results), context, data: { failures } })
   }
   if (failures.length) {
     const text = 'Some requested light changes completed, but others did not. Would you like me to try again?'
-    return responseWithContext({ status: 'partial', text, controls: retryControls(results), context: plan.context, data: { successes, failures } })
+    const context = plan.context ? { ...plan.context } : null
+    if (context) delete context.lastState
+    return responseWithContext({ status: 'partial', text, controls: retryControls(results), context, data: { successes, failures } })
   }
   const text = results.map((result) => operationSuccessText(result.operation, result.resultingBrightness)).join(' ')
   const lastResult = results.at(-1)!
@@ -865,7 +1151,18 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
         ...(last.lightNames.length ? { subject: `${formatNames(last.lightNames)} in the ${last.room.name}` } : {}),
       }]
     : []
-  return responseWithContext({ status: 'success', text, controls, context: plan.context, data: { successes } })
+  const context = plan.context ? { ...plan.context } : null
+  if (context) {
+    delete context.lastState
+    const multiContext = context.roomId === null && Boolean(context.roomIds?.length)
+    const completedStates = new Set(results.map((result) => result.operation.action))
+    if (multiContext && completedStates.size === 1 && [...completedStates].every((action) => action === 'on' || action === 'off')) {
+      context.lastState = [...completedStates][0] as 'on' | 'off'
+    } else if (!multiContext && (last.action === 'on' || last.action === 'off')) {
+      context.lastState = last.action
+    }
+  }
+  return responseWithContext({ status: 'success', text, controls, context, data: { successes } })
 }
 
 function assistantText(value: unknown) {
@@ -953,7 +1250,16 @@ async function callTool(
           }),
         })
         result = context && response && typeof response === 'object'
-          ? { ...(response as Record<string, unknown>), context }
+          ? {
+              ...(response as Record<string, unknown>),
+              context: context.lastAction === 'lights-on' || context.lastAction === 'rooms-on'
+                ? (() => {
+                    const next = { ...context }
+                    delete next.lastAction
+                    return next
+                  })()
+                : context,
+            }
           : response
       }
       if (result && typeof result === 'object' && !Array.isArray(result)) {

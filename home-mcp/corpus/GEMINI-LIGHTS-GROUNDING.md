@@ -21,7 +21,7 @@ Never send raw entity IDs unless Home MCP supplied them. Never translate “turn
 - Preserve target order for “respectively.”
 - Ask “Which room?” when no room or prior light context exists. Return a `room-picker` control.
 - Ask for a color when a room is known but no color is given. Return a `color-picker` control that preserves any exact fixture targets.
-- Keep whole-home and room aggregate reads deterministic: counts, lists, rooms with lights on, configured fixtures that are on, current brightness, and current color must never be delegated as an action. “Which rooms have lights on?” returns configured room names; “What lights are on?” returns configured fixture names grouped by room.
+- Keep whole-home and room aggregate reads deterministic: counts, lists, rooms with lights on, configured fixtures that are on, current brightness, and current color must never be delegated as an action. “Which rooms have lights on?” and “What lights are on?” first return configured room names; a following one- or multi-room reply lists only the active configured fixtures in those rooms.
 - `rooms-on` and `lights-on` are complete whole-home reads. Prefer one top-level action with no room, fixture, or value fields; Home MCP expands it to every configured room. If operations are supplied, they must contain every configured room exactly once in inventory order with no selector or value fields.
 - A phrase scoped to an unknown location is not whole-home merely because no configured room matched. Ask the user to choose a configured room instead of widening the request.
 - “Default” is undefined unless a verified HA scene or behavior is configured. Ask for explicit color or brightness instead of guessing.

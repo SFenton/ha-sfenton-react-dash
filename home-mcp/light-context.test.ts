@@ -53,4 +53,59 @@ describe('canonical light context', () => {
       lastAction: 'brightness-state',
     })
   })
+
+  it('retains canonical multi-room fixture context without entity IDs', () => {
+    expect(canonicalizeLightContext({
+      domain: 'lights',
+      roomId: null,
+      entityIds: [],
+      lightNames: [],
+      roomIds: ['living-room', 'kitchen'],
+      roomLightNames: {
+        'living-room': ['Front Left', 'Back Right'],
+        kitchen: ['Sink Light'],
+      },
+      lastAction: 'list',
+      lastState: 'on',
+    })).toEqual({
+      domain: 'lights',
+      roomId: null,
+      entityIds: [],
+      lightNames: [],
+      roomIds: ['living-room', 'kitchen'],
+      roomLightNames: {
+        'living-room': ['Front Left', 'Back Right'],
+        kitchen: ['Sink Light'],
+      },
+      lastAction: 'list',
+      lastState: 'on',
+    })
+    expect(canonicalizeLightContext({
+      domain: 'lights',
+      roomId: null,
+      entityIds: [],
+      lightNames: [],
+      roomIds: ['living-room'],
+      roomLightNames: { kitchen: ['Sink Light'] },
+    })).toBeNull()
+    expect(canonicalizeLightContext({
+      domain: 'lights',
+      roomId: null,
+      entityIds: [],
+      lightNames: [],
+      roomIds: ['living-room', 'kitchen'],
+      roomLightNames: { 'living-room': ['Front Left'] },
+    })).toMatchObject({
+      roomIds: ['living-room', 'kitchen'],
+      roomLightNames: { 'living-room': ['Front Left'] },
+    })
+    expect(canonicalizeLightContext({
+      domain: 'lights',
+      roomId: null,
+      entityIds: [],
+      lightNames: [],
+      roomIds: ['living-room'],
+      roomLightNames: { 'living-room': [] },
+    })).toBeNull()
+  })
 })

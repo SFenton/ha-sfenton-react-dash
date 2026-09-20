@@ -530,6 +530,11 @@ export class ChatClient {
       const threadRecord: ChatThreadRecord = thread?.record ?? {
         version: 1, kind: 'thread', id: this.newId(), agentId: agent.id, agentName: agent.name, createdAt: this.now(),
       }
+      const sourceResult = this.pendingControlOwnerResultId
+        ? thread?.turns.find((turn) => turn.result?.id === this.pendingControlOwnerResultId)?.result
+        : null
+      if (this.pendingControlOwnerResultId && !sourceResult) throw new ChatBlocked()
+      const sourceContext = sourceResult?.skillContext ?? null
       request = {
         version: 1, kind: 'request', id: this.newId(), threadId: threadRecord.id, createdAt: this.now(),
         parentId: thread?.turns.at(-1)?.request.id ?? null, conversationId: thread?.tail?.conversationId ?? null,
@@ -557,7 +562,7 @@ export class ChatClient {
       dispatched = true
       this.publish()
       const responsePromise = this.homeMcp
-        ? this.homeMcp.request(text, request.conversationId, thread?.tail?.skillContext ?? null, {
+        ? this.homeMcp.request(text, request.conversationId, sourceContext ?? thread?.tail?.skillContext ?? null, {
             threadId: request.threadId,
             turnId: request.id,
             ...(request.sourceControlId ? { controlId: request.sourceControlId } : {}),

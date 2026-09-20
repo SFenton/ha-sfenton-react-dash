@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { CopilotClient, ToolSet, defineTool, type SessionConfig } from '@github/copilot-sdk'
+import { canonicalizeLightContext } from '../light-context'
 import type { LightAction, LightContext } from '../light-skill'
 import { HOUSE_LIGHT_ROOMS, RGB_COLORS, WHITE_COLORS } from '../lights-config'
 import { validateLightPlanForExecution } from '../app'
@@ -22,7 +23,7 @@ const CONTROL_KINDS = new Set(['room-picker', 'color-picker', 'brightness-slider
 const UNSAFE_SUMMARY = /(?:https?:\/\/|[a-z0-9_]+\.[a-z0-9_]+|gh[opsu]_|github_pat_)/i
 const PRIVATE_DETAIL = /\b(?:medical|health|diagnosis|appointment|address|email|phone number|social security|ssn|credit card|bank account|wi-?fi|wireless network|password|passcode)\b/i
 const REGRESSION_WORDS = new Set([
-  ...`a about across active adjust again all and any are arent as at been before both brighter brighten brightness by cancel change check choose color colour configured could currently decrease default did dim dimmer do does dont down each explain for from had has have higher home house how i if in inactive increase is it its k kelvin lamp lamps latest left light lighting lights lower make many me mean never no now of off on one or overview percent pick please presence quick raise respectively rgb room rooms same set should show state status switch switched than that the their them these they those three throughout to turn two up was we were what whats when whether which white whole why would you`.split(' '),
+  ...`a about across active adjust again all and any are arent as at been before both brighter brighten brightness by cancel change check choose color colour configured could currently decrease default detail details did dim dimmer do does dont down each explain for from had has have higher home house how i if in inactive increase is it its k kelvin lamp lamps latest left light lighting lights like lower make many me mean never no now of off on one or overview percent pick please presence quick raise respectively rgb room rooms same set should show state status switch switched than that the their them these they those three throughout to turn two up was we were what whats when whether which white whole why would you`.split(' '),
   ...HOUSE_LIGHT_ROOMS.flatMap((room) => [
     room.id, room.name, ...room.aliases,
     ...room.lights.flatMap((light) => [light.name, ...(light.aliases ?? [])]),
@@ -91,37 +92,14 @@ function analysisContext(value: unknown): LightContext | null {
     || !Array.isArray(value.lightNames) || !value.lightNames.every((item) => typeof item === 'string')) {
     throw new Error('Copilot returned an invalid light context')
   }
-  const room = value.roomId === null ? null : HOUSE_LIGHT_ROOMS.find((candidate) => candidate.id === value.roomId)
-  if (value.roomId !== null && !room) throw new Error('Copilot returned an unknown light context room')
-  const lightNames = value.lightNames.map(String)
-  if (lightNames.length && (!room || lightNames.some((name) => !room.lights.some((light) => light.name === name)))) {
-    throw new Error('Copilot returned unknown light context targets')
-  }
-  if (value.lastAction !== undefined && (typeof value.lastAction !== 'string' || !LIGHT_ACTIONS.has(value.lastAction as LightAction))) {
-    throw new Error('Copilot returned an invalid light context action')
-  }
-  if (value.lastState !== undefined && !['on', 'off', 'mixed', 'unavailable'].includes(String(value.lastState))) {
-    throw new Error('Copilot returned an invalid light context state')
-  }
-  if (value.targetState !== undefined && value.targetState !== 'on' && value.targetState !== 'off') {
-    throw new Error('Copilot returned an invalid light context target state')
-  }
   if (value.historyBefore !== undefined && (
     typeof value.historyBefore !== 'string'
     || Number.isNaN(Date.parse(value.historyBefore))
     || !safeAnalysisText(value.historyBefore)
   )) throw new Error('Copilot returned an invalid light history boundary')
-  return {
-    domain: 'lights',
-    roomId: value.roomId,
-    entityIds: [],
-    lightNames,
-    ...(typeof value.lastAction === 'string' ? { lastAction: value.lastAction as LightAction } : {}),
-    ...(value.lastState === 'on' || value.lastState === 'off' || value.lastState === 'mixed' || value.lastState === 'unavailable'
-      ? { lastState: value.lastState } : {}),
-    ...(value.targetState === 'on' || value.targetState === 'off' ? { targetState: value.targetState } : {}),
-    ...(typeof value.historyBefore === 'string' ? { historyBefore: value.historyBefore } : {}),
-  }
+  const context = canonicalizeLightContext(value, { retainEntityIds: false })
+  if (!context) throw new Error('Copilot returned an invalid light context')
+  return context
 }
 
 export function parseImprovementAnalysis(content: string, job: ImprovementJob): ImprovementAnalysis {
@@ -355,7 +333,7 @@ export function improvementAnalysisPrompt(job: ImprovementJob) {
   return `Determine whether the assistant met the user's light-control or light-query needs. Infer the intended behavior when it did not. Use only the supplied transcript, routing provenance, light context, and configured inventory.
 
 Return exactly:
-{"version":1,"outcome":"met-needs"|"needs-improvement","inferredIntent":"plain English","issues":["plain English"],"summary":["one to three nontechnical release bullets"],"regressions":[{"turnIndex":0,"input":"new generalized regression utterance","context":null|{"domain":"lights","roomId":string|null,"entityIds":[],"lightNames":string[],"lastAction"?:string,"lastState"?:string,"targetState"?:"on"|"off","historyBefore"?:string},"status":"ready"|"clarify"|"unsupported","operations":[{"action":string,"roomId":string,"lightNames":string[],"brightnessPct":number|number[]|null,"rgbColor":[number,number,number]|null,"colorName":string|null,"colorTemperatureKelvin":number|null,"historyBefore":string|null,"targetState":"on"|"off"|null}],"controlKinds":string[],"textIncludes":[]}]}
+{"version":1,"outcome":"met-needs"|"needs-improvement","inferredIntent":"plain English","issues":["plain English"],"summary":["one to three nontechnical release bullets"],"regressions":[{"turnIndex":0,"input":"new generalized regression utterance","context":null|{"domain":"lights","roomId":string|null,"entityIds":[],"lightNames":string[],"roomIds"?:string[],"roomLightNames"?:object,"lastAction"?:string,"lastState"?:string,"targetState"?:"on"|"off","historyBefore"?:string},"status":"ready"|"clarify"|"unsupported","operations":[{"action":string,"roomId":string,"lightNames":string[],"brightnessPct":number|number[]|null,"rgbColor":[number,number,number]|null,"colorName":string|null,"colorTemperatureKelvin":number|null,"historyBefore":string|null,"targetState":"on"|"off"|null}],"controlKinds":string[],"textIncludes":[]}]}
 
 Rules:
 - If every user request was satisfied clearly and consistently, use outcome "met-needs" and an empty regressions array.

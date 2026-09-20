@@ -273,6 +273,75 @@ describe('Copilot improvement analysis', () => {
     }), job)).toThrow(/invalid expected brightness/)
   })
 
+  it('accepts canonical multi-room light context for conversational regressions', () => {
+    const result = parseImprovementAnalysis(JSON.stringify({
+      version: 1,
+      outcome: 'needs-improvement',
+      inferredIntent: 'List lights for the selected rooms.',
+      issues: ['The assistant did not continue from the whole-home room summary.'],
+      summary: ['Continues from room summaries into exact light details.'],
+      regressions: [{
+        turnIndex: 0,
+        input: 'Living Room and Kitchen',
+        context: {
+          domain: 'lights',
+          roomId: null,
+          entityIds: [],
+          lightNames: [],
+          roomIds: ['living-room', 'kitchen'],
+          roomLightNames: {
+            'living-room': ['Front Left'],
+            kitchen: ['Sink Light'],
+          },
+          lastAction: 'list',
+        },
+        status: 'ready',
+        operations: [
+          operation({ action: 'list', roomId: 'living-room', lightNames: [] }),
+          operation({ action: 'list', roomId: 'kitchen', lightNames: [] }),
+        ],
+        controlKinds: [],
+        textIncludes: [],
+      }],
+    }), job)
+
+    expect(result.regressions[0].context).toMatchObject({
+      roomIds: ['living-room', 'kitchen'],
+      roomLightNames: {
+        'living-room': ['Front Left'],
+        kitchen: ['Sink Light'],
+      },
+    })
+  })
+
+  it('accepts room-detail regression wording', () => {
+    const result = parseImprovementAnalysis(JSON.stringify({
+      version: 1,
+      outcome: 'needs-improvement',
+      inferredIntent: 'Show the active lights in the Living Room.',
+      issues: ['The assistant did not continue into room details.'],
+      summary: ['Understands requests for room details.'],
+      regressions: [{
+        turnIndex: 0,
+        input: 'I would like details for Living Room',
+        context: {
+          domain: 'lights',
+          roomId: null,
+          entityIds: [],
+          lightNames: [],
+          roomIds: ['living-room'],
+          lastAction: 'lights-on',
+        },
+        status: 'ready',
+        operations: [operation({ action: 'list', roomId: 'living-room' })],
+        controlKinds: [],
+        textIncludes: [],
+      }],
+    }), job)
+
+    expect(result.regressions[0].input).toBe('I would like details for Living Room')
+  })
+
   it('accepts fully specified custom RGB and Kelvin expectations', () => {
     const base = {
       version: 1,

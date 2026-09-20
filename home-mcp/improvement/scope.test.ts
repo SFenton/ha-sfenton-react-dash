@@ -90,6 +90,76 @@ describe('conversation improvement privacy and scope', () => {
     expect(JSON.stringify(conversation)).not.toContain('private medical appointment')
   })
 
+  it('retains configured multi-room fixture names without backend IDs', () => {
+    const conversation = normalizeImprovementConversation({
+      version: 1,
+      threadId: 'thread-multi-room',
+      userScope: 'stable-user',
+      createdAt: 1,
+      updatedAt: 2,
+      turns: [{
+        id: 'turn-multi-room',
+        createdAt: 2,
+        userText: 'Turn them off.',
+        assistantText: 'I turned them off.',
+        outcome: 'answer',
+        handledByHomeMcp: true,
+        contextBefore: {
+          domain: 'lights',
+          roomId: null,
+          entityIds: [],
+          lightNames: [],
+          roomIds: ['living-room', 'kitchen'],
+          roomLightNames: {
+            'living-room': ['Front Left'],
+            kitchen: ['Sink Light'],
+          },
+          lastAction: 'list',
+        },
+        contextAfter: null,
+      }],
+    }, 'stable-user')
+
+    expect(conversation?.turns[0].contextBefore).toMatchObject({
+      roomIds: ['living-room', 'kitchen'],
+      roomLightNames: {
+        'living-room': ['Front Left'],
+        kitchen: ['Sink Light'],
+      },
+      entityIds: [],
+    })
+  })
+
+  it('does not classify unrelated room prose as a light follow-up', () => {
+    const conversation = normalizeImprovementConversation({
+      version: 1,
+      threadId: 'thread-unrelated-room',
+      userScope: 'stable-user',
+      createdAt: 1,
+      updatedAt: 2,
+      turns: [{
+        id: 'turn-unrelated-room',
+        createdAt: 2,
+        userText: 'I left my tax documents in the Kitchen.',
+        assistantText: 'Okay.',
+        outcome: 'answer',
+        handledByHomeMcp: false,
+        contextBefore: {
+          domain: 'lights',
+          roomId: null,
+          entityIds: [],
+          lightNames: [],
+          roomIds: ['kitchen'],
+          lastAction: 'lights-on',
+        },
+        contextAfter: null,
+      }],
+    }, 'stable-user')
+
+    expect(conversation?.turns[0].parsedAsLights).toBe(false)
+    expect(conversationIsSupportedLights(conversation!)).toBe(false)
+  })
+
   it('redacts credentials expressed as natural language', () => {
     const conversation = normalizeImprovementConversation({
       version: 1,

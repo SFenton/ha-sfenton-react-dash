@@ -283,6 +283,58 @@ describe('Home MCP server', () => {
     }
   })
 
+  it('does not reuse an aggregate room-detail affirmative after an unrelated turn', async () => {
+    const app = await startServer('conversation.household', () => ({
+      conversation_id: 'thread-continued',
+      response: { response_type: 'query_answer', speech: { plain: { speech: 'Delegated reply.' } } },
+    }))
+    try {
+      const weather = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 153, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'What is the weather?',
+            conversation_id: 'thread-1',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['living-room'],
+              roomLightNames: { 'living-room': ['Front Left'] },
+              lastAction: 'lights-on',
+            },
+          },
+        },
+      })
+      const weatherPayload = await weather.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      expect(weatherPayload.result.structuredContent.context).not.toHaveProperty('lastAction')
+
+      const affirmative = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 154, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Yes',
+            conversation_id: 'thread-continued',
+            context: weatherPayload.result.structuredContent.context,
+          },
+        },
+      })
+      const affirmativePayload = await affirmative.json() as {
+        result: { structuredContent: { handled_by_home_mcp: boolean } }
+      }
+      expect(affirmativePayload.result.structuredContent.handled_by_home_mcp).toBe(false)
+      expect(app.calls.filter((call) => call.input.endsWith('/api/conversation/process'))).toHaveLength(2)
+      expect(app.calls.some((call) => call.input.includes('/api/states/'))).toBe(false)
+    } finally {
+      await app.close()
+    }
+  })
+
   it('does not delegate non-light follow-ups from light controls to the general HA agent', async () => {
     const app = await startServer('conversation.test')
     try {
@@ -617,6 +669,23 @@ describe('Home MCP server', () => {
         { entity_id: 'light.kitchen' },
         { entity_id: 'light.living_room' },
       ])
+
+      app.calls.splice(0)
+      const mixed = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 70, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: { text: 'Turn off the Kitchen lights and turn the Music Room lights blue.' },
+        },
+      })
+      const mixedPayload = await mixed.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      expect(mixedPayload.result.structuredContent.context).toMatchObject({
+        roomId: 'music-room',
+        lastAction: 'color',
+      })
+      expect(mixedPayload.result.structuredContent.context).not.toHaveProperty('lastState')
     } finally {
       await app.close()
     }
@@ -1003,6 +1072,50 @@ describe('Home MCP server', () => {
     }
   })
 
+  it('keeps exact fixture subjects in count and color-state answers', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (!path.includes('/api/states/')) return []
+      const entityId = decodeURIComponent(path.split('/').at(-1) ?? '')
+      return {
+        entity_id: entityId,
+        state: entityId === 'light.kitchen_door_light' || entityId === 'light.kitchen_table_light' ? 'on' : 'off',
+        attributes: entityId === 'light.kitchen_door_light' ? { color_temp_kelvin: 3000 } : {},
+      }
+    })
+    try {
+      const count = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 164, method: 'tools/call',
+        params: {
+          name: 'home_lights',
+          arguments: {
+            action: 'count',
+            room: 'Kitchen',
+            light_names: ['Door Light', 'Sink Light'],
+          },
+        },
+      })
+      const countPayload = await count.json() as { result: { structuredContent: { text: string } } }
+      expect(countPayload.result.structuredContent.text).toBe('1 of 2 selected Kitchen lights is on.')
+
+      const color = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 165, method: 'tools/call',
+        params: {
+          name: 'home_lights',
+          arguments: {
+            action: 'color-state',
+            room: 'Kitchen',
+            light_names: ['Sink Light'],
+          },
+        },
+      })
+      const colorPayload = await color.json() as { result: { structuredContent: { text: string } } }
+      expect(colorPayload.result.structuredContent.text).toBe('The Sink Light in the Kitchen is off.')
+      expect(app.calls.some((call) => call.input.includes('/api/services/'))).toBe(false)
+    } finally {
+      await app.close()
+    }
+  })
+
   it('lists only configured lights for a whole-home on query', async () => {
     const app = await startServer(undefined, (path) => {
       if (!path.includes('/api/states/')) return []
@@ -1010,18 +1123,22 @@ describe('Home MCP server', () => {
       const on = entityId === 'light.living_room_front_left_light' || entityId === 'light.kitchen_sink_light'
       return { entity_id: entityId, state: on ? 'on' : 'off', attributes: {} }
     })
+
     try {
       const response = await rpc(app.baseUrl, {
         jsonrpc: '2.0', id: 120, method: 'tools/call',
         params: { name: 'home_chat', arguments: { text: 'What lights are on?' } },
       })
       const payload = await response.json() as {
-        result: { structuredContent: { status: string; text: string; context: { lastAction?: string }; handled_by_home_mcp?: boolean } }
+        result: { structuredContent: { status: string; text: string; context: { lastAction?: string; roomIds?: string[]; roomLightNames?: Record<string, string[]> }; handled_by_home_mcp?: boolean } }
       }
       expect(payload.result.structuredContent).toMatchObject({
         status: 'answer',
-        text: 'Front Left is on in the Living Room. Sink Light is on in the Kitchen.',
-        context: { lastAction: 'lights-on' },
+        text: 'These rooms have lights on:\n• Living Room\n• Kitchen\n\nWould you like to know more about a particular room?',
+        context: {
+          lastAction: 'lights-on',
+          roomIds: ['living-room', 'kitchen'],
+        },
         handled_by_home_mcp: true,
       })
       expect(payload.result.structuredContent.text).not.toMatch(/Christmas|transit|Line/)
@@ -1033,13 +1150,157 @@ describe('Home MCP server', () => {
         },
       })
       const directPayload = await directResponse.json() as {
-        result: { structuredContent: { status: string; text: string; context: { lastAction?: string } } }
+        result: { structuredContent: { status: string; text: string; context: { lastAction?: string; roomIds?: string[]; roomLightNames?: Record<string, string[]> } } }
       }
       expect(directPayload.result.structuredContent).toMatchObject({
         status: 'answer',
-        text: 'Front Left is on in the Living Room. Sink Light is on in the Kitchen.',
-        context: { lastAction: 'lights-on' },
+        text: 'These rooms have lights on:\n• Living Room\n• Kitchen\n\nWould you like to know more about a particular room?',
+        context: {
+          lastAction: 'lights-on',
+          roomIds: ['living-room', 'kitchen'],
+        },
       })
+      expect(app.calls.some((call) => call.input.includes('/api/services/'))).toBe(false)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('uses singular room copy when only one room has lights on', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (!path.includes('/api/states/')) return []
+      const entityId = decodeURIComponent(path.split('/').at(-1) ?? '')
+      return {
+        entity_id: entityId,
+        state: entityId === 'light.living_room_front_left_light' ? 'on' : 'off',
+        attributes: {},
+      }
+    })
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 136, method: 'tools/call',
+        params: { name: 'home_chat', arguments: { text: 'What lights are on?' } },
+      })
+      const payload = await response.json() as {
+        result: { structuredContent: { text: string; context: Record<string, unknown> } }
+      }
+      expect(payload.result.structuredContent).toMatchObject({
+        text: 'The Living Room lights are on.\n\nWould you like to know more about the Living Room?',
+        context: {
+          roomIds: ['living-room'],
+          lastAction: 'lights-on',
+        },
+      })
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('keeps a room-specific lights-on question scoped to the fixtures it lists', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (!path.includes('/api/states/')) return []
+      const entityId = decodeURIComponent(path.split('/').at(-1) ?? '')
+      return {
+        entity_id: entityId,
+        state: entityId === 'light.kitchen_sink_light' ? 'on' : 'off',
+        attributes: {},
+      }
+    })
+    try {
+      const overview = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 159, method: 'tools/call',
+        params: { name: 'home_chat', arguments: { text: 'What lights are on?' } },
+      })
+      const overviewPayload = await overview.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      const detail = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 160, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Which Kitchen lights are on?',
+            context: overviewPayload.result.structuredContent.context,
+          },
+        },
+      })
+      const detailPayload = await detail.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      expect(detailPayload.result.structuredContent.context).toMatchObject({
+        roomId: null,
+        roomIds: ['kitchen'],
+        roomLightNames: { kitchen: ['Sink Light'] },
+        lastAction: 'list',
+        lastState: 'on',
+      })
+
+      app.calls.splice(0)
+      await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 161, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Turn them off.',
+            context: detailPayload.result.structuredContent.context,
+          },
+        },
+      })
+      expect(app.calls.filter((call) => call.input.endsWith('/api/services/light/turn_off'))
+        .map((call) => JSON.parse(String(call.init?.body)))).toEqual([
+        { entity_id: 'light.kitchen_sink_light' },
+      ])
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('keeps an unreadable room list non-actionable', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (path.includes('/api/states/')) throw new Error('state unavailable')
+      return []
+    })
+    try {
+      const detail = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 162, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Which Kitchen lights are on?',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['kitchen'],
+              lastAction: 'lights-on',
+            },
+          },
+        },
+      })
+      const detailPayload = await detail.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      expect(detailPayload.result.structuredContent.context).toMatchObject({
+        roomId: null,
+        roomIds: ['kitchen'],
+        lastAction: 'list',
+        lastState: 'unavailable',
+      })
+      expect(detailPayload.result.structuredContent.context).not.toHaveProperty('roomLightNames')
+
+      const followUp = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 163, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Turn them off.',
+            context: detailPayload.result.structuredContent.context,
+          },
+        },
+      })
+      const followUpPayload = await followUp.json() as { result: { structuredContent: { status: string } } }
+      expect(followUpPayload.result.structuredContent.status).toBe('unsupported')
       expect(app.calls.some((call) => call.input.includes('/api/services/'))).toBe(false)
     } finally {
       await app.close()
@@ -1068,10 +1329,380 @@ describe('Home MCP server', () => {
       }
       expect(payload.result.structuredContent).toMatchObject({
         status: 'answer',
-        text: 'Kitchen has lights on. Living Room could not be fully checked because some light states could not be read. Try again.',
-        data: { rooms: ['Kitchen'], uncertainRooms: ['Living Room'] },
+        text: 'The Kitchen lights are on.\n\nLiving Room could not be fully checked because some light states could not be read.\n\nWould you like to know more about the Kitchen?',
+        context: {
+          roomIds: ['kitchen'],
+          lastAction: 'rooms-on',
+        },
+        data: { uncertainRooms: ['Living Room'] },
       })
       expect(app.calls.some((call) => call.input.includes('/api/services/'))).toBe(false)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('continues a whole-home overview into one or more room details and exact fixture actions', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (!path.includes('/api/states/')) return []
+      const entityId = decodeURIComponent(path.split('/').at(-1) ?? '')
+      const on = [
+        'light.living_room_front_left_light',
+        'light.living_room_back_right_light',
+        'light.kitchen_sink_light',
+      ].includes(entityId)
+      return { entity_id: entityId, state: on ? 'on' : 'off', attributes: { brightness: 128 } }
+    })
+    try {
+      const overview = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 132, method: 'tools/call',
+        params: { name: 'home_chat', arguments: { text: 'What lights are on?' } },
+      })
+      const overviewPayload = await overview.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      const detail = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 133, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Living Room and Kitchen',
+            context: overviewPayload.result.structuredContent.context,
+          },
+        },
+      })
+      const detailPayload = await detail.json() as {
+        result: { structuredContent: { status: string; text: string; context: Record<string, unknown> } }
+      }
+      expect(detailPayload.result.structuredContent).toMatchObject({
+        status: 'answer',
+        text: 'These lights are on in the Living Room:\n• Front Left\n• Back Right\n\nAnd these lights are on in the Kitchen:\n• Sink Light\n\nI can tell you when these lights last turned on, change their color, turn them off, or tell you why they are on. What would you like to do next?',
+        context: {
+          roomId: null,
+          roomIds: ['living-room', 'kitchen'],
+          roomLightNames: {
+            'living-room': ['Front Left', 'Back Right'],
+            kitchen: ['Sink Light'],
+          },
+          lastAction: 'list',
+        },
+      })
+
+      const color = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 134, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Change their color.',
+            context: detailPayload.result.structuredContent.context,
+          },
+        },
+      })
+      const colorPayload = await color.json() as {
+        result: { structuredContent: { status: string; controls: Array<{ kind: string; options?: Array<{ label: string; message: string }> }> } }
+      }
+      expect(colorPayload.result.structuredContent).toMatchObject({
+        status: 'clarify',
+        controls: [expect.objectContaining({
+          kind: 'room-picker',
+          options: [
+            expect.objectContaining({ label: 'Living Room', message: 'Change the color of the Front Left and Back Right in the Living Room.' }),
+            expect.objectContaining({ label: 'Kitchen', message: 'Change the color of the Sink Light in the Kitchen.' }),
+          ],
+        })],
+      })
+
+      app.calls.splice(0)
+      const off = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 135, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Turn them off.',
+            context: detailPayload.result.structuredContent.context,
+          },
+        },
+      })
+      const offPayload = await off.json() as {
+        result: { structuredContent: { status: string; context: Record<string, unknown> } }
+      }
+      expect(offPayload.result.structuredContent).toMatchObject({
+        status: 'success',
+        context: {
+          roomIds: ['living-room', 'kitchen'],
+          roomLightNames: {
+            'living-room': ['Front Left', 'Back Right'],
+            kitchen: ['Sink Light'],
+          },
+          lastAction: 'off',
+          lastState: 'off',
+        },
+      })
+      const services = app.calls.filter((call) => call.input.endsWith('/api/services/light/turn_off'))
+        .map((call) => JSON.parse(String(call.init?.body)) as { entity_id: string | string[] })
+      expect(services).toEqual([
+        { entity_id: ['light.living_room_front_left_light', 'light.living_room_back_right_light'] },
+        { entity_id: 'light.kitchen_sink_light' },
+      ])
+
+      app.calls.splice(0)
+      const on = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 137, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Turn them on.',
+            context: offPayload.result.structuredContent.context,
+          },
+        },
+      })
+      const onPayload = await on.json() as {
+        result: { structuredContent: { status: string; context: Record<string, unknown> } }
+      }
+      expect(onPayload.result.structuredContent).toMatchObject({
+        status: 'success',
+        context: { lastAction: 'on', lastState: 'on' },
+      })
+      expect(onPayload.result.structuredContent.context).not.toHaveProperty('targetState')
+      expect(app.calls.filter((call) => call.input.endsWith('/api/services/light/turn_on'))
+        .map((call) => JSON.parse(String(call.init?.body)) as { entity_id: string | string[] })).toEqual([
+        { entity_id: ['light.living_room_front_left_light', 'light.living_room_back_right_light'] },
+        { entity_id: 'light.kitchen_sink_light' },
+      ])
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('clears aggregate state after only part of an exact multi-room toggle succeeds', async () => {
+    const app = await startServer(undefined, (path, init) => {
+      if (path.includes('/api/states/')) {
+        return { entity_id: decodeURIComponent(path.split('/').at(-1) ?? ''), state: 'on', attributes: {} }
+      }
+      if (path.endsWith('/api/services/light/turn_off')
+        && String(init?.body).includes('light.kitchen_sink_light')) throw new Error('simulated service failure')
+      return []
+    })
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 141, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Turn them off.',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['living-room', 'kitchen'],
+              roomLightNames: {
+                'living-room': ['Front Left'],
+                kitchen: ['Sink Light'],
+              },
+              lastAction: 'list',
+              lastState: 'on',
+            },
+          },
+        },
+      })
+      const payload = await response.json() as {
+        result: { structuredContent: { status: string; context: Record<string, unknown> } }
+      }
+      expect(payload.result.structuredContent.status).toBe('partial')
+      expect(payload.result.structuredContent.context).toMatchObject({
+        lastAction: 'off',
+        roomIds: ['living-room', 'kitchen'],
+      })
+      expect(payload.result.structuredContent.context).not.toHaveProperty('lastState')
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('warns when a room detail list is incomplete', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (!path.includes('/api/states/')) return []
+      const entityId = decodeURIComponent(path.split('/').at(-1) ?? '')
+      if (entityId === 'light.living_room_front_left_light') {
+        return { entity_id: entityId, state: 'on', attributes: {} }
+      }
+      if (entityId === 'light.living_room_front_right_light') {
+        return { entity_id: entityId, state: 'unknown', attributes: {} }
+      }
+      return { entity_id: entityId, state: 'off', attributes: {} }
+    })
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 138, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Living Room',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['living-room'],
+              lastAction: 'lights-on',
+            },
+          },
+        },
+      })
+      const payload = await response.json() as {
+        result: { structuredContent: { text: string; context: Record<string, unknown> } }
+      }
+      expect(payload.result.structuredContent.text).toContain(
+        'I could not read 1 other light in the Living Room. This list may be incomplete.',
+      )
+      expect(payload.result.structuredContent.context).toMatchObject({
+        roomId: null,
+        roomIds: ['living-room'],
+        roomLightNames: { 'living-room': ['Front Left'] },
+        lastState: 'on',
+      })
+      const reason = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 158, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: { text: 'Why?', context: payload.result.structuredContent.context },
+        },
+      })
+      const reasonPayload = await reason.json() as { result: { structuredContent: { status: string } } }
+      expect(reasonPayload.result.structuredContent.status).toBe('answer')
+      expect(app.calls.some((call) =>
+        call.input.includes('/api/history/period/') && call.input.includes('light.living_room_front_left_light'))).toBe(true)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('retains the queried room scope when selected rooms no longer have lights on', async () => {
+    const app = await startServer(undefined, (path) => path.includes('/api/states/')
+      ? { entity_id: decodeURIComponent(path.split('/').at(-1) ?? ''), state: 'off', attributes: {} }
+      : [])
+    try {
+      const detail = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 139, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Living Room and Kitchen',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['living-room', 'kitchen'],
+              roomLightNames: {
+                'living-room': ['Front Left'],
+                kitchen: ['Sink Light'],
+              },
+              lastAction: 'lights-on',
+            },
+          },
+        },
+      })
+      const detailPayload = await detail.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      expect(detailPayload.result.structuredContent.context).toMatchObject({
+        roomIds: ['living-room', 'kitchen'],
+        lastAction: 'list',
+        lastState: 'off',
+      })
+      expect(detailPayload.result.structuredContent.context).not.toHaveProperty('roomLightNames')
+
+      const repeat = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 140, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'What about now?',
+            context: detailPayload.result.structuredContent.context,
+          },
+        },
+      })
+      const repeatPayload = await repeat.json() as {
+        result: { structuredContent: { controls: Array<{ kind: string; options?: Array<{ label: string }> }> } }
+      }
+      expect(repeatPayload.result.structuredContent.controls[0]).toMatchObject({
+        kind: 'room-picker',
+        options: [{ label: 'Living Room' }, { label: 'Kitchen' }],
+      })
+
+      const singleDetail = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 143, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Living Room',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['living-room'],
+              roomLightNames: { 'living-room': ['Front Left'] },
+              lastAction: 'lights-on',
+            },
+          },
+        },
+      })
+      const singlePayload = await singleDetail.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      expect(singlePayload.result.structuredContent.context).toMatchObject({
+        roomId: null,
+        roomIds: ['living-room'],
+        lastAction: 'list',
+        lastState: 'off',
+      })
+      expect(singlePayload.result.structuredContent.context).not.toHaveProperty('roomLightNames')
+      const unsafeWrite = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 144, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: { text: 'Turn them on.', context: singlePayload.result.structuredContent.context },
+        },
+      })
+      const unsafePayload = await unsafeWrite.json() as { result: { structuredContent: { status: string } } }
+      expect(unsafePayload.result.structuredContent.status).toBe('unsupported')
+      expect(app.calls.some((call) => call.input.includes('/api/services/'))).toBe(false)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('omits unavailable color actions from room detail guidance', async () => {
+    const app = await startServer(undefined, (path) => path.includes('/api/states/')
+      ? { entity_id: decodeURIComponent(path.split('/').at(-1) ?? ''), state: 'on', attributes: {} }
+      : [])
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 142, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Dining Room',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['dining-room'],
+              roomLightNames: { 'dining-room': ['Dining Room Light'] },
+              lastAction: 'lights-on',
+            },
+          },
+        },
+      })
+      const payload = await response.json() as { result: { structuredContent: { text: string } } }
+      expect(payload.result.structuredContent.text).toContain(
+        'I can tell you when these lights last turned on, turn them off, or tell you why they are on.',
+      )
+      expect(payload.result.structuredContent.text).not.toContain('change their color')
     } finally {
       await app.close()
     }
@@ -1095,8 +1726,15 @@ describe('Home MCP server', () => {
       expect(payload.result.structuredContent).toMatchObject({
         status: 'answer',
         text: 'Entry Light is on in the Hallway. No Guest Bathroom lights are on.',
-        context: { roomId: null, entityIds: [], lightNames: [], lastAction: 'list' },
+        context: {
+          roomId: null,
+          entityIds: [],
+          lightNames: [],
+          roomIds: ['hallway', 'guest-bathroom'],
+          lastAction: 'list',
+        },
       })
+      expect(payload.result.structuredContent.context).not.toHaveProperty('roomLightNames')
 
       const followUp = await rpc(app.baseUrl, {
         jsonrpc: '2.0', id: 124, method: 'tools/call',
@@ -1105,12 +1743,9 @@ describe('Home MCP server', () => {
           arguments: { text: 'Turn them off.', context: payload.result.structuredContent.context },
         },
       })
-      const followUpPayload = await followUp.json() as {
-        result: { structuredContent: { status: string; controls: Array<{ kind: string }> } }
-      }
+      const followUpPayload = await followUp.json() as { result: { structuredContent: { status: string } } }
       expect(followUpPayload.result.structuredContent).toMatchObject({
-        status: 'clarify',
-        controls: [expect.objectContaining({ kind: 'room-picker' })],
+        status: 'unsupported',
       })
       expect(app.calls.some((call) => call.input.includes('/api/services/'))).toBe(false)
     } finally {
@@ -1125,29 +1760,197 @@ describe('Home MCP server', () => {
     try {
       const response = await rpc(app.baseUrl, {
         jsonrpc: '2.0', id: 125, method: 'tools/call',
-        params: { name: 'home_chat', arguments: { text: 'Are the Hallway or Guest Bathroom lights on?' } },
+        params: { name: 'home_chat', arguments: { text: 'Are the Hallway or Guest Bathroom lights off?' } },
       })
       const payload = await response.json() as {
         result: { structuredContent: { status: string; context: Record<string, unknown> } }
       }
       expect(payload.result.structuredContent).toMatchObject({
         status: 'answer',
-        context: { roomId: null, entityIds: [], lightNames: [], lastAction: 'state' },
+        context: {
+          roomId: null,
+          entityIds: [],
+          lightNames: [],
+          roomIds: ['hallway', 'guest-bathroom'],
+          lastAction: 'state',
+          targetState: 'off',
+        },
+      })
+      const repeat = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 126, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: { text: 'What about now?', context: payload.result.structuredContent.context },
+        },
+      })
+      const repeatPayload = await repeat.json() as {
+        result: { structuredContent: { controls: Array<{ kind: string; options?: Array<{ message: string }> }> } }
+      }
+      expect(repeatPayload.result.structuredContent.controls[0]).toMatchObject({
+        kind: 'room-picker',
+        options: [
+          expect.objectContaining({ message: 'Are the Hallway lights off?' }),
+          expect.objectContaining({ message: 'Are the Guest Bathroom lights off?' }),
+        ],
       })
       const followUp = await rpc(app.baseUrl, {
-        jsonrpc: '2.0', id: 126, method: 'tools/call',
+        jsonrpc: '2.0', id: 127, method: 'tools/call',
         params: {
           name: 'home_chat',
           arguments: { text: 'Turn them off.', context: payload.result.structuredContent.context },
         },
       })
-      const followUpPayload = await followUp.json() as {
-        result: { structuredContent: { status: string; controls: Array<{ kind: string }> } }
-      }
+      const followUpPayload = await followUp.json() as { result: { structuredContent: { status: string; text: string } } }
       expect(followUpPayload.result.structuredContent).toMatchObject({
-        status: 'clarify',
-        controls: [expect.objectContaining({ kind: 'room-picker' })],
+        status: 'unsupported',
+        text: 'Choose a room to see which lights are on before changing them.',
       })
+      expect(app.calls.some((call) => call.input.includes('/api/services/'))).toBe(false)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('describes and retains exact fixtures in multi-room state reads', async () => {
+    const app = await startServer(undefined, (path) => path.includes('/api/states/')
+      ? { entity_id: decodeURIComponent(path.split('/').at(-1) ?? ''), state: 'off', attributes: {} }
+      : [])
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 145, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Are they still on in the Living Room and Kitchen?',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['living-room', 'kitchen'],
+              roomLightNames: {
+                'living-room': ['Front Left'],
+                kitchen: ['Sink Light'],
+              },
+              lastAction: 'list',
+              lastState: 'on',
+            },
+          },
+        },
+      })
+      const payload = await response.json() as {
+        result: { structuredContent: { text: string; context: Record<string, unknown> } }
+      }
+      expect(payload.result.structuredContent).toMatchObject({
+        text: 'Front Left in the Living Room is off; Sink Light in the Kitchen is off.',
+        context: {
+          roomIds: ['living-room', 'kitchen'],
+          roomLightNames: {
+            'living-room': ['Front Left'],
+            kitchen: ['Sink Light'],
+          },
+          lastAction: 'state',
+          lastState: 'off',
+          targetState: 'on',
+        },
+      })
+      const reason = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 146, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: { text: 'Why?', context: payload.result.structuredContent.context },
+        },
+      })
+      const reasonPayload = await reason.json() as {
+        result: { structuredContent: { controls: Array<{ kind: string; options?: Array<{ message: string }> }> } }
+      }
+      expect(reasonPayload.result.structuredContent.controls[0]).toMatchObject({
+        kind: 'room-picker',
+        options: [
+          expect.objectContaining({ message: 'Why did the Front Left in the Living Room turn off?' }),
+          expect.objectContaining({ message: 'Why did the Sink Light in the Kitchen turn off?' }),
+        ],
+      })
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('reports readable and unavailable fixtures separately in scoped state reads', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (!path.includes('/api/states/')) return []
+      const entityId = decodeURIComponent(path.split('/').at(-1) ?? '')
+      return {
+        entity_id: entityId,
+        state: entityId === 'light.living_room_back_right_light' ? 'unknown' : 'off',
+        attributes: {},
+      }
+    })
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 150, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Are they still on in the Living Room and Kitchen?',
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: ['living-room', 'kitchen'],
+              roomLightNames: {
+                'living-room': ['Front Left', 'Back Right'],
+                kitchen: ['Sink Light'],
+              },
+              lastAction: 'list',
+              lastState: 'on',
+            },
+          },
+        },
+      })
+      const payload = await response.json() as { result: { structuredContent: { text: string } } }
+      expect(payload.result.structuredContent.text).toBe(
+        'Front Left in the Living Room is off; Back Right in the Living Room is unavailable; Sink Light in the Kitchen is off.',
+      )
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('keeps mixed whole-room and fixture state reads non-actionable', async () => {
+    const app = await startServer(undefined, (path) => path.includes('/api/states/')
+      ? { entity_id: decodeURIComponent(path.split('/').at(-1) ?? ''), state: 'off', attributes: {} }
+      : [])
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 147, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: {
+            text: 'Are the Hallway lights and the Sink Light in the Kitchen on?',
+          },
+        },
+      })
+      const payload = await response.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      expect(payload.result.structuredContent.context).toMatchObject({
+        roomIds: ['hallway', 'kitchen'],
+        lastAction: 'state',
+        lastState: 'off',
+      })
+      expect(payload.result.structuredContent.context).not.toHaveProperty('roomLightNames')
+
+      const followUp = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 148, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: { text: 'Turn them off.', context: payload.result.structuredContent.context },
+        },
+      })
+      const followUpPayload = await followUp.json() as { result: { structuredContent: { status: string } } }
+      expect(followUpPayload.result.structuredContent.status).toBe('unsupported')
       expect(app.calls.some((call) => call.input.includes('/api/services/'))).toBe(false)
     } finally {
       await app.close()
@@ -1187,10 +1990,81 @@ describe('Home MCP server', () => {
           { action: 'list', room: 'Master Bedroom', light_names: ['Door Light'] },
         ] } },
       })
-      const payload = await response.json() as { result: { structuredContent: { text: string } } }
+      const payload = await response.json() as {
+        result: { structuredContent: { text: string; context: Record<string, unknown> } }
+      }
       expect(payload.result.structuredContent.text).toBe(
         'The Door Light in the Kitchen is off. The Door Light in the Master Bedroom is off.',
       )
+      expect(payload.result.structuredContent.context).toMatchObject({
+        roomIds: ['kitchen', 'master-bedroom'],
+        roomLightNames: {
+          kitchen: ['Door Light'],
+          'master-bedroom': ['Door Light'],
+        },
+        lastAction: 'list',
+        lastState: 'off',
+      })
+      const repeat = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 155, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: { text: 'What about now?', context: payload.result.structuredContent.context },
+        },
+      })
+      const repeatPayload = await repeat.json() as {
+        result: { structuredContent: { controls: Array<{ kind: string; options?: Array<{ message: string }> }> } }
+      }
+      expect(repeatPayload.result.structuredContent.controls[0]).toMatchObject({
+        kind: 'room-picker',
+        options: [
+          expect.objectContaining({ message: 'Which selected Kitchen lights are on?' }),
+          expect.objectContaining({ message: 'Which selected Master Bedroom lights are on?' }),
+        ],
+      })
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('marks mixed exact-list results without inventing a shared reason polarity', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (!path.includes('/api/states/')) return []
+      const entityId = decodeURIComponent(path.split('/').at(-1) ?? '')
+      return {
+        entity_id: entityId,
+        state: entityId === 'light.kitchen_door_light' ? 'on' : 'off',
+        attributes: {},
+      }
+    })
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 156, method: 'tools/call',
+        params: { name: 'home_lights', arguments: { operations: [
+          { action: 'list', room: 'Kitchen', light_names: ['Door Light'] },
+          { action: 'list', room: 'Master Bedroom', light_names: ['Door Light'] },
+        ] } },
+      })
+      const payload = await response.json() as {
+        result: { structuredContent: { context: Record<string, unknown> } }
+      }
+      expect(payload.result.structuredContent.context).toMatchObject({
+        roomLightNames: {
+          kitchen: ['Door Light'],
+          'master-bedroom': ['Door Light'],
+        },
+        lastAction: 'list',
+        lastState: 'mixed',
+      })
+      const reason = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 157, method: 'tools/call',
+        params: {
+          name: 'home_chat',
+          arguments: { text: 'Why?', context: payload.result.structuredContent.context },
+        },
+      })
+      const reasonPayload = await reason.json() as { result: { structuredContent: { status: string } } }
+      expect(reasonPayload.result.structuredContent.status).toBe('unsupported')
     } finally {
       await app.close()
     }
@@ -1209,6 +2083,38 @@ describe('Home MCP server', () => {
       expect(payload.result.structuredContent.text).toBe('Yes, the Front Left in the Living Room is off.')
       expect(app.calls.filter((call) => call.input.includes('/api/states/')).map((call) => call.input))
         .toEqual(['http://ha.test/api/states/light.living_room_front_left_light'])
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('reports mixed fixture readability within one room without widening the subject', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (!path.includes('/api/states/')) return []
+      const entityId = decodeURIComponent(path.split('/').at(-1) ?? '')
+      return {
+        entity_id: entityId,
+        state: entityId === 'light.living_room_back_right_light' ? 'unknown' : 'off',
+        attributes: {},
+      }
+    })
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 151, method: 'tools/call',
+        params: {
+          name: 'home_lights',
+          arguments: {
+            action: 'state',
+            room: 'Living Room',
+            light_names: ['Front Left', 'Back Right'],
+            target_state: 'on',
+          },
+        },
+      })
+      const payload = await response.json() as { result: { structuredContent: { text: string } } }
+      expect(payload.result.structuredContent.text).toBe(
+        'Front Left in the Living Room is off; Back Right in the Living Room is unavailable.',
+      )
     } finally {
       await app.close()
     }
@@ -1342,6 +2248,37 @@ describe('Home MCP server', () => {
       }],
     })
     expect(conflictingColor.status).toBe('unsupported')
+    const pendingOff = validateLightPlanForExecution(parseLightUtterance('Turn them off.', {
+      domain: 'lights',
+      roomId: null,
+      entityIds: [],
+      lightNames: [],
+      roomIds: ['living-room', 'kitchen'],
+      roomLightNames: {
+        'living-room': ['Front Left'],
+        kitchen: ['Sink Light'],
+      },
+      lastAction: 'list',
+      lastState: 'on',
+    })!)
+    expect(pendingOff.context).toMatchObject({ lastState: 'on' })
+    const colorPrompt = parseLightUtterance('Change the Living Room and Music Room light colors.')!
+    const colorControl = colorPrompt.controls[0]
+    expect(colorControl).toMatchObject({ kind: 'color-picker' })
+    if (colorControl?.kind === 'color-picker') {
+      const colorPlan = parseLightUtterance(`Turn the ${colorControl.subject} to warm white.`, colorPrompt.context)!
+      const validatedColor = validateLightPlanForExecution(colorPlan)
+      expect(validatedColor.context).toMatchObject({
+        roomId: null,
+        roomIds: ['living-room', 'music-room'],
+        roomLightNames: {
+          'living-room': HOUSE_LIGHT_ROOMS.find((room) => room.id === 'living-room')!.lights.map((light) => light.name),
+          'music-room': HOUSE_LIGHT_ROOMS.find((room) => room.id === 'music-room')!.lights.map((light) => light.name),
+        },
+      })
+      expect(parseLightUtterance('Turn them off.', validatedColor.context)?.operations?.map((operation) => operation.room.id))
+        .toEqual(['living-room', 'music-room'])
+    }
   })
 
   it('rejects mixed read and write operation arrays before any HA request', async () => {
@@ -1379,6 +2316,20 @@ describe('Home MCP server', () => {
       expect(payload.result.structuredContent).toMatchObject({
         status: 'unsupported',
         text: 'Detailed light queries support one room. Ask about one room at a time.',
+      })
+      expect(app.calls).toHaveLength(0)
+
+      const duplicateRoom = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 149, method: 'tools/call',
+        params: { name: 'home_lights', arguments: { operations: [
+          { action: 'state', room: 'Living Room', light_names: ['Front Left'] },
+          { action: 'state', room: 'Living Room', light_names: ['Back Right'] },
+        ] } },
+      })
+      const duplicatePayload = await duplicateRoom.json() as { result: { structuredContent: { status: string; text: string } } }
+      expect(duplicatePayload.result.structuredContent).toMatchObject({
+        status: 'unsupported',
+        text: 'Combine fixtures from the same room into one light query.',
       })
       expect(app.calls).toHaveLength(0)
     } finally {
@@ -1505,8 +2456,22 @@ describe('Home MCP server', () => {
   it('answers PBL, history, and cause queries from Home Assistant evidence', async () => {
     const app = await startServer(undefined, (path) => {
       if (path.includes('/api/states/switch.living_room_presence')) return { entity_id: 'switch.living_room_presence_living_room_lights_presence_allowed', state: 'on', attributes: {} }
+      if (path.includes('/api/history/period/') && path.includes('front_left')) return [
+        [{ entity_id: 'light.living_room_front_left_light', state: 'on', last_changed: '2026-09-08T12:00:00Z' }],
+        [{ entity_id: 'light.living_room_back_right_light', state: 'on', last_changed: '2026-09-08T13:00:00Z' }],
+      ]
       if (path.includes('/api/history/period/')) return [[{ state: 'off', last_changed: '2026-09-08T12:00:00Z' }]]
-      if (path.includes('/api/logbook/')) return [{ state: 'on', name: 'Living Room Presence-Based Lighting' }]
+      if (path.includes('/api/logbook/') && path.includes('front_left')) return [
+        { entity_id: 'light.living_room_front_left_light', state: 'on', context_name: 'Old Scene', when: '2026-09-08T11:00:00Z' },
+        { entity_id: 'light.living_room_front_left_light', state: 'on', context_name: 'Movie Scene', when: '2026-09-08T13:00:00Z' },
+        { entity_id: 'light.living_room_front_left_light', state: 'on', name: 'Front Left', when: '2026-09-08T14:00:00Z' },
+        { entity_id: 'light.living_room_back_right_light', state: 'on', context_entity_id: 'automation.private_bedtime_routine', when: '2026-09-08T12:30:00Z' },
+      ]
+      if (path.includes('/api/logbook/')) return [{
+        state: 'on',
+        context_name: 'Living Room Presence-Based Lighting',
+        when: '2026-09-08T12:00:00Z',
+      }]
       return []
     })
     try {
@@ -1521,8 +2486,76 @@ describe('Home MCP server', () => {
 
       const reason = await rpc(app.baseUrl, { jsonrpc: '2.0', id: 15, method: 'tools/call', params: { name: 'home_lights', arguments: { action: 'reason', room: 'Living Room' } } })
       const reasonPayload = await reason.json() as { result: { structuredContent: { text: string; data: { causalClaim: boolean } } } }
-      expect(reasonPayload.result.structuredContent.text).toContain('latest Home Assistant record links')
+      expect(reasonPayload.result.structuredContent.text).toContain('Home Assistant record links')
       expect(reasonPayload.result.structuredContent.data.causalClaim).toBe(false)
+
+      const multiHistory = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 16, method: 'tools/call',
+        params: {
+          name: 'home_lights',
+          arguments: {
+            action: 'history',
+            room: 'Living Room',
+            light_names: ['Front Left', 'Back Right'],
+            target_state: 'on',
+          },
+        },
+      })
+      const multiHistoryPayload = await multiHistory.json() as { result: { structuredContent: { text: string } } }
+      expect(multiHistoryPayload.result.structuredContent.text).toContain('• Front Left:')
+      expect(multiHistoryPayload.result.structuredContent.text).toContain('• Back Right:')
+
+      const multiReason = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 17, method: 'tools/call',
+        params: {
+          name: 'home_lights',
+          arguments: {
+            action: 'reason',
+            room: 'Living Room',
+            light_names: ['Front Left', 'Back Right'],
+            target_state: 'on',
+          },
+        },
+      })
+      const multiReasonPayload = await multiReason.json() as { result: { structuredContent: { text: string } } }
+      expect(multiReasonPayload.result.structuredContent.text).toContain('• Front Left: Movie Scene')
+      expect(multiReasonPayload.result.structuredContent.text).toContain('• Back Right: a Home Assistant automation')
+      expect(multiReasonPayload.result.structuredContent.text).not.toContain('automation.private_bedtime_routine')
+    } finally {
+      await app.close()
+    }
+  })
+
+  it('reports unavailable cause evidence separately from an empty logbook', async () => {
+    const app = await startServer(undefined, (path) => {
+      if (path.includes('/api/history/period/')) {
+        return [[{
+          entity_id: 'light.living_room_front_left_light',
+          state: 'on',
+          last_changed: '2026-09-08T12:00:00Z',
+        }]]
+      }
+      if (path.includes('/api/logbook/')) throw new Error('logbook unavailable')
+      return []
+    })
+    try {
+      const response = await rpc(app.baseUrl, {
+        jsonrpc: '2.0', id: 152, method: 'tools/call',
+        params: {
+          name: 'home_lights',
+          arguments: {
+            action: 'reason',
+            room: 'Living Room',
+            light_names: ['Front Left'],
+            target_state: 'on',
+          },
+        },
+      })
+      const payload = await response.json() as {
+        result: { structuredContent: { text: string; data: { logbookAvailable: boolean } } }
+      }
+      expect(payload.result.structuredContent.text).toContain('I could not check Home Assistant’s cause records.')
+      expect(payload.result.structuredContent.data.logbookAvailable).toBe(false)
     } finally {
       await app.close()
     }

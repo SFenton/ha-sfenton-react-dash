@@ -39,7 +39,7 @@ Vite proxies `/__home-mcp` to `/mcp`. Production uses `/api/sfenton_home_mcp`, r
 - `home_info`: read the configured model, MCP version, queue state, and five latest improvements.
 - `home_state`: bounded current-state reads for up to 50 entity IDs.
 - `home_history`: recorder history for up to 20 entity IDs and at most seven days.
-- `home_lights`: household room/group/fixture-aware light actions and queries. It supports ordered compound operations, on/off, exact or relative brightness, configured RGB/white-temperature colors, whole-home lists of configured lights that are on, current state, seven-day last-off history, cautious cause evidence, and Presence-Based Lighting status.
+- `home_lights`: household room/group/fixture-aware light actions and queries. It supports ordered compound operations, on/off, exact or relative brightness, configured RGB/white-temperature colors, whole-home room summaries with one- or multi-room fixture follow-ups, current state, seven-day history, cautious cause evidence, and Presence-Based Lighting status.
 
 `home_chat` recognizes supported light requests before falling back to the configured Gemini conversation agent. Light responses use a structured envelope containing `text`, optional embedded `controls`, compact semantic `context`, and diagnostic `data`. The React chat persists the context and source control ID. This preserves named room/fixture references across long conversations without replaying the transcript and prevents an old embedded control from submitting twice.
 
@@ -133,7 +133,7 @@ npm run home-mcp:corpus:lights -- \
   --utterances-per-family 10000
 ```
 
-The generated corpus covers 34 interaction families: prefix and postfix room/fixture on/off phrasing, aliases across every applicable room, exact and relative brightness, unsupported brightness, same-value and “respectively” multi-light brightness, supported/unsupported color, room and whole-home state/history/reason/PBL queries, ambiguity controls, compound rooms, and reference retention after 100 intervening messages. At 10,000 user utterances per family it contains 340,098 user utterances.
+The generated corpus covers 35 interaction families: prefix and postfix room/fixture on/off phrasing, aliases across every applicable room, exact and relative brightness, unsupported brightness, same-value and “respectively” multi-light brightness, supported/unsupported color, room and whole-home state/history/reason/PBL queries, one- and multi-room whole-home detail follow-ups, ambiguity controls, compound rooms, and reference retention after 100 intervening messages. The room-detail family requires 10,000 distinct user phrasings with balanced one-, two-, and three-room coverage. At the 10,000-utterance validation setting, the corpus contains 360,098 user utterances across 315,099 examples.
 
 Validate every generated example against the deterministic light parser/planner, including expected actions, rooms, fixtures, brightness, colors, clarification controls, unsupported responses, room coverage, unique IDs, and the 180-character limit:
 

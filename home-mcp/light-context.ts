@@ -26,6 +26,31 @@ export function canonicalizeLightContext(
   if (value.historyBefore !== undefined && (
     typeof value.historyBefore !== 'string' || value.historyBefore.length > 64 || Number.isNaN(Date.parse(value.historyBefore))
   )) return null
+  const roomIds = value.roomIds === undefined
+    ? undefined
+    : Array.isArray(value.roomIds) && value.roomIds.length <= HOUSE_LIGHT_ROOMS.length
+      && value.roomIds.every((item) => typeof item === 'string')
+      && new Set(value.roomIds).size === value.roomIds.length
+      ? value.roomIds
+      : null
+  if (roomIds === null || roomIds?.some((id) => !HOUSE_LIGHT_ROOMS.some((room) => room.id === id))) return null
+  const roomLightNames = value.roomLightNames === undefined
+    ? undefined
+    : object(value.roomLightNames)
+      ? value.roomLightNames
+      : null
+  if (roomLightNames === null || (roomLightNames && !roomIds?.length)) return null
+  const canonicalRoomLightNames: Record<string, string[]> = {}
+  if (roomLightNames) {
+    for (const [roomId, names] of Object.entries(roomLightNames)) {
+      const room = HOUSE_LIGHT_ROOMS.find((candidate) => candidate.id === roomId)
+      if (!room || !roomIds?.includes(roomId) || !Array.isArray(names)
+        || names.length < 1 || names.length > room.lights.length || new Set(names).size !== names.length
+        || !names.every((name) => typeof name === 'string' && room.lights.some((light) => light.name === name))) return null
+      canonicalRoomLightNames[roomId] = names
+    }
+    if (!Object.keys(canonicalRoomLightNames).length) return null
+  }
 
   if (value.roomId === null) {
     if (value.entityIds.length || value.lightNames.length) return null
@@ -34,6 +59,8 @@ export function canonicalizeLightContext(
       roomId: null,
       entityIds: [],
       lightNames: [],
+      ...(roomIds?.length ? { roomIds: [...roomIds] } : {}),
+      ...(Object.keys(canonicalRoomLightNames).length ? { roomLightNames: canonicalRoomLightNames } : {}),
       ...(lastAction ? { lastAction: lastAction as LightAction } : {}),
       ...(value.lastState ? { lastState: value.lastState as NonNullable<LightContext['lastState']> } : {}),
       ...(value.targetState ? { targetState: value.targetState as 'on' | 'off' } : {}),
@@ -42,7 +69,8 @@ export function canonicalizeLightContext(
   }
 
   const room = HOUSE_LIGHT_ROOMS.find((candidate) => candidate.id === value.roomId)
-  if (!room || new Set(value.entityIds).size !== value.entityIds.length || new Set(value.lightNames).size !== value.lightNames.length) return null
+  if (!room || roomIds?.length || roomLightNames
+    || new Set(value.entityIds).size !== value.entityIds.length || new Set(value.lightNames).size !== value.lightNames.length) return null
   const byIds = value.entityIds.map((id) => room.lights.find((light) => light.entityId === id))
   if (byIds.some((light) => !light)) return null
   const byNames = value.lightNames.map((name) => room.lights.find((light) => light.name === name))

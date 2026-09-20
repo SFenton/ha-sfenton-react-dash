@@ -1,5 +1,5 @@
 import { MockChatServer, MOCK_CHAT_AGENT } from '../../../test/mocks/chatServer'
-import { CHAT_METADATA_TIMEOUT_MS, ChatClient } from './chatClient'
+import { CHAT_METADATA_TIMEOUT_MS, ChatClient, HOME_MCP_AGENT } from './chatClient'
 import { HomeMcpRequestRejected } from './homeMcpClient'
 import {
   CHAT_HISTORY_VISIBLE_MS, CHAT_MESSAGE_LIMIT, CHAT_PENDING_MS, CHAT_REPLY_LIMIT, CHAT_STORAGE_PREFIX,
@@ -704,6 +704,82 @@ describe('native chat client', () => {
 
     expect(client.controlUsed('lights-room-picker-state', resultOne.id)).toBe(true)
     expect(client.controlUsed('lights-room-picker-state', resultTwo.id)).toBe(false)
+  })
+
+  it('sends a control with its owning response context instead of the latest context', async () => {
+    const thread: ChatThreadRecord = { version: 1, kind: 'thread', id: 'thread-context-owner', agentId: HOME_MCP_AGENT.id, agentName: HOME_MCP_AGENT.name, createdAt: 1 }
+    const requestOne: ChatRequestRecord = { version: 1, kind: 'request', id: 'context-request-one', threadId: thread.id, createdAt: 2, parentId: null, clientId: 'owner', text: 'Living Room', conversationId: 'owner' }
+    const resultOne: ChatResultRecord = {
+      version: 1, kind: 'result', id: requestOne.id, threadId: thread.id, createdAt: 3, text: 'Choose a color.',
+      conversationId: 'owner', response: 'answer', contextReset: false, controls: [],
+      skillContext: {
+        domain: 'lights', roomId: 'living-room',
+        entityIds: ['light.living_room_front_left_light'], lightNames: ['Front Left'], lastAction: 'color',
+      },
+    }
+    const requestTwo: ChatRequestRecord = { version: 1, kind: 'request', id: 'context-request-two', threadId: thread.id, createdAt: 4, parentId: resultOne.id, clientId: 'owner', text: 'What lights are on?', conversationId: 'owner' }
+    const resultTwo: ChatResultRecord = {
+      version: 1, kind: 'result', id: requestTwo.id, threadId: thread.id, createdAt: 5, text: 'The Kitchen lights are on.',
+      conversationId: 'owner', response: 'answer', contextReset: false, controls: [],
+      skillContext: {
+        domain: 'lights', roomId: null, entityIds: [], lightNames: [],
+        roomIds: ['kitchen'], lastAction: 'lights-on',
+      },
+    }
+    server.seed('user-a', Object.fromEntries([thread, requestOne, resultOne, requestTwo, resultTwo].map((record) => [chatRecordKey(record), record])))
+    const contexts: unknown[] = []
+    const homeMcp = {
+      request: async (_text: string, _conversationId: string | null, context: unknown) => {
+        contexts.push(context)
+        return {
+          status: 'success', text: 'Done.', conversation_id: 'owner', controls: [],
+          context: resultOne.skillContext,
+        }
+      },
+    }
+    const client = new ChatClient(server.connect('user-a'), 'user-a', () => 10, undefined, homeMcp)
+    clients.push(client)
+    await client.activate()
+    client.selectThread(thread.id)
+    client.allowResume()
+    expect(client.getSnapshot()).toMatchObject({ status: 'ready', selectedId: thread.id, availability: 'confirm', consented: true })
+
+    await client.sendControl('old-color-control', 'Turn the selected Living Room lights to warm white.', resultOne.id)
+
+    expect(contexts).toEqual([resultOne.skillContext])
+  })
+
+  it('rejects a control whose owning response belongs to another thread', async () => {
+    const firstThread: ChatThreadRecord = { version: 1, kind: 'thread', id: 'thread-first', agentId: HOME_MCP_AGENT.id, agentName: HOME_MCP_AGENT.name, createdAt: 1 }
+    const firstRequest: ChatRequestRecord = { version: 1, kind: 'request', id: 'first-request', threadId: firstThread.id, createdAt: 2, parentId: null, clientId: 'owner', text: 'Living Room', conversationId: 'first' }
+    const firstResult: ChatResultRecord = {
+      version: 1, kind: 'result', id: firstRequest.id, threadId: firstThread.id, createdAt: 3, text: 'Choose a color.',
+      conversationId: 'first', response: 'answer', contextReset: false, controls: [],
+      skillContext: { domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [], lastAction: 'color' },
+    }
+    const secondThread: ChatThreadRecord = { version: 1, kind: 'thread', id: 'thread-second', agentId: HOME_MCP_AGENT.id, agentName: HOME_MCP_AGENT.name, createdAt: 4 }
+    const secondRequest: ChatRequestRecord = { version: 1, kind: 'request', id: 'second-request', threadId: secondThread.id, createdAt: 5, parentId: null, clientId: 'owner', text: 'Kitchen', conversationId: 'second' }
+    const secondResult: ChatResultRecord = {
+      version: 1, kind: 'result', id: secondRequest.id, threadId: secondThread.id, createdAt: 6, text: 'The Kitchen lights are on.',
+      conversationId: 'second', response: 'answer', contextReset: false, controls: [],
+      skillContext: { domain: 'lights', roomId: 'kitchen', entityIds: [], lightNames: [], lastAction: 'state' },
+    }
+    server.seed('user-a', Object.fromEntries([
+      firstThread, firstRequest, firstResult, secondThread, secondRequest, secondResult,
+    ].map((record) => [chatRecordKey(record), record])))
+    const request = vi.fn(async () => ({
+      status: 'success', text: 'Done.', conversation_id: 'second', controls: [],
+      context: secondResult.skillContext,
+    }))
+    const client = new ChatClient(server.connect('user-a'), 'user-a', () => 10, undefined, { request })
+    clients.push(client)
+    await client.activate()
+    client.selectThread(secondThread.id)
+
+    await client.sendControl('first-color-control', 'Turn the selected Living Room lights to warm white.', firstResult.id)
+
+    expect(request).not.toHaveBeenCalled()
+    expect(client.getSnapshot().threads.find((thread) => thread.record.id === secondThread.id)?.turns).toHaveLength(1)
   })
 
   it('instances repeated server control ids per reply and chat', async () => {

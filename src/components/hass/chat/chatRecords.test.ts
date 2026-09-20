@@ -118,7 +118,9 @@ describe('chat records', () => {
       ...result,
       handledByHomeMcp: true,
       skillContext: {
-        domain: 'lights', roomId: 'living-room', entityIds: [], lightNames: [],
+        domain: 'lights', roomId: null, entityIds: [], lightNames: [],
+        roomIds: ['living-room', 'kitchen'],
+        roomLightNames: { 'living-room': ['Front Left'], kitchen: ['Sink Light'] },
         lastAction: 'history', lastState: 'off', targetState: 'on', historyBefore: '2026-09-08T12:00:00Z',
       },
     } satisfies ChatResultRecord
@@ -130,9 +132,73 @@ describe('chat records', () => {
       readChatData({ value: data(thread, request, legacyContextual) }).records,
       4000,
     )[0])?.turns[0].handledByHomeMcp).toBe(false)
+    expect(readChatData({ value: data(thread, request, {
+      ...contextual,
+      skillContext: {
+        ...contextual.skillContext,
+        roomIds: ['living-room'],
+        roomLightNames: { kitchen: ['Sink Light'] },
+      },
+    }) }).issue).toBe('unreadable')
+    const partial = readChatData({ value: data(thread, request, {
+      ...contextual,
+      skillContext: {
+        ...contextual.skillContext,
+        roomLightNames: { 'living-room': ['Front Left'] },
+      },
+    }) })
+    expect(partial.issue).toBeNull()
+    expect(partial.records.get(chatRecordKey(contextual))).toMatchObject({
+      skillContext: { roomLightNames: { 'living-room': ['Front Left'] } },
+    })
+    expect(readChatData({ value: data(thread, request, {
+      ...contextual,
+      skillContext: {
+        ...contextual.skillContext,
+        roomIds: ['living-room'],
+        roomLightNames: { 'living-room': [] },
+      },
+    }) }).issue).toBe('unreadable')
     expect(readChatData({ value: data(thread, request, result) }).issue).toBeNull()
     expect(chatImprovementConversation(deriveChatThreads(readChatData({ value: data(thread, request, result) }).records, 4000)[0])?.turns[0].handledByHomeMcp).toBe(false)
     expect(parseChatRecord({ ...result, handledByHomeMcp: 'yes' })).toBeNull()
+  })
+
+  it('uses a control owner context when exporting retained improvement turns', () => {
+    const livingContext = {
+      domain: 'lights', roomId: 'living-room',
+      entityIds: ['light.living_room_front_left_light'], lightNames: ['Front Left'], lastAction: 'color',
+    }
+    const kitchenContext = {
+      domain: 'lights', roomId: 'kitchen',
+      entityIds: ['light.kitchen_sink_light'], lightNames: ['Sink Light'], lastAction: 'list',
+    }
+    const firstResult = { ...result, skillContext: livingContext } satisfies ChatResultRecord
+    const secondRequest = {
+      ...request, id: 'two', parentId: firstResult.id, text: 'What lights are on?', conversationId: 'native-one', createdAt: 4000,
+    } satisfies ChatRequestRecord
+    const secondResult = {
+      ...result, id: secondRequest.id, text: 'The Kitchen lights are on.', skillContext: kitchenContext, createdAt: 5000,
+    } satisfies ChatResultRecord
+    const controlRequest = {
+      ...request,
+      id: 'three',
+      parentId: secondResult.id,
+      text: 'Turn the selected Living Room lights to warm white.',
+      conversationId: 'native-one',
+      sourceControlId: 'old-color-control',
+      sourceResultId: firstResult.id,
+      createdAt: 6000,
+    } satisfies ChatRequestRecord
+    const controlResult = {
+      ...result, id: controlRequest.id, text: 'Done.', skillContext: livingContext, createdAt: 7000,
+    } satisfies ChatResultRecord
+    const records = readChatData({ value: data(
+      thread, request, firstResult, secondRequest, secondResult, controlRequest, controlResult,
+    ) }).records
+    const conversation = chatImprovementConversation(deriveChatThreads(records, 8000)[0])
+
+    expect(conversation?.turns[2].contextBefore).toEqual(livingContext)
   })
 
   it('uses the Home MCP status for retained failed-turn outcomes', () => {

@@ -87,7 +87,10 @@ function validateExample(example: CorpusExample) {
       operations.forEach((operation, index) => validateOperation(example, result.operations![index], operation))
     }
     if (context) {
-      if (result.context?.roomId !== context.roomId || comparable(result.context?.entityIds) !== comparable(context.entityIds)) {
+      if (result.context?.roomId !== context.roomId
+        || comparable(result.context?.entityIds) !== comparable(context.entityIds)
+        || comparable(result.context?.roomIds) !== comparable(context.roomIds)
+        || comparable(result.context?.roomLightNames) !== comparable(context.roomLightNames)) {
         fail(example, `context target was not retained: ${comparable(result.context)}`)
       }
     }

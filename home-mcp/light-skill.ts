@@ -9,6 +9,8 @@ export interface LightContext {
   roomId: string | null
   entityIds: string[]
   lightNames: string[]
+  roomIds?: string[]
+  roomLightNames?: Record<string, string[]>
   lastAction?: LightAction
   lastState?: 'on' | 'off' | 'mixed' | 'unavailable'
   targetState?: 'on' | 'off'
@@ -82,6 +84,7 @@ const SUPPORTED_LIGHT_ACTIONS = new Set<LightAction>([
   'color-state', 'brightness-state', 'history', 'reason', 'pbl', 'pbl-rules',
 ])
 const WHOLE_HOME_READ_ACTIONS = new Set<LightAction>(['rooms-on', 'lights-on'])
+const ROOM_DETAIL_REQUIRED_RESPONSE = 'Choose a room to see which lights are on before changing them.'
 const RAW_OPERATION_FIELDS = new Set([
   'action', 'room', 'entity_ids', 'light_names', 'brightness_pct', 'color_name',
   'rgb_color', 'color_temperature_kelvin', 'history_before', 'target_state',
@@ -91,9 +94,10 @@ const WRITE_ACTION_LANGUAGE = /\b(?:turn|switch|put|set|change|adjust|dim|dimmer
 const NEGATION_LANGUAGE = /\b(?:dont|do not|never|not|shouldnt|couldnt|wouldnt|cant|wont|isnt|arent|wasnt|werent|hasnt|havent|doesnt|didnt)\b/
 const META_ACTION_LANGUAGE = /\b(?:ask|remind|reminder|schedule|scheduled|timer|alarm|automation|notification)\b/
 const NON_LIGHT_TARGET_LANGUAGE = /\b(?:fan|garage door|door lock|lock|thermostat|vacuum|robot|speaker|television|media player)\b/g
+const STATE_RELATIVE_LIGHT_TARGET = /\b(?:any|whichever|whatever)\b.*\blights?\b.*\b(?:on|off)\b|\bremaining\b.*\blights?\b|\b(?:still|currently)\s+(?:on|off)\b.*\blights?\b|\blights?\s+(?:on|off)\s+(?:in|inside|of|on|at|to)\b|\blights?\s+(?:(?:that|which)\s+(?:are|were|remain|remained|stay|stayed)\s+(?:(?:currently|still)\s+)*(?:on|off)|(?:currently|still)(?:\s+(?:currently|still))*\s+(?:on|off)|(?:left|remaining)\s+(?:on|off))\b/
 const DIRECT_WRITE_REQUEST = /^(?:(?:(?:please|hey|quickly|for me|when you can)\s*,?\s*)|(?:(?:i need you|i want|id like)\s+to)\s+|(?:(?:can|could|would)\s+you\s+(?:please\s+)?))*(?:turn|switch|put|set|change|adjust|dim|brighten|raise|lower|enable|disable|shut|kill|make|color|colour|light up)\b/
 const READ_ONLY_REQUEST = /^(?:(?:(?:please|hey|quickly|for me|when you can)\s*,?\s*)|(?:i need you to)\s+|(?:(?:can|could|would)\s+you\s+))*(?:what|which|who|where|why|how|when(?!\s+you can\b)|is|are|was|were|did|does|do|has|have)\b/
-const imperativeClause = (value: string) => value.split(/\b(?:until|while|before|after|if|unless|when|because|since)\b/, 1)[0]
+const imperativeClause = (value: string) => value.split(/\b(?:until|while|before|after|if|unless|when|because|since|so)\b/, 1)[0]
 
 export function parseRgbColor(value: unknown): [number, number, number] | null {
   if (!Array.isArray(value) || value.length !== 3 || !value.every((part) => typeof part === 'number' && Number.isFinite(part))) return null
@@ -140,8 +144,12 @@ export function roomPickerResponse(action: LightAction = 'state', details: {
       return `Turn the ${formatNames(selectedNames)} in the ${room.name} to ${details.brightnessPct.join('% and ')}% respectively.`
     }
     if (action === 'set' && typeof details.brightnessPct === 'number') return `Turn the ${target} to ${details.brightnessPct}%.`
-    if (action === 'count') return `How many ${target} are on?`
-    if (action === 'list') return `Which ${target} are on?`
+    if (action === 'count') return selectedNames.length
+      ? `How many selected ${room.name} lights are on?`
+      : `How many ${target} are on?`
+    if (action === 'list') return selectedNames.length
+      ? `Which selected ${room.name} lights are on?`
+      : `Which ${target} are on?`
     if (action === 'lights-on') return 'Which configured lights are on?'
     if (action === 'color-state') return `What color are the ${target}?`
     if (action === 'brightness-state') return `What is the brightness of the ${target}?`
@@ -156,11 +164,50 @@ export function roomPickerResponse(action: LightAction = 'state', details: {
     }
     return `Are the ${target} ${details.targetState ?? 'on'}?`
   }
+  const compactMessage = (room: HouseLightRoom) => {
+    const selectedNames = details.roomLightNames?.[room.id] ?? details.lightNames ?? []
+    const target = `selected ${room.name} lights`
+    if (action === 'on') return `Turn on the ${target}.`
+    if (action === 'off') return `Turn off the ${target}.`
+    if (action === 'up' || action === 'down') {
+      const values = Array.isArray(details.brightnessPct) ? details.brightnessPct : [details.brightnessPct]
+      if (values.length > 1 && selectedNames.length === values.length) {
+        return `Turn the ${target} ${action} by ${formatNames(values.map((value) => `${value}%`))} respectively.`
+      }
+      return values[0] === undefined
+        ? `Turn ${action} the ${target}.`
+        : `Turn the ${target} ${action} by ${values[0]}%.`
+    }
+    if (action === 'set' && Array.isArray(details.brightnessPct) && selectedNames.length === details.brightnessPct.length) {
+      return `Turn the ${target} to ${details.brightnessPct.join('% and ')}% respectively.`
+    }
+    if (action === 'set' && typeof details.brightnessPct === 'number') {
+      return `Turn the ${target} to ${details.brightnessPct}%.`
+    }
+    if (action === 'count') return `How many ${target} are on?`
+    if (action === 'list') return `Which ${target} are on?`
+    if (action === 'state') return `Are the ${target} ${details.targetState ?? 'on'}?`
+    if (action === 'color-state') return `What color are the ${target}?`
+    if (action === 'brightness-state') return `What is the brightness of the ${target}?`
+    if (action === 'history') return `When did the ${target} turn ${details.targetState ?? 'off'}?`
+    if (action === 'reason') return `Why did the ${target} turn ${details.targetState ?? 'on'}?`
+    if (action === 'color') {
+      if (details.rgbColor) return `Turn the ${target} to rgb(${details.rgbColor.join(', ')}).`
+      if (details.colorTemperatureKelvin) return `Turn the ${target} to ${details.colorTemperatureKelvin}K.`
+      if (details.colorName) return `Turn the ${target} to ${details.colorName}.`
+      return `Change the color of the ${target}.`
+    }
+    return message(room)
+  }
   const options = HOUSE_LIGHT_ROOMS
     .filter((room) => {
       if (details.roomIds?.length && !details.roomIds.includes(room.id)) return false
+      if (details.roomLightNames && !Object.hasOwn(details.roomLightNames, room.id)) return false
       const selectedNames = details.roomLightNames?.[room.id] ?? details.lightNames ?? []
       if (selectedNames.length && !selectedNames.every((name) => room.lights.some((light) => light.name === name))) return false
+      if (['set', 'up', 'down'].includes(action) && room.dimmable === false) return false
+      if (Array.isArray(details.brightnessPct) && details.brightnessPct.length > 1
+        && ['set', 'up', 'down'].includes(action) && selectedNames.length !== details.brightnessPct.length) return false
       if (action !== 'color') return true
       if (room.color === 'none') return false
       if (details.colorName && details.colorName in WHITE_COLORS) return true
@@ -169,21 +216,36 @@ export function roomPickerResponse(action: LightAction = 'state', details: {
       return true
     })
     .flatMap((room) => {
-      const optionMessage = message(room)
+      const exactMessage = message(room)
+      const optionMessage = exactMessage.length <= HOME_CHAT_USER_LIMIT ? exactMessage : compactMessage(room)
       return optionMessage.length <= HOME_CHAT_USER_LIMIT
         ? [{ label: room.name, value: room.name, message: optionMessage }]
         : []
     })
   if (!options.length) {
-    const response = details.lightNames?.length || details.roomLightNames
-      ? MULTI_ROOM_FIXTURE_RESPONSE
+    const response = details.roomIds?.length && ['set', 'up', 'down'].includes(action)
+      ? 'Brightness control is not supported by the selected lights.'
+      : details.roomIds?.length && (details.colorName || details.rgbColor || details.colorTemperatureKelvin)
+      ? 'That color is not supported by the selected lights.'
+      : action === 'color' && details.roomIds?.length
+        ? 'Color control is not supported by the selected lights.'
+      : details.lightNames?.length || details.roomLightNames
+        ? MULTI_ROOM_FIXTURE_RESPONSE
       : 'That color is not supported by any configured room.'
     return {
       status: 'unsupported',
       text: response,
       response,
       controls: [],
-      context: { domain: 'lights', roomId: null, entityIds: [], lightNames: [], lastAction: action },
+      context: {
+        domain: 'lights',
+        roomId: null,
+        entityIds: [],
+        lightNames: [],
+        ...(details.roomIds?.length ? { roomIds: details.roomIds } : {}),
+        ...(details.roomLightNames ? { roomLightNames: details.roomLightNames } : {}),
+        lastAction: action,
+      },
     }
   }
   return {
@@ -197,6 +259,8 @@ export function roomPickerResponse(action: LightAction = 'state', details: {
       roomId: null,
       entityIds: [],
       lightNames: [],
+      ...(details.roomIds?.length ? { roomIds: details.roomIds } : {}),
+      ...(details.roomLightNames ? { roomLightNames: details.roomLightNames } : {}),
       lastAction: action,
       ...(details.targetState ? { targetState: details.targetState } : {}),
       ...(details.historyBefore ? { historyBefore: details.historyBefore } : {}),
@@ -210,6 +274,20 @@ export function colorPickerResponse(roomOrRooms: HouseLightRoom | HouseLightRoom
   const selected = targets.lightNames.length
     ? `${formatNames(targets.lightNames)} in the ${room.name}`
     : formatNames(rooms.map((candidate) => `${candidate.name} lights`))
+  const context: LightContext = rooms.length === 1
+    ? { domain: 'lights', roomId: room.id, entityIds: targets.entityIds, lightNames: targets.lightNames, lastAction: 'color' }
+    : {
+        domain: 'lights',
+        roomId: null,
+        entityIds: [],
+        lightNames: [],
+        roomIds: rooms.map((candidate) => candidate.id),
+        roomLightNames: Object.fromEntries(rooms.map((candidate) => [
+          candidate.id,
+          candidate.lights.map((light) => light.name),
+        ])),
+        lastAction: 'color',
+      }
   if (rooms.some((candidate) => candidate.color === 'none')) {
     const plural = rooms.length > 1 || targets.lightNames.length !== 1
     const text = `${selected} ${plural ? 'do' : 'does'} not support color control.`
@@ -218,13 +296,7 @@ export function colorPickerResponse(roomOrRooms: HouseLightRoom | HouseLightRoom
       text,
       response: text,
       controls: [],
-      context: {
-        domain: 'lights',
-        roomId: rooms.length === 1 ? room.id : null,
-        entityIds: targets.entityIds,
-        lightNames: targets.lightNames,
-        lastAction: 'color',
-      },
+      context,
     }
   }
   const text = `What color would you like to change the ${selected} to?`
@@ -235,16 +307,26 @@ export function colorPickerResponse(roomOrRooms: HouseLightRoom | HouseLightRoom
   const entityIds = targets.entityIds.length
     ? targets.entityIds
     : rooms.flatMap((candidate) => candidate.lights.map((light) => light.entityId))
+  const controlSubject = rooms.length === 1 && selected.length > 80 ? `selected ${room.name} lights` : selected
+  if (`Turn the ${controlSubject} to rgb(255, 255, 255).`.length > HOME_CHAT_USER_LIMIT) {
+    return {
+      status: 'unsupported',
+      text: SINGLE_ROOM_DETAIL_RESPONSE,
+      response: SINGLE_ROOM_DETAIL_RESPONSE,
+      controls: [],
+      context: null,
+    }
+  }
   return {
     status: 'clarify', text, response: text,
     controls: [{
       id: `lights-color-${rooms.map((candidate) => candidate.id).join('-')}`, kind: 'color-picker', room: room.name,
       rooms: rooms.map((candidate) => candidate.name), palette: [...new Set(palette)], supportsCustomRgb,
       colorMode: supportsCustomRgb ? 'rgb' : 'temperature', entityIds,
-      subject: targets.lightNames.length || rooms.length > 1 ? selected : undefined,
+      subject: targets.lightNames.length || rooms.length > 1 ? controlSubject : undefined,
       minTemperatureKelvin: 2000, maxTemperatureKelvin: 6500,
     }],
-    context: { domain: 'lights', roomId: rooms.length === 1 ? room.id : null, entityIds: targets.entityIds, lightNames: targets.lightNames, lastAction: 'color' },
+    context,
   }
 }
 
@@ -605,16 +687,32 @@ function fixturePickerDetails(text: string) {
   }
 }
 
-function roomsInText(text: string) {
+function roomsInText(text: string, context?: LightContext | null) {
   const normalized = normalize(text)
   const fixtureSpans = fixtureSpansInText(normalized)
   const rawMatches = ROOM_ALIAS_MATCHES.flatMap(({ room, phrase }) =>
     phrasePositions(normalized, phrase).map((position) => ({ room, alias: phrase, position })))
   const matches = rawMatches
-    .filter((match) => !fixtureSpans.some((span) => span.room.id !== match.room.id
-      && match.position >= span.start && match.position + match.alias.length <= span.end
-      && rawMatches.some((other) => other.room.id !== match.room.id
-        && (other.position < span.start || other.position + other.alias.length > span.end))))
+    .filter((match) => {
+      const containing = fixtureSpans.filter((span) =>
+        match.position >= span.start && match.position + match.alias.length <= span.end)
+      if (!containing.length) return true
+      const candidateRooms = new Set(containing.map((span) => span.room.id))
+      if (candidateRooms.size > 1) {
+        const spanStart = Math.min(...containing.map((span) => span.start))
+        const spanEnd = Math.max(...containing.map((span) => span.end))
+        const hasSeparateRoomScope = rawMatches.some((other) =>
+          other.position < spanStart || other.position + other.alias.length > spanEnd)
+        const contextualRooms = [...candidateRooms].filter((roomId) =>
+          context?.roomId === roomId || Boolean(context?.roomLightNames?.[roomId]?.some((name) =>
+            containing.some((span) => span.room.id === roomId && span.light.name === name))))
+        if (contextualRooms.length > 1) return false
+        return contextualRooms.length === 1
+          ? match.room.id === contextualRooms[0]
+          : !hasSeparateRoomScope && candidateRooms.has(match.room.id)
+      }
+      return candidateRooms.size === 1 && candidateRooms.has(match.room.id)
+    })
     .sort((left, right) => right.alias.length - left.alias.length || left.position - right.position)
   const occupied: Array<[number, number]> = []
   const rooms: HouseLightRoom[] = []
@@ -630,6 +728,82 @@ function roomsInText(text: string) {
     return leftPosition - rightPosition
   })
   return ordered
+}
+
+function roomSelectionOnly(text: string, rooms: HouseLightRoom[]) {
+  const normalized = normalize(text)
+  if (/^(?:i|we)\s+(?:like|love|prefer)\b/.test(normalized)) return false
+  let remainder = normalized.replace(/[?!.:,]+/g, ' ')
+  const matches = rooms.flatMap((room) => room.aliases.flatMap((alias) => {
+    const phrase = normalize(alias)
+    return phrasePositions(remainder, phrase).map((start) => ({ start, end: start + phrase.length }))
+  })).sort((left, right) => left.start - right.start || right.end - left.end)
+  const spans: typeof matches = []
+  for (const match of matches) {
+    if (!spans.some((selected) => match.start < selected.end && match.end > selected.start)) spans.push(match)
+  }
+  for (const span of spans.sort((left, right) => right.start - left.start)) {
+    remainder = `${remainder.slice(0, span.start)} ${remainder.slice(span.end)}`
+  }
+  const allowed = new Set([
+    'and', 'or', 'the', 'please', 'tell', 'me', 'about', 'show', 'details', 'detail',
+    'for', 'how', 'what', 'i', 'id', 'would', 'like', 'more', 'those', 'these', 'room', 'rooms', 'light', 'lights',
+    'both', 'plus', 'as', 'well', 'now', 'yes', 'sure', 'okay', 'ok', 'can', 'could', 'you', 'thank', 'thanks',
+  ])
+  return remainder.split(/\s+/).filter(Boolean).every((word) => allowed.has(word))
+}
+
+function multiRoomContext(context?: LightContext | null) {
+  if (!context?.roomIds?.length) return null
+  const rooms = context.roomIds.flatMap((id) => HOUSE_LIGHT_ROOMS.find((room) => room.id === id) ?? [])
+  if (rooms.length !== context.roomIds.length) return null
+  return {
+    rooms,
+    roomIds: rooms.map((room) => room.id),
+    roomLightNames: context.roomLightNames,
+    hasExactTargets: Boolean(context.roomLightNames && Object.keys(context.roomLightNames).length),
+  }
+}
+
+function singleRoomContextPlan(
+  action: LightAction,
+  multi: NonNullable<ReturnType<typeof multiRoomContext>>,
+  details: { targetState?: 'on' | 'off'; historyBefore?: string } = {},
+) {
+  if (multi.rooms.length !== 1 || !multi.hasExactTargets) return null
+  const room = multi.rooms[0]
+  return buildLightPlan({
+    action,
+    room: room.name,
+    light_names: multi.roomLightNames?.[room.id],
+    target_state: details.targetState,
+    history_before: details.historyBefore,
+  })
+}
+
+function contextAfterWrite(context: LightContext, action: LightAction): LightContext {
+  const next = { ...context, lastAction: action }
+  delete next.targetState
+  return next
+}
+
+function roomDetailResponse(rooms: HouseLightRoom[]) {
+  const plan = buildLightPlan({
+    operations: rooms.map((room) => ({ action: 'list', room: room.name })),
+  })
+  if (plan.status !== 'ready') return plan
+  return {
+    ...plan,
+    context: {
+      domain: 'lights' as const,
+      roomId: null,
+      entityIds: [],
+      lightNames: [],
+      roomIds: rooms.map((room) => room.id),
+      lastAction: 'list' as const,
+    },
+    data: { queryMode: 'lights-on-detail' },
+  }
 }
 
 function targetsInText(room: HouseLightRoom, text: string) {
@@ -703,7 +877,10 @@ function targetsInText(room: HouseLightRoom, text: string) {
 
 function targetsFromContext(room: HouseLightRoom, context: LightContext) {
   const allowedIds = new Set(room.lights.map((light) => light.entityId))
-  const named = resolveNamedTargets(room, context.lightNames)
+  const named = resolveNamedTargets(room, [
+    ...context.lightNames,
+    ...(context.roomLightNames?.[room.id] ?? []),
+  ])
   const entityIds = [...new Set([
     ...context.entityIds.filter((id) => allowedIds.has(id)),
     ...named.entityIds,
@@ -995,7 +1172,22 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   const fixtureMatches = fixtureSpansInText(semanticText)
   const fixtureLanguage = fixtureMatches.length > 0
   const implicitLightAlias = /\bexterior\b/.test(normalized)
-  const explicitRooms = roomsInText(semanticText)
+  const explicitRooms = roomsInText(semanticText, context)
+  const aggregateRoomContext = Boolean(context?.domain === 'lights'
+    && (context.lastAction === 'lights-on' || context.lastAction === 'rooms-on'))
+  const aggregateRoomMention = Boolean(explicitRooms.length && aggregateRoomContext)
+  const aggregateRoomFollowUp = Boolean(aggregateRoomMention && roomSelectionOnly(semanticText, explicitRooms))
+  const aggregateAffirmative = Boolean(aggregateRoomContext && context?.roomIds?.length === 1
+    && /^(?:yes(?:,? please)?|sure|okay|ok|tell me more|show me that room|tell me about that room|(?:can|could|would) you (?:show me|tell me) (?:more|that room|more about that room))[.!?]?$/.test(normalized))
+  const firstRoomPosition = Math.min(...explicitRooms.flatMap((room) => room.aliases
+    .flatMap((alias) => phrasePositions(semanticText, normalize(alias)))), Number.POSITIVE_INFINITY)
+  const aggregateSelectionPrefix = normalized.slice(0, firstRoomPosition).trim()
+  const aggregateSelectionWrapperWords = new Set([
+    'the', 'both', 'please', 'tell', 'me', 'about', 'show', 'how', 'what',
+    'i', 'would', 'like', 'details', 'for', 'can', 'could', 'you',
+  ])
+  const aggregateSelectionWrapper = aggregateSelectionPrefix.split(/\s+/).filter(Boolean)
+    .every((word) => aggregateSelectionWrapperWords.has(word))
   const potentiallyWrites = WRITE_ACTION_LANGUAGE.test(normalized)
     || Boolean(namedColorInText(normalized))
     || /\b\d{1,3}\s*%|\b\d{4}\s*k(?:elvin)?\b/.test(normalized)
@@ -1021,10 +1213,27 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   })
   const unsafeUnscopedFixtureContinuation = !explicitRooms.length && fixtureMatches.length > 0
     && /[.!?]\s+\S/.test(normalized)
+  const boundedThatReference = DIRECT_WRITE_REQUEST.test(normalized) && /\bthat\b/.test(semanticText)
+    || /\bwhy\b.*\bthat\b.*\b(?:on|off)\b/.test(normalized)
   const contextualReference = /\b(it|its|them|their|they|those|these|same|that one|that room|which ones|what about|how about now|and now|before that|why|how come|those rules|the rules)\b/.test(normalized)
-  const contextualTargetReference = /\b(it|its|them|their|they|those|these|same|that one)\b/.test(normalized)
+    || boundedThatReference
+  const contextualTargetReference = /\b(it|its|them|their|they|those|these|same|that(?: one)?)\b/.test(semanticText)
+  const stateQualifiedTargetReference = STATE_RELATIVE_LIGHT_TARGET.test(semanticText)
+  const contextualSelectionReference = contextualTargetReference || /\bselected\b/.test(semanticText)
+  const selectedTargetReference = contextualSelectionReference || /\b(?:which ones|that light)\b/.test(semanticText)
+  const aggregateSelectionCandidate = aggregateRoomMention && (
+    roomSelectionOnly(semanticText, explicitRooms)
+    || aggregateSelectionWrapper
+  )
   if (!lightLanguage && !fixtureLanguage && !implicitLightAlias
-    && !(contextualReference && context?.domain === 'lights')) return null
+    && !(contextualReference && context?.domain === 'lights')
+    && !aggregateRoomFollowUp && !aggregateAffirmative && !aggregateSelectionCandidate) return null
+  const unqualifiedToggle = (/\b(?:turn|switch)\b/.test(semanticText)
+    && !/\b(?:any|whichever|whatever|remaining|left|still|currently|that|which)\b/.test(semanticText))
+  if (DIRECT_WRITE_REQUEST.test(normalized) && stateQualifiedTargetReference && !unqualifiedToggle) {
+    const response = 'State-qualified light changes require a fresh explicit target. Ask which lights are on, then use that exact result.'
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
   if (unknownLeadingLocation || unknownTrailingLocation || unsafeUnscopedFixtureContinuation) {
     const response = 'That location is not configured for this light.'
     return { status: 'unsupported', text: response, response, controls: [], context: null }
@@ -1033,6 +1242,8 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
     return potentiallyWrites ? indirectWriteResponse() : null
   }
   const informationalRequest = /^(?:(?:please\s+)?(?:explain|tell me|show me|describe|help me understand)|(?:can|could|would)\s+you\s+(?:explain|tell me|show me|describe|help me understand))\b/.test(normalized)
+  const reasonPrefix = '(?:(?:please\\s+)?(?:tell me|explain)\\s+|(?:can|could|would)\\s+you\\s+(?:please\\s+)?tell me\\s+)?'
+  const reasonQuestion = new RegExp(`^${reasonPrefix}why\\b`).test(normalized)
   if (informationalRequest && (
     /\bhow\s+(?:to\b|(?:i|we|you|they|he|she|it)\s+(?:can|could|would|should|might|may)\b)/.test(normalized)
     || /\bwhether\s+to\b/.test(normalized)
@@ -1041,7 +1252,7 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   if (/^(?:i\s+(?:wonder|wondered|am wondering)|we\s+(?:wonder|wondered|are wondering))\b.*\b(?:if|whether)\b/.test(normalized)) {
     return potentiallyWrites ? indirectWriteResponse() : null
   }
-  if (NEGATION_LANGUAGE.test(normalized) && (
+  if (!reasonQuestion && NEGATION_LANGUAGE.test(normalized) && (
     WRITE_ACTION_LANGUAGE.test(normalized)
     || Boolean(namedColorInText(normalized))
     || /\b\d{1,3}\s*%|\b\d{4}\s*k(?:elvin)?\b/.test(normalized)
@@ -1058,8 +1269,8 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
         : context ?? null,
     }
   }
-  if (/\b(?:except|excluding|but not|other than|besides|with the exception of|rather than|instead of|apart from|not|but)\b/.test(normalized)
-    || /\bwithout\b(?!\s+(?:a\s+)?transition\b)/.test(normalized)) {
+  if (!reasonQuestion && (/\b(?:except|excluding|but not|other than|besides|with the exception of|rather than|instead of|apart from|not|but)\b/.test(normalized)
+    || /\bwithout\b(?!\s+(?:a\s+)?transition\b)/.test(normalized))) {
     const response = 'That light request uses an unsupported exclusion or contrast.'
     return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
   }
@@ -1072,6 +1283,12 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   const fixtureRooms = [...new Map(fixtureMatches.map((match) => [match.room.id, match.room])).values()]
   const safeUniqueFixtureInference = !potentiallyWrites || READ_ONLY_REQUEST.test(normalized)
   if (!rooms.length && fixtureRooms.length === 1 && safeUniqueFixtureInference) rooms = fixtureRooms
+  if (!rooms.length && context?.roomLightNames) {
+    const contextualFixtureRooms = fixtureRooms.filter((room) =>
+      context.roomLightNames?.[room.id]?.some((name) =>
+        fixtureMatches.some((match) => match.room.id === room.id && match.light.name === name)))
+    if (contextualFixtureRooms.length === 1) rooms = contextualFixtureRooms
+  }
   if (!rooms.length && context?.roomId) {
     const contextual = HOUSE_LIGHT_ROOMS.find((room) => room.id === context.roomId)
     if (contextual) rooms = [contextual]
@@ -1080,16 +1297,117 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   const contextualTargets = contextualRoom
     ? (() => {
         const explicit = targetsInText(contextualRoom, text)
-        return explicit.entityIds.length ? explicit : !fixtureMatches.length && context?.roomId === contextualRoom.id
-          && (!explicitRooms.length || (explicitRooms.length === 1 && contextualTargetReference))
-          ? targetsFromContext(contextualRoom, context)
-          : explicit
+        if (explicit.entityIds.length) return explicit
+        const singleRoomContext = !fixtureMatches.length && context?.roomId === contextualRoom.id
+          && (!explicitRooms.length || (explicitRooms.length === 1 && selectedTargetReference))
+        const multiRoomContext = !fixtureMatches.length
+          && selectedTargetReference
+          && Boolean(context?.roomIds?.includes(contextualRoom.id) && context.roomLightNames?.[contextualRoom.id]?.length)
+        return singleRoomContext || multiRoomContext ? targetsFromContext(contextualRoom, context!) : explicit
       })()
     : { entityIds: [], lightNames: [] }
+  const hasWholeRoomContext = (room: HouseLightRoom) => context?.roomId === room.id
+    && context.entityIds.length === 0 && context.lightNames.length === 0
+  const readTargetsForRoom = (room: HouseLightRoom) => {
+    const explicit = targetsInText(room, text)
+    if (explicit.entityIds.length || !selectedTargetReference) return { targets: explicit, resolved: true }
+    const targets = context ? targetsFromContext(room, context) : explicit
+    return { targets, resolved: targets.entityIds.length > 0 || hasWholeRoomContext(room) }
+  }
+  const unresolvedReadResponse = (): LightSkillResponse => {
+    const response = 'I could not match the earlier light target in that query.'
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
+  const explicitWholeRoomColorTarget = explicitRooms.some((room) => room.aliases.some((alias) => {
+    const escaped = normalize(alias).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = new RegExp(`\\b(?:the\\s+)?${escaped}\\s+lights?\\b`).exec(normalized)
+    if (!match || match.index === undefined) return false
+    const throughSubject = normalized.slice(0, match.index + match[0].length)
+    return !/\b(?:selected|it|them|their|they|these|those|same|that)\b/.test(throughSubject)
+  }))
   const invalidContextTargets = Boolean(!explicitRooms.length && !fixtureMatches.length
     && contextualRoom && context?.roomId === contextualRoom.id
     && (context.entityIds.length || context.lightNames.length)
     && !contextualTargets.entityIds.length)
+  const fixtureCandidatesBySpan = new Map<string, typeof fixtureMatches>()
+  for (const match of fixtureMatches) {
+    const key = `${match.start}:${match.end}`
+    const candidates = fixtureCandidatesBySpan.get(key) ?? []
+    candidates.push(match)
+    fixtureCandidatesBySpan.set(key, candidates)
+  }
+  const scopedFixtureMismatch = [...fixtureCandidatesBySpan.entries()].some(([key, candidates]) => {
+    const [start, end] = key.split(':').map(Number)
+    const suffix = normalized.slice(end).trimStart()
+    const scopedRoom = HOUSE_LIGHT_ROOMS.find((room) => room.aliases.some((alias) => {
+      const escaped = normalize(alias).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      return new RegExp(`^(?:in|inside|of|on)\\s+(?:the\\s+)?${escaped}\\b`).test(suffix)
+    }))
+    const fixturePhrase = normalized.slice(start, end).replace(/\blights?\b/g, '').trim()
+    const matchesRoom = (room: HouseLightRoom) => candidates.some((candidate) => candidate.room.id === room.id)
+      || FIXTURE_MATCHES.some((match) =>
+        match.room.id === room.id && match.phrase.replace(/\blights?\b/g, '').trim() === fixturePhrase)
+    return scopedRoom
+      ? !matchesRoom(scopedRoom)
+      : explicitRooms.length > 0 && !explicitRooms.some(matchesRoom)
+  })
+  if (explicitRooms.length && scopedFixtureMismatch) {
+    const roomScope = explicitRooms.length === 1
+      ? `the ${explicitRooms[0].name}`
+      : formatNames(explicitRooms.map((room) => room.name))
+    const response = `That light is not configured in ${roomScope}.`
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
+  const contextualScopePosition = /\b(?:selected|it|them|their|they|those|these|same|that)\b/.exec(semanticText)?.index ?? -1
+  const lightSubjectCount = semanticText.match(/\blights?\b/g)?.length ?? 0
+  if (explicitRooms.length > 1 && contextualScopePosition >= 0
+    && (contextualScopePosition > firstRoomPosition || lightSubjectCount > 1 || /\b(?:all|every)\b/.test(semanticText))) {
+    const response = 'Mixing whole-room and selected targets across rooms is not supported.'
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
+  const colorClarificationIntent = /\b(change|pick|choose)\b.*\b(?:colors?|lights?)\b/.test(normalized)
+    && !/\d{1,3}\s*%/.test(normalized) && !namedColorInText(normalized) && !/rgb\s*\(/i.test(text)
+  if (colorClarificationIntent && fixtureMatches.length && contextualSelectionReference) {
+    const response = 'Please name every light in that color request instead of mixing a pronoun with another fixture.'
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
+  const preliminarySegments = actionSegments(text)
+  if (contextualSelectionReference && fixtureMatches.length
+    && (!preliminarySegments || preliminarySegments.length === 1)) {
+    const response = 'Please name every light in that request instead of mixing a pronoun with another fixture.'
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
+  const contextualTargetSpans = [...semanticText.matchAll(/\b(?:selected|it|them|those|these|same|that(?: one)?)\b/g)]
+    .flatMap((match) => match.index === undefined ? [] : [{ start: match.index, end: match.index + match[0].length }])
+  const explicitRoomSubjects = explicitRooms.flatMap((room) => room.aliases.flatMap((alias) => {
+    const escaped = normalize(alias).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return [...semanticText.matchAll(new RegExp(`\\b(?:(?:the\\s+)?${escaped}\\s+lights?|lights?\\s+(?:in|inside|of|on|at)\\s+(?:the\\s+)?${escaped})\\b`, 'g'))]
+      .flatMap((match) => match.index === undefined ? [] : [{ start: match.index, end: match.index + match[0].length }])
+  }))
+  const contextualDeterminesRoomSubject = contextualTargetSpans.every((target) =>
+    explicitRoomSubjects.some((subject) =>
+      target.end <= subject.start && !semanticText.slice(target.end, subject.start).trim()))
+  const contextualDeterminesCoordinatedRooms = lightSubjectCount === 1
+    && contextualTargetSpans.some((target) =>
+      target.end <= firstRoomPosition && !semanticText.slice(target.end, firstRoomPosition).trim())
+  const coordinatedContextAndRoom = contextualTargetSpans.length > 0
+    && explicitRoomSubjects.length > 0
+    && !contextualDeterminesRoomSubject
+    && !contextualDeterminesCoordinatedRooms
+    && (!preliminarySegments || preliminarySegments.length === 1)
+  if (coordinatedContextAndRoom) {
+    const response = 'Mixing contextual and explicit room targets is not supported.'
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
+  if (reasonQuestion && (
+    /\b(?:instead of|rather than|except|excluding|but)\b/.test(normalized)
+    || /\b(?:did|does|do|could|would|will|has|have)\b.*\bnot\s+(?:turn|switch)\b.*\blights?\b/.test(normalized)
+    || /\b(?:didnt|doesnt|wont|couldnt|wouldnt|hasnt|havent)\b.*\b(?:turn|switch)\b.*\blights?\b/.test(normalized)
+    || /\b(?:on|off)\s*,?\s+not\s+(?:on|off)\b/.test(normalized)
+  )) {
+    const response = 'That reason question compares or negates multiple actions. Ask why the lights turned on or off.'
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
   const wholeHomeRoomsOnIntent = wholeHomeQueryIntent(
     text, WHOLE_HOME_ROOMS_ON_PATTERNS, WHOLE_HOME_ROOMS_ON_CANDIDATES, explicitRooms,
     WHOLE_HOME_ROOMS_ON_SCOPED_PATTERNS,
@@ -1098,6 +1416,24 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
     text, WHOLE_HOME_LIGHTS_ON_PATTERNS, WHOLE_HOME_LIGHTS_ON_CANDIDATES, explicitRooms,
     WHOLE_HOME_LIGHTS_ON_SCOPED_PATTERNS,
   )
+
+  if (aggregateRoomFollowUp && context?.roomIds?.length
+    && explicitRooms.some((room) => !context.roomIds!.includes(room.id))) {
+    const response = 'Choose one or more rooms from the earlier list.'
+    return { status: 'unsupported', text: response, response, controls: [], context }
+  }
+  if (aggregateAffirmative) {
+    const room = HOUSE_LIGHT_ROOMS.find((candidate) => candidate.id === context?.roomIds?.[0])
+    if (room) return roomDetailResponse([room])
+  }
+  if (aggregateRoomFollowUp) return roomDetailResponse(explicitRooms)
+  if (aggregateRoomContext && /^(?:i|we)\s+(?:like|love|prefer)\b/.test(normalized)) return null
+  if (aggregateRoomContext && explicitRooms.length
+    && aggregateSelectionWrapper
+    && !roomSelectionOnly(semanticText, explicitRooms)) {
+    const response = 'Choose one or more rooms from the earlier list.'
+    return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+  }
 
   if (wholeHomeRoomsOnIntent === 'whole-home') {
     return wholeHomeReadResponse('rooms-on')
@@ -1110,41 +1446,93 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   }
   if (wholeHomeLightsOnIntent === 'configured-room') {
     const action = /\b(?:what|which|list|show)\b/.test(normalized) ? 'list' : 'state'
-    return buildLightPlan({ operations: explicitRooms.map((room) => ({
-      action,
-      room: room.name,
-      ...entityTarget(targetsInText(room, text).entityIds),
-      target_state: action === 'state' ? 'on' : undefined,
-    })) })
+    let unresolvedReference = false
+    const operations = explicitRooms.map((room) => {
+      const explicit = targetsInText(room, text)
+      const targets = !explicit.entityIds.length && selectedTargetReference && context
+        ? targetsFromContext(room, context)
+        : explicit
+      if (selectedTargetReference && !targets.entityIds.length && !hasWholeRoomContext(room)) unresolvedReference = true
+      return {
+        action,
+        room: room.name,
+        ...entityTarget(targets.entityIds),
+        target_state: action === 'state' ? 'on' : undefined,
+      }
+    })
+    if (unresolvedReference) {
+      const response = 'I could not match the earlier light target in that query.'
+      return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+    }
+    return buildLightPlan({ operations })
   }
   if (/\bhow many\b.*\blights?\b.*\bon\b/.test(normalized)) {
-    if (!rooms.length) return roomPickerResponse('count')
+    if (!rooms.length) {
+      const multi = multiRoomContext(context)
+      return multi
+        ? singleRoomContextPlan('count', multi)
+          ?? roomPickerResponse('count', { roomIds: multi.roomIds, roomLightNames: multi.roomLightNames })
+        : roomPickerResponse('count')
+    }
     if (rooms.length > 1) {
       const response = SINGLE_ROOM_DETAIL_RESPONSE
       return { status: 'unsupported', text: response, response, controls: [], context: null }
     }
-    return buildLightPlan({ action: 'count', room: rooms[0].name, ...entityTarget(contextualTargets.entityIds) })
+    const selection = readTargetsForRoom(rooms[0])
+    return selection.resolved
+      ? buildLightPlan({ action: 'count', room: rooms[0].name, ...entityTarget(selection.targets.entityIds) })
+      : unresolvedReadResponse()
   }
   if (/\b(what(?:s| is| are)? (?:their|its|the)?\s*brightness|how bright)\b/.test(normalized)) {
-    if (!rooms.length) return roomPickerResponse('brightness-state')
+    if (!rooms.length) {
+      const multi = multiRoomContext(context)
+      return multi
+        ? singleRoomContextPlan('brightness-state', multi)
+          ?? roomPickerResponse('brightness-state', { roomIds: multi.roomIds, roomLightNames: multi.roomLightNames })
+        : roomPickerResponse('brightness-state')
+    }
     if (rooms.length > 1) {
       const response = SINGLE_ROOM_DETAIL_RESPONSE
       return { status: 'unsupported', text: response, response, controls: [], context: null }
     }
-    return buildLightPlan({ action: 'brightness-state', room: rooms[0].name, ...entityTarget(contextualTargets.entityIds) })
+    const selection = readTargetsForRoom(rooms[0])
+    return selection.resolved
+      ? buildLightPlan({ action: 'brightness-state', room: rooms[0].name, ...entityTarget(selection.targets.entityIds) })
+      : unresolvedReadResponse()
   }
   if (/\b(what color|which color|what colour|which colour)\b/.test(normalized)) {
-    if (!rooms.length) return roomPickerResponse('color-state')
+    if (!rooms.length) {
+      const multi = multiRoomContext(context)
+      return multi
+        ? singleRoomContextPlan('color-state', multi)
+          ?? roomPickerResponse('color-state', { roomIds: multi.roomIds, roomLightNames: multi.roomLightNames })
+        : roomPickerResponse('color-state')
+    }
     if (rooms.length > 1) {
       const response = SINGLE_ROOM_DETAIL_RESPONSE
       return { status: 'unsupported', text: response, response, controls: [], context: null }
     }
-    return buildLightPlan({ action: 'color-state', room: rooms[0].name, ...entityTarget(contextualTargets.entityIds) })
+    const selection = readTargetsForRoom(rooms[0])
+    return selection.resolved
+      ? buildLightPlan({ action: 'color-state', room: rooms[0].name, ...entityTarget(selection.targets.entityIds) })
+      : unresolvedReadResponse()
   }
   if (/\b(each lights? status|status of each light|which ones?)\b/.test(normalized)
     || (/^which ones\??$/.test(normalized) && context?.lastAction === 'count')) {
-    if (!rooms.length) return roomPickerResponse('list')
-    return buildLightPlan({ action: 'list', room: rooms[0].name, ...entityTarget(contextualTargets.entityIds) })
+    if (!rooms.length) {
+      const multi = multiRoomContext(context)
+      return multi
+        ? singleRoomContextPlan('list', multi)
+          ?? roomPickerResponse('list', { roomIds: multi.roomIds, roomLightNames: multi.roomLightNames })
+        : roomPickerResponse('list')
+    }
+    const selections = rooms.map((room) => ({ room, selection: readTargetsForRoom(room) }))
+    if (selections.some(({ selection }) => !selection.resolved)) return unresolvedReadResponse()
+    return buildLightPlan({ operations: selections.map(({ room, selection }) => ({
+      action: 'list',
+      room: room.name,
+      ...entityTarget(selection.targets.entityIds),
+    })) })
   }
   if (/^(what about now|and now|how about now)\??$/.test(normalized)
     && (context?.lastAction === 'rooms-on' || context?.lastAction === 'lights-on')) {
@@ -1154,13 +1542,31 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
     const action = ['state', 'count', 'list', 'color-state', 'brightness-state', 'pbl'].includes(context.lastAction)
       ? context.lastAction
       : 'state'
-    return roomPickerResponse(action)
+    const multi = multiRoomContext(context)
+    const targetState = context.lastState === 'on' || context.lastState === 'off'
+      ? context.lastState
+      : context.targetState
+    return multi
+      ? singleRoomContextPlan(action, multi, { targetState })
+        ?? roomPickerResponse(action, {
+          roomIds: multi.roomIds,
+          ...(multi.hasExactTargets ? { roomLightNames: multi.roomLightNames } : {}),
+          ...(targetState ? { targetState } : {}),
+          })
+      : roomPickerResponse(action)
   }
   if (/^(what about now|and now|how about now)\??$/.test(normalized) && context?.lastAction && rooms.length) {
     const action = ['state', 'count', 'list', 'color-state', 'brightness-state', 'pbl'].includes(context.lastAction) ? context.lastAction : 'state'
-    return buildLightPlan({ action, room: rooms[0].name, ...entityTarget(contextualTargets.entityIds), target_state: context.targetState })
+    const targetState = context.lastState === 'on' || context.lastState === 'off'
+      ? context.lastState
+      : context.targetState
+    return buildLightPlan({ action, room: rooms[0].name, ...entityTarget(contextualTargets.entityIds), target_state: targetState })
   }
   if (/^(what about before that|before that|and before that)\??$/.test(normalized) && context?.lastAction === 'history' && rooms.length) {
+    if (contextualTargets.entityIds.length > 1) {
+      const response = 'Earlier history follow-ups support one light at a time.'
+      return { status: 'unsupported', text: response, response, controls: [], context }
+    }
     return buildLightPlan({
       action: 'history',
       room: rooms[0].name,
@@ -1169,8 +1575,49 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
       target_state: context.targetState,
     })
   }
-  if (/^(why|why is that|how come)\??$/.test(normalized) && context?.lastAction && rooms.length) {
-    return buildLightPlan({ action: 'reason', room: rooms[0].name, ...entityTarget(contextualTargets.entityIds), target_state: context.lastState })
+  if (/^(why|why is that|how come)\??$/.test(normalized) && context?.lastAction) {
+    const targetState = context.lastState === 'on' || context.lastState === 'off'
+      ? context.lastState
+      : context.lastState === undefined
+        ? context.targetState ?? null
+        : null
+    const multi = multiRoomContext(context)
+    if (multi && targetState) {
+      if (!multi.hasExactTargets) {
+        return {
+          status: 'unsupported',
+          text: ROOM_DETAIL_REQUIRED_RESPONSE,
+          response: ROOM_DETAIL_REQUIRED_RESPONSE,
+          controls: [],
+          context: context ?? null,
+        }
+      }
+      if (multi.rooms.length === 1) {
+        const room = multi.rooms[0]
+        return buildLightPlan({
+          action: 'reason',
+          room: room.name,
+          light_names: multi.roomLightNames?.[room.id],
+          target_state: targetState,
+        })
+      }
+      return singleRoomContextPlan('reason', multi, { targetState })
+        ?? roomPickerResponse('reason', {
+          roomIds: multi.roomIds,
+          roomLightNames: multi.roomLightNames,
+          targetState,
+        })
+    }
+    if (rooms.length && targetState) {
+      return buildLightPlan({
+        action: 'reason',
+        room: rooms[0].name,
+        ...entityTarget(contextualTargets.entityIds),
+        target_state: targetState,
+      })
+    }
+    const response = 'I need a confirmed on or off state before I can explain why.'
+    return { status: 'unsupported', text: response, response, controls: [], context }
   }
   if (/\bwhat (?:are|were) (?:those|the) rules\b|\bwhich rules\b/.test(normalized) && context?.lastAction && rooms.length) {
     return buildLightPlan({ action: 'pbl-rules', room: rooms[0].name })
@@ -1200,44 +1647,208 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   const historyQuery = /\bwhen\b.*\b(?:turn|turned|switch|switched)\s+(on|off)\b/.exec(normalized)
   if (historyQuery) {
     const targetState = historyQuery[1] as 'on' | 'off'
+    const multi = multiRoomContext(context)
+    if (!rooms.length && multi) {
+      if (!multi.hasExactTargets) {
+        return {
+          status: 'unsupported',
+          text: ROOM_DETAIL_REQUIRED_RESPONSE,
+          response: ROOM_DETAIL_REQUIRED_RESPONSE,
+          controls: [],
+          context: context ?? null,
+        }
+      }
+      return singleRoomContextPlan('history', multi, { targetState })
+        ?? roomPickerResponse('history', {
+        roomIds: multi.roomIds,
+        roomLightNames: multi.roomLightNames,
+        targetState,
+        })
+    }
     if (!rooms.length) return roomPickerResponse('history', { targetState })
     if (rooms.length > 1) {
       const response = SINGLE_ROOM_DETAIL_RESPONSE
       return { status: 'unsupported', text: response, response, controls: [], context: null }
     }
-    return buildLightPlan({
-      action: 'history',
-      room: rooms[0].name,
-      ...entityTarget(contextualTargets.entityIds),
-      target_state: targetState,
-      history_before: context?.roomId === null && context.lastAction === 'history' ? context.historyBefore : undefined,
-    })
+    const selection = readTargetsForRoom(rooms[0])
+    return selection.resolved
+      ? buildLightPlan({
+          action: 'history',
+          room: rooms[0].name,
+          ...entityTarget(selection.targets.entityIds),
+          target_state: targetState,
+          history_before: context?.roomId === null && context.lastAction === 'history' ? context.historyBefore : undefined,
+        })
+      : unresolvedReadResponse()
   }
-  if (/\bwhy\b.*\b(turn|turned|switch|switched)\s+(on|off)\b/.test(normalized)) {
-    const targetState = /\b(turn|turned|switch|switched)\s+off\b/.test(normalized) ? 'off' : 'on'
+  const reasonTurn = /\bwhy\b.*?\b(turn|turned|switch|switched)\s+(on|off)\b/.exec(normalized)
+  if (reasonTurn) {
+    const requestedState = reasonTurn[2] as 'on' | 'off'
+    const negativeAuxiliary = /\b(?:didnt|doesnt|dont|wont|cant|couldnt|wouldnt|shouldnt|hasnt|havent|did not|does not|do not|will not|can not|could not|would not|should not|has not|have not|never)\b/.exec(reasonTurn[0])
+    const auxiliaryScope = negativeAuxiliary
+      ? reasonTurn[0].slice(negativeAuxiliary.index + negativeAuxiliary[0].length)
+      : ''
+    const matrixVerb = /\b(?:expect|think|believe|report|say|tell|want|ask|know|realize|notice|remember|mean|intend|hope)\b|\bto\s*$/.test(auxiliaryScope)
+    const subjectNegation = /\b(?:the\s+)?(?:[a-z0-9]+\s+){0,6}[a-z0-9]+\s+(?:didnt|doesnt|dont|wont|cant|couldnt|wouldnt|shouldnt|hasnt|havent|did not|does not|do not|will not|can not|could not|would not|should not|has not|have not|not|never)\s+(?:turn|turned|switch|switched)\s+(?:on|off)\b/.test(reasonTurn[0])
+    const copularNegation = requestedState === 'on'
+      ? /\b(?:not(?:\s+(?:currently|still|yet|right now|at the moment|at present))?|no longer)\s+(?:switched\s+)?on\b/.test(reasonTurn[0])
+      : /\b(?:not(?:\s+(?:currently|still|yet|right now|at the moment|at present))?|no longer)\s+(?:switched\s+)?off\b/.test(reasonTurn[0])
+    const negatedPredicate = Boolean(negativeAuxiliary && !matrixVerb) || subjectNegation || copularNegation
+    const targetState = negatedPredicate
+      ? requestedState === 'on' ? 'off' : 'on'
+      : requestedState
+    const multi = multiRoomContext(context)
+    if (!rooms.length && multi) {
+      if (!multi.hasExactTargets) {
+        return {
+          status: 'unsupported',
+          text: ROOM_DETAIL_REQUIRED_RESPONSE,
+          response: ROOM_DETAIL_REQUIRED_RESPONSE,
+          controls: [],
+          context: context ?? null,
+        }
+      }
+      return singleRoomContextPlan('reason', multi, { targetState })
+        ?? roomPickerResponse('reason', {
+          roomIds: multi.roomIds,
+          roomLightNames: multi.roomLightNames,
+          targetState,
+        })
+    }
     if (!rooms.length) return roomPickerResponse('reason', { targetState })
     if (rooms.length > 1) {
       const response = SINGLE_ROOM_DETAIL_RESPONSE
       return { status: 'unsupported', text: response, response, controls: [], context: null }
     }
-    return buildLightPlan({
-      action: 'reason',
-      room: rooms[0].name,
-      ...entityTarget(contextualTargets.entityIds),
-      target_state: targetState,
-      history_before: context?.roomId === null && context.lastAction === 'reason' ? context.historyBefore : undefined,
-    })
+    const selection = readTargetsForRoom(rooms[0])
+    return selection.resolved
+      ? buildLightPlan({
+          action: 'reason',
+          room: rooms[0].name,
+          ...entityTarget(selection.targets.entityIds),
+          target_state: targetState,
+          history_before: context?.roomId === null && context.lastAction === 'reason' ? context.historyBefore : undefined,
+        })
+      : unresolvedReadResponse()
   }
-  if (wholeHomeLightsOnIntent === 'scoped') return roomPickerResponse('list')
+  const contextualReason = new RegExp(`^${reasonPrefix}why\\b.*\\b(?:it|they|these|those|that|lights?)\\b.*\\b(on|off)\\b`).exec(normalized)
+  if (contextualReason) {
+    const negatedOn = /\b(?:isnt|arent|wasnt|werent)\b.*\bon\b|\b(?:not(?:\s+(?:currently|still|yet|right now|at the moment|at present))?|no longer)\s+(?:switched\s+)?on\b/.test(normalized)
+    const negatedOff = /\b(?:isnt|arent|wasnt|werent)\b.*\boff\b|\b(?:not(?:\s+(?:currently|still|yet|right now|at the moment|at present))?|no longer)\s+(?:switched\s+)?off\b/.test(normalized)
+    const targetState = negatedOn ? 'off' : negatedOff ? 'on' : contextualReason[1] as 'on' | 'off'
+    if (explicitRooms.length > 1) {
+      const response = SINGLE_ROOM_DETAIL_RESPONSE
+      return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+    }
+    if (explicitRooms.length === 1) {
+      const selection = readTargetsForRoom(explicitRooms[0])
+      return selection.resolved
+        ? buildLightPlan({
+            action: 'reason',
+            room: explicitRooms[0].name,
+            ...entityTarget(selection.targets.entityIds),
+            target_state: targetState,
+          })
+        : unresolvedReadResponse()
+    }
+    const multi = multiRoomContext(context)
+    if (multi) {
+      if (!multi.hasExactTargets) {
+        return {
+          status: 'unsupported',
+          text: ROOM_DETAIL_REQUIRED_RESPONSE,
+          response: ROOM_DETAIL_REQUIRED_RESPONSE,
+          controls: [],
+          context: context ?? null,
+        }
+      }
+      return singleRoomContextPlan('reason', multi, { targetState })
+        ?? roomPickerResponse('reason', {
+          roomIds: multi.roomIds,
+          roomLightNames: multi.roomLightNames,
+          targetState,
+        })
+    }
+    if (rooms.length === 1) {
+      return buildLightPlan({
+        action: 'reason',
+        room: rooms[0].name,
+        ...entityTarget(contextualTargets.entityIds),
+        target_state: targetState,
+      })
+    }
+    return roomPickerResponse('reason', { targetState })
+  }
+  const namedReason = reasonQuestion && (fixtureMatches.length > 0 || explicitRooms.length > 0)
+  if (namedReason) {
+    const stateMatch = /\b(?:is|are)\b.*\b(on|off)\b/.exec(normalized)
+      ?? /\b(on|off)\b.*\b(?:is|are)\b/.exec(normalized)
+    const negatedOn = /\b(?:isnt|arent|wasnt|werent)\b.*\bon\b|\b(?:not(?:\s+(?:currently|still|yet|right now|at the moment|at present))?|no longer)\s+(?:switched\s+)?on\b/.test(normalized)
+    const negatedOff = /\b(?:isnt|arent|wasnt|werent)\b.*\boff\b|\b(?:not(?:\s+(?:currently|still|yet|right now|at the moment|at present))?|no longer)\s+(?:switched\s+)?off\b/.test(normalized)
+    const targetState = negatedOn
+      ? 'off'
+      : negatedOff
+        ? 'on'
+        : stateMatch?.[1] as 'on' | 'off' | undefined
+    if (targetState && rooms.length === 1) {
+      const selection = readTargetsForRoom(rooms[0])
+      return selection.resolved
+        ? buildLightPlan({
+            action: 'reason',
+            room: rooms[0].name,
+            ...entityTarget(selection.targets.entityIds),
+            target_state: targetState,
+          })
+        : unresolvedReadResponse()
+    }
+  }
+  if (wholeHomeLightsOnIntent === 'scoped') {
+    if (selectedTargetReference && rooms.length === 1
+      && (contextualTargets.entityIds.length || hasWholeRoomContext(rooms[0]))) {
+      return buildLightPlan({ action: 'list', room: rooms[0].name, ...entityTarget(contextualTargets.entityIds) })
+    }
+    const multi = multiRoomContext(context)
+    if (selectedTargetReference && multi?.hasExactTargets) {
+      return roomPickerResponse('list', { roomIds: multi.roomIds, roomLightNames: multi.roomLightNames })
+    }
+    if (selectedTargetReference) {
+      const response = 'I could not match the earlier light target in that query.'
+      return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+    }
+    return roomPickerResponse('list')
+  }
   if (READ_ONLY_REQUEST.test(normalized) && /\b(are|is)\b.*\b(on|off)\b/.test(normalized)) {
     const targetState = /\boff\b/.test(normalized) ? 'off' : 'on'
-    if (!rooms.length) return roomPickerResponse('state', { targetState })
-    return buildLightPlan({ operations: rooms.map((room) => ({
-      action: 'state',
-      room: room.name,
-      ...entityTarget(targetsInText(room, text).entityIds),
-      target_state: targetState,
-    })) })
+    if (!rooms.length) {
+      const multi = multiRoomContext(context)
+      return multi
+        ? singleRoomContextPlan('state', multi, { targetState })
+          ?? roomPickerResponse('state', {
+            roomIds: multi.roomIds,
+            roomLightNames: multi.roomLightNames,
+            targetState,
+          })
+        : roomPickerResponse('state', { targetState })
+    }
+    let unresolvedReference = false
+    const operations = rooms.map((room) => {
+      const explicit = targetsInText(room, text)
+      const targets = !explicit.entityIds.length && selectedTargetReference && context
+        ? targetsFromContext(room, context)
+        : explicit
+      if (selectedTargetReference && !targets.entityIds.length && !hasWholeRoomContext(room)) unresolvedReference = true
+      return {
+        action: 'state',
+        room: room.name,
+        ...entityTarget(targets.entityIds),
+        target_state: targetState,
+      }
+    })
+    if (unresolvedReference) {
+      const response = 'I could not match the earlier light target in that query.'
+      return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+    }
+    return buildLightPlan({ operations })
   }
   if (potentiallyWrites && !READ_ONLY_REQUEST.test(normalized)
     && hasUnknownNamedLightTarget(semanticText, fixtureMatches)) {
@@ -1248,14 +1859,41 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   if (potentiallyWrites && !DIRECT_WRITE_REQUEST.test(normalized)) {
     return indirectWriteResponse()
   }
-  if (/\b(change|pick|choose)\b.*\b(?:colors?|lights?)\b/.test(normalized) && !/\d{1,3}\s*%/.test(normalized) && !namedColorInText(normalized) && !/rgb\s*\(/i.test(text)) {
-    const requestedPhrases = [...new Set(fixtureMatches.map((match) => match.phrase))]
-    if (explicitRooms.length && requestedPhrases.some((phrase) =>
-      !fixtureMatches.some((match) => explicitRooms.some((room) => room.id === match.room.id) && match.phrase === phrase))) {
-      const response = `That light is not configured in ${formatNames(explicitRooms.map((room) => room.name))}.`
-      return { status: 'unsupported', text: response, response, controls: [], context: null }
+  if (colorClarificationIntent) {
+    if (selectedTargetReference && explicitRooms.length && !explicitWholeRoomColorTarget) {
+      const selections = explicitRooms.map((room) => ({ room, targets: context ? targetsFromContext(room, context) : { entityIds: [], lightNames: [] } }))
+      if (selections.some((selection) => !selection.targets.entityIds.length && !hasWholeRoomContext(selection.room))) {
+        const response = 'I could not match the earlier light target in that color request.'
+        return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+      }
+      if (selections.length > 1) {
+        return roomPickerResponse('color', {
+          roomIds: selections.map((selection) => selection.room.id),
+          roomLightNames: Object.fromEntries(selections.map((selection) => [
+            selection.room.id,
+            selection.targets.lightNames,
+          ])),
+        })
+      }
+      return colorPickerResponse(selections[0].room, selections[0].targets)
     }
     if (!rooms.length) {
+      const multi = multiRoomContext(context)
+      if (multi) {
+        if (!multi.hasExactTargets) {
+          return {
+            status: 'unsupported',
+            text: ROOM_DETAIL_REQUIRED_RESPONSE,
+            response: ROOM_DETAIL_REQUIRED_RESPONSE,
+            controls: [],
+            context: context ?? null,
+          }
+        }
+        return roomPickerResponse('color', {
+          roomIds: multi.roomIds,
+          roomLightNames: multi.roomLightNames,
+        })
+      }
       const fixtureDetails = fixturePickerDetails(text)
       if (fixtureDetails) {
         if (!fixtureDetails.roomIds.length) {
@@ -1278,11 +1916,50 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
       const response = `I could not match the earlier light target in the ${rooms[0].name}. Name the light or room again.`
       return { status: 'unsupported', text: response, response, controls: [], context: { domain: 'lights', roomId: rooms[0].id, entityIds: [], lightNames: [], lastAction: 'color' } }
     }
-    return colorPickerResponse(rooms, contextualTargets)
+    return colorPickerResponse(rooms, explicitWholeRoomColorTarget
+      ? { entityIds: [], lightNames: [] }
+      : contextualTargets)
   }
   if (explicitRooms.length && context?.lastAction && !/\b(turn|switch|put|enable|shut|disable|kill|set|dim|brighten|raise|lower|change|adjust|make|light up|are|is|when|why|what|which|how)\b/.test(normalized)) {
+    if (explicitRooms.length > 1) {
+      if (aggregateRoomContext && roomSelectionOnly(semanticText, explicitRooms)
+        && explicitRooms.every((room) => context.roomIds?.includes(room.id))) {
+        return roomDetailResponse(explicitRooms)
+      }
+      if (aggregateRoomContext) {
+        const response = 'Choose one or more rooms from the earlier list.'
+        return { status: 'unsupported', text: response, response, controls: [], context }
+      }
+      const response = SINGLE_ROOM_DETAIL_RESPONSE
+      return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+    }
     const action = ['state', 'count', 'list', 'color-state', 'brightness-state', 'pbl'].includes(context.lastAction) ? context.lastAction : 'state'
     return buildLightPlan({ action, room: explicitRooms[0].name })
+  }
+  const contextualAction = actionForSegment(text)
+  const multi = multiRoomContext(context)
+  if (multi && contextualTargetReference && !explicitRooms.length
+    && (contextualAction === 'on' || contextualAction === 'off')
+    && /^(?:(?:please\s+)?(?:turn|switch)\s+(?:it|that(?: light)?|them|these lights|those lights)\s+(?:on|off)|(?:please\s+)?(?:turn|switch)\s+(?:on|off)\s+(?:it|that(?: light)?|them|these lights|those lights))[.!]?$/.test(normalized)) {
+    const operations = multi.rooms.flatMap((room) => {
+      const names = multi.roomLightNames?.[room.id] ?? []
+      return names.length ? [{
+        action: contextualAction,
+        room: room.name,
+        light_names: names,
+      }] : []
+    })
+    if (operations.length) {
+      const plan = buildLightPlan({ operations })
+      return plan.status === 'ready' ? { ...plan, context: contextAfterWrite(context!, contextualAction) } : plan
+    }
+    return {
+      status: 'unsupported',
+      text: ROOM_DETAIL_REQUIRED_RESPONSE,
+      response: ROOM_DETAIL_REQUIRED_RESPONSE,
+      controls: [],
+      context: context ?? null,
+    }
   }
   if (/^(?:who|what|where|why|how|did|does|do|is|are|was|were|has|have)\b/.test(normalized)
     || (/^when\b/.test(normalized) && !/^when you can\b/.test(normalized))
@@ -1315,7 +1992,7 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
     }
     const brightness = [...segmentCommandClause.matchAll(/(\d{1,3})\s*%/g)].map((match) => Number(match[1]))
     const color = colorInText(segmentCommandClause)
-    const explicitSegmentRooms = roomsInText(segmentCommandClause)
+    const explicitSegmentRooms = roomsInText(segmentCommandClause, context)
     const segmentFixtures = fixtureSpansInText(segmentCommandClause)
     if (hasNonLightTarget(segmentCommandClause, segmentFixtures)) {
       const response = 'I could not match the light target in one of those action clauses.'
@@ -1324,11 +2001,22 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
     const segmentLightSubject = /\blights?\b|\blighting\b/.test(segmentCommandClause)
       || /\bexterior\b/.test(segmentCommandClause)
       || explicitSegmentRooms.length > 0 && /\blight up\b/.test(segmentCommandClause)
+    const contextualLightDeterminer = /\b(?:those|these|same|that)\b/.test(segmentCommandClause)
     const explicitWholeRoomTarget = explicitSegmentRooms.length > 0
       && !segmentFixtures.length
       && segmentLightSubject
+      && !contextualLightDeterminer
     const segmentPronoun = !explicitWholeRoomTarget
-      && /\b(?:it|them|those|these|same|that one|that light|the same one|the same lights?)\b/.test(segmentCommandClause)
+      && /\b(?:it|them|those|these|same|that(?: one| light)?|the same one|the same lights?)\b/.test(segmentCommandClause)
+    const segmentContextTargetReference = segmentPronoun || /\bselected\b/.test(segmentCommandClause)
+    if (segmentPronoun && segmentFixtures.length) {
+      const response = 'Please name every light in that action instead of mixing a pronoun with another fixture.'
+      return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+    }
+    if (raw.length && segmentPronoun && !previousSegmentTarget) {
+      const response = 'I could not match that pronoun to one current light target.'
+      return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+    }
     if (!segmentFixtures.length && !segmentLightSubject && !segmentPronoun) {
       const response = 'I could not match the light target in one of those action clauses.'
       return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
@@ -1346,11 +2034,47 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
       const inheritedRoom = HOUSE_LIGHT_ROOMS.find((room) => room.id === previousSegmentTarget?.roomId)
       if (inheritedRoom) segmentRooms = [inheritedRoom]
     }
+    if (!segmentRooms.length && segments.length === 1 && rooms.length === 1) {
+      segmentRooms = rooms
+    }
     if (!segmentRooms.length && segments.length === 1 && context?.roomId) {
       const contextual = HOUSE_LIGHT_ROOMS.find((room) => room.id === context.roomId)
       if (contextual) segmentRooms = [contextual]
     }
+    if (segmentPronoun && previousSegmentTarget && explicitSegmentRooms.length
+      && (explicitSegmentRooms.length !== 1 || explicitSegmentRooms[0].id !== previousSegmentTarget.roomId)) {
+      const response = 'I could not match the current light target to that room.'
+      return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+    }
     if (!segmentRooms.length) {
+      if (raw.length && segmentPronoun) {
+        const response = 'I could not match that pronoun to one current light target.'
+        return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+      }
+      const contextualMulti = multiRoomContext(context)
+      if (contextualMulti && selectedTargetReference) {
+        if (segments.length > 1) {
+          const response = 'Please split that multi-room follow-up into separate light requests.'
+          return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
+        }
+        if (!contextualMulti.hasExactTargets) {
+          return {
+            status: 'unsupported',
+            text: ROOM_DETAIL_REQUIRED_RESPONSE,
+            response: ROOM_DETAIL_REQUIRED_RESPONSE,
+            controls: [],
+            context: context ?? null,
+          }
+        }
+        return roomPickerResponse(action, {
+          roomIds: contextualMulti.roomIds,
+          roomLightNames: contextualMulti.roomLightNames,
+          ...(brightness.length ? { brightnessPct: brightness.length === 1 ? brightness[0] : brightness } : {}),
+          ...(typeof color.color_name === 'string' ? { colorName: color.color_name } : {}),
+          ...(typeof color.color_temperature_kelvin === 'number' ? { colorTemperatureKelvin: color.color_temperature_kelvin } : {}),
+          ...(Array.isArray(color.rgb_color) ? { rgbColor: color.rgb_color as [number, number, number] } : {}),
+        })
+      }
       const fixtureDetails = fixturePickerDetails(segment)
       if (fixtureDetails && !fixtureDetails.roomIds.length) {
         return {
@@ -1386,12 +2110,23 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
         && previousSegmentTarget?.roomId === room.id
       const usesContext = segments.length === 1 && !targets.entityIds.length
         && context?.roomId === room.id && !explicitSegmentRooms.length
-      if (segmentPronoun && !inheritsPrevious && !usesContext) {
+      const usesMultiContext = !targets.entityIds.length
+        && segmentContextTargetReference
+        && Boolean(context?.roomIds?.includes(room.id) && context.roomLightNames?.[room.id]?.length)
+      const usesSingleSelectedContext = !targets.entityIds.length
+        && segmentContextTargetReference
+        && context?.roomId === room.id
+        && Boolean(context.entityIds.length || context.lightNames.length)
+      const usesSingleWholeRoomContext = !targets.entityIds.length
+        && segmentContextTargetReference
+        && hasWholeRoomContext(room)
+      if (segmentContextTargetReference && !targets.entityIds.length && !inheritsPrevious
+        && !usesContext && !usesMultiContext && !usesSingleSelectedContext && !usesSingleWholeRoomContext) {
         const response = 'I could not match the earlier light target in that action clause.'
         return { status: 'unsupported', text: response, response, controls: [], context: context ?? null }
       }
-      const contextualIds = usesContext
-        ? targetsFromContext(room, context).entityIds : []
+      const contextualIds = usesContext || usesMultiContext || usesSingleSelectedContext
+        ? targetsFromContext(room, context!).entityIds : []
       const inheritedIds = inheritsPrevious ? previousSegmentTarget?.entityIds ?? [] : []
       const selectedIds = targets.entityIds.length
         ? targets.entityIds
@@ -1409,5 +2144,22 @@ export function parseLightUtterance(text: string, context?: LightContext | null)
   }
   if (!raw.length) return lightLanguage && WRITE_ACTION_LANGUAGE.test(normalized)
     ? roomPickerResponse() : null
-  return buildLightPlan({ operations: raw })
+  const plan = buildLightPlan({ operations: raw })
+  const contextualMulti = multiRoomContext(context)
+  const selectedRoomIds = contextualMulti?.roomLightNames ? Object.keys(contextualMulti.roomLightNames) : []
+  const preservesMultiContext = plan.status === 'ready' && contextualMulti
+    && contextualMulti.roomLightNames
+    && plan.operations?.length === selectedRoomIds.length
+    && plan.operations.every((operation) => {
+      const selectedNames = contextualMulti.roomLightNames?.[operation.room.id]
+      const actualNames = operation.lightNames.length
+        ? operation.lightNames
+        : operation.room.lights.map((light) => light.name)
+      return selectedNames && selectedNames.length === actualNames.length
+        && selectedNames.every((name) => actualNames.includes(name))
+    })
+    && selectedRoomIds.every((roomId) => plan.operations?.some((operation) => operation.room.id === roomId))
+  return preservesMultiContext
+    ? { ...plan, context: contextAfterWrite(context!, plan.operations!.at(-1)!.action) }
+    : plan
 }

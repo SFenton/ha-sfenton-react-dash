@@ -25,6 +25,11 @@ describe('Gemini lights corpus', () => {
     }
   })
 
+  it('keeps delayed requests out of immediate-command families', () => {
+    const generated = generateFamily('clarify-room', 10_000)
+    expect(generated.examples.every((item) => !/\bin a moment\b/i.test(item.turns[0].text))).toBe(true)
+  })
+
   it('generates a full whole-home light-status family', () => {
     const generated = generateFamily('whole-home-lights-on', 10_000)
     expect(generated.utterances).toBeGreaterThanOrEqual(10_000)
@@ -46,5 +51,38 @@ describe('Gemini lights corpus', () => {
       return ['currently', 'right now', 'at the moment', 'at present']
         .reduce((count, marker) => count + normalized.split(marker).length - 1, 0) <= 1
     })).toBe(true)
+  })
+
+  it('generates one- and multi-room whole-home detail follow-ups', () => {
+    const generated = generateFamily('followup-whole-home-room-detail', 10_000)
+    expect(generated.utterances).toBeGreaterThanOrEqual(10_000)
+    const operationCounts = new Set(generated.examples.map((item) =>
+      (item.expected.operations as Array<{ room: string }>).length))
+    expect(operationCounts).toEqual(new Set([1, 2, 3]))
+    const cardinalityCounts = [1, 2, 3].map((count) => generated.examples.filter((item) =>
+      (item.expected.operations as Array<{ room: string }>).length === count).length)
+    expect(Math.max(...cardinalityCounts) - Math.min(...cardinalityCounts))
+      .toBeLessThanOrEqual(generated.examples.length * 0.02)
+    const rooms = new Set(generated.examples.flatMap((item) =>
+      (item.expected.operations as Array<{ room: string }>).map((operation) => operation.room)))
+    expect([...rooms].sort()).toEqual(HOUSE_LIGHT_ROOMS.map((room) => room.name).sort())
+    const followUps = generated.examples.map((item) => item.turns.at(-1)?.text ?? '')
+    expect(new Set(followUps).size).toBeGreaterThanOrEqual(10_000)
+    for (const wrapper of ['Tell me about ', 'Show me ', 'How about ', 'What about ', 'I would like details for ']) {
+      expect(followUps.some((text) => text.startsWith(wrapper))).toBe(true)
+    }
+    for (const count of [1, 2, 3]) {
+      const coveredRooms = new Set(generated.examples
+        .filter((item) => (item.expected.operations as Array<{ room: string }>).length === count)
+        .flatMap((item) => (item.expected.operations as Array<{ room: string }>).map((operation) => operation.room)))
+      expect([...coveredRooms].sort()).toEqual(HOUSE_LIGHT_ROOMS.map((room) => room.name).sort())
+    }
+    expect(generated.examples.some((item) => {
+      const selected = (item.expected.operations as Array<{ room: string }>).map((operation) => operation.room)
+      return selected.includes('Hallway') && selected.includes('Downstairs Hallway')
+    })).toBe(true)
+    const roomCounts = HOUSE_LIGHT_ROOMS.map((room) => generated.examples.filter((item) =>
+      (item.expected.operations as Array<{ room: string }>).some((operation) => operation.room === room.name)).length)
+    expect(Math.max(...roomCounts) - Math.min(...roomCounts)).toBeLessThanOrEqual(generated.examples.length * 0.01)
   })
 })

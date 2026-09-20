@@ -25,7 +25,7 @@ function actionBodies(action: 'on' | 'off', target: string) {
     : [`turn off ${target}`, `turn ${target} off`, `switch off ${target}`, `switch ${target} off`, `shut off ${target}`, `shut ${target} off`]
 }
 const levels = Array.from({ length: 101 }, (_, value) => value)
-const commandContexts = ['', ' for now', ' for this evening', ' before dinner', ' while we are home', ' until I change them', ' as the next step', ' for this scene', ' in a moment', ' before we leave', ' for the next hour', ' while I finish this', ' for everyone', ' just this once', ' as requested', ' without a transition']
+const commandContexts = ['', ' for now', ' for this evening', ' before dinner', ' while we are home', ' until I change them', ' as the next step', ' for this scene', ' before we leave', ' for the next hour', ' while I finish this', ' for everyone', ' just this once', ' as requested', ' without a transition']
 const queryContexts = ['', ' right now', ' at the moment', ' as a quick check', ' before I change anything', ' based on Home Assistant', ' from the latest state', ' for this room']
 const rgbNames = Object.keys(RGB_COLORS)
 const whiteNames = Object.keys(WHITE_COLORS)
@@ -257,6 +257,98 @@ function* wholeHomeLightsOn() {
   }
 }
 
+function* wholeHomeRoomDetailFollowUp() {
+  const byCardinality: Array<Array<Array<(typeof HOUSE_LIGHT_ROOMS)[number]>>> = [
+    HOUSE_LIGHT_ROOMS.map((room) => [room]),
+    [],
+    [],
+  ]
+  for (let first = 0; first < HOUSE_LIGHT_ROOMS.length; first += 1) {
+    for (let second = first + 1; second < HOUSE_LIGHT_ROOMS.length; second += 1) {
+      const pair = [HOUSE_LIGHT_ROOMS[first], HOUSE_LIGHT_ROOMS[second]]
+      byCardinality[1].push(pair)
+      for (let third = second + 1; third < HOUSE_LIGHT_ROOMS.length; third += 1) {
+        const triple = [HOUSE_LIGHT_ROOMS[first], HOUSE_LIGHT_ROOMS[second], HOUSE_LIGHT_ROOMS[third]]
+        byCardinality[2].push(triple)
+      }
+    }
+  }
+  const balanced = (items: Array<Array<(typeof HOUSE_LIGHT_ROOMS)[number]>>) => {
+    const remaining = items.map((rooms, index) => ({ rooms, index }))
+    const counts = new Map(HOUSE_LIGHT_ROOMS.map((room) => [room.id, 0]))
+    const ordered: typeof items = []
+    while (remaining.length) {
+      remaining.sort((left, right) => {
+        const leftCounts = left.rooms.map((room) => counts.get(room.id) ?? 0)
+        const rightCounts = right.rooms.map((room) => counts.get(room.id) ?? 0)
+        return Math.max(...leftCounts) - Math.max(...rightCounts)
+          || leftCounts.reduce((sum, count) => sum + count, 0) - rightCounts.reduce((sum, count) => sum + count, 0)
+          || left.index - right.index
+      })
+      const next = remaining.shift()!
+      ordered.push(next.rooms)
+      next.rooms.forEach((room) => counts.set(room.id, (counts.get(room.id) ?? 0) + 1))
+    }
+    return ordered
+  }
+  const balancedByCardinality = byCardinality.map(balanced)
+  const wrappers = [
+    '', 'Tell me about ', 'Show me ', 'How about ', 'What about ', 'I would like details for ',
+    'Please show me ', 'Can you show me ', 'Could you show me ', 'Would you show me ',
+    'Tell me more about ', 'Can you tell me about ', 'Could you tell me about ',
+    'Would you tell me about ', 'Show me more about ', 'I would like more details for ',
+  ]
+  const selectionEndings = [
+    '', '.', ' please.', '?', ', please.', ', thanks.', ' thanks.', ', thank you.',
+    ' now.', ' please?', ' now?', ', please?', ', thanks?', ' thank you?',
+  ]
+  function* examplesFor(selections: Array<Array<(typeof HOUSE_LIGHT_ROOMS)[number]>>) {
+    for (let wrapperIndex = 0; wrapperIndex < wrappers.length; wrapperIndex += 1) {
+      for (const ending of selectionEndings) {
+        for (let selectionIndex = 0; selectionIndex < selections.length; selectionIndex += 1) {
+          const rooms = selections[selectionIndex]
+          const names = rooms.map((room, roomIndex) => {
+            const references = roomReferences(room)
+            return references[(wrapperIndex + selectionIndex + roomIndex) % references.length]
+          })
+          const joined = names.length === 1
+            ? names[0]
+            : names.length === 2
+              ? `${names[0]} and ${names[1]}`
+              : `${names.slice(0, -1).join(', ')}, and ${names.at(-1)}`
+          yield example('followup-whole-home-room-detail', [
+            { role: 'user', text: 'What lights are on?' },
+            { role: 'assistant', text: 'I found the rooms with lights on.' },
+            { role: 'user', text: phrase('', `${wrappers[wrapperIndex]}${joined}`, ending) },
+          ], {
+            context: {
+              domain: 'lights',
+              roomId: null,
+              entityIds: [],
+              lightNames: [],
+              roomIds: rooms.map((room) => room.id),
+              lastAction: 'lights-on',
+            },
+            tool: 'home_lights',
+            operations: rooms.map((room) => ({ action: 'list', room: room.name })),
+          })
+        }
+      }
+    }
+  }
+  const iterators = balancedByCardinality.map((selections) => examplesFor(selections))
+  while (true) {
+    let emitted = false
+    for (const iterator of iterators) {
+      const next = iterator.next()
+      if (next.done) continue
+      emitted = true
+      yield next.value
+    }
+    if (!emitted) break
+  }
+}
+
 function* clarification(family: 'clarify-room' | 'clarify-color') {
   if (family === 'clarify-room') {
     for (const action of ['on', 'off'] as const) for (const body of actionBodies(action, 'the lights')) for (const opener of openers) for (const context of commandContexts) for (const ending of endings) {
@@ -340,6 +432,7 @@ export const CORPUS_FAMILIES = [
   ['brightness-query', () => queries('brightness-query')], ['color-state-query', () => queries('color-state-query')],
   ['history-query', () => queries('history-query')], ['reason-query', () => queries('reason-query')], ['pbl-query', () => queries('pbl-query')],
   ['whole-home-lights-on', wholeHomeLightsOn],
+  ['followup-whole-home-room-detail', wholeHomeRoomDetailFollowUp],
   ['clarify-room', () => clarification('clarify-room')], ['clarify-color', () => clarification('clarify-color')],
   ['fixture-color-clarify', () => replayConversations('fixture-color-clarify')],
   ['followup-which-ones', () => replayConversations('followup-which-ones')], ['followup-repeat-now', () => replayConversations('followup-repeat-now')],
@@ -352,16 +445,26 @@ export function generateFamily(family: string, targetUtterances: number) {
   const factory = CORPUS_FAMILIES.find(([name]) => name === family)?.[1]
   if (!factory) throw new Error(`Unknown corpus family: ${family}`)
   const seen = new Set<string>()
+  const uniqueUserUtterances = new Set<string>()
   const output: CorpusExample[] = []
   let utterances = 0
   for (const item of factory()) {
     if (item.family !== family || seen.has(item.id)) continue
     seen.add(item.id)
     output.push(item)
-    utterances += item.turns.filter((turn) => turn.role === 'user').length
-    if (utterances >= targetUtterances) break
+    const userTurns = item.turns.filter((turn) => turn.role === 'user')
+    utterances += userTurns.length
+    if (family === 'followup-whole-home-room-detail') {
+      const followUp = userTurns.at(-1)
+      if (followUp) uniqueUserUtterances.add(followUp.text)
+    } else {
+      userTurns.forEach((turn) => uniqueUserUtterances.add(turn.text))
+    }
+    const coverage = family === 'followup-whole-home-room-detail' ? uniqueUserUtterances.size : utterances
+    if (coverage >= targetUtterances) break
   }
-  if (utterances < targetUtterances) throw new Error(`${family} produced only ${utterances} unique user utterances; expected ${targetUtterances}`)
+  const coverage = family === 'followup-whole-home-room-detail' ? uniqueUserUtterances.size : utterances
+  if (coverage < targetUtterances) throw new Error(`${family} produced only ${coverage} user utterances; expected ${targetUtterances}`)
   return { examples: output, utterances }
 }
 

@@ -25,7 +25,7 @@
 
 | Done | Capability | Coverage | Grounding / corpus |
 |---|---|---|---|
-| [x] | Household lights | Room groups and named fixtures; compound on/off; exact and relative brightness; configured RGB/white-temperature color; room and configured-fixture whole-home reads; state, last-off history, cautious cause evidence, and Presence-Based Lighting status; embedded clarification/continuation controls with one-send persistence; sanitized serial conversation-learning queue with routing provenance, frozen replays, and guarded patch releases | `corpus/GEMINI-LIGHTS-GROUNDING.md`; deterministic 10k-utterance-per-family generator; `improvement/` |
+| [x] | Household lights | Room groups and named fixtures; compound on/off; exact and relative brightness; configured RGB/white-temperature color; whole-home room summaries with one- or multi-room fixture detail follow-ups; state, history, cautious cause evidence, and Presence-Based Lighting status; embedded clarification/continuation controls with one-send persistence; sanitized serial conversation-learning queue with routing provenance, frozen replays, and guarded patch releases | `corpus/GEMINI-LIGHTS-GROUNDING.md`; deterministic 10k-utterance-per-family generator; `improvement/` |
 | [ ] | Contact sensors | Not planned yet | — |
 
 A capability check means the initial end-to-end MCP, chat-control, context,
