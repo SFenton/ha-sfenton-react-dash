@@ -502,6 +502,7 @@ describe('admin issue controller security configuration', () => {
       repository: 'SFenton/ha-sfenton-react-dash',
       repositoryId: 1228257493,
       repositoryPath,
+      requiredCheckAppId: 15368,
       requiredChecks: ['Playwright gate'],
       requiredWorkflow: 'deploy-dashboard.yml',
       stateDirectory: join(root, 'state'),
@@ -516,6 +517,7 @@ describe('admin issue controller security configuration', () => {
     writeFileSync(configPath, JSON.stringify(base))
     expect(loadAdminIssueControllerConfig(configPath)).toMatchObject({
       repository: base.repository,
+      requiredCheckAppId: 15368,
       workerImageId: base.workerImageId,
     })
 

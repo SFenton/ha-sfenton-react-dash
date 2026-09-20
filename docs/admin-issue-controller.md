@@ -51,7 +51,8 @@ mutable user extensions or unrelated personal skills.
    `max` effort, and `/tandem-research`.
 6. Post a structured question and pause when a consequential decision remains.
 7. Otherwise validate the isolated worktree, commit and push it, open a pull
-   request, and repair failed protected checks up to the configured limit.
+   request, and repair failed protected checks from the pinned GitHub App up to
+   the configured limit.
 8. Merge only the recorded head SHA after every required check succeeds.
 9. Require the successful v2 deployment artifact for the exact merge SHA,
    including accepted disposition, verified paths, panel registration, and

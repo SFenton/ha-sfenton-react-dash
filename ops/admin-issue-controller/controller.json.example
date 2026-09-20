@@ -17,6 +17,7 @@
   "issueLabels": [
     "bug"
   ],
+  "requiredCheckAppId": 15368,
   "requiredChecks": [
     "Playwright gate"
   ],

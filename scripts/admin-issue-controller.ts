@@ -65,6 +65,7 @@ interface AdminIssueControllerConfig {
   pollSeconds: number
   repository: string
   repositoryId: number
+  requiredCheckAppId: number
   repositoryPath: string
   requiredChecks: string[]
   requiredWorkflow: string
@@ -114,6 +115,9 @@ interface GitHubPullRequest {
 }
 
 interface CheckRun {
+  app: {
+    id: number
+  }
   conclusion: string | null
   details_url: string | null
   id: number
@@ -334,6 +338,10 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
     repository,
     repositoryId: parsePositiveInteger(raw.repositoryId, 'repositoryId'),
     repositoryPath,
+    requiredCheckAppId: parsePositiveInteger(
+      raw.requiredCheckAppId,
+      'requiredCheckAppId',
+    ),
     requiredChecks,
     requiredWorkflow: parseNonEmptyString(
       raw.requiredWorkflow ?? 'deploy-dashboard.yml',
@@ -1640,7 +1648,7 @@ async function waitForRequiredChecks(
     )
     const latestByName = new Map<string, CheckRun>()
     for (const check of response.check_runs.sort((left, right) => left.id - right.id)) {
-      latestByName.set(check.name, check)
+      if (check.app.id === config.requiredCheckAppId) latestByName.set(check.name, check)
     }
     const required = config.requiredChecks.map((name) => latestByName.get(name))
     if (required.every(Boolean)) {
