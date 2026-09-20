@@ -29,6 +29,9 @@ export const PAGE_FOOD_COPY_NAMESPACE = 'pageFood' as const
 export const PAGE_SETTINGS_COPY_NAMESPACE = 'pageSettings' as const
 export const PAGE_SETTINGS_COPY_KEYS = {
   items: {
+    todo: {
+      githubSyncDisclosure: 'items.todo.githubSyncDisclosure',
+    },
     vacation: {
       subtitle: 'items.vacation.subtitle',
       title: 'items.vacation.title',

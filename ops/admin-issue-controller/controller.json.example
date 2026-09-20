@@ -1,0 +1,29 @@
+{
+  "repository": "SFenton/ha-sfenton-react-dash",
+  "repositoryId": 1228257493,
+  "ownerLogin": "SFenton",
+  "ownerId": 3988463,
+  "repositoryPath": "/home/sfenton/repos/ha-sfenton-react-dash",
+  "stateDirectory": "~/.local/state/admin-issue-controller",
+  "worktreeRoot": "~/.local/share/admin-issue-controller/worktrees",
+  "workerHome": "~/.local/share/admin-issue-controller/worker-home",
+  "workerExtensionPath": "~/.local/share/admin-issue-controller/worker-extension.mjs",
+  "tandemSkillPath": "~/.local/share/admin-issue-controller/tandem-research/SKILL.md",
+  "workerImageId": "sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948",
+  "workerTimeoutMinutes": 90,
+  "todoEntityId": "todo.groceries",
+  "completionScript": "script.complete_admin_todo_item",
+  "completionReceiptEntityId": "input_text.admin_todo_completion_receipt",
+  "issueLabels": [
+    "bug"
+  ],
+  "requiredCheckAppId": 15368,
+  "requiredChecks": [
+    "Playwright gate"
+  ],
+  "requiredWorkflow": "deploy-dashboard.yml",
+  "maxRepairAttempts": 3,
+  "pollSeconds": 30,
+  "deploymentPollSeconds": 20,
+  "deploymentTimeoutMinutes": 90
+}

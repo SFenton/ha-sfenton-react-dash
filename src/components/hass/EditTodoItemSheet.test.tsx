@@ -1,7 +1,9 @@
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
 // @covers src/components/hass/adminTodoEdit.ts
+// @covers src/i18n/index.ts
 // @covers src/i18n/locales/en/core.json
+// @covers src/i18n/locales/en/pages/settings.json
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { EditTodoItemSheet } from './EditTodoItemSheet'
@@ -24,6 +26,7 @@ describe('EditTodoItemSheet', () => {
     render(<EditTodoItemSheet editTarget={target} onClose={onClose} onSaved={onSaved} open />)
 
     const dialog = await screen.findByRole('dialog', { name: 'Edit Task' })
+    expect(within(dialog).getByText('This issue is synchronized from the dashboard Admin To-Do list. The repository is public.')).toBeVisible()
     const input = screen.getByRole('textbox', { name: 'Task Name' })
     expect(input).toHaveValue('  Raw task title  ')
     expect(within(dialog).getByRole('button', { name: 'Reset' })).toBeDisabled()
