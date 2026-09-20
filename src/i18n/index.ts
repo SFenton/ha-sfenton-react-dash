@@ -294,14 +294,11 @@ export const SOLO_TRIP_COPY_KEYS = {
     vacation: 'chooser.vacation',
   },
   editor: {
-    cancelReturn: 'editor.cancelReturn',
-    changeReturn: 'editor.changeReturn',
     confirm: 'editor.confirm',
     description: 'editor.description',
     endDate: 'editor.endDate',
     endTime: 'editor.endTime',
     homeResident: 'editor.homeResident',
-    saveReturn: 'editor.saveReturn',
     startDate: 'editor.startDate',
     startTime: 'editor.startTime',
     title: 'editor.title',
@@ -310,7 +307,7 @@ export const SOLO_TRIP_COPY_KEYS = {
     travelerStephen: 'editor.travelerStephen',
     validation: {
       endAfterStart: 'editor.validation.endAfterStart',
-      startInFuture: 'editor.validation.startInFuture',
+      endInFuture: 'editor.validation.endInFuture',
       travelerRequired: 'editor.validation.travelerRequired',
     },
   },
@@ -353,9 +350,6 @@ export const SOLO_TRIP_COPY_KEYS = {
     restoreRequiredDescription: 'status.restoreRequiredDescription',
     restoreRequiredTitle: 'status.restoreRequiredTitle',
     restoreSaved: 'status.restoreSaved',
-    scheduledDescription: 'status.scheduledDescription',
-    scheduledTitle: 'status.scheduledTitle',
-    updateEnd: 'status.updateEnd',
   },
 } as const
 

@@ -439,8 +439,19 @@ async function soloTripSettingsFacts(root: Locator, state: string) {
   await expect(toggle).toHaveAttribute('aria-checked', 'true')
   await expect(root.getByText('Away', { exact: true })).toBeVisible()
   await expect(root.getByText('Home', { exact: true })).toBeVisible()
-  await expect(root.getByLabel('Departure Date')).toBeVisible()
+  await expect(root.getByLabel('Departure Date')).toHaveCount(0)
+  await expect(root.getByLabel('Departure Time')).toHaveCount(0)
+  const returnDate = root.getByLabel('Return Date')
+  const returnTime = root.getByLabel('Return Time')
+  await expect(returnDate).toBeVisible()
   await expect(root.getByLabel('Return Time')).toBeVisible()
+  if (state === 'ending') {
+    await expect(returnDate).toBeDisabled()
+    await expect(returnTime).toBeDisabled()
+  } else {
+    await expect(returnDate).toBeEnabled()
+    await expect(returnTime).toBeEnabled()
+  }
   await expect(travelerButtons).toHaveCount(0)
   const viewerState = state === 'active-home-viewer' ? 'home' : state === 'active-unknown-viewer' ? 'unknown' : 'traveler'
   const awayTraveler = root.locator(`article[aria-label="${viewerState === 'traveler' ? 'You' : 'Stephen'} Away"]`)
@@ -459,12 +470,20 @@ async function soloTripSettingsFacts(root: Locator, state: string) {
     { backgroundColor: 'rgba(91, 141, 239, 0.6)', filter: 'saturate(0.45)' },
     { backgroundColor: 'rgba(255, 255, 255, 0.1)', filter: 'saturate(0.45)' },
   ])
+  if (state === 'scheduled') await expect(root.getByRole('note', { name: 'Stephen Away' })).toHaveCount(0)
+  else await expect(root.getByRole('note', { name: 'Stephen Away' })).toHaveCount(1)
 
   if (state === 'scheduled') {
     await expect(toggle).toBeEnabled()
-    await expect(root.getByRole('heading', { name: 'Solo Trip Scheduled' })).toBeVisible()
-    await expect(root.getByRole('button', { name: 'Change' })).toBeVisible()
+    await expect(root.getByRole('heading', { name: 'Solo Trip Scheduled' })).toHaveCount(0)
+    await expect(root.getByRole('button', { name: 'Change' })).toHaveCount(0)
     return { ...facts, state, toggle: 'enabled-on', returnEditor: 'available', travelerCards }
+  }
+  if (state === 'invalid-return') {
+    await expect(toggle).toBeEnabled()
+    await expect(root.getByRole('alert')).toContainText('Return date/time must be in the future.')
+    await expect.poll(() => page.evaluate(() => window.__mockHass?.calls.filter((call) => call.domain === 'script' && call.service === 'household_away_command') ?? [])).toEqual([])
+    return { ...facts, state, invalidReturn: 'local-only', returnEditor: 'available', travelerCards }
   }
   if (state === 'activating') {
     await expect(toggle).toBeEnabled()
@@ -489,7 +508,7 @@ async function soloTripSettingsFacts(root: Locator, state: string) {
       sameSection: noticeElement.closest('section') === descriptionElement.closest('section'),
     }), statusElement)
     expect(statusPlacement).toEqual({ beforeDescription: true, sameSection: true })
-    await expect(root.getByRole('button', { name: 'Change' })).toBeVisible()
+    await expect(root.getByRole('button', { name: 'Change' })).toHaveCount(0)
     return { ...facts, state, activeCopy, status: 'confirmed active before description', statusPlacement, returnEditor: 'available', travelerCards, viewerState }
   }
   if (state === 'degraded') {

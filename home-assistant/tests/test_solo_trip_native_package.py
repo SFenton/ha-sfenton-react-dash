@@ -101,7 +101,9 @@ class SoloTripNativePackageTests(unittest.TestCase):
         )[0]
         self.assertIn("journal_phase != 'idle'", schedule_section)
         self.assertIn("solo_trip_already_configured", schedule_section)
-        self.assertIn("current_minute_timestamp", schedule_section)
+        self.assertNotIn("current_minute_timestamp", schedule_section)
+        self.assertNotIn("start_in_past", schedule_section)
+        self.assertIn("request_end_timestamp <= request_start_timestamp", schedule_section)
 
     def test_activation_adds_truthful_activating_barriers_and_alarm_clear_wait(self) -> None:
         self.assertIn("activating_status_payload", self.package_text)

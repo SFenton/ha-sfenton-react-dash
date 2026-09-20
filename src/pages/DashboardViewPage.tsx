@@ -1890,14 +1890,22 @@ function SettingsLink({ item, onNavigate }: { item: SettingsLinkConfig; onNaviga
   )
 }
 
-function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+function SettingsLinkList({ ariaLabel, items, onNavigate }: {
+  ariaLabel: string
+  items: SettingsLinkConfig[]
+  onNavigate: (path: string) => void
+}) {
   return (
-    <nav aria-label="Settings pages" className={styles.settingsList}>
-      {SETTINGS_PAGE_ITEMS.map((item) => (
+    <nav aria-label={ariaLabel} className={styles.settingsList} data-settings-link-list="true">
+      {items.map((item) => (
         <SettingsLink item={item} key={item.title} onNavigate={onNavigate} />
       ))}
     </nav>
   )
+}
+
+function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
+  return <SettingsLinkList ariaLabel="Settings pages" items={SETTINGS_PAGE_ITEMS} onNavigate={onNavigate} />
 }
 
 function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -2288,21 +2296,7 @@ function VacationChooserPage({ onNavigate }: { onNavigate: (path: string) => voi
 
   return (
     <div className={styles.stack}>
-      <DynamicGrid
-        ariaLabel={vacationCopy(PAGE_VACATION_COPY_KEYS.chooser.ariaLabel)}
-        columns={2}
-        gap={8}
-        justify="center"
-        lastRow="fill-minimum"
-        layout="bounded"
-        maxCellWidth={320}
-        maxColumns={3}
-        role="navigation"
-      >
-        {items.map((item) => (
-          <SettingsLink item={item} key={item.path} onNavigate={onNavigate} />
-        ))}
-      </DynamicGrid>
+      <SettingsLinkList ariaLabel={vacationCopy(PAGE_VACATION_COPY_KEYS.chooser.ariaLabel)} items={items} onNavigate={onNavigate} />
     </div>
   )
 }
@@ -2319,14 +2313,13 @@ function SoloTripPage() {
   const [scheduleAwaitingState, setScheduleAwaitingState] = useState<SoloTripScheduleAwaitingState | null>(null)
   const [toggleAwaitingSnapshot, setToggleAwaitingSnapshot] = useState(false)
   const [returnDraft, setReturnDraft] = useState({ endDate: '', endTime: '' })
-  const [returnEditing, setReturnEditing] = useState(false)
+  const [returnDraftDirty, setReturnDraftDirty] = useState(false)
   const [returnAwaitingState, setReturnAwaitingState] = useState<SoloTripReturnAwaitingState | null>(null)
   const [restoreAwaitingSnapshot, setRestoreAwaitingSnapshot] = useState(false)
   const [previousMode, setPreviousMode] = useState(snapshot.mode)
   const engaged = householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.SOLO_TRIP)
   const vacationEngaged = householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.VACATION)
   const setupError = householdAwaySetupError(copy, snapshot)
-  const commandError = householdAwayCommandError(copy, controller.errorCode)
   const authoritativeStart = householdAwayWallClockParts(snapshot.startsAt)
   const authoritativeEnd = householdAwayWallClockParts(snapshot.endsAt)
   const authoritativeEndDate = authoritativeEnd?.date ?? ''
@@ -2340,7 +2333,8 @@ function SoloTripPage() {
   const selectionLocked = editorOpen || scheduleAwaitingState !== null || engaged || vacationEngaged
   const knownTraveler = snapshot.traveler !== 'none' ? snapshot.traveler : selectedTraveler
   const canEditReturn = snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
-    && (snapshot.state === HOUSEHOLD_AWAY_STATE.SCHEDULED || snapshot.state === HOUSEHOLD_AWAY_STATE.ACTIVE)
+    && snapshot.state !== HOUSEHOLD_AWAY_STATE.IDLE
+    && snapshot.state !== HOUSEHOLD_AWAY_STATE.ENDING
     && Boolean(authoritativeStart && authoritativeEnd)
     && snapshot.available
     && snapshot.commandAvailable
@@ -2354,7 +2348,7 @@ function SoloTripPage() {
       && scheduleAwaitingState === null
     ) {
       setSelectedTraveler(null)
-      setReturnEditing(false)
+      setReturnDraftDirty(false)
     }
   }
 
@@ -2388,7 +2382,7 @@ function SoloTripPage() {
     && authoritativeEndTime === returnAwaitingState.endTime
   if (returnConfirmed) {
     setReturnAwaitingState(null)
-    setReturnEditing(false)
+    setReturnDraftDirty(false)
   }
 
   if (restoreAwaitingSnapshot && snapshot.state !== HOUSEHOLD_AWAY_STATE.RESTORE_REQUIRED) {
@@ -2396,7 +2390,8 @@ function SoloTripPage() {
   }
 
   if (
-    !returnEditing
+    !returnDraftDirty
+    && returnAwaitingState === null
     && authoritativeEndDate
     && authoritativeEndTime
     && (returnDraft.endDate !== authoritativeEndDate || returnDraft.endTime !== authoritativeEndTime)
@@ -2467,28 +2462,20 @@ function SoloTripPage() {
     }
   }
 
-  const beginReturnEdit = () => {
-    if (!authoritativeEnd || !canEditReturn || controller.pending || awaitingCommand) return
+  const updateReturnDraft = async (nextDraft: SoloTripReturnAwaitingState) => {
+    if (!canEditReturn || controller.pending || returnAwaitingState !== null) return
     controller.clearError()
-    setReturnDraft({ endDate: authoritativeEnd.date, endTime: authoritativeEnd.time })
-    setReturnEditing(true)
-  }
-
-  const cancelReturnEdit = () => {
-    if (!authoritativeEnd || controller.pending || returnAwaitingState !== null) return
-    controller.clearError()
-    setReturnDraft({ endDate: authoritativeEnd.date, endTime: authoritativeEnd.time })
-    setReturnEditing(false)
-  }
-
-  const saveReturnEdit = async () => {
-    if (!canEditReturn || controller.pending || returnAwaitingState !== null || !returnValidation.valid) return
-    const result = await controller.updateEnd(returnDraft.endDate, returnDraft.endTime)
+    setReturnDraft(nextDraft)
+    setReturnDraftDirty(true)
+    const validation = validateSoloTripEndDraft(nextDraft.endDate, nextDraft.endTime, snapshot.startsAt)
+    if (!validation.valid) return
+    if (nextDraft.endDate === authoritativeEndDate && nextDraft.endTime === authoritativeEndTime) {
+      setReturnDraftDirty(false)
+      return
+    }
+    const result = await controller.updateEnd(nextDraft.endDate, nextDraft.endTime)
     if (result.status !== 'rejected') {
-      setReturnAwaitingState({
-        endDate: returnDraft.endDate,
-        endTime: returnDraft.endTime,
-      })
+      setReturnAwaitingState(nextDraft)
     }
   }
 
@@ -2582,26 +2569,14 @@ function SoloTripPage() {
                 )
               })}
             </DynamicGrid>
-            {snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP && authoritativeStart && authoritativeEnd && (
+            {snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP && authoritativeEnd && (
               <>
                 <div className={styles.soloTripFieldGrid}>
-                  <NativePickerField disabled label={copy(SOLO_TRIP_COPY_KEYS.editor.startDate)} onChange={() => undefined} type="date" value={authoritativeStart.date} />
-                  <NativePickerField disabled label={copy(SOLO_TRIP_COPY_KEYS.editor.startTime)} onChange={() => undefined} type="time" value={authoritativeStart.time} />
-                  <NativePickerField disabled={!returnEditing || !canEditReturn} label={copy(SOLO_TRIP_COPY_KEYS.editor.endDate)} onChange={(value) => setReturnDraft((current) => ({ ...current, endDate: value }))} type="date" value={returnEditing ? returnDraft.endDate : authoritativeEnd.date} />
-                  <NativePickerField disabled={!returnEditing || !canEditReturn} label={copy(SOLO_TRIP_COPY_KEYS.editor.endTime)} onChange={(value) => setReturnDraft((current) => ({ ...current, endTime: value }))} type="time" value={returnEditing ? returnDraft.endTime : authoritativeEnd.time} />
+                  <NativePickerField disabled={!canEditReturn || controller.pending || returnAwaitingState !== null} label={copy(SOLO_TRIP_COPY_KEYS.editor.endDate)} onChange={(value) => void updateReturnDraft({ ...returnDraft, endDate: value })} type="date" value={returnDraft.endDate} />
+                  <NativePickerField disabled={!canEditReturn || controller.pending || returnAwaitingState !== null} label={copy(SOLO_TRIP_COPY_KEYS.editor.endTime)} onChange={(value) => void updateReturnDraft({ ...returnDraft, endTime: value })} type="time" value={returnDraft.endTime} />
                 </div>
-                {returnEditing && !returnValidation.endAfterStart && <InlineAlert>{copy(SOLO_TRIP_COPY_KEYS.editor.validation.endAfterStart)}</InlineAlert>}
-                {returnEditing && commandError && <InlineAlert>{commandError}</InlineAlert>}
-                {canEditReturn && (
-                  returnEditing ? (
-                    <div className={styles.soloTripActionRow}>
-                      <FieldActionButton disabled={controller.pending || returnAwaitingState !== null || !returnValidation.valid} label={copy(SOLO_TRIP_COPY_KEYS.editor.saveReturn)} onClick={() => void saveReturnEdit()} />
-                      <FieldActionButton disabled={controller.pending || returnAwaitingState !== null} label={copy(SOLO_TRIP_COPY_KEYS.editor.cancelReturn)} onClick={cancelReturnEdit} />
-                    </div>
-                  ) : (
-                    <FieldActionButton disabled={controller.pending || awaitingCommand} label={copy(SOLO_TRIP_COPY_KEYS.editor.changeReturn)} onClick={beginReturnEdit} />
-                  )
-                )}
+                {returnDraftDirty && !returnValidation.endInFuture && <InlineAlert>{copy(SOLO_TRIP_COPY_KEYS.editor.validation.endInFuture)}</InlineAlert>}
+                {returnDraftDirty && returnValidation.endInFuture && !returnValidation.endAfterStart && <InlineAlert>{copy(SOLO_TRIP_COPY_KEYS.editor.validation.endAfterStart)}</InlineAlert>}
               </>
             )}
             {engaged && (

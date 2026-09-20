@@ -207,13 +207,13 @@ export interface SoloTripDraft {
 
 export interface SoloTripDraftValidation {
   endAfterStart: boolean
-  startInFuture: boolean
   travelerValid: boolean
   valid: boolean
 }
 
 export interface SoloTripEndDraftValidation {
   endAfterStart: boolean
+  endInFuture: boolean
   valid: boolean
 }
 
@@ -239,30 +239,28 @@ export function householdAwayWallClockParts(value: string | null | undefined): H
   return { date: datePart, time: timePart }
 }
 
-export function validateSoloTripDraft(draft: SoloTripDraft, now = new Date()): SoloTripDraftValidation {
+export function validateSoloTripDraft(draft: SoloTripDraft): SoloTripDraftValidation {
   const travelerValid = draft.traveler === HOUSEHOLD_RESIDENT.STEPH || draft.traveler === HOUSEHOLD_RESIDENT.STEPHEN
   const start = localDateTime(draft.startDate, draft.startTime)
   const end = localDateTime(draft.endDate, draft.endTime)
-  const currentMinute = new Date(now)
-  currentMinute.setSeconds(0, 0)
-  const startInFuture = Boolean(start && start >= currentMinute)
   const endAfterStart = Boolean(start && end && end > start)
   return {
     endAfterStart,
-    startInFuture,
     travelerValid,
-    valid: travelerValid && startInFuture && endAfterStart,
+    valid: travelerValid && endAfterStart,
   }
 }
 
-export function validateSoloTripEndDraft(endDate: string, endTime: string, startsAt: string | null): SoloTripEndDraftValidation {
+export function validateSoloTripEndDraft(endDate: string, endTime: string, startsAt: string | null, now = new Date()): SoloTripEndDraftValidation {
   const start = householdAwayWallClockParts(startsAt)
   const startDateTime = start ? localDateTime(start.date, start.time) : null
   const endDateTime = localDateTime(endDate, endTime)
   const endAfterStart = Boolean(startDateTime && endDateTime && endDateTime > startDateTime)
+  const endInFuture = Boolean(endDateTime && endDateTime > now)
   return {
     endAfterStart,
-    valid: endAfterStart,
+    endInFuture,
+    valid: endAfterStart && endInFuture,
   }
 }
 

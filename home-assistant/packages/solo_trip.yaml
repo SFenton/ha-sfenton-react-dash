@@ -300,7 +300,6 @@ script:
           plan_start_timestamp: "{{ as_timestamp(journal_plan.starts_at) if journal_plan is mapping and journal_plan.starts_at is defined else none }}"
           plan_end_timestamp: "{{ as_timestamp(journal_plan.ends_at) if journal_plan is mapping and journal_plan.ends_at is defined else none }}"
           now_timestamp: "{{ as_timestamp(now()) }}"
-          current_minute_timestamp: "{{ as_timestamp(now().replace(second=0, microsecond=0)) }}"
           request_payload: >-
             {{ {
               'operation': normalized_operation,
@@ -420,10 +419,10 @@ script:
                           household_away_response: "{{ dict(default_response, error_code='vacation_mode_conflict') }}"
                       - stop: Vacation conflict
                         response_variable: household_away_response
-                  - conditions: "{{ request_start_timestamp is not number or request_end_timestamp is not number or request_start_timestamp < current_minute_timestamp or request_end_timestamp <= request_start_timestamp }}"
+                  - conditions: "{{ request_start_timestamp is not number or request_end_timestamp is not number or request_end_timestamp <= request_start_timestamp }}"
                     sequence:
                       - variables:
-                          household_away_response: "{{ dict(default_response, error_code='start_in_past' if request_start_timestamp is number and request_start_timestamp < current_minute_timestamp else 'invalid_dates') }}"
+                          household_away_response: "{{ dict(default_response, error_code='invalid_dates') }}"
                       - stop: Invalid dates
                         response_variable: household_away_response
               - variables:

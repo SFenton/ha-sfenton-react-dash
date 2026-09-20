@@ -1,3 +1,5 @@
+// @covers src/pages/DashboardViewPage.module.css
+// @covers src/pages/DashboardViewPage.tsx
 import { expect, test, type Page } from './layout/fixture'
 import { RESPONSIVE_ROUTES } from './responsive-acceptance-data'
 import { setSafeAreaInsets } from './safe-area'
@@ -46,6 +48,61 @@ test('preserves the approved 393x852 Home geometry', async ({ page }) => {
     scroller: { height: 612, width: 393, x: 0, y: 154 },
     weather: { height: 222, width: 361, x: 16, y: 166 },
   })
+})
+
+test('Vacation choices follow the Settings link columns', async ({ page }) => {
+  for (const viewport of [
+    { columns: 1, height: 852, width: 393 },
+    { columns: 2, height: 1180, width: 820 },
+    { columns: 2, height: 900, width: 1440 },
+  ]) {
+    await page.setViewportSize({ height: viewport.height, width: viewport.width })
+    await page.goto('/index.html?path=settings')
+
+    const settingsLinks = page.getByRole('navigation', { name: 'Settings pages' }).getByRole('button')
+    await expect(settingsLinks).toHaveCount(7)
+    const settingsColumns = await settingsLinks.evaluateAll((items) =>
+      new Set(items.map((item) => Math.round(item.getBoundingClientRect().x))).size)
+    expect(settingsColumns).toBe(viewport.columns)
+
+    await setRoute(page, 'vacation')
+    const awayModeLinks = page.getByRole('navigation', { name: 'Away modes' }).getByRole('button')
+    await expect(awayModeLinks).toHaveCount(2)
+    await expect.poll(() => awayModeLinks.evaluateAll((items) =>
+      new Set(items.map((item) => Math.round(item.getBoundingClientRect().x))).size)).toBe(settingsColumns)
+  }
+})
+
+test('Solo Trip keeps return-only fields inline and rejects a past return locally', async ({ page }) => {
+  await page.setViewportSize({ height: 852, width: 393 })
+  await page.goto('/index.html?path=solo-trip')
+  await page.evaluate(() => {
+    const api = window.__mockHass!
+    api.calls.splice(0)
+    api.setEntityState('sensor.household_away_status', 'scheduled')
+    api.setEntityAttribute('sensor.household_away_status', 'mode', 'solo_trip')
+    api.setEntityAttribute('sensor.household_away_status', 'traveler', 'stephen')
+    api.setEntityAttribute('sensor.household_away_status', 'home_resident', 'steph')
+    api.setEntityAttribute('sensor.household_away_status', 'starts_at', '2099-01-01T09:00:00')
+    api.setEntityAttribute('sensor.household_away_status', 'ends_at', '2099-01-03T17:00:00')
+  })
+
+  await expect(page.getByLabel('Departure Date')).toHaveCount(0)
+  await expect(page.getByLabel('Departure Time')).toHaveCount(0)
+  await expect(page.getByLabel('Return Date')).toBeEnabled()
+  await expect(page.getByLabel('Return Time')).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Change' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Solo Trip Scheduled' })).toHaveCount(0)
+
+  await page.getByLabel('Return Date').fill('2020-01-01')
+
+  await expect(page.getByRole('alert')).toContainText('Return date/time must be in the future.')
+  await expect.poll(() => page.evaluate(() =>
+    window.__mockHass!.calls.filter((call) => call.domain === 'script' && call.service === 'household_away_command'))).toEqual([])
+
+  await page.setViewportSize({ height: 393, width: 852 })
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1)
 })
 
 test('preserves the approved 393x852 Food tile geometry', async ({ page }) => {
