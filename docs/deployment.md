@@ -4,6 +4,11 @@ Every push to protected `master` starts `.github/workflows/deploy-dashboard.yml`
 The post-merge layout workflow is independent regression monitoring: dashboard
 deployment neither depends on nor waits for its jobs or artifacts.
 
+Admin To-Do issue automation is operated by a separate controller and does not
+change deployment ownership. See
+[Admin issue controller](./admin-issue-controller.md) for its installation,
+isolation boundary, protected-merge flow, and deployment-receipt verification.
+
 ## Trust boundary
 
 The workflow separates build and deployment:

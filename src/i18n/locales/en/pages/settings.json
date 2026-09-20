@@ -21,6 +21,7 @@
       "title": "Mach-E"
     },
     "todo": {
+      "githubSyncDisclosure": "This issue is synchronized from the dashboard Admin To-Do list. The repository is public.",
       "subtitle": "An admin panel for to-do tasks.",
       "title": "To-Do"
     },

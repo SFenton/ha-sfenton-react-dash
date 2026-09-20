@@ -22,6 +22,7 @@ __pycache__/
 .outbox/
 .deploy/
 .ha-deploy-build/
+.admin-issue-controller-build/
 artifacts/
 home-mcp/.data/
 home-mcp/.tls/

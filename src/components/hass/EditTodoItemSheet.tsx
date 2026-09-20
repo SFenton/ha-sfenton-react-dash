@@ -1,8 +1,9 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { useHass } from '@hakit/core'
+import { Description } from '../core/Description'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
-import { useCopy } from '../../i18n'
+import { PAGE_SETTINGS_COPY_KEYS, PAGE_SETTINGS_COPY_NAMESPACE, useCopy } from '../../i18n'
 import type { AdminTodoEditTarget } from './adminTodoEdit'
 import styles from './EditTodoItemSheet.module.css'
 
@@ -26,6 +27,7 @@ const EDIT_TODO_ITEM_CENTERED_GEOMETRY = {
 
 export function EditTodoItemSheet({ editTarget, onClose, onSaved, open }: EditTodoItemSheetProps) {
   const copy = useCopy(TODO_EDIT_I18N.namespace)
+  const settingsCopy = useCopy(PAGE_SETTINGS_COPY_NAMESPACE)
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const [draft, setDraft] = useState(editTarget.originalTitle)
   const [error, setError] = useState<string | null>(null)
@@ -102,6 +104,7 @@ export function EditTodoItemSheet({ editTarget, onClose, onSaved, open }: EditTo
       <form className={styles.form} id={FORM_ID} onSubmit={handleSubmit}>
         {error && <p aria-live="polite" className={styles.error} role="alert">{error}</p>}
         {!editTarget.itemUid && <p className={styles.error} role="alert">{copy('todo.identityUnavailable')}</p>}
+        <Description>{settingsCopy(PAGE_SETTINGS_COPY_KEYS.items.todo.githubSyncDisclosure)}</Description>
         <label className={styles.field}>
           <span>{copy('todo.taskName')}</span>
           <input autoComplete="off" disabled={submitting} name="taskName" onChange={(event) => setDraft(event.target.value)} required type="text" value={draft} />

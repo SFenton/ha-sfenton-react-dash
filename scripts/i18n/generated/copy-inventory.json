@@ -7705,6 +7705,18 @@
       "words": 7
     },
     {
+      "characters": 89,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "0ea76f7f770a36a0",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "This issue is synchronized from the dashboard Admin To-Do list. The repository is public.",
+      "words": 14
+    },
+    {
       "characters": 228,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/chat.json",
@@ -18277,7 +18289,7 @@
       "file": "src/components/hass/CreateTodoItemSheet.tsx",
       "id": "dcdc9746ea2b7c14",
       "lines": [
-        75
+        79
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -28515,7 +28527,7 @@
       "file": "src/components/hass/CreateTodoItemSheet.tsx",
       "id": "db28b3fc955f4887",
       "lines": [
-        70
+        73
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -41176,11 +41188,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 943,
+    "catalogRecords": 944,
     "documentRecords": 1,
     "legacyOccurrences": 2465,
     "legacyRecords": 2036,
-    "totalRecords": 2980
+    "totalRecords": 2981
   },
   "version": 1
 }
