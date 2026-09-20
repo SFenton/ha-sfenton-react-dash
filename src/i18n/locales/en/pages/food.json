@@ -18,6 +18,16 @@
     "updateError": "Unable to update item"
   },
   "loading": "Loading Food & Recipes",
+  "recipes": {
+    "filterEmptyDescription": "No recipes matched the current filters.",
+    "label": "Recipes",
+    "loading": "Loading recipes",
+    "noResultsTitle": "No Recipes Found",
+    "pageLoading": "Loading Recipes",
+    "retry": "Retry",
+    "searchEmptyDescription": "Try a different search or loosen the recipe filters.",
+    "unableToLoad": "Unable to Load Recipes"
+  },
   "sections": {
     "allFood": "All Food",
     "allRecipes": "All Recipes",

@@ -6,6 +6,9 @@ import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeo
 import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from './quick-links'
 import { waitForModalReady, waitForRoute } from './layout/evidence'
 
+// @covers src/pages/RecipesPage.tsx
+// @covers src/pages/RecipesPage.module.css
+// @covers src/test/mocks/hakitCoreState.ts
 const DIALOG_SQUARE_TILE_SIZE = 168
 
 type FreeSleepAlarmSnapshot = {
@@ -394,6 +397,45 @@ test('cold Recipes refresh keeps the full app gate until the initial catalog res
   await expect(page.getByRole('navigation', { name: 'Dashboard sections' })).toBeVisible()
   await expect(page.getByRole('status', { name: 'Loading Recipes', exact: true })).toHaveCount(0)
   await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(50)
+})
+
+test('Recipes recovers in place after an unavailable initial service and centers its loader', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.goto('/at-a-glance/recipes?__mockRecipeQueryUnavailableFailures=1')
+
+  const appLoader = page.getByRole('status', { name: 'Loading dashboard' })
+  await expect(appLoader).toBeVisible()
+  await expect(appLoader).not.toBeVisible({ timeout: 8_000 })
+  const loading = page.getByRole('status', { name: 'Loading recipes', exact: true })
+  await expect(loading).toBeVisible({ timeout: 8_000 })
+  await expect(page.getByRole('heading', { name: 'Unable to Load Recipes' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0)
+
+  const resultsRegion = page.locator('[data-recovery="true"]')
+  await expect(resultsRegion).toHaveAttribute('aria-busy', 'true')
+  const loaderBox = await loading.boundingBox()
+  const spinnerBox = await loading.locator('span').boundingBox()
+  expect(Math.round(loaderBox?.height ?? 0)).toBe(644)
+  expect(Math.abs(
+    ((spinnerBox?.x ?? 0) + ((spinnerBox?.width ?? 0) / 2))
+      - ((loaderBox?.x ?? 0) + ((loaderBox?.width ?? 0) / 2)),
+  )).toBeLessThanOrEqual(1)
+  expect(Math.abs(
+    ((spinnerBox?.y ?? 0) + ((spinnerBox?.height ?? 0) / 2))
+      - ((loaderBox?.y ?? 0) + ((loaderBox?.height ?? 0) / 2)),
+  )).toBeLessThanOrEqual(1)
+
+  await page.evaluate(() => (
+    window as unknown as {
+      __mockHass?: { setRecipeQueryAvailable: (available: boolean) => void }
+    }
+  ).__mockHass?.setRecipeQueryAvailable(true))
+  await expect(resultsRegion).toHaveAttribute('data-criteria-phase', 'spinner-exiting', { timeout: 8_000 })
+  const exitingLoaderBox = await loading.boundingBox()
+  expect(Math.round(exitingLoaderBox?.height ?? 0)).toBe(Math.round(loaderBox?.height ?? 0))
+  await expect(page.locator('[data-recipe-grid="true"] [data-recipe-card]')).toHaveCount(50, { timeout: 8_000 })
+  await expect(page.getByRole('status', { name: 'Loading recipes', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Unable to Load Recipes' })).toHaveCount(0)
 })
 
 test('tall desktop Recipes primes enough rows for automatic infinite scrolling', async ({ page }) => {

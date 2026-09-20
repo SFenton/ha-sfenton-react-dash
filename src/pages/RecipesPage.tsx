@@ -6,6 +6,7 @@ import { useRecipeCollection } from '../components/hass/recipes/useRecipeCollect
 import { useRecipeDetailModalController } from '../components/hass/recipes/useRecipeDetailModal'
 import { DashboardPageLoadGate } from '../components/shell/DashboardPageLoadGate'
 import type { RecipeControls } from '../components/hass/recipes/useRecipeControls'
+import { FOOD_COPY_KEYS, FOOD_COPY_NAMESPACE, useCopy } from '../i18n'
 import styles from './RecipesPage.module.css'
 
 interface RecipesPageProps {
@@ -20,6 +21,7 @@ type ResultsRegionStyle = CSSProperties & {
 }
 
 export function RecipesPage({ controls, initiallyAppGated = false, onInitialResolved, preload = false }: RecipesPageProps) {
+  const copy = useCopy(FOOD_COPY_NAMESPACE)
   const collection = useRecipeCollection(controls.criteria, { preload })
   const recipeDetail = useRecipeDetailModalController({ enabled: !preload })
   const regionRef = useRef<HTMLDivElement>(null)
@@ -70,36 +72,40 @@ export function RecipesPage({ controls, initiallyAppGated = false, onInitialReso
 
   const content = (
     <section
-      aria-label="Recipes"
+      aria-label={copy(FOOD_COPY_KEYS.recipes.label)}
       className={styles.page}
       data-generation={collection.generation}
       data-hydration-state={collection.hydrationState}
     >
       <div
+        aria-busy={showSpinner ? 'true' : undefined}
         className={styles.resultsRegion}
         data-criteria-phase={collection.criteriaPhase}
         data-height-frozen={frozenHeight === null ? undefined : 'true'}
+        data-recovery={collection.recovery ? 'true' : undefined}
         ref={regionRef}
         style={regionStyle}
       >
         {showSpinner && (
-          <div aria-label="Loading recipes" className={styles.criteriaLoading} role="status">
+          <div aria-label={copy(FOOD_COPY_KEYS.recipes.loading)} className={styles.criteriaLoading} role="status">
             <span aria-hidden="true" className={styles.spinner} />
           </div>
         )}
-        {showGrid && collection.error && (
+        {showGrid && collection.error && !collection.recovery && (
           <div className={styles.errorState}>
-            <EmptyState description={collection.error} title="Unable to Load Recipes" />
-            <button onClick={collection.retryCriteria} type="button">Retry</button>
+            <h2>{copy(FOOD_COPY_KEYS.recipes.unableToLoad)}</h2>
+            <button onClick={collection.retryCriteria} type="button">{copy(FOOD_COPY_KEYS.recipes.retry)}</button>
           </div>
         )}
-        {showGrid && !collection.error && collection.items.length === 0 && collection.criteriaPhase !== 'exiting' && (
+        {showGrid && !collection.error && !collection.recovery && collection.items.length === 0 && collection.criteriaPhase !== 'exiting' && (
           <EmptyState
-            description={controls.criteria.q.trim() ? 'Try a different search or loosen the recipe filters.' : 'No recipes matched the current filters.'}
-            title="No Recipes Found"
+            description={controls.criteria.q.trim()
+              ? copy(FOOD_COPY_KEYS.recipes.searchEmptyDescription)
+              : copy(FOOD_COPY_KEYS.recipes.filterEmptyDescription)}
+            title={copy(FOOD_COPY_KEYS.recipes.noResultsTitle)}
           />
         )}
-        {showGrid && !collection.error && collection.items.length > 0 && (
+        {showGrid && !collection.error && !collection.recovery && collection.items.length > 0 && (
           <RecipeGrid
             autoLoadEnabled={collection.criteriaPhase === 'idle'}
             hasMore={collection.hasMore}
@@ -131,7 +137,7 @@ export function RecipesPage({ controls, initiallyAppGated = false, onInitialReso
 
   return (
     <DashboardPageLoadGate
-      label="Loading Recipes"
+      label={copy(FOOD_COPY_KEYS.recipes.pageLoading)}
       settled={pageReady}
     >
       {contentWithModal}
