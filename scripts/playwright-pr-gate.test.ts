@@ -123,7 +123,12 @@ describe('dashboard Playwright workflow policy', () => {
     const postMergeNonBlockingIndex = releaseSkill.indexOf(
       'Start the merged build and deployment after proving the merge',
     )
-    const buildIndex = releaseSkill.indexOf('## Build the merged commit')
+    const automatedDeploymentIndex = releaseSkill.indexOf(
+      'For a frontend-only merge accepted by `.github/workflows/deploy-dashboard.yml`',
+    )
+    const buildIndex = releaseSkill.indexOf(
+      '## Manual fallback: build the merged commit',
+    )
     const tools = new Map(toolRegistry.tools.map((tool) => [tool.id, tool]))
     const referencedToolIds = Array.from(
       new Set(
@@ -179,7 +184,8 @@ describe('dashboard Playwright workflow policy', () => {
     expect(releaseSkill).toContain('gh pr checks --watch --fail-fast')
     expect(mergeProofIndex).toBeGreaterThan(-1)
     expect(postMergeNonBlockingIndex).toBeGreaterThan(mergeProofIndex)
-    expect(buildIndex).toBeGreaterThan(postMergeNonBlockingIndex)
+    expect(automatedDeploymentIndex).toBeGreaterThan(postMergeNonBlockingIndex)
+    expect(buildIndex).toBeGreaterThan(automatedDeploymentIndex)
     expect(releaseSkill).not.toContain('Wait for the post-merge `master` workflow')
     expect(releaseSkill).not.toContain('gh run watch <run-id> --exit-status')
     expect(releaseSkill).not.toContain('gh run download <run-id> --name layout-automation')

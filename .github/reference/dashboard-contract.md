@@ -92,6 +92,21 @@ worktree, not just `index.html`, before calling the runtime valid.
 
 The deployed Home Assistant version should be a production Vite build, not the dev server.
 
+For frontend-only merges, `.github/workflows/deploy-dashboard.yml` is the
+production owner. It starts independently on every push to `master`, builds
+without Home Assistant credentials, and uses an environment-protected,
+host-controlled one-job JIT runner to deploy and verify the exact merge SHA.
+It does not wait for the post-merge layout workflow. The automatic path must
+fail before mutation when the cumulative range since the deployed SHA contains
+Home Assistant runtime or Home MCP changes, or when the custom-panel bridge
+changed. Those changes retain the restart-aware manual release below.
+
+The CI deployment must never expose `VITE_HA_TOKEN` to the hosted build, stage
+HA packages/components, restart Home Assistant, register a persistent runner
+against this public repository, or grant HA network access before the
+controller verifies the exact GitHub job-to-runner binding. See
+`docs/deployment.md`.
+
 Prefer SMB deployment over the SSH deploy script. Use `npm run deploy` only as a fallback when the SMB share is unavailable and the required SSH env vars are configured.
 
 Use:

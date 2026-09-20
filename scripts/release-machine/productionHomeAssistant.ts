@@ -20,7 +20,7 @@ import type {
   ProductionMetadata,
 } from './production'
 
-type HomeAssistantProductionOptions = {
+export type HomeAssistantProductionOptions = {
   haUrl: string
   haToken: string
   host: string
@@ -46,6 +46,47 @@ type LegacyDashboardConfig = {
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
+}
+
+export function ciProductionOptionsFromEnvironment(
+  environment: NodeJS.ProcessEnv,
+  verificationDirectory: string,
+  workflowId: string,
+  authorizationHash: string,
+): HomeAssistantProductionOptions {
+  const haUrl = environment.HA_DEPLOY_URL
+  const haToken = environment.HA_DEPLOY_TOKEN
+  const privateKey = environment.HA_DEPLOY_SSH_PRIVATE_KEY
+  const sshHostKeySha256 =
+    environment.HA_DEPLOY_SSH_HOST_KEY_SHA256
+  const remoteFolderName =
+    environment.HA_DEPLOY_FOLDER_NAME || RELEASE_REMOTE_FOLDER
+  assert(haUrl, 'Missing HA_DEPLOY_URL')
+  assert(haToken, 'Missing HA_DEPLOY_TOKEN')
+  assert(privateKey, 'Missing HA_DEPLOY_SSH_PRIVATE_KEY')
+  assert(
+    remoteFolderName === RELEASE_REMOTE_FOLDER,
+    `HA_DEPLOY_FOLDER_NAME must be exactly ${RELEASE_REMOTE_FOLDER}`,
+  )
+  assert(
+    typeof sshHostKeySha256 === 'string' &&
+      /^[a-f0-9]{64}$/.test(sshHostKeySha256),
+    'HA_DEPLOY_SSH_HOST_KEY_SHA256 must be the pinned SHA-256 host-key digest',
+  )
+  return {
+    haUrl,
+    haToken,
+    host: environment.HA_DEPLOY_SSH_HOST || 'ha-ssh-proxy',
+    port: Number(environment.HA_DEPLOY_SSH_PORT || 2222),
+    username: environment.HA_DEPLOY_SSH_USERNAME || 'root',
+    privateKey: Buffer.from(privateKey),
+    sshHostKeySha256,
+    remoteFolderName,
+    verificationDirectory,
+    scopePaths: [],
+    workflowId,
+    authorizationHash,
+  }
 }
 
 type DashboardConnection = Pick<Connection, 'sendMessagePromise'>
@@ -325,6 +366,21 @@ export async function restoreReleaseConfiguration(
 
 export class HomeAssistantProductionAdapter implements ProductionAdapter {
   constructor(private readonly options: HomeAssistantProductionOptions) {}
+
+  static fromCiEnvironment(
+    verificationDirectory: string,
+    workflowId: string,
+    authorizationHash: string,
+  ) {
+    return new HomeAssistantProductionAdapter(
+      ciProductionOptionsFromEnvironment(
+        process.env,
+        verificationDirectory,
+        workflowId,
+        authorizationHash,
+      ),
+    )
+  }
 
   static async fromEnvironment(
     verificationDirectory: string,
