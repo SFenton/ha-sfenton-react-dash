@@ -8,8 +8,13 @@
   --floating-action-size: 56px;
   --floating-action-gap: 4px;
   --floating-action-content-gap: 20px;
-  --floating-action-nav-gap: 10px;
-  --floating-action-bottom: calc(var(--bottom-nav-height) - 14px + var(--rd-bottom-nav-offset));
+  --bottom-chrome-gap: 10px;
+  --bottom-nav-surface-height: 62px;
+  --floating-action-bottom: calc(
+    var(--bottom-nav-surface-height)
+    + var(--bottom-chrome-gap)
+    + var(--rd-bottom-nav-offset)
+  );
   --page-scroll-nav-gap: 12px;
   --page-scroll-bottom-inset: calc(var(--bottom-nav-height) - var(--page-scroll-nav-gap) + var(--rd-bottom-nav-offset));
   --page-bottom-extra-padding: 22px;
@@ -24,7 +29,7 @@
   --page-bottom-extra-padding: calc(
     var(--floating-action-bottom)
     + var(--floating-action-size)
-    + var(--floating-action-nav-gap)
+    + var(--bottom-chrome-gap)
     - var(--page-scroll-bottom-inset)
   );
 }

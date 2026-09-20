@@ -61,8 +61,11 @@ async function measureBottomChromeSpacing(page: Page) {
         ? 0
         : Math.max(...actionBounds.map((bounds) => bounds.top)) - Math.min(...actionBounds.map((bounds) => bounds.top)),
       contentToDockGap: dockBounds.top - contentBounds.bottom,
+      dockBottomOffset: innerHeight - dockBounds.bottom,
       dockHeight: dockBounds.height,
       dockToNavGap: bottomNavBounds.top - dockBounds.bottom,
+      navBottomOffset: innerHeight - bottomNavBounds.bottom,
+      navHeight: bottomNavBounds.height,
       terminalScrollDelta: Math.abs(scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop),
       terminalToWrapperGap: terminal ? contentBounds.bottom - terminal.bottom : null,
     }
@@ -272,6 +275,13 @@ test.describe('safe-area responsive acceptance', () => {
         expect(Math.abs(metrics.dockToNavGap - 10), `${geometry.name} ${route} dock-to-nav gap`).toBeLessThanOrEqual(1)
         expect(Math.abs(metrics.contentToDockGap - metrics.dockToNavGap), `${geometry.name} ${route} balanced gaps`).toBeLessThanOrEqual(1)
         expect(Math.abs(metrics.dockHeight - 56), `${geometry.name} ${route} dock height`).toBeLessThanOrEqual(1)
+        expect(Math.abs(metrics.navHeight - 62), `${geometry.name} ${route} navigation height`).toBeLessThanOrEqual(1)
+        const expectedNavBottomOffset = Math.max(12, geometry.insets.bottom)
+        expect(Math.abs(metrics.navBottomOffset - expectedNavBottomOffset), `${geometry.name} ${route} navigation position`).toBeLessThanOrEqual(1)
+        expect(
+          Math.abs(metrics.dockBottomOffset - (expectedNavBottomOffset + metrics.navHeight + 10)),
+          `${geometry.name} ${route} dock position`,
+        ).toBeLessThanOrEqual(1)
         expect(metrics.actionCount, `${geometry.name} ${route} dock action count`).toBe(expectedActionCount)
         expect(metrics.actionHeights.every((height) => Math.abs(height - 56) <= 1), `${geometry.name} ${route} action heights`).toBe(true)
         expect(metrics.actionTopSpread, `${geometry.name} ${route} action alignment`).toBeLessThanOrEqual(1)
