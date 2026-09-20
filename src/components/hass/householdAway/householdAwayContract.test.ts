@@ -106,42 +106,51 @@ describe('householdAwayServiceCall', () => {
 })
 
 describe('validateSoloTripDraft', () => {
-  const now = new Date('2026-01-01T00:00:00')
-
   it('accepts a valid future draft with end after start', () => {
     const validation = validateSoloTripDraft({
       endDate: '2026-01-05', endTime: '18:00', startDate: '2026-01-02', startTime: '09:00', traveler: 'stephen',
-    }, now)
+    })
     expect(validation.valid).toBe(true)
   })
 
-  it('rejects a start date in the past', () => {
+  it('accepts a departure in the past when return is after departure', () => {
     const validation = validateSoloTripDraft({
-      endDate: '2026-01-05', endTime: '18:00', startDate: '2025-01-02', startTime: '09:00', traveler: 'stephen',
-    }, now)
-    expect(validation.startInFuture).toBe(false)
-    expect(validation.valid).toBe(false)
+      endDate: '2026-01-05', endTime: '18:00', startDate: '2025-12-31', startTime: '09:00', traveler: 'stephen',
+    })
+    expect(validation.endAfterStart).toBe(true)
+    expect(validation.valid).toBe(true)
   })
 
   it('rejects an end before start', () => {
     const validation = validateSoloTripDraft({
       endDate: '2026-01-02', endTime: '08:00', startDate: '2026-01-02', startTime: '09:00', traveler: 'stephen',
-    }, now)
+    })
     expect(validation.endAfterStart).toBe(false)
     expect(validation.valid).toBe(false)
   })
 })
 
 describe('validateSoloTripEndDraft', () => {
-  it('accepts a return change after the stored departure even when it is not in the future', () => {
-    const validation = validateSoloTripEndDraft('2026-01-02', '10:00', '2026-01-02T09:00:00')
+  const now = new Date('2026-01-02T09:30:00')
+
+  it('accepts a future return change after the stored departure', () => {
+    const validation = validateSoloTripEndDraft('2026-01-02', '10:00', '2026-01-02T09:00:00', now)
     expect(validation.endAfterStart).toBe(true)
+    expect(validation.endInFuture).toBe(true)
     expect(validation.valid).toBe(true)
   })
 
-  it('rejects a return change at or before the stored departure', () => {
-    const validation = validateSoloTripEndDraft('2026-01-02', '09:00', '2026-01-02T09:00:00')
+  it('rejects a return change that is not in the future', () => {
+    const validation = validateSoloTripEndDraft('2026-01-02', '09:15', '2026-01-02T09:00:00', now)
+    expect(validation.endAfterStart).toBe(true)
+    expect(validation.endInFuture).toBe(false)
+    expect(validation.valid).toBe(false)
+  })
+
+  it('rejects a future return change at or before the stored departure', () => {
+    const validation = validateSoloTripEndDraft('2026-01-03', '09:00', '2026-01-04T09:00:00', now)
     expect(validation.endAfterStart).toBe(false)
+    expect(validation.endInFuture).toBe(true)
     expect(validation.valid).toBe(false)
   })
 })
@@ -170,8 +179,7 @@ describe('defaultSoloTripDraft', () => {
   it('produces a valid time range that still requires a traveler', () => {
     const now = new Date('2026-01-01T00:00:00')
     const draft = defaultSoloTripDraft(now)
-    const validation = validateSoloTripDraft(draft, now)
-    expect(validation.startInFuture).toBe(true)
+    const validation = validateSoloTripDraft(draft)
     expect(validation.endAfterStart).toBe(true)
     expect(validation.travelerValid).toBe(false)
     expect(validation.valid).toBe(false)

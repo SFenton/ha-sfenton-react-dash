@@ -171,7 +171,8 @@ describe('DashboardViewPage Solo Trip', () => {
     render(<DashboardViewPage activePath="settings" onNavigate={onNavigate} path="vacation" />)
 
     const chooser = screen.getByRole('navigation', { name: 'Away modes' })
-    expect(chooser).toHaveAttribute('data-dynamic-grid-columns', '2')
+    expect(chooser).toHaveAttribute('data-settings-link-list', 'true')
+    expect(chooser).not.toHaveAttribute('data-dynamic-grid')
     const vacation = within(chooser).getByRole('button', { name: /Vacation Set away dates and prepare the house for vacation./i })
     const soloTrip = within(chooser).getByRole('button', { name: /Solo Trip One traveler, one home resident/i })
 
@@ -249,12 +250,12 @@ describe('DashboardViewPage Solo Trip', () => {
     expect((screen.getByLabelText('Departure Date') as HTMLInputElement).value).toBe(originalDate)
   })
 
-  it('schedules exactly once after confirmation and then renders the authoritative scheduled state', async () => {
+  it('accepts a past departure, schedules once, and then shows only editable return fields', async () => {
     renderSoloTripPage()
     selectTraveler('Stephen')
     fireEvent.click(soloTripToggle())
 
-    fireEvent.change(screen.getByLabelText('Departure Date'), { target: { value: '2099-01-02' } })
+    fireEvent.change(screen.getByLabelText('Departure Date'), { target: { value: '2025-01-02' } })
     fireEvent.change(screen.getByLabelText('Departure Time'), { target: { value: '09:15' } })
     fireEvent.change(screen.getByLabelText('Return Date'), { target: { value: '2099-01-05' } })
     fireEvent.change(screen.getByLabelText('Return Time'), { target: { value: '18:45' } })
@@ -281,7 +282,7 @@ describe('DashboardViewPage Solo Trip', () => {
         end_time: '18:45',
         mode: 'solo_trip',
         operation: 'schedule',
-        start_date: '2099-01-02',
+        start_date: '2025-01-02',
         start_time: '09:15',
         traveler: 'stephen',
       },
@@ -289,11 +290,13 @@ describe('DashboardViewPage Solo Trip', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Schedule Solo Trip' })).not.toBeInTheDocument())
     expect(soloTripToggle()).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('heading', { name: 'Solo Trip Scheduled' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Departure Date')).toBeDisabled()
-    expect(screen.getByLabelText('Departure Time')).toBeDisabled()
-    expect(screen.getByLabelText('Return Date')).toBeDisabled()
-    expect(screen.getByLabelText('Return Time')).toBeDisabled()
+    expect(screen.queryByRole('heading', { name: 'Solo Trip Scheduled' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Departure Date')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Departure Time')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Return Date')).toBeEnabled()
+    expect(screen.getByLabelText('Return Time')).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('note', { name: 'Stephen Away' })).not.toBeInTheDocument()
   })
 
   it('preserves the modal draft and validation state when scheduling fails', async () => {
@@ -313,16 +316,26 @@ describe('DashboardViewPage Solo Trip', () => {
     expect((screen.getByLabelText('Return Time') as HTMLInputElement).value).toBe('18:45')
   })
 
-  it('updates only the return date and time through update_end and keeps traveler/departure read-only', async () => {
+  it('updates return date and time automatically through update_end', async () => {
     setupSoloTripSnapshot('scheduled')
     renderSoloTripPage()
 
     expect(screen.queryByRole('button', { name: 'End Solo Trip Now' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel Solo Trip' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
     fireEvent.change(screen.getByLabelText('Return Date'), { target: { value: '2099-01-04' } })
+
+    await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
+    expect(latestHouseholdAwayCall()).toMatchObject({
+      serviceData: {
+        end_date: '2099-01-04',
+        end_time: '17:00',
+        operation: 'update_end',
+      },
+    })
+
+    mockCallServiceCalls.length = 0
+    await waitFor(() => expect(screen.getByLabelText('Return Time')).toBeEnabled())
     fireEvent.change(screen.getByLabelText('Return Time'), { target: { value: '18:30' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
     expectExactServiceKeys(latestHouseholdAwayCall(), [
@@ -339,11 +352,26 @@ describe('DashboardViewPage Solo Trip', () => {
         operation: 'update_end',
       },
     })
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument())
-    expect(screen.getByLabelText('Departure Time')).toBeDisabled()
-    expect(screen.getByLabelText('Departure Date')).toBeDisabled()
-    expect(screen.getByLabelText('Return Date')).toBeDisabled()
-    expect(screen.getByLabelText('Return Time')).toBeDisabled()
+    expect(screen.queryByLabelText('Departure Time')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Departure Date')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Return Date')).toBeEnabled()
+    expect(screen.getByLabelText('Return Time')).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /Change|Save|Cancel/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps an invalid return local until it is in the future', async () => {
+    setupSoloTripSnapshot('scheduled')
+    renderSoloTripPage()
+
+    fireEvent.change(screen.getByLabelText('Return Date'), { target: { value: '2020-01-04' } })
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Return date/time must be in the future.')
+    expect(householdAwayCalls()).toEqual([])
+
+    fireEvent.change(screen.getByLabelText('Return Date'), { target: { value: '2099-01-04' } })
+
+    await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
+    expect(screen.queryByText('Return date/time must be in the future.')).not.toBeInTheDocument()
   })
 
   it('uses the Solo Trip toggle as the scheduled cancel path', async () => {
@@ -414,12 +442,15 @@ describe('DashboardViewPage Solo Trip', () => {
     expect(document.querySelector('article[aria-label="Stephen Home"]')).toBeInTheDocument()
   })
 
-  it('shows active unconfirmed state without the green confirmation box', () => {
+  it('shows active unconfirmed state with a title-only neutral away chip', () => {
     setupSoloTripSnapshot('active', {
       effects: { sleepypod_live_follow: false, sleepypod_schedule: true, wake_light_source: true },
     })
     renderSoloTripPage()
-    expect(screen.queryByRole('note', { name: 'Stephen Away' })).not.toBeInTheDocument()
+    const notice = screen.getByRole('note', { name: 'Stephen Away' })
+    expect(notice).toHaveAttribute('data-tone', 'neutral')
+    expect(notice).toHaveTextContent('Stephen Away')
+    expect(notice).not.toHaveTextContent('controls and alarms will control the entire bed')
     expect(screen.getByText('Solo Trip is active, but some requested effects are still waiting for Home Assistant confirmation.')).toBeInTheDocument()
   })
 
@@ -445,8 +476,8 @@ describe('DashboardViewPage Solo Trip', () => {
 
     expect(screen.getByRole('heading', { name: 'Solo Trip Degraded' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'End Solo Trip Now' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Return Date')).toBeDisabled()
-    expect(screen.getByLabelText('Return Time')).toBeDisabled()
+    expect(screen.getByLabelText('Return Date')).toBeEnabled()
+    expect(screen.getByLabelText('Return Time')).toBeEnabled()
     fireEvent.click(soloTripToggle())
 
     await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
@@ -464,7 +495,13 @@ describe('DashboardViewPage Solo Trip', () => {
   it('locks restore-required state while retaining truthful recovery actions', async () => {
     setupSoloTripSnapshot('restore_required')
     renderSoloTripPage()
+    const notice = screen.getByRole('note', { name: 'Stephen Away' })
+    const description = screen.getByText('Enable or disable Solo Trip mode for the house.')
     expect(soloTripToggle()).toBeDisabled()
+    expect(notice).toHaveAttribute('data-tone', 'neutral')
+    expect(notice.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByLabelText('Return Date')).toBeEnabled()
+    expect(screen.getByLabelText('Return Time')).toBeEnabled()
     expect(screen.getByRole('heading', { name: 'Solo Trip Needs Attention' })).toBeInTheDocument()
     expect(screen.queryByText('sleepypod_schedule_diverged')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Restore Saved Schedule' }))
@@ -541,7 +578,9 @@ describe('DashboardViewPage Solo Trip', () => {
   it('routes Vacation entry directly to the dedicated Solo Trip page when Solo Trip is engaged', () => {
     setupSoloTripSnapshot('scheduled')
     renderSoloTripPage('vacation')
-    expect(screen.getByRole('heading', { name: 'Solo Trip Scheduled' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Solo Trip Scheduled' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Return Date')).toBeEnabled()
+    expect(screen.queryByLabelText('Departure Date')).not.toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Away modes' })).not.toBeInTheDocument()
   })
 
@@ -629,25 +668,22 @@ describe('DashboardViewPage Solo Trip', () => {
     setupSoloTripSnapshot('scheduled')
     setMockCallServiceOutcome('script', 'household_away_command', 'pending')
     renderSoloTripPage()
-    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
     fireEvent.change(screen.getByLabelText('Return Date'), { target: { value: '2099-01-04' } })
-    fireEvent.change(screen.getByLabelText('Return Time'), { target: { value: '18:30' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
     act(() => setMockEntityAttribute(STATUS_ENTITY, 'revision', 1))
     await act(async () => acknowledgePendingMockHouseholdAwayCommands())
 
     act(() => setMockEntityAttribute(STATUS_ENTITY, 'revision', 2))
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect((screen.getByLabelText('Return Time') as HTMLInputElement).value).toBe('18:30')
+    expect(screen.getByLabelText('Return Date')).toBeDisabled()
+    expect((screen.getByLabelText('Return Date') as HTMLInputElement).value).toBe('2099-01-04')
 
     act(() => {
-      setMockEntityAttribute(STATUS_ENTITY, 'ends_at', '2099-01-04T18:30:00')
+      setMockEntityAttribute(STATUS_ENTITY, 'ends_at', '2099-01-04T17:00:00')
       setMockEntityAttribute(STATUS_ENTITY, 'revision', 3)
     })
 
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText('Return Date')).toBeEnabled())
   })
 
   it('keeps an acknowledged cancel locked until the authoritative mode exits', async () => {
@@ -701,7 +737,9 @@ describe('DashboardViewPage Solo Trip', () => {
 
     await act(async () => resolvePendingMockHouseholdAwayCommands())
     expect(soloTripToggle()).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('heading', { name: 'Solo Trip Scheduled' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Solo Trip Scheduled' })).not.toBeInTheDocument()
+    const pageReturnDate = screen.getAllByLabelText('Return Date').find((field) => !field.closest('[role="dialog"]'))
+    expect(pageReturnDate).toBeEnabled()
   })
 
   it('locks a timed-out cancel request until the authoritative snapshot arrives', async () => {
@@ -749,21 +787,18 @@ describe('DashboardViewPage Solo Trip', () => {
     setupSoloTripSnapshot('scheduled')
     setMockCallServiceOutcome('script', 'household_away_command', 'pending')
     renderSoloTripPage()
-    fireEvent.click(screen.getByRole('button', { name: 'Change' }))
     fireEvent.change(screen.getByLabelText('Return Date'), { target: { value: '2099-01-04' } })
-    fireEvent.change(screen.getByLabelText('Return Time'), { target: { value: '18:30' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(householdAwayCalls()).toHaveLength(1)
     await elapseHouseholdAwayTimeout()
 
-    expect(screen.getAllByText('Home Assistant did not confirm the Solo Trip change. Wait for the dashboard to refresh before sending another request.')).toHaveLength(2)
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getAllByText('Home Assistant did not confirm the Solo Trip change. Wait for the dashboard to refresh before sending another request.')).toHaveLength(1)
+    expect(screen.getByLabelText('Return Date')).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Return Date'), { target: { value: '2099-01-05' } })
     expect(householdAwayCalls()).toHaveLength(1)
 
     await act(async () => resolvePendingMockHouseholdAwayCommands())
-    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Return Date')).toBeEnabled()
   })
 
   it('keeps the traveler bed visible and read-only during an active Solo Trip', async () => {

@@ -36,8 +36,9 @@ leave the journal.
 
 1. Replays the latest matching `request_id` only when the canonical request
    hash matches, otherwise rejects `request_id_conflict`.
-2. Parses local schedule edits into timestamps, rejects starts in the past, and
-   rejects `end <= start` without lexicographic datetime comparisons.
+2. Parses local schedule edits into timestamps, accepts a past departure so
+   Solo Trip can be enabled after someone leaves, and rejects `end <= start`
+   without lexicographic datetime comparisons.
 3. Claims the writer, commits and echoes the exact away-side baseline, re-reads
    that baseline before effects, and mirrors the full home-side schedule onto
    the away side during activation.

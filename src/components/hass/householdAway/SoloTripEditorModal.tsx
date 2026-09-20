@@ -66,8 +66,7 @@ export function SoloTripEditorModal({
           <NativePickerField className={scheduleFormStyles.picker} label={copy(C.editor.endTime)} onChange={(value) => onDraftChange({ ...draft, endTime: value })} type="time" value={draft.endTime} />
         </div>
         {!selectedTraveler && <InlineAlert>{copy(C.errors.travelerRequired)}</InlineAlert>}
-        {!validation.startInFuture && <InlineAlert>{copy(C.editor.validation.startInFuture)}</InlineAlert>}
-        {validation.startInFuture && !validation.endAfterStart && <InlineAlert>{copy(C.editor.validation.endAfterStart)}</InlineAlert>}
+        {!validation.endAfterStart && <InlineAlert>{copy(C.editor.validation.endAfterStart)}</InlineAlert>}
         {availabilityMessage && <InlineAlert>{availabilityMessage}</InlineAlert>}
         {commandError && <InlineAlert>{commandError}</InlineAlert>}
         <FieldActionButton data-schedule-confirmation-action="true" disabled={disabled || !validation.valid || !selectedTraveler} label={copy(C.editor.confirm)} onClick={onConfirm} variant="primary" />

@@ -74,7 +74,11 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
   await page.goto(`/index.html?path=${route}${recipeDelay}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
   if (scenario === 'solo-trip-settings') {
-    const fixtureState = state === 'active-home-viewer' || state === 'active-unknown-viewer' ? 'active' : state ?? 'idle'
+    const fixtureState = state === 'active-home-viewer' || state === 'active-unknown-viewer'
+      ? 'active'
+      : state === 'invalid-return'
+        ? 'scheduled'
+        : state ?? 'idle'
     const viewer = state === 'active-home-viewer' ? 'steph' : state === 'active-unknown-viewer' ? 'unknown' : 'stephen'
     await seedSoloTripState(page, fixtureState, viewer)
     const pageRoot = page.locator(`[data-route-path="${route}"]:not([aria-hidden="true"]) main`)
@@ -85,6 +89,11 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
     if (state === 'modal') {
       await pageRoot.locator('button[role="switch"][aria-label^="Solo Trip"]').click()
       await expect(page.getByRole('dialog', { name: 'Schedule Solo Trip' })).toBeVisible()
+    }
+    if (state === 'invalid-return') {
+      await page.evaluate(() => { window.__mockHass!.calls.splice(0) })
+      await pageRoot.getByLabel('Return Date').fill('2020-01-01')
+      await expect(pageRoot.getByRole('alert')).toContainText('Return date/time must be in the future.')
     }
     return pageRoot
   }

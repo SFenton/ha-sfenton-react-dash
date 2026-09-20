@@ -19,14 +19,11 @@
     "vacation": "Vacation Mode"
   },
   "editor": {
-    "changeReturn": "Change",
-    "cancelReturn": "Cancel",
     "confirm": "Schedule Solo Trip",
     "description": "Choose when Solo Trip starts and ends for the selected traveler.",
     "endDate": "Return Date",
     "endTime": "Return Time",
     "homeResident": "At Home",
-    "saveReturn": "Save",
     "startDate": "Departure Date",
     "startTime": "Departure Time",
     "title": "Schedule Solo Trip",
@@ -35,7 +32,7 @@
     "travelerStephen": "Stephen",
     "validation": {
       "endAfterStart": "Return must be after departure.",
-      "startInFuture": "Departure must be in the future.",
+      "endInFuture": "Return date/time must be in the future.",
       "travelerRequired": "Select the resident who will be away from home."
     }
   },
@@ -77,9 +74,6 @@
     "restoreKeepCurrent": "Keep Current Schedule",
     "restoreRequiredDescription": "The away-side schedule changed unexpectedly during Solo Trip. Choose how to resolve it before Solo Trip can finish.",
     "restoreRequiredTitle": "Solo Trip Needs Attention",
-    "restoreSaved": "Restore Saved Schedule",
-    "scheduledDescription": "Solo Trip for {{traveler}} starts {{startsAt}} and ends {{endsAt}}.",
-    "scheduledTitle": "Solo Trip Scheduled",
-    "updateEnd": "Change Return Time"
+    "restoreSaved": "Restore Saved Schedule"
   }
 }

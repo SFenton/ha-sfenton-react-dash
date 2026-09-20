@@ -4,18 +4,11 @@ import { FieldActionButton } from '../../core/FieldActionButton'
 import { InfoBox } from '../../core/InfoBox'
 import { InlineAlert } from '../../core/InlineAlert'
 import { SectionHeader } from '../../core/SectionHeader'
-import { householdAwayFullyActive } from './householdAwayContract'
+import { HOUSEHOLD_AWAY_MODE, HOUSEHOLD_AWAY_STATE, householdAwayFullyActive } from './householdAwayContract'
 import { householdAwayActiveDescription, householdAwayCommandError, householdAwayResidentLabel } from './householdAwayLabels'
 import type { useHouseholdAwayController } from './useHouseholdAwayController'
-import { formatDate, formatClockTime, useCopy, SOLO_TRIP_COPY_KEYS as C, SOLO_TRIP_COPY_NAMESPACE } from '../../../i18n'
+import { useCopy, SOLO_TRIP_COPY_KEYS as C, SOLO_TRIP_COPY_NAMESPACE } from '../../../i18n'
 import { householdResidentForHaUserId } from '../../../constants/householdResidents'
-
-function formatWhen(iso: string | null) {
-  if (!iso) return ''
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return `${formatDate(date)} ${formatClockTime(date)}`
-}
 
 export function SoloTripActiveNotice({ controller }: {
   controller: ReturnType<typeof useHouseholdAwayController>
@@ -23,12 +16,17 @@ export function SoloTripActiveNotice({ controller }: {
   const copy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
   const { snapshot } = controller
   const viewer = householdResidentForHaUserId(useUser()?.id)
-  if (!householdAwayFullyActive(snapshot)) return null
+  const fullyActive = householdAwayFullyActive(snapshot)
+  const travelerAway = snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+    && snapshot.traveler !== 'none'
+    && snapshot.state !== HOUSEHOLD_AWAY_STATE.IDLE
+    && snapshot.state !== HOUSEHOLD_AWAY_STATE.SCHEDULED
+  if (!travelerAway) return null
   const travelerLabel = householdAwayResidentLabel(copy, snapshot.traveler)
 
   return (
-    <InfoBox title={copy(C.status.activeTitle, { traveler: travelerLabel })} tone="success">
-      {householdAwayActiveDescription(copy, snapshot, viewer)}
+    <InfoBox title={copy(C.status.activeTitle, { traveler: travelerLabel })} tone={fullyActive ? 'success' : 'neutral'}>
+      {fullyActive ? householdAwayActiveDescription(copy, snapshot, viewer) : undefined}
     </InfoBox>
   )
 }
@@ -113,17 +111,7 @@ export function SoloTripStatusSection({
   }
 
   if (snapshot.state === 'scheduled') {
-    return (
-      <div>
-        <SectionHeader title={copy(C.status.scheduledTitle)} />
-        <Description>{copy(C.status.scheduledDescription, {
-          traveler: travelerLabel,
-          startsAt: formatWhen(snapshot.startsAt),
-          endsAt: formatWhen(snapshot.endsAt),
-        })}</Description>
-        {actionableError}
-      </div>
-    )
+    return actionableError
   }
 
   if (snapshot.state === 'degraded') {
@@ -143,6 +131,15 @@ export function SoloTripStatusSection({
         <SectionHeader title={copy(C.status.activeTitle, { traveler: travelerLabel })} />
         {actionableError}
         <SoloTripActiveNotice controller={controller} />
+      </div>
+    )
+  }
+
+  if (!showConfirmedActiveNotice) {
+    return (
+      <div>
+        {actionableError}
+        <Description>{copy(C.status.activeUnconfirmedDescription)}</Description>
       </div>
     )
   }

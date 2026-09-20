@@ -247,7 +247,18 @@ class NativeLifecycleTests(unittest.TestCase):
         self.assertEqual(trimmed.journal["request_results"][0]["request_id"], "old-1")
         self.assertEqual(trimmed.journal["request_results"][-1]["request_id"], "fresh")
 
-    def test_schedule_rejects_a_second_plan_but_accepts_the_current_minute(self) -> None:
+    def test_schedule_accepts_past_departure_and_current_minute_but_rejects_a_second_plan(self) -> None:
+        departed = schedule_solo_trip(
+            initial_journal(),
+            request_id="already-departed",
+            expected_revision=0,
+            traveler="stephen",
+            starts_at="2026-09-18T14:00:00+00:00",
+            ends_at="2026-09-19T15:00:00+00:00",
+            now=datetime(2026, 9, 18, 15, 0, 42, tzinfo=timezone.utc),
+        )
+        self.assertEqual(departed.response["status"], "accepted")
+
         current_minute = schedule_solo_trip(
             initial_journal(),
             request_id="current-minute",
