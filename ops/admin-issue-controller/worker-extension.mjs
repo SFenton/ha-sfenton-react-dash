@@ -5,21 +5,6 @@ import { isAbsolute } from "node:path";
 import { joinSession } from "@github/copilot-sdk/extension";
 
 const MAX_OUTPUT_BYTES = 512 * 1024;
-const MASKED_WORKSPACE_FILES = [
-  ".env",
-  ".env.development",
-  ".env.development.local",
-  ".env.emulator",
-  ".env.local",
-  ".env.production",
-  ".env.production.local",
-  ".env.test",
-  ".env.test.local",
-  ".envrc",
-  ".npmrc",
-  ".yarnrc",
-  ".yarnrc.yml",
-];
 const READ_ONLY_WORKSPACE_PATHS = [
   ".git",
   ".github",
@@ -112,7 +97,7 @@ async function runIsolated(command, timeoutSeconds) {
   const name = `admin-issue-worker-${randomUUID()}`;
   const uid = process.getuid();
   const gid = process.getgid();
-  const maskedWorkspaceFiles = new Set(MASKED_WORKSPACE_FILES);
+  const maskedWorkspaceFiles = new Set();
   for (const entry of await readdir(workspace)) {
     if (isMaskedWorkspaceFile(entry)) maskedWorkspaceFiles.add(entry);
   }

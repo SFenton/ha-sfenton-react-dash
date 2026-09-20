@@ -146,21 +146,6 @@ const STATE_VERSION = 1 as const
 const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
-const MASKED_WORKSPACE_FILES = [
-  '.env',
-  '.env.development',
-  '.env.development.local',
-  '.env.emulator',
-  '.env.local',
-  '.env.production',
-  '.env.production.local',
-  '.env.test',
-  '.env.test.local',
-  '.envrc',
-  '.npmrc',
-  '.yarnrc',
-  '.yarnrc.yml',
-] as const
 const PROTECTED_WORKER_PATHS = [
   '.gitattributes',
   '.git',
@@ -1313,7 +1298,7 @@ async function runWorkspaceContainer(
   const containerName = `admin-issue-validate-${process.pid}-${Date.now()}`
   const uid = process.getuid?.() ?? 1000
   const gid = process.getgid?.() ?? 1000
-  const maskedWorkspaceFiles = new Set<string>(MASKED_WORKSPACE_FILES)
+  const maskedWorkspaceFiles = new Set<string>()
   for (const entry of readdirSync(worktreePath)) {
     if (isMaskedWorkspaceFile(entry)) maskedWorkspaceFiles.add(entry)
   }
