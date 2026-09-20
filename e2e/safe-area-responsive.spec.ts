@@ -1,3 +1,4 @@
+// @covers src/components/shell/AppShell.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import {
   MOBILE_GEOMETRY_PROFILES,
@@ -34,6 +35,41 @@ async function setRoute(page: Page, route: ResponsiveRoute) {
     window.dispatchEvent(new PopStateEvent('popstate'))
   }, route)
   await waitForRoute(page, route)
+}
+
+async function measureBottomChromeSpacing(page: Page) {
+  return page.locator('[data-page-scroller="true"]:visible').last().evaluate((scroller) => {
+    const content = scroller.querySelector<HTMLElement>('[data-page-content="true"]')
+    const dock = document.querySelector<HTMLElement>('[data-floating-action-dock="true"]')
+    const bottomNav = document.querySelector<HTMLElement>('[data-adaptive-navigation="bottom"]')
+    if (!content || !dock || !bottomNav) throw new Error('Bottom chrome geometry is incomplete')
+
+    scroller.scrollTop = scroller.scrollHeight
+    const contentBounds = content.getBoundingClientRect()
+    const dockBounds = dock.getBoundingClientRect()
+    const bottomNavBounds = bottomNav.getBoundingClientRect()
+    const actionBounds = Array.from(dock.querySelectorAll<HTMLElement>(':scope > button'))
+      .map((action) => action.getBoundingClientRect())
+    const terminal = Array.from(content.children)
+      .filter((child): child is HTMLElement => child instanceof HTMLElement)
+      .at(-1)?.getBoundingClientRect()
+
+    return {
+      actionCount: actionBounds.length,
+      actionHeights: actionBounds.map((bounds) => bounds.height),
+      actionTopSpread: actionBounds.length === 0
+        ? 0
+        : Math.max(...actionBounds.map((bounds) => bounds.top)) - Math.min(...actionBounds.map((bounds) => bounds.top)),
+      contentToDockGap: dockBounds.top - contentBounds.bottom,
+      dockBottomOffset: innerHeight - dockBounds.bottom,
+      dockHeight: dockBounds.height,
+      dockToNavGap: bottomNavBounds.top - dockBounds.bottom,
+      navBottomOffset: innerHeight - bottomNavBounds.bottom,
+      navHeight: bottomNavBounds.height,
+      terminalScrollDelta: Math.abs(scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop),
+      terminalToWrapperGap: terminal ? contentBounds.bottom - terminal.bottom : null,
+    }
+  })
 }
 
 async function auditSafeArea(page: Page, route: ResponsiveRoute, geometry: MobileGeometryProfile) {
@@ -215,6 +251,77 @@ test.describe('safe-area responsive acceptance', () => {
       }
     })
   }
+
+  test('keeps terminal page content evenly spaced around the bottom action dock', async ({ page }) => {
+    const portraitProfiles = [
+      profile('island-phone-portrait'),
+      profile('rectangular-phone-portrait'),
+    ]
+    await page.setViewportSize(portraitProfiles[0].viewport)
+    await installSafeAreaInsets(page, portraitProfiles[0].insets)
+    await page.goto('/index.html?path=overview')
+
+    for (const geometry of portraitProfiles) {
+      await page.setViewportSize(geometry.viewport)
+      await setSafeAreaInsets(page, geometry.insets)
+
+      for (const [route, expectedActionCount] of [['overview', 1], ['groceries', 2]] as const) {
+        await setRoute(page, route)
+        await expect(page.locator('[data-app-shell="true"]')).toHaveAttribute('data-navigation-layout', 'bottom')
+        const metrics = await measureBottomChromeSpacing(page)
+
+        expect(metrics.terminalScrollDelta, `${geometry.name} ${route} terminal scroll`).toBeLessThanOrEqual(1)
+        expect(Math.abs(metrics.contentToDockGap - 10), `${geometry.name} ${route} content-to-dock gap`).toBeLessThanOrEqual(1)
+        expect(Math.abs(metrics.dockToNavGap - 10), `${geometry.name} ${route} dock-to-nav gap`).toBeLessThanOrEqual(1)
+        expect(Math.abs(metrics.contentToDockGap - metrics.dockToNavGap), `${geometry.name} ${route} balanced gaps`).toBeLessThanOrEqual(1)
+        expect(Math.abs(metrics.dockHeight - 56), `${geometry.name} ${route} dock height`).toBeLessThanOrEqual(1)
+        expect(Math.abs(metrics.navHeight - 62), `${geometry.name} ${route} navigation height`).toBeLessThanOrEqual(1)
+        const expectedNavBottomOffset = Math.max(12, geometry.insets.bottom)
+        expect(Math.abs(metrics.navBottomOffset - expectedNavBottomOffset), `${geometry.name} ${route} navigation position`).toBeLessThanOrEqual(1)
+        expect(
+          Math.abs(metrics.dockBottomOffset - (expectedNavBottomOffset + metrics.navHeight + 10)),
+          `${geometry.name} ${route} dock position`,
+        ).toBeLessThanOrEqual(1)
+        expect(metrics.actionCount, `${geometry.name} ${route} dock action count`).toBe(expectedActionCount)
+        expect(metrics.actionHeights.every((height) => Math.abs(height - 56) <= 1), `${geometry.name} ${route} action heights`).toBe(true)
+        expect(metrics.actionTopSpread, `${geometry.name} ${route} action alignment`).toBeLessThanOrEqual(1)
+        if (route === 'overview') {
+          expect(metrics.terminalToWrapperGap, `${geometry.name} visible terminal content`).not.toBeNull()
+          expect(Math.abs(metrics.terminalToWrapperGap ?? 0), `${geometry.name} visible terminal content`).toBeLessThanOrEqual(1)
+        }
+      }
+    }
+
+    for (const geometry of [
+      profile('island-phone-landscape-left'),
+      profile('island-phone-landscape-right'),
+    ]) {
+      await page.setViewportSize(geometry.viewport)
+      await setSafeAreaInsets(page, geometry.insets)
+      await setRoute(page, 'overview')
+      await expect(page.locator('[data-app-shell="true"]')).toHaveAttribute('data-navigation-layout', 'drawer-only')
+      await expect(page.locator('[data-adaptive-navigation="bottom"]')).toBeHidden()
+      const geometryFacts = await page.evaluate((insets) => {
+        const scroller = document.querySelector<HTMLElement>('[data-page-scroller="true"]')
+        const content = scroller?.querySelector<HTMLElement>('[data-page-content="true"]')
+        const dock = document.querySelector<HTMLElement>('[data-floating-action-dock="true"]')
+        if (!scroller || !content || !dock) throw new Error('Drawer-only geometry is incomplete')
+        scroller.scrollTop = scroller.scrollHeight
+        const contentBounds = content.getBoundingClientRect()
+        const dockBounds = dock.getBoundingClientRect()
+        return {
+          contentToDockGap: dockBounds.top - contentBounds.bottom,
+          dockLeft: dockBounds.left,
+          dockRight: dockBounds.right,
+          safeLeft: insets.left,
+          safeRight: innerWidth - insets.right,
+        }
+      }, geometry.insets)
+      expect(geometryFacts.contentToDockGap, `${geometry.name} content-to-dock overlap`).toBeGreaterThanOrEqual(-1)
+      expect(geometryFacts.dockLeft, `${geometry.name} dock left containment`).toBeGreaterThanOrEqual(geometryFacts.safeLeft - 1)
+      expect(geometryFacts.dockRight, `${geometry.name} dock right containment`).toBeLessThanOrEqual(geometryFacts.safeRight + 1)
+    }
+  })
 
   test('keeps Chores adaptive across safe-area and rectangular phone profiles', async ({ page }) => {
     const expectedColumns = new Map([

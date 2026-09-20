@@ -8,12 +8,30 @@
   --floating-action-size: 56px;
   --floating-action-gap: 4px;
   --floating-action-content-gap: 20px;
-  --page-scroll-bottom-inset: calc(var(--bottom-nav-height) - 12px + var(--rd-bottom-nav-offset));
+  --bottom-chrome-gap: 10px;
+  --bottom-nav-surface-height: 62px;
+  --floating-action-bottom: calc(
+    var(--bottom-nav-surface-height)
+    + var(--bottom-chrome-gap)
+    + var(--rd-bottom-nav-offset)
+  );
+  --page-scroll-nav-gap: 12px;
+  --page-scroll-bottom-inset: calc(var(--bottom-nav-height) - var(--page-scroll-nav-gap) + var(--rd-bottom-nav-offset));
   --page-bottom-extra-padding: 22px;
 }
 
 .hasFloatingAction {
   --page-bottom-extra-padding: calc(var(--floating-action-size) + var(--floating-action-gap) + var(--floating-action-content-gap));
+}
+
+/* Preserve fixed chrome positions and derive terminal padding from their shared geometry. */
+.shell[data-navigation-layout='bottom'].hasFloatingAction {
+  --page-bottom-extra-padding: calc(
+    var(--floating-action-bottom)
+    + var(--floating-action-size)
+    + var(--bottom-chrome-gap)
+    - var(--page-scroll-bottom-inset)
+  );
 }
 
 .shell[data-page-measure='dashboard'] {
@@ -65,7 +83,6 @@
   justify-content: flex-end;
   gap: var(--floating-action-gap);
   pointer-events: none;
-  --floating-action-bottom: calc(var(--bottom-nav-height) - 14px + var(--rd-bottom-nav-offset));
   --floating-action-keyboard-gap: 8px;
   animation: floatingActionFadeIn 170ms ease-out;
   transform: translate3d(0, 0, 0);

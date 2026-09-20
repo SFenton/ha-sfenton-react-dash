@@ -1,3 +1,4 @@
+// @covers src/components/shell/AppShell.module.css
 // @covers src/components/core/InfoBox.module.css
 // @covers src/i18n/locales/en/pages/chores.json
 // @covers src/components/core/DynamicGrid.module.css
@@ -92,6 +93,11 @@ function listenForUnexpectedErrors(page: Page) {
 }
 
 async function auditPage(page: Page, route: ResponsiveRoute, viewport: ResponsiveViewport, stage: string) {
+  const loadGate = page.locator('[data-page-load-phase]:visible')
+  if (await loadGate.count() > 0) {
+    await expect(loadGate).toHaveAttribute('data-page-load-phase', 'content', { timeout: 15_000 })
+  }
+
   const metrics = await page.evaluate(() => {
     const isVisible = (element: Element | null): element is HTMLElement => {
       if (!(element instanceof HTMLElement)) return false
@@ -213,10 +219,28 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
     const maximum = Math.max(0, scroller.scrollHeight - scroller.clientHeight)
     scroller.scrollTop = maximum
     const reached = scroller.scrollTop
+    const content = scroller.querySelector<HTMLElement>('[data-page-content="true"]')
+    const dock = document.querySelector<HTMLElement>('[data-floating-action-dock="true"]')
+    const bottomNav = document.querySelector<HTMLElement>('[data-adaptive-navigation="bottom"]')
+    const contentBounds = content?.getBoundingClientRect()
+    const dockBounds = dock?.getBoundingClientRect()
+    const bottomNavBounds = bottomNav?.getBoundingClientRect()
     scroller.scrollTop = 0
-    return { maximum, reached }
+    return {
+      contentToDockGap: contentBounds && dockBounds ? dockBounds.top - contentBounds.bottom : null,
+      dockToNavGap: dockBounds && bottomNavBounds ? bottomNavBounds.top - dockBounds.bottom : null,
+      maximum,
+      reached,
+    }
   })
   if (scrollResult.maximum > 1) expect(scrollResult.reached, `${route} ${stage} vertical scrolling`).toBeGreaterThan(0)
+  if (navigationLayout === 'bottom') {
+    expect(scrollResult.contentToDockGap, `${route} ${stage} content-to-dock gap`).not.toBeNull()
+    expect(scrollResult.dockToNavGap, `${route} ${stage} dock-to-nav gap`).not.toBeNull()
+    expect(Math.abs((scrollResult.contentToDockGap ?? 0) - 10), `${route} ${stage} content-to-dock gap`).toBeLessThanOrEqual(1)
+    expect(Math.abs((scrollResult.dockToNavGap ?? 0) - 10), `${route} ${stage} dock-to-nav gap`).toBeLessThanOrEqual(1)
+    expect(Math.abs((scrollResult.contentToDockGap ?? 0) - (scrollResult.dockToNavGap ?? 0)), `${route} ${stage} balanced bottom chrome`).toBeLessThanOrEqual(1)
+  }
 
   manifest.push({ route, stage, viewport, ...metrics })
 }
