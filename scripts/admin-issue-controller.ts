@@ -939,8 +939,19 @@ function prepareCopilotHome(config: AdminIssueControllerConfig) {
   const copilotHome = join(config.workerHome, '.copilot')
   const extensionDirectory = join(copilotHome, 'extensions', 'admin-issue-worker')
   const skillDirectory = join(copilotHome, 'skills', 'tandem-research')
-  rmSync(join(copilotHome, 'extensions'), { force: true, recursive: true })
-  rmSync(join(copilotHome, 'skills'), { force: true, recursive: true })
+  for (const path of [
+    'agents',
+    'copilot-instructions.md',
+    'extensions',
+    'hooks',
+    'installed-plugins',
+    'instructions',
+    'mcp-config.json',
+    'mcp.json',
+    'skills',
+  ]) {
+    rmSync(join(copilotHome, path), { force: true, recursive: true })
+  }
   mkdirSync(extensionDirectory, { mode: 0o700, recursive: true })
   mkdirSync(skillDirectory, { mode: 0o700, recursive: true })
   mkdirSync(join(copilotHome, 'logs'), { mode: 0o700, recursive: true })
@@ -959,6 +970,7 @@ function prepareCopilotHome(config: AdminIssueControllerConfig) {
     `${JSON.stringify(
       {
         banner: 'never',
+        disableAllHooks: true,
         experimental: true,
         memory: false,
         notifications: false,
@@ -970,6 +982,22 @@ function prepareCopilotHome(config: AdminIssueControllerConfig) {
     )}\n`,
     { mode: 0o600 },
   )
+}
+
+export function assertWorkerHostConfigurationSafe(
+  worktreePath: string,
+  policyHookDirectory = '/etc/github-copilot/policy.d',
+) {
+  const projectExtensions = join(worktreePath, '.github/extensions')
+  if (existsSync(projectExtensions) && readdirSync(projectExtensions, { recursive: true }).length > 0) {
+    throw new Error('Project Copilot extensions are not allowed in autonomous worker sessions')
+  }
+  if (
+    existsSync(policyHookDirectory) &&
+    readdirSync(policyHookDirectory).some((entry) => entry.endsWith('.json'))
+  ) {
+    throw new Error('Copilot policy hooks are not allowed in autonomous worker sessions')
+  }
 }
 
 async function getGitCommonDirectory(worktreePath: string) {
@@ -1072,6 +1100,7 @@ async function runCopilotWorker(
 ) {
   const worktreePath = await ensureWorktree(config, state, record)
   assertProtectedPathsUntouched(await changedFiles(worktreePath))
+  assertWorkerHostConfigurationSafe(worktreePath)
   prepareCopilotHome(config)
   const githubToken = (
     await runCommand('gh', ['auth', 'token'], {

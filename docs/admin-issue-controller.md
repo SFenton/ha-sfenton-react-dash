@@ -27,6 +27,9 @@ The controller rejects changes outside the auto-deployed dashboard surfaces:
 Repository env and package-credential files are masked with `/dev/null`, and
 build caches use per-command tmpfs mounts, so model commands cannot read local
 tokens or persist a cache that influences trusted validation.
+Non-policy hooks are disabled, user plugins/hooks/instructions are removed from
+the dedicated Copilot home before each run, and the controller refuses to start
+a worker when project extensions or machine policy hooks are present.
 
 The controller passes `GH_TOKEN` to Copilot only so the CLI can authenticate
 its model session. The variable is declared secret and is not requested by the

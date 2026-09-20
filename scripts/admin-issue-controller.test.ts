@@ -13,6 +13,7 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  assertWorkerHostConfigurationSafe,
   assertWorkerChangesSafe,
   githubRepositoryFromRemote,
   loadAdminIssueControllerConfig,
@@ -454,6 +455,29 @@ describe('admin issue controller security configuration', () => {
     )
   })
 
+  it('rejects executable Copilot configuration outside the dedicated extension', () => {
+    const root = mkdtempSync(join(homedir(), '.admin-issue-controller-host-config-test-'))
+    temporaryDirectories.push(root)
+    const repositoryPath = join(root, 'repository')
+    const policyPath = join(root, 'policy')
+    mkdirSync(repositoryPath, { recursive: true })
+    mkdirSync(policyPath, { recursive: true })
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).not.toThrow()
+
+    const extensionPath = join(repositoryPath, '.github/extensions')
+    mkdirSync(extensionPath, { recursive: true })
+    writeFileSync(join(extensionPath, 'unexpected.mjs'), 'export {};\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
+      'Project Copilot extensions are not allowed',
+    )
+    rmSync(join(repositoryPath, '.github'), { force: true, recursive: true })
+
+    writeFileSync(join(policyPath, 'mandatory.json'), '{}\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
+      'Copilot policy hooks are not allowed',
+    )
+  })
+
   it('requires immutable worker images and keeps mutable paths under the user home', () => {
     const root = mkdtempSync(join(homedir(), '.admin-issue-controller-test-'))
     temporaryDirectories.push(root)
@@ -539,6 +563,8 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain("'--disable-builtin-mcps'")
     expect(controller).toContain("'custom-tool(admin_issue_workspace)'")
     expect(controller).toContain("'GH_TOKEN'")
+    expect(controller).toContain('disableAllHooks: true')
+    expect(controller).toContain("'installed-plugins'")
     expect(controller).toContain("const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']")
     expect(controller).not.toContain("'--allow-all-tools'")
     const completionReceipt = controller.indexOf('record.receipts.todoCompletedAt = now()')
