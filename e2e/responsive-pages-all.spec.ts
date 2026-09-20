@@ -237,8 +237,8 @@ async function auditPage(page: Page, route: ResponsiveRoute, viewport: Responsiv
   if (navigationLayout === 'bottom') {
     expect(scrollResult.contentToDockGap, `${route} ${stage} content-to-dock gap`).not.toBeNull()
     expect(scrollResult.dockToNavGap, `${route} ${stage} dock-to-nav gap`).not.toBeNull()
-    expect(Math.abs((scrollResult.contentToDockGap ?? 0) - 20), `${route} ${stage} content-to-dock gap`).toBeLessThanOrEqual(1)
-    expect(Math.abs((scrollResult.dockToNavGap ?? 0) - 20), `${route} ${stage} dock-to-nav gap`).toBeLessThanOrEqual(1)
+    expect(Math.abs((scrollResult.contentToDockGap ?? 0) - 10), `${route} ${stage} content-to-dock gap`).toBeLessThanOrEqual(1)
+    expect(Math.abs((scrollResult.dockToNavGap ?? 0) - 10), `${route} ${stage} dock-to-nav gap`).toBeLessThanOrEqual(1)
     expect(Math.abs((scrollResult.contentToDockGap ?? 0) - (scrollResult.dockToNavGap ?? 0)), `${route} ${stage} balanced bottom chrome`).toBeLessThanOrEqual(1)
   }
 

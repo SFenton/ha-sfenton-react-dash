@@ -268,8 +268,8 @@ test.describe('safe-area responsive acceptance', () => {
         const metrics = await measureBottomChromeSpacing(page)
 
         expect(metrics.terminalScrollDelta, `${geometry.name} ${route} terminal scroll`).toBeLessThanOrEqual(1)
-        expect(Math.abs(metrics.contentToDockGap - 20), `${geometry.name} ${route} content-to-dock gap`).toBeLessThanOrEqual(1)
-        expect(Math.abs(metrics.dockToNavGap - 20), `${geometry.name} ${route} dock-to-nav gap`).toBeLessThanOrEqual(1)
+        expect(Math.abs(metrics.contentToDockGap - 10), `${geometry.name} ${route} content-to-dock gap`).toBeLessThanOrEqual(1)
+        expect(Math.abs(metrics.dockToNavGap - 10), `${geometry.name} ${route} dock-to-nav gap`).toBeLessThanOrEqual(1)
         expect(Math.abs(metrics.contentToDockGap - metrics.dockToNavGap), `${geometry.name} ${route} balanced gaps`).toBeLessThanOrEqual(1)
         expect(Math.abs(metrics.dockHeight - 56), `${geometry.name} ${route} dock height`).toBeLessThanOrEqual(1)
         expect(metrics.actionCount, `${geometry.name} ${route} dock action count`).toBe(expectedActionCount)
