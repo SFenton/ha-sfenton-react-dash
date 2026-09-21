@@ -840,3 +840,10 @@ export const MEDIA_SECTIONS: EntitySectionConfig[] = [
     ],
   },
 ]
+
+export const VACUUM_OUTCOME_RECONCILIATIONS: Readonly<Record<string, readonly { entityId: string; id: string }[]>> = {
+  valetudo_exaltedsneakydeer: [
+    { id: 'gym', entityId: 'input_text.main_floor_vacuum_gym_reconciled_attempt' },
+    { id: 'office', entityId: 'input_text.main_floor_vacuum_office_reconciled_attempt' },
+  ],
+}

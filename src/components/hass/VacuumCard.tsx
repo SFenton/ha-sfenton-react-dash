@@ -17,7 +17,7 @@ import { useModalSheetPresentation } from '../core/modalSheetPresentation'
 import { NativeSelectField } from '../core/NativeSelectField'
 import { DashboardPageLoading } from '../shell/DashboardPageLoading'
 import { StatusPill } from '../core/StatusPill'
-import { type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
+import { VACUUM_OUTCOME_RECONCILIATIONS, type VacuumAutoCleanDisabledRoomConfig, type VacuumConfig, type VacuumConsumableConfig, type VacuumZoneConfig } from '../../constants/portedDashboard'
 import { VACUUM_MODAL_TABS, type VacuumModalTab } from '../../constants/surfaceSemantics'
 import { DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from '../../constants/loading'
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../../hooks/dashboardLocation'
@@ -2464,7 +2464,7 @@ function VacuumMapAndStatus({
 export function VacuumRoomSourceModalContent({ vacuum }: VacuumCardProps) {
   const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
   const { optimisticState, runtimeMode, status, visibleTabs } = useVacuumModalRuntime(vacuum)
-  const outcomePresentation = vacuumWhileAwayPresentation(session?.attributes)
+  const outcomePresentation = useVacuumWhileAwayPresentation(vacuum, session?.attributes)
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
   const areaEditorSession = useVacuumAreaEditorSession(runtimeMode)
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
@@ -2534,7 +2534,7 @@ export function VacuumModal({
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const session = useOptionalEntity(vacuum.coordinatorSessionEntityId)
   const { optimisticState, runtimeMode, status, visibleTabs } = useVacuumModalRuntime(vacuum)
-  const outcomePresentation = vacuumWhileAwayPresentation(session?.attributes)
+  const outcomePresentation = useVacuumWhileAwayPresentation(vacuum, session?.attributes)
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
   const areaEditorSession = useVacuumAreaEditorSession(runtimeMode)
   const [outcomeDetailContract, setOutcomeDetailContract] = useState<VacuumOutcomeContract | null>(null)
@@ -2711,4 +2711,21 @@ export function VacuumCard({ preload = false, vacuum }: VacuumCardProps) {
   return preload
     ? <VacuumTile interaction={{ kind: 'preload' }} vacuum={vacuum} />
     : <LiveVacuumCard vacuum={vacuum} />
+}
+
+function useVacuumWhileAwayPresentation(
+  vacuum: VacuumConfig,
+  attributes: Record<string, unknown> | null | undefined,
+) {
+  const reconciliationSnapshot = useHass((state) => JSON.stringify(
+    (VACUUM_OUTCOME_RECONCILIATIONS[vacuum.vacuumMapId] ?? []).map(({ entityId, id }) => [
+      id,
+      state.entities[entityId]?.state ?? '',
+    ]),
+  ))
+
+  const reconciledAttemptEventIds = Object.fromEntries(
+    (JSON.parse(reconciliationSnapshot) as Array<[string, string]>).filter(([, eventId]) => eventId),
+  )
+  return vacuumWhileAwayPresentation(attributes, reconciledAttemptEventIds)
 }

@@ -233,6 +233,40 @@ describe('vacuum while-away source selection', () => {
     expect(presentation).not.toHaveProperty('issues')
   })
 
+  it('reconciles only an exact Home Assistant attempt marker without rewriting attempt history', () => {
+    const payload = cloneV2Payload()
+    const originalGym = structuredClone(payload.rooms[0])
+    const presentation = vacuumWhileAwayPresentation(
+      { while_away_outcomes: payload },
+      {
+        gym: 'session-v2:gym:attempt',
+        office: 'session-v2:gym:attempt',
+      },
+    )
+
+    expect(presentation.kind).toBe('typed')
+    if (presentation.kind !== 'typed') throw new Error('Expected reconciled typed presentation')
+    expect(presentation.contract.rooms[0]).toMatchObject({
+      credit: { operation: 'vacuum', status: 'full' },
+      latest_attempt: {
+        event_id: 'session-v2:gym:attempt',
+        result: 'uncertain',
+      },
+      outstanding: null,
+      reconciled_event_id: 'session-v2:gym:attempt',
+      status: 'completed',
+    })
+    expect(presentation.contract.events[0]).toMatchObject({
+      attempt_result: 'uncertain',
+      id: 'session-v2:gym:attempt',
+    })
+    expect(presentation.contract.rooms[1]).toMatchObject({
+      room_id: 'office',
+      status: 'uncertain',
+    })
+    expect(payload.rooms[0]).toEqual(originalGym)
+  })
+
   it.each([
     ['incomplete', INCOMPLETE_V2_VACUUM_OUTCOME_PAYLOAD, 'incomplete'],
     ['malformed', MALFORMED_V2_VACUUM_OUTCOME_PAYLOAD, 'malformed'],

@@ -222,6 +222,29 @@ describe('VacuumOutcomeDetail', () => {
     expect(livingRoom).not.toHaveTextContent('Failed')
   })
 
+  it('presents an explicitly reconciled attempt as complete while retaining its diagnostic evidence and history', () => {
+    const presentation = vacuumWhileAwayPresentation(
+      { while_away_outcomes: structuredClone(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD) },
+      { gym: 'session-v2:gym:attempt' },
+    )
+    if (presentation.kind !== 'typed') throw new Error('Expected reconciled typed presentation')
+
+    render(<VacuumOutcomeDetail contract={presentation.contract} vacuum={vacuum} />)
+
+    const gym = screen.getByLabelText('Gym Completed')
+    expect(gym).toHaveAttribute('data-reconciled', 'true')
+    expect(gym).toHaveTextContent('Vacuuming completed for the room.')
+    expect(within(gym).queryByText('Vacuuming remains due.')).not.toBeInTheDocument()
+    const retainedReason = within(gym).getByText('Observed 1 of 2 requested iterations.')
+    expect(retainedReason).not.toBeVisible()
+
+    fireEvent.click(within(gym).getByRole('button', { name: 'Show Gym Cleaning Evidence' }))
+    expect(within(gym).getByText('Completion').nextElementSibling).toHaveTextContent('Uncertain')
+    fireEvent.click(within(gym).getByRole('button', { name: 'Show Gym History' }))
+    expect(retainedReason).toBeVisible()
+    expect(screen.getByLabelText('Office Completion Unverified')).toBeInTheDocument()
+  })
+
   it('renders current evidence-free v2 uncertainty without legacy or raw failure wording', () => {
     render(<VacuumOutcomeDetail contract={parsedContract(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD)} vacuum={vacuum} />)
 
