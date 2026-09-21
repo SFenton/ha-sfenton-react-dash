@@ -41,6 +41,27 @@ function record(value: unknown) {
   return value as Record<string, unknown>
 }
 
+function historicalLostMopContract() {
+  const payload = structuredClone(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD)
+  const room = record(payload.rooms[2])
+  const attempt = record(room.latest_attempt)
+  const event = record(payload.events[2])
+  const historicalReason = { category: 'unknown', code: 'unknown', data: {}, raw: 'Lost mop pad' }
+  room.room_id = 'dining_room'
+  room.room_name = 'Dining Room'
+  room.status = 'interrupted'
+  attempt.result = 'interrupted'
+  attempt.reason = structuredClone(historicalReason)
+  room.credit = { operation: null, status: 'none' }
+  room.outstanding = { operation: 'vacuum_mop', reason: structuredClone(historicalReason) }
+  event.room_id = 'dining_room'
+  event.room_name = 'Dining Room'
+  event.kind = 'failed'
+  event.attempt_result = 'interrupted'
+  event.reason = structuredClone(historicalReason)
+  return parsedContract(payload)
+}
+
 function protocolPresentation(payload: unknown) {
   const presentation = vacuumWhileAwayPresentation({
     ...LEGACY_VACUUM_OUTCOMES,
@@ -324,6 +345,16 @@ describe('VacuumOutcomeDetail', () => {
     expect(chip).toHaveTextContent('Vacuuming and mopping the room failed.')
     expect(chip).not.toHaveTextContent('The vacuum outcome reason was not recognized.')
     expect(chip).not.toHaveTextContent(unknown.raw)
+  })
+
+  it('renders the historical lost-mop payload with the canonical attachment guidance', () => {
+    render(<VacuumOutcomeDetail contract={historicalLostMopContract()} vacuum={vacuum} />)
+
+    const chip = document.querySelector<HTMLElement>('[data-room-id="dining_room"]')!
+    expect(chip).toHaveTextContent('Interrupted')
+    expect(chip).toHaveTextContent("The vacuum's mop attachment was missing; attach it before mopping.")
+    expect(chip).not.toHaveTextContent('Vacuuming and mopping the room was interrupted.')
+    expect(chip).not.toHaveTextContent('Lost mop pad')
   })
 
   it('defines only the status-chip layout for room outcomes', () => {
