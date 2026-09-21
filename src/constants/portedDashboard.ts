@@ -843,7 +843,16 @@ export const MEDIA_SECTIONS: EntitySectionConfig[] = [
 
 export const VACUUM_OUTCOME_RECONCILIATIONS: Readonly<Record<string, readonly { entityId: string; id: string }[]>> = {
   valetudo_exaltedsneakydeer: [
-    { id: 'gym', entityId: 'input_text.main_floor_vacuum_gym_reconciled_attempt' },
+    { id: 'living_room', entityId: 'input_text.main_floor_vacuum_living_room_reconciled_attempt' },
+    { id: 'master_bedroom', entityId: 'input_text.main_floor_vacuum_master_bedroom_reconciled_attempt' },
+    { id: 'kitchen', entityId: 'input_text.main_floor_vacuum_kitchen_reconciled_attempt' },
     { id: 'office', entityId: 'input_text.main_floor_vacuum_office_reconciled_attempt' },
+    { id: 'hallway', entityId: 'input_text.main_floor_vacuum_hallway_reconciled_attempt' },
+    { id: 'guest_room', entityId: 'input_text.main_floor_vacuum_guest_room_reconciled_attempt' },
+    { id: 'master_bathroom', entityId: 'input_text.main_floor_vacuum_master_bathroom_reconciled_attempt' },
+    { id: 'guest_bathroom', entityId: 'input_text.main_floor_vacuum_guest_bathroom_reconciled_attempt' },
+    { id: 'gym', entityId: 'input_text.main_floor_vacuum_gym_reconciled_attempt' },
+    { id: 'master_bedroom_closet', entityId: 'input_text.main_floor_vacuum_master_bedroom_closet_reconciled_attempt' },
+    { id: 'dining_room', entityId: 'input_text.main_floor_vacuum_dining_room_reconciled_attempt' },
   ],
 }

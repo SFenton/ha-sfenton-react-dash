@@ -236,10 +236,12 @@ describe('vacuum while-away source selection', () => {
   it('reconciles only an exact Home Assistant attempt marker without rewriting attempt history', () => {
     const payload = cloneV2Payload()
     const originalGym = structuredClone(payload.rooms[0])
+    const originalLivingRoom = structuredClone(payload.rooms[2])
     const presentation = vacuumWhileAwayPresentation(
       { while_away_outcomes: payload },
       {
         gym: 'session-v2:gym:attempt',
+        living_room: 'session-v2:living-room:attempt',
         office: 'session-v2:gym:attempt',
       },
     )
@@ -264,7 +266,19 @@ describe('vacuum while-away source selection', () => {
       room_id: 'office',
       status: 'uncertain',
     })
+    expect(presentation.contract.rooms[2]).toMatchObject({
+      credit: { operation: 'vacuum_mop', status: 'full' },
+      latest_attempt: {
+        event_id: 'session-v2:living-room:attempt',
+        result: 'partial',
+      },
+      outstanding: null,
+      reconciled_event_id: 'session-v2:living-room:attempt',
+      room_id: 'living_room',
+      status: 'completed',
+    })
     expect(payload.rooms[0]).toEqual(originalGym)
+    expect(payload.rooms[2]).toEqual(originalLivingRoom)
   })
 
   it.each([
