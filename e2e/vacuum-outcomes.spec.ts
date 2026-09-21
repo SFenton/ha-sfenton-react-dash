@@ -30,6 +30,47 @@ type MockHassApi = {
   setEntityAttribute: (entityId: string, attribute: string, value: unknown) => void
 }
 
+type ReviewRoomExpectation = {
+  detail: string
+  icon: string
+  roomId: string
+  status: 'completed' | 'deferred' | 'failed' | 'interrupted' | 'partial' | 'uncertain'
+  tone: 'danger' | 'ok' | 'warning'
+}
+
+const COMPACT_MIXED_REVIEW_ROOM_IDS = ['dining_room', 'kitchen', 'gym', 'hallway'] as const
+const ALL_COMPLETED_REVIEW_ROOM_IDS = ['gym', 'office', 'guest_room', 'master_bedroom_closet'] as const
+
+function projectedOutcomeContract(roomIds: readonly string[]) {
+  const selectedRoomIds = new Set(roomIds)
+  const contract = structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT)
+  contract.events = contract.events.filter((event) => selectedRoomIds.has(event.room_id))
+  contract.rooms = contract.rooms.filter((room) => selectedRoomIds.has(room.room_id))
+  return contract
+}
+
+async function expectReviewRooms(detail: Locator, expectedRooms: readonly ReviewRoomExpectation[]) {
+  const chips = detail.locator('[data-vacuum-outcome-chip="true"]')
+  await expect(chips).toHaveCount(expectedRooms.length)
+  expect(await chips.evaluateAll((items) => items.map((item) => item.getAttribute('data-room-id')))).toEqual(
+    expectedRooms.map((room) => room.roomId),
+  )
+  await expect(detail.getByRole('button')).toHaveCount(0)
+  await expect(detail.getByText('Room Event History')).toHaveCount(0)
+  await expect(detail.getByText('Cleaning Evidence')).toHaveCount(0)
+  await expect(detail.getByText('Vacuum Diagnostics')).toHaveCount(0)
+
+  for (const expected of expectedRooms) {
+    const chip = detail.locator(`[data-room-id="${expected.roomId}"]`)
+    await expect(chip).toHaveAttribute('data-action-kind', 'state')
+    await expect(chip).toHaveAttribute('data-status', expected.status)
+    await expect(chip.getByRole('group')).toHaveAttribute('data-tone', expected.tone)
+    await expect(chip.getByRole('group')).toHaveAttribute('data-icon', expected.icon)
+    await expect(chip).toContainText(expected.detail)
+    await expect(chip).toBeInViewport()
+  }
+}
+
 async function setOutcomeAttributes(page: Page, contract: unknown, legacy?: typeof LEGACY_VACUUM_OUTCOMES) {
   await page.evaluate(({ contractValue, entityId, legacyValue }) => {
     const api = (window as unknown as { __mockHass: MockHassApi }).__mockHass
@@ -185,6 +226,95 @@ test('typed vacuum outcomes use one same-sheet status-chip detail at 393x852', a
   expect(await vacuumActionCalls(page)).toEqual([])
 })
 
+test('mock review captures compact mixed room statuses at 393x852', async ({ page }) => {
+  const expectedRooms: ReviewRoomExpectation[] = [
+    {
+      detail: "The mop dock's clean-water tank was empty; refill it.",
+      icon: 'mdi:alert-circle',
+      roomId: 'dining_room',
+      status: 'failed',
+      tone: 'danger',
+    },
+    {
+      detail: "The mop dock's clean-water tank was empty; refill it.",
+      icon: 'mdi:clock-outline',
+      roomId: 'kitchen',
+      status: 'deferred',
+      tone: 'warning',
+    },
+    {
+      detail: 'Vacuuming completed for the room.',
+      icon: 'mdi:check-circle',
+      roomId: 'gym',
+      status: 'completed',
+      tone: 'ok',
+    },
+    {
+      detail: 'Cleaning was interrupted because someone returned home.',
+      icon: 'mdi:pause-circle',
+      roomId: 'hallway',
+      status: 'interrupted',
+      tone: 'warning',
+    },
+  ]
+
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/at-a-glance/vacuums')
+  await setOutcomeAttributes(page, projectedOutcomeContract(COMPACT_MIXED_REVIEW_ROOM_IDS))
+  const dialog = await openVacuum(page)
+  const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
+  await expect(summary).toContainText('1 Room Completed • 2 Rooms Need Attention • 1 Error')
+  await summary.click()
+
+  const detail = dialog.locator('[data-vacuum-outcome-detail="true"]')
+  const grid = dialog.getByRole('group', { name: 'Main Floor Cleaning Report' })
+  await expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
+  await expectReviewRooms(detail, expectedRooms)
+  expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
+  expect(await vacuumActionCalls(page)).toEqual([])
+  await saveEvidence(page, dialog, 'vacuum-room-outcomes-compact-mixed-phone-393x852.mock', {
+    columns: await grid.getAttribute('data-dynamic-grid-columns'),
+    dialogHorizontalOverflow: await horizontalOverflow(dialog),
+    mock: true,
+    roomStatuses: Object.fromEntries(expectedRooms.map((room) => [room.roomId, room.status])),
+    viewport: { height: 852, width: 393 },
+  })
+})
+
+test('mock review captures all-completed room statuses at 393x852', async ({ page }) => {
+  const expectedRooms: ReviewRoomExpectation[] = ALL_COMPLETED_REVIEW_ROOM_IDS.map((roomId) => ({
+    detail: 'Vacuuming completed for the room.',
+    icon: 'mdi:check-circle',
+    roomId,
+    status: 'completed',
+    tone: 'ok',
+  }))
+
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.goto('/at-a-glance/vacuums')
+  await setOutcomeAttributes(page, projectedOutcomeContract(ALL_COMPLETED_REVIEW_ROOM_IDS))
+  const dialog = await openVacuum(page)
+  const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
+  await expect(summary).toContainText('4 Rooms Completed')
+  await summary.click()
+
+  const detail = dialog.locator('[data-vacuum-outcome-detail="true"]')
+  const grid = dialog.getByRole('group', { name: 'Main Floor Cleaning Report' })
+  await expect(grid).toHaveAttribute('data-dynamic-grid-columns', '1')
+  await expectReviewRooms(detail, expectedRooms)
+  expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
+  expect(await vacuumActionCalls(page)).toEqual([])
+  await saveEvidence(page, dialog, 'vacuum-room-outcomes-all-completed-phone-393x852.mock', {
+    columns: await grid.getAttribute('data-dynamic-grid-columns'),
+    dialogHorizontalOverflow: await horizontalOverflow(dialog),
+    mock: true,
+    roomStatuses: Object.fromEntries(expectedRooms.map((room) => [room.roomId, room.status])),
+    viewport: { height: 852, width: 393 },
+  })
+})
+
 for (const profile of LOADING_CENTER_LANDSCAPE_PROFILES) {
   test(`vacuum loading arc stays centered after outcome Back at ${profile.name}`, async ({ page }) => {
     await page.setViewportSize(profile.viewport)
@@ -281,9 +411,11 @@ test('v2 uncertainty overrides legacy issues with concise status-chip details', 
   await expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
   expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
   expect(await vacuumActionCalls(page)).toEqual([])
-  await saveEvidence(page, dialog, 'vacuum-outcomes-v2-status-chips', {
+  await saveEvidence(page, dialog, 'vacuum-room-outcomes-uncertain-partial-phone-393x852.mock', {
     columns: await dialog.getByRole('group', { name: 'Main Floor Cleaning Report' }).getAttribute('data-dynamic-grid-columns'),
     dialogHorizontalOverflow: await horizontalOverflow(dialog),
+    mock: true,
+    roomStatuses: { gym: 'uncertain', living_room: 'partial', office: 'uncertain' },
     viewport: { height: 852, width: 393 },
   })
 })
@@ -457,6 +589,44 @@ test.describe('fine-pointer outcome details', () => {
       await saveEvidence(page, dialog, 'vacuum-outcomes-desktop-' + viewport.name + '-status-chips', {
         columns: await detailGrid.getAttribute('data-dynamic-grid-columns'),
       })
+      if (viewport.width === 1280) {
+        await page.setViewportSize({ width: 1280, height: 900 })
+        await setSafeAreaInsets(page, { top: 0, right: 0, bottom: 0, left: 0 })
+        await expect(dialog).toHaveAttribute('data-modal-presentation', 'dialog')
+        await expect(detailGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+        expect(await detail.locator('[data-room-id]').evaluateAll((items) => items.map((item) => item.getAttribute('data-room-id')))).toEqual([
+          'dining_room',
+          'kitchen',
+          'master_bathroom',
+          'guest_bathroom',
+          'gym',
+          'office',
+          'guest_room',
+          'master_bedroom_closet',
+          'hallway',
+        ])
+        await expect(detail.locator('[data-room-id="hallway"]')).toBeInViewport()
+        expect(await horizontalOverflow(dialog)).toBeLessThanOrEqual(0)
+        await saveEvidence(page, dialog, 'vacuum-room-outcomes-full-mixed-desktop-1280x900.mock', {
+          columns: await detailGrid.getAttribute('data-dynamic-grid-columns'),
+          dialogHorizontalOverflow: await horizontalOverflow(dialog),
+          mock: true,
+          roomStatuses: {
+            dining_room: 'failed',
+            guest_bathroom: 'deferred',
+            guest_room: 'completed',
+            gym: 'completed',
+            hallway: 'interrupted',
+            kitchen: 'deferred',
+            master_bathroom: 'deferred',
+            master_bedroom_closet: 'completed',
+            office: 'completed',
+          },
+          viewport: { height: 900, width: 1280 },
+        })
+        await page.setViewportSize({ width: viewport.width, height: viewport.height })
+        await expect(detailGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+      }
       await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
       await expectVacuumLoadingCentered(dialog)
       await expect(summary).toBeFocused()
