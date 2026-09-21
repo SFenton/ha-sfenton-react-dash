@@ -13,6 +13,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -21,19 +22,30 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  AdminIssueProvenanceError,
+  assertExactCandidateSnapshot,
   assertWorkerHostConfigurationSafe,
   assertWorkerChangesSafe,
+  assertPullRequestBinding,
   buildWorkerPrompt,
+  createCommittedDiffReceipt,
+  findExactMergeCommit,
   githubRepositoryFromRemote,
   loadAdminIssueControllerConfig,
+  loadAdminIssueControllerState,
   prepareCopilotHome,
-  recoverableCommittedHead,
+  readWorktreeSnapshot,
   selectWorkerHassMcpConfig,
+  synchronizeCandidateBase,
+  waitForMergedPullRequest,
 } from './admin-issue-controller'
 import {
   CONTROLLER_COMMENT_MARKER,
   adminIssueMarker,
   appendIssueInput,
+  assertAdminIssueControllerState,
+  assertCandidateAuthorized,
+  assertFinalizationAuthorized,
   baselineAdminIssueState,
   beginAdminIssueGeneration,
   branchNameForIssue,
@@ -47,6 +59,7 @@ import {
   issueBody,
   issueTitle,
   markIssueInputsProcessed,
+  migrateAdminIssueControllerState,
   neutralizeGitHubClosingReferences,
   parseWorkerOutcome,
   pendingIssueInputs,
@@ -54,6 +67,9 @@ import {
   sessionNameForIssue,
   todoFingerprint,
   type AdminIssueRecord,
+  type AdminIssueControllerState,
+  type AdminIssueDiffReceipt,
+  type AdminIssueValidationReceipt,
 } from './lib/adminIssueController'
 
 const temporaryDirectories: string[] = []
@@ -84,6 +100,7 @@ function record(): AdminIssueRecord {
     issueUrl: 'https://github.com/SFenton/ha-sfenton-react-dash/issues/321',
     phase: 'queued',
     processedRevision: 0,
+    provenance: { kind: 'none' },
     receipts: {},
     repairAttempts: 0,
     sessionName: 'admin-issue-321-task-1',
@@ -92,6 +109,124 @@ function record(): AdminIssueRecord {
     uid: 'task-1',
     updatedAt: '2026-09-20T12:00:00.000Z',
     workerRuns: 0,
+  }
+}
+
+function authorizeRecord(issue: AdminIssueRecord) {
+  const baseSha = 'a'.repeat(40)
+  const headSha = 'b'.repeat(40)
+  const treeSha = 'c'.repeat(40)
+  const mergeSha = 'd'.repeat(40)
+  issue.processedRevision = issue.inputRevision
+  issue.pr = {
+    number: 400,
+    url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
+  }
+  issue.provenance = {
+    candidate: {
+      checks: {
+        epoch: 'epoch-1',
+        generation: issue.generation,
+        headSha,
+        observedAt: '2026-09-20T12:04:00.000Z',
+        requiredSetSha256: '3'.repeat(64),
+        revision: issue.processedRevision,
+        runs: [
+          {
+            appId: 15368,
+            checkRunId: 22,
+            completedAt: '2026-09-20T12:04:00.000Z',
+            conclusion: 'success',
+            name: 'Playwright gate',
+          },
+        ],
+      },
+      diff: {
+        baseSha,
+        entryCount: 1,
+        epoch: 'epoch-1',
+        files: ['src/App.tsx'],
+        generation: issue.generation,
+        headSha,
+        manifestSha256: '1'.repeat(64),
+        mergeBaseSha: baseSha,
+        revision: issue.processedRevision,
+        treeSha,
+      },
+      headSha,
+      targetBaseSha: baseSha,
+      treeSha,
+      validation: {
+        commands: ['npm run build'],
+        commandsSha256: '2'.repeat(64),
+        completedAt: '2026-09-20T12:03:00.000Z',
+        diffManifestSha256: '1'.repeat(64),
+        epoch: 'epoch-1',
+        generation: issue.generation,
+        headSha,
+        revision: issue.processedRevision,
+        treeSha,
+      },
+    },
+    deployment: {
+      deployedSha: 'e'.repeat(40),
+      disposition: 'forward',
+      epoch: 'epoch-1',
+      generation: issue.generation,
+      mergeSha,
+      receiptHash: '4'.repeat(64),
+      revision: issue.processedRevision,
+      sourceSha: mergeSha,
+      workflowHeadSha: mergeSha,
+      workflowRunAttempt: 1,
+      workflowRunId: 23,
+    },
+    epoch: 'epoch-1',
+    generation: issue.generation,
+    kind: 'active',
+    merge: {
+      baseSha,
+      candidateHeadSha: headSha,
+      epoch: 'epoch-1',
+      generation: issue.generation,
+      mergeSha,
+      mergedAt: '2026-09-20T12:05:00.000Z',
+      observedAt: '2026-09-20T12:05:00.000Z',
+      prNumber: 400,
+      revision: issue.processedRevision,
+    },
+    preparedBaseSha: baseSha,
+    resyncAttempts: 0,
+    revision: issue.processedRevision,
+  }
+}
+
+function controllerState(issue: AdminIssueRecord): AdminIssueControllerState {
+  return {
+    activeUid: issue.uid,
+    baselineCompletedAt: issue.createdAt,
+    ignoredUids: [],
+    issues: { [issue.uid]: issue },
+    updatedAt: issue.updatedAt,
+    version: 2,
+  }
+}
+
+function validationReceipt(
+  issue: AdminIssueRecord,
+  diff: AdminIssueDiffReceipt,
+): AdminIssueValidationReceipt {
+  if (issue.provenance.kind !== 'active') throw new Error('Expected active provenance')
+  return {
+    commands: ['test validation'],
+    commandsSha256: '2'.repeat(64),
+    completedAt: '2026-09-20T12:03:00.000Z',
+    diffManifestSha256: diff.manifestSha256,
+    epoch: issue.provenance.epoch,
+    generation: issue.generation,
+    headSha: diff.headSha,
+    revision: issue.processedRevision,
+    treeSha: diff.treeSha,
   }
 }
 
@@ -160,14 +295,13 @@ describe('admin issue controller domain', () => {
       ignoredUids: ['existing-1', 'existing-2'],
       issues: {},
       updatedAt: '2026-09-20T12:00:00.000Z',
-      version: 1,
+      version: 2,
     })
 
     const issue = record()
     issue.branch = 'copilot/admin-todo-321-g1-fix'
     issue.worktreePath = '/tmp/worktree'
-    issue.baseSha = 'a'.repeat(40)
-    issue.pr = { headSha: 'b'.repeat(40), number: 400, url: 'https://example.test/pr/400' }
+    authorizeRecord(issue)
     issue.lastOutcome = parseWorkerOutcome(
       JSON.stringify({
         decision: 'blocked',
@@ -180,6 +314,8 @@ describe('admin issue controller domain', () => {
     )
     issue.repairAttempts = 2
     issue.receipts.awaitingIosVerificationAt = '2026-09-20T12:01:00.000Z'
+    issue.receipts.checksPassedAt = '2026-09-20T12:01:00.000Z'
+    issue.receipts.deployedAt = '2026-09-20T12:01:00.000Z'
     const sessionName = issue.sessionName
 
     beginAdminIssueGeneration(issue, '2026-09-20T12:02:00.000Z')
@@ -189,12 +325,116 @@ describe('admin issue controller domain', () => {
       generation: 2,
       phase: 'queued',
       pr: undefined,
+      provenance: { kind: 'none' },
       repairAttempts: 0,
       sessionName,
       updatedAt: '2026-09-20T12:02:00.000Z',
       worktreePath: undefined,
     })
     expect(issue.receipts.awaitingIosVerificationAt).toBeUndefined()
+    expect(issue.receipts.checksPassedAt).toBeUndefined()
+    expect(issue.receipts.deployedAt).toBeUndefined()
+  })
+
+  it('migrates version-1 state without granting legacy provenance', () => {
+    const active = record()
+    const legacyRecord = JSON.parse(JSON.stringify(active)) as Record<string, unknown>
+    delete legacyRecord.provenance
+    const legacyState = {
+      activeUid: active.uid,
+      baselineCompletedAt: active.createdAt,
+      ignoredUids: [],
+      issues: {
+        [active.uid]: {
+          ...legacyRecord,
+          baseSha: 'a'.repeat(40),
+          phase: 'pull-request',
+          pr: {
+            headSha: 'b'.repeat(40),
+            mergeSha: 'c'.repeat(40),
+            number: 400,
+            url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
+          },
+          receipts: {
+            checksPassedAt: '2026-09-20T12:04:00.000Z',
+            validatedAt: '2026-09-20T12:03:00.000Z',
+          },
+        },
+      },
+      updatedAt: active.updatedAt,
+      version: 1,
+    }
+    const migratedAt = '2026-09-21T12:00:00.000Z'
+    const migrated = migrateAdminIssueControllerState(legacyState, migratedAt)
+    expect(migrated.version).toBe(2)
+    expect(migrated.issues[active.uid].pr).toEqual({
+      number: 400,
+      url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
+    })
+    expect(migrated.issues[active.uid].provenance).toEqual({
+      kind: 'legacy-untrusted',
+      migratedAt,
+      observedBaseSha: 'a'.repeat(40),
+      observedHeadSha: 'b'.repeat(40),
+      observedMergeSha: 'c'.repeat(40),
+      reason: 'v1-missing-exact-provenance',
+    })
+    expect(() => assertCandidateAuthorized(migrated.issues[active.uid])).toThrow(
+      'active provenance',
+    )
+    expect(() => assertAdminIssueControllerState(migrated)).not.toThrow()
+  })
+
+  it('backs up version-1 state before its one-way migration', () => {
+    const stateDirectory = mkdtempSync(join(homedir(), '.admin-issue-controller-state-test-'))
+    temporaryDirectories.push(stateDirectory)
+    const pristine = record()
+    const legacyRecord = JSON.parse(JSON.stringify(pristine)) as Record<string, unknown>
+    delete legacyRecord.provenance
+    writeFileSync(
+      join(stateDirectory, 'state.json'),
+      JSON.stringify({
+        baselineCompletedAt: pristine.createdAt,
+        ignoredUids: [],
+        issues: { [pristine.uid]: legacyRecord },
+        updatedAt: pristine.updatedAt,
+        version: 1,
+      }),
+      { mode: 0o600 },
+    )
+    const config = {
+      stateDirectory,
+    } as Parameters<typeof loadAdminIssueControllerState>[0]
+    expect(() => loadAdminIssueControllerState(config)).toThrow('requires a locked run')
+    const migrated = loadAdminIssueControllerState(config, true)
+    expect(migrated.version).toBe(2)
+    expect(migrated.issues[pristine.uid].provenance).toEqual({ kind: 'none' })
+    const backups = readdirSync(stateDirectory).filter((entry) =>
+      entry.startsWith('state.v1-backup-'),
+    )
+    expect(backups).toHaveLength(1)
+    expect(statSync(join(stateDirectory, backups[0])).mode & 0o777).toBe(0o600)
+    expect(JSON.parse(readFileSync(join(stateDirectory, 'state.json'), 'utf8')).version).toBe(2)
+  })
+
+  it('binds candidate, checks, merge, and deployment to one exact identity', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    expect(() => assertCandidateAuthorized(issue, true)).not.toThrow()
+    expect(() => assertFinalizationAuthorized(issue)).not.toThrow()
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate?.checks) {
+      throw new Error('Expected authorized record')
+    }
+    issue.provenance.candidate.checks.headSha = 'f'.repeat(40)
+    expect(() => assertCandidateAuthorized(issue, true)).toThrow(
+      'Checks head does not match candidate',
+    )
+    issue.provenance.candidate.checks.headSha = issue.provenance.candidate.headSha
+    if (!issue.provenance.deployment) throw new Error('Expected deployment')
+    issue.provenance.deployment.sourceSha = 'f'.repeat(40)
+    expect(() => assertFinalizationAuthorized(issue)).toThrow(
+      'Deployment source does not match merge',
+    )
   })
 
   it('accepts only non-controller comments from the pinned repository owner', () => {
@@ -356,11 +596,7 @@ describe('admin issue controller domain', () => {
     )
     if (readyOutcome.decision !== 'ready_for_pr') throw new Error('Expected ready_for_pr')
     issue.lastOutcome = readyOutcome
-    issue.pr = {
-      headSha: 'a'.repeat(40),
-      number: 400,
-      url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
-    }
+    authorizeRecord(issue)
     expect(formatPullRequestComment(issue.uid, issue.inputRevision, issue.pr, readyOutcome)).toContain(
       issue.pr.url,
     )
@@ -427,7 +663,7 @@ describe('admin issue controller security configuration', () => {
     expect(githubRepositoryFromRemote('https://example.test/SFenton/ha-sfenton-react-dash.git')).toBeUndefined()
   })
 
-  it('recovers a clean validated commit that was not journaled as a pull request', async () => {
+  it('authorizes the complete committed diff and detects dirty worktrees', async () => {
     const repositoryPath = mkdtempSync(join(homedir(), '.admin-issue-controller-git-test-'))
     temporaryDirectories.push(repositoryPath)
     const git = (...args: string[]) =>
@@ -435,28 +671,406 @@ describe('admin issue controller security configuration', () => {
     git('init', '--initial-branch=master')
     git('config', 'user.name', 'Admin Issue Controller Test')
     git('config', 'user.email', 'controller-test@example.invalid')
-    writeFileSync(join(repositoryPath, 'fixture.txt'), 'base\n')
-    git('add', 'fixture.txt')
+    mkdirSync(join(repositoryPath, 'src'))
+    writeFileSync(join(repositoryPath, 'src/fixture.ts'), 'export const value = 1\n')
+    git('add', 'src/fixture.ts')
     git('commit', '-m', 'Base')
     const baseSha = git('rev-parse', 'HEAD')
     git('switch', '-c', 'copilot/admin-todo-321-g1-fix')
-    writeFileSync(join(repositoryPath, 'fixture.txt'), 'fixed\n')
-    git('commit', '-am', 'Fix')
+    writeFileSync(join(repositoryPath, 'src/fixture.ts'), 'export const value = 2\n')
+    mkdirSync(join(repositoryPath, 'e2e'))
+    writeFileSync(join(repositoryPath, 'e2e/fixture.spec.ts'), 'export {}\n')
+    git('add', '--all')
+    git('commit', '-m', 'Fix')
     const headSha = git('rev-parse', 'HEAD')
     const issue = record()
-    issue.baseSha = baseSha
     issue.branch = 'copilot/admin-todo-321-g1-fix'
     issue.worktreePath = repositoryPath
     issue.processedRevision = 1
-    issue.receipts.validatedWorkerInput = '1:1'
+    issue.provenance = {
+      epoch: 'epoch-1',
+      generation: 1,
+      kind: 'active',
+      preparedBaseSha: baseSha,
+      resyncAttempts: 0,
+      revision: 1,
+    }
 
-    await expect(recoverableCommittedHead(issue)).resolves.toBe(headSha)
+    const receipt = await createCommittedDiffReceipt(issue, baseSha, headSha)
+    expect(receipt).toMatchObject({
+      baseSha,
+      entryCount: 2,
+      files: ['e2e/fixture.spec.ts', 'src/fixture.ts'],
+      headSha,
+      mergeBaseSha: baseSha,
+    })
+    expect(receipt.manifestSha256).toMatch(/^[a-f0-9]{64}$/)
 
-    writeFileSync(join(repositoryPath, 'fixture.txt'), 'dirty\n')
-    await expect(recoverableCommittedHead(issue)).resolves.toBeUndefined()
-    issue.receipts.validatedWorkerInput = '1:0'
-    git('checkout', '--', 'fixture.txt')
-    await expect(recoverableCommittedHead(issue)).resolves.toBeUndefined()
+    expect(await readWorktreeSnapshot(repositoryPath)).toMatchObject({
+      branch: issue.branch,
+      gitOperations: [],
+      headSha,
+      status: '',
+    })
+    writeFileSync(join(repositoryPath, 'src/fixture.ts'), 'export const value = 3\n')
+    expect((await readWorktreeSnapshot(repositoryPath)).status).not.toBe('')
+
+    git('checkout', '--', 'src/fixture.ts')
+    writeFileSync(join(repositoryPath, 'package.json'), '{}\n')
+    git('add', 'package.json')
+    git('commit', '-m', 'Protected change')
+    await expect(
+      createCommittedDiffReceipt(issue, baseSha, git('rev-parse', 'HEAD')),
+    ).rejects.toThrow('protected path')
+  })
+
+  it('synchronizes a clean stale candidate with a normal merge and fresh validation', async () => {
+    const root = mkdtempSync(join(homedir(), '.admin-issue-controller-sync-test-'))
+    temporaryDirectories.push(root)
+    const remotePath = join(root, 'origin.git')
+    const repositoryPath = join(root, 'repository')
+    execFileSync('git', ['init', '--bare', remotePath])
+    mkdirSync(repositoryPath)
+    const git = (...args: string[]) =>
+      execFileSync('git', args, { cwd: repositoryPath, encoding: 'utf8' }).trim()
+    git('init', '--initial-branch=master')
+    git('config', 'user.name', 'Admin Issue Controller Test')
+    git('config', 'user.email', 'controller-test@example.invalid')
+    git('remote', 'add', 'origin', remotePath)
+    mkdirSync(join(repositoryPath, 'src'))
+    writeFileSync(join(repositoryPath, 'src/base.ts'), 'export const base = 1\n')
+    git('add', '--all')
+    git('commit', '-m', 'Base')
+    git('push', '--set-upstream', 'origin', 'master')
+    const baseSha = git('rev-parse', 'HEAD')
+
+    const branch = 'copilot/admin-todo-321-g1-fix'
+    git('switch', '-c', branch)
+    writeFileSync(join(repositoryPath, 'src/task.ts'), 'export const task = true\n')
+    git('add', '--all')
+    git('commit', '-m', 'Task')
+    git('push', '--set-upstream', 'origin', branch)
+    const candidateHead = git('rev-parse', 'HEAD')
+
+    const issue = record()
+    issue.branch = branch
+    issue.worktreePath = repositoryPath
+    issue.processedRevision = 1
+    issue.provenance = {
+      epoch: 'epoch-sync',
+      generation: 1,
+      kind: 'active',
+      preparedBaseSha: baseSha,
+      resyncAttempts: 0,
+      revision: 1,
+    }
+    const candidateDiff = await createCommittedDiffReceipt(issue, baseSha, candidateHead)
+    issue.provenance.candidate = {
+      diff: candidateDiff,
+      expectedRemoteHeadSha: candidateHead,
+      headSha: candidateHead,
+      targetBaseSha: baseSha,
+      treeSha: candidateDiff.treeSha,
+      validation: validationReceipt(issue, candidateDiff),
+    }
+
+    git('switch', 'master')
+    writeFileSync(join(repositoryPath, 'src/base.ts'), 'export const base = 2\n')
+    git('commit', '-am', 'Advance master')
+    git('push', 'origin', 'master')
+    const advancedBaseSha = git('rev-parse', 'HEAD')
+    git('switch', branch)
+
+    const state = controllerState(issue)
+    const config = {
+      repository: 'SFenton/ha-sfenton-react-dash',
+      repositoryPath,
+      stateDirectory: join(root, 'state'),
+    } as Parameters<typeof synchronizeCandidateBase>[0]
+    issue.provenance.resyncAttempts = 2
+    await expect(
+      synchronizeCandidateBase(config, state, issue, advancedBaseSha),
+    ).rejects.toThrow('advanced more than 2 times')
+    issue.provenance.resyncAttempts = 0
+
+    git('switch', 'master')
+    await expect(
+      synchronizeCandidateBase(config, state, issue, advancedBaseSha),
+    ).rejects.toThrow('expected')
+    git('switch', branch)
+
+    writeFileSync(join(repositoryPath, 'src/task.ts'), 'export const task = false\n')
+    await expect(
+      synchronizeCandidateBase(config, state, issue, advancedBaseSha),
+    ).rejects.toThrow('must remain clean')
+    git('checkout', '--', 'src/task.ts')
+
+    await expect(
+      synchronizeCandidateBase(
+        config,
+        state,
+        issue,
+        advancedBaseSha,
+        async (_config, candidateIssue, candidate) =>
+          validationReceipt(candidateIssue, candidate.diff),
+      ),
+    ).resolves.toBe(true)
+
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate) {
+      throw new Error('Expected synchronized candidate')
+    }
+    const synchronized = issue.provenance.candidate
+    expect(synchronized.headSha).not.toBe(candidateHead)
+    expect(synchronized.targetBaseSha).toBe(advancedBaseSha)
+    expect(synchronized.diff.files).toEqual(['src/task.ts'])
+    expect(synchronized.validation?.headSha).toBe(synchronized.headSha)
+    expect(issue.provenance.resyncAttempts).toBe(1)
+    expect(issue.provenance.transition).toBeUndefined()
+    expect(git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s+/)[0]).toBe(
+      synchronized.headSha,
+    )
+    expect(git('rev-list', '--parents', '-n', '1', synchronized.headSha).split(/\s+/)).toEqual([
+      synchronized.headSha,
+      candidateHead,
+      advancedBaseSha,
+    ])
+
+    git('switch', 'master')
+    writeFileSync(join(repositoryPath, 'src/base-two.ts'), 'export const next = true\n')
+    git('add', '--all')
+    git('commit', '-m', 'Advance master again')
+    git('push', 'origin', 'master')
+    const secondBaseSha = git('rev-parse', 'HEAD')
+    git('switch', branch)
+    issue.provenance.resyncAttempts = 2
+    issue.provenance.transition = {
+      attempt: 2,
+      epoch: issue.provenance.epoch,
+      expectedRemoteHeadSha: synchronized.headSha,
+      fromBaseSha: synchronized.targetBaseSha,
+      fromHeadSha: synchronized.headSha,
+      fromTreeSha: synchronized.treeSha,
+      generation: issue.generation,
+      id: 'transition-with-unpersisted-target',
+      revision: issue.processedRevision,
+      stage: 'intent',
+      startedAt: '2026-09-20T12:06:00.000Z',
+      targetBaseSha: secondBaseSha,
+    }
+    git('merge', '--no-ff', '--no-edit', secondBaseSha)
+    await expect(
+      synchronizeCandidateBase(config, state, issue),
+    ).rejects.toThrow('before the target SHA was persisted')
+    expect(issue.provenance.quarantine?.reason).toContain('Local head changed')
+  })
+
+  it('aborts a conflicted base synchronization and preserves the prior candidate', async () => {
+    const root = mkdtempSync(join(homedir(), '.admin-issue-controller-conflict-test-'))
+    temporaryDirectories.push(root)
+    const remotePath = join(root, 'origin.git')
+    const repositoryPath = join(root, 'repository')
+    execFileSync('git', ['init', '--bare', remotePath])
+    mkdirSync(repositoryPath)
+    const git = (...args: string[]) =>
+      execFileSync('git', args, { cwd: repositoryPath, encoding: 'utf8' }).trim()
+    git('init', '--initial-branch=master')
+    git('config', 'user.name', 'Admin Issue Controller Test')
+    git('config', 'user.email', 'controller-test@example.invalid')
+    git('remote', 'add', 'origin', remotePath)
+    mkdirSync(join(repositoryPath, 'src'))
+    writeFileSync(join(repositoryPath, 'src/shared.ts'), 'export const value = 1\n')
+    git('add', '--all')
+    git('commit', '-m', 'Base')
+    git('push', '--set-upstream', 'origin', 'master')
+    const baseSha = git('rev-parse', 'HEAD')
+
+    const branch = 'copilot/admin-todo-321-g1-conflict'
+    git('switch', '-c', branch)
+    writeFileSync(join(repositoryPath, 'src/shared.ts'), 'export const value = 2\n')
+    git('commit', '-am', 'Task')
+    git('push', '--set-upstream', 'origin', branch)
+    const candidateHead = git('rev-parse', 'HEAD')
+
+    const issue = record()
+    issue.branch = branch
+    issue.worktreePath = repositoryPath
+    issue.processedRevision = 1
+    issue.provenance = {
+      epoch: 'epoch-conflict',
+      generation: 1,
+      kind: 'active',
+      preparedBaseSha: baseSha,
+      resyncAttempts: 0,
+      revision: 1,
+    }
+    const candidateDiff = await createCommittedDiffReceipt(issue, baseSha, candidateHead)
+    issue.provenance.candidate = {
+      diff: candidateDiff,
+      expectedRemoteHeadSha: candidateHead,
+      headSha: candidateHead,
+      targetBaseSha: baseSha,
+      treeSha: candidateDiff.treeSha,
+      validation: validationReceipt(issue, candidateDiff),
+    }
+
+    git('switch', 'master')
+    writeFileSync(join(repositoryPath, 'src/shared.ts'), 'export const value = 3\n')
+    git('commit', '-am', 'Conflicting master')
+    git('push', 'origin', 'master')
+    const advancedBaseSha = git('rev-parse', 'HEAD')
+    git('switch', branch)
+
+    const state = controllerState(issue)
+    const config = {
+      repository: 'SFenton/ha-sfenton-react-dash',
+      repositoryPath,
+      stateDirectory: join(root, 'state'),
+    } as Parameters<typeof synchronizeCandidateBase>[0]
+    await expect(
+      synchronizeCandidateBase(
+        config,
+        state,
+        issue,
+        advancedBaseSha,
+        async (_config, candidateIssue, candidate) =>
+          validationReceipt(candidateIssue, candidate.diff),
+      ),
+    ).rejects.toThrow('prior candidate was restored')
+    expect(await readWorktreeSnapshot(repositoryPath)).toMatchObject({
+      gitOperations: [],
+      headSha: candidateHead,
+      status: '',
+    })
+    if (issue.provenance.kind !== 'active') throw new Error('Expected active provenance')
+    expect(issue.provenance.transition?.stage).toBe('aborted')
+    expect(issue.provenance.transition?.diagnostics?.unmergedPaths).toEqual(['src/shared.ts'])
+  })
+
+  it('requires exact repository, branch, base, and head PR identity', () => {
+    const pullRequest = {
+      base: {
+        ref: 'master',
+        repo: { full_name: 'SFenton/ha-sfenton-react-dash' },
+      },
+      head: {
+        ref: 'copilot/admin-todo-321-g1-fix',
+        repo: { full_name: 'SFenton/ha-sfenton-react-dash' },
+        sha: 'b'.repeat(40),
+      },
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
+      merge_commit_sha: null,
+      merged_at: null,
+      number: 400,
+      state: 'open' as const,
+    }
+    expect(() =>
+      assertPullRequestBinding(
+        'SFenton/ha-sfenton-react-dash',
+        'copilot/admin-todo-321-g1-fix',
+        pullRequest,
+        'b'.repeat(40),
+      ),
+    ).not.toThrow()
+    expect(() =>
+      assertPullRequestBinding(
+        'SFenton/ha-sfenton-react-dash',
+        'copilot/admin-todo-321-g1-fix',
+        {
+          ...pullRequest,
+          head: { ...pullRequest.head, sha: 'c'.repeat(40) },
+        },
+        'b'.repeat(40),
+      ),
+    ).toThrow('does not match authorized candidate')
+    expect(() =>
+      assertPullRequestBinding(
+        'SFenton/ha-sfenton-react-dash',
+        'copilot/admin-todo-321-g1-fix',
+        {
+          ...pullRequest,
+          base: { ...pullRequest.base, ref: 'other' },
+        },
+        'b'.repeat(40),
+      ),
+    ).toThrow('expected master')
+  })
+
+  it('treats committed-candidate worktree drift as a provenance failure', () => {
+    const issue = record()
+    issue.branch = 'copilot/admin-todo-321-g1-fix'
+    expect(() =>
+      assertExactCandidateSnapshot(
+        {
+          branch: issue.branch,
+          gitOperations: [],
+          headSha: 'c'.repeat(40),
+          status: '1 .M N... 100644 100644 100644 a b src/changed.ts\0',
+          treeSha: 'd'.repeat(40),
+        },
+        issue,
+        'c'.repeat(40),
+        'd'.repeat(40),
+      ),
+    ).toThrow(AdminIssueProvenanceError)
+  })
+
+  it('waits for delayed merge metadata and identifies an exact merge in master history', async () => {
+    const pullRequest = {
+      base: {
+        ref: 'master',
+        repo: { full_name: 'SFenton/ha-sfenton-react-dash' },
+      },
+      head: {
+        ref: 'copilot/admin-todo-321-g1-fix',
+        repo: { full_name: 'SFenton/ha-sfenton-react-dash' },
+        sha: 'b'.repeat(40),
+      },
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
+      merge_commit_sha: null,
+      merged_at: null,
+      number: 400,
+      state: 'open' as const,
+    }
+    let reads = 0
+    let waits = 0
+    const merged = await waitForMergedPullRequest(
+      async () => {
+        reads += 1
+        if (reads < 3) return pullRequest
+        return {
+          ...pullRequest,
+          merge_commit_sha: 'c'.repeat(40),
+          merged_at: '2026-09-20T12:10:00.000Z',
+          state: 'closed' as const,
+        }
+      },
+      3,
+      async (milliseconds) => {
+        expect(milliseconds).toBe(2_000)
+        waits += 1
+      },
+    )
+    expect(merged?.merge_commit_sha).toBe('c'.repeat(40))
+    expect({ reads, waits }).toEqual({ reads: 3, waits: 2 })
+
+    const baseSha = 'a'.repeat(40)
+    const candidateHeadSha = 'b'.repeat(40)
+    const mergeSha = 'c'.repeat(40)
+    const descendantSha = 'd'.repeat(40)
+    expect(
+      findExactMergeCommit(
+        `${descendantSha} ${mergeSha}\n${mergeSha} ${baseSha} ${candidateHeadSha}\n`,
+        baseSha,
+        candidateHeadSha,
+      ),
+    ).toBe(mergeSha)
+    expect(
+      findExactMergeCommit(
+        `${mergeSha} ${candidateHeadSha} ${baseSha}\n`,
+        baseSha,
+        candidateHeadSha,
+      ),
+    ).toBeUndefined()
   })
 
   it('allows only auto-deployed dashboard paths from workers', () => {
@@ -645,6 +1259,18 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain("'installed-plugins'")
     expect(controller).toContain("const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']")
     expect(controller).not.toContain("'--allow-all-tools'")
+    expect(controller).toContain('MAX_BASE_RESYNCS_PER_GENERATION = 2')
+    expect(controller).toContain("runCommand('git', ['merge', '--abort']")
+    expect(controller).toContain('assertPullRequestBinding(')
+    expect(controller).toContain('assertRequiredChecksCurrent(')
+    expect(controller).toContain('verifyMergedPullRequest(')
+    expect(controller).toContain('assertFinalizationAuthorized(record)')
+    expect(controller).not.toContain("'--force-with-lease'")
+    expect(controller).not.toContain("'--amend'")
+    expect(controller).not.toContain("['rebase'")
+    expect(controller).not.toContain("['reset'")
+    expect(controller).not.toContain('record.pr.headSha')
+    expect(controller).not.toContain('record.pr.mergeSha')
     const completionReceipt = controller.indexOf('record.receipts.todoCompletedAt = now()')
     const cleanup = controller.indexOf('await cleanupWorktree(config, record, true)', completionReceipt)
     const completed = controller.indexOf("record.phase = 'completed'", cleanup)

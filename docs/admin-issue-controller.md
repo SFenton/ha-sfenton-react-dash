@@ -64,20 +64,68 @@ mutable user extensions or unrelated personal skills.
    operator's configured `hass` MCP server.
 6. Gather available repository and live Home Assistant evidence, then post a
    structured question only when a consequential decision still remains.
-7. Otherwise validate the isolated worktree, commit and push it, open a pull
-   request, and repair failed protected checks from the pinned GitHub App up to
-   the configured limit.
-8. Merge only the recorded head SHA after every required check succeeds.
-9. Require the successful v2 deployment artifact for the exact merge SHA,
+7. Otherwise create a local candidate commit, authorize its complete committed
+   diff, and validate that exact clean commit in the isolated runner.
+8. Merge current `origin/master` into a stale candidate only through a
+   controller-journaled, conflict-free normal merge. Every new candidate is
+   revalidated before a normal push.
+9. Require the live pull request repository, base, branch, and head SHA to
+   match the candidate. Bind protected checks from the pinned GitHub App to
+   that exact SHA and merge with `--match-head-commit`.
+10. Require the successful v2 deployment artifact for the exact merge SHA,
    including accepted disposition, verified paths, panel registration, and
    released deployment lease.
-10. Post the completion evidence, close the issue, complete the Home Assistant
+11. Post the completion evidence, close the issue, complete the Home Assistant
     item, verify its completion receipt, and remove the issue worktree.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
 stable Copilot session. A worker-classified iOS/WebKit fix remains open after
 deployment with a manual-device follow-up comment.
+
+## Candidate provenance
+
+Controller state version 2 uses one provenance record as the sole lifecycle
+authority. It keeps the prepared base, current candidate head and tree,
+committed-diff manifest, validation receipt, protected-check runs, PR merge
+receipt, and deployment binding distinct. Timestamp receipts remain useful for
+audit but cannot authorize a merge or completion.
+
+The following rules are fail closed:
+
+- ancestry never substitutes for exact candidate SHA equality;
+- validation runs after the local commit and checks the same clean `HEAD` and
+  tree before and after every isolated command;
+- committed scope is calculated from the candidate tree against its current
+  authorized target base, so upstream changes inherited from `master` are not
+  attributed to the worker;
+- the live PR must remain in this repository, target `master`, use the recorded
+  controller branch, and expose the exact candidate head;
+- checks must be the latest successful runs for the exact candidate and pinned
+  GitHub App;
+- already-merged PRs pass the same provenance guard and must report a
+  two-parent merge commit containing the exact authorized base and candidate;
+- deployment workflow `head_sha` and receipt `sourceSha` must both equal the
+  verified merge commit.
+
+Strict branch protection can make a valid candidate stale while checks run.
+The controller permits at most two base synchronizations per generation. Each
+attempt is journaled before Git mutation, uses a normal merge and normal
+fast-forward push, invalidates old checks, and reruns committed-diff
+authorization plus trusted validation. Rebase, amend, reset, force push, and
+force-with-lease are not recovery mechanisms.
+
+An interrupted `gh pr merge` response is reconciled before any stale-base
+decision. The controller waits for GitHub's PR metadata and, if necessary,
+recognizes an exact two-parent `[base, candidate]` merge already visible in
+`master` as incomplete observation rather than permission to resynchronize.
+
+If a base merge conflicts, the controller records bounded diagnostics, runs
+`git merge --abort`, and verifies the exact prior clean head and tree. The
+generation blocks after successful restoration. An unexplained local or remote
+head, an ambiguous crash after local commit creation, failed abort, or any
+restoration mismatch quarantines the worktree; it is not dispatched to the
+worker or cleaned automatically.
 
 ## Installation
 
@@ -148,6 +196,17 @@ systemctl --user daemon-reload
 systemctl --user enable --now admin-issue-controller.service
 ```
 
+Upgrading an existing controller from state version 1 is a separate operational
+rollout. Stop the old service first and retain its state. The first locked
+version-2 `once` or `run` invocation validates the version-1 journal, writes a
+mode-`0600` backup, and atomically migrates it. In-flight records with prior
+worktrees, PRs, or authorization-like receipts become `legacy-untrusted` and
+cannot continue until an owner comment starts a fresh generation. Completed
+history and pristine queued records remain readable, but no legacy SHA or
+timestamp is promoted into trusted provenance. Version-1 binaries reject the
+new journal; rollback requires stopping the service and explicitly restoring
+the retained backup.
+
 ## Operation and recovery
 
 ```bash
@@ -158,7 +217,7 @@ node "$HOME/.local/share/admin-issue-controller/controller.mjs" \
   "$HOME/.config/admin-issue-controller/controller.json"
 ```
 
-State is an atomic `0600` JSON journal under
+State is an atomic, strictly validated version-2 `0600` JSON journal under
 `~/.local/state/admin-issue-controller`. Worker JSON event logs are retained in
 its `worker-logs` child directory. Stable issue, comment, branch, session, PR,
 merge, deployment, Home Assistant receipt, and worktree receipts make retries
@@ -166,4 +225,5 @@ idempotent.
 
 Do not delete or edit the journal while the service runs. If intervention is
 required, stop the service first and retain the journal and worker logs for
-diagnosis.
+diagnosis. The `status` command intentionally refuses to migrate version-1
+state outside the controller lock.
