@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { join, relative, resolve } from 'node:path'
+import { basename, extname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   CONTROLLER_COMMENT_MARKER,
@@ -26,10 +26,12 @@ import {
   appendIssueInput,
   assertAdminIssueControllerState,
   assertCandidateAuthorized,
+  assertCandidateVisualEvidence,
   assertFinalizationAuthorized,
   baselineAdminIssueState,
   beginAdminIssueGeneration,
   branchNameForIssue,
+  candidateRequiresVisualEvidence,
   controllerReceiptMarker,
   deploymentReceiptIsAccepted,
   formatBlockedComment,
@@ -52,6 +54,8 @@ import {
   type AdminIssueInput,
   type AdminIssueRecord,
   type AdminIssueValidationReceipt,
+  type AdminIssueVisualEvidenceDraft,
+  type AdminIssueVisualEvidenceReceipt,
   type AdminIssueWorkerOutcome,
   type GitHubIssueComment,
 } from './lib/adminIssueController'
@@ -127,6 +131,8 @@ export interface GitHubPullRequest {
     } | null
     sha: string
   }
+  body: string | null
+  draft: boolean
   html_url: string
   merge_commit_sha: string | null
   merged_at: string | null
@@ -1226,6 +1232,8 @@ Use the tandem-research workflow to investigate the issue before implementation.
 
 Gather available Home Assistant evidence yourself before asking the operator for diagnostics or authorization. Do not offer an input option that merely authorizes a capability already available to you. If a consequential product or design decision remains after repository and Home Assistant investigation, stop and return needs_input with concise options and your recommendation. Otherwise implement the complete fix in the assigned worktree, update the directly owned tests, run the relevant tests through admin_issue_workspace, iterate until they pass, and perform a meaningful code review. Treat iOS/WebKit-specific behavior as requiring explicit manual follow-up.
 
+When the committed fix changes production dashboard runtime files (index.html, public/**, or non-test src/**), generate one to four deterministic PNG, JPEG, or WebP images showing the proposed fixed behavior. Store them only below artifacts/admin-issue-${record.issueNumber}/; this ignored directory is not part of the commit. Use focused states and viewports that make the fix reviewable, label mock-backed evidence visibly, and never actuate devices merely to capture an image. Each caption must explicitly say whether the image is mock or live evidence. Non-runtime, test-only, documentation-only, Home Assistant-only, and controller-only outcomes use an empty visualEvidence array. Images supplement tests and do not replace required manual iOS/WebKit verification.
+
 Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.
 
 Return a final response containing exactly one JSON object and no Markdown fence:
@@ -1236,15 +1244,16 @@ Return a final response containing exactly one JSON object and no Markdown fence
   "questions": [{ "question": "...", "options": ["...", "..."], "recommendation": "..." }],
   "changeSummary": ["..."],
   "tests": [{ "command": "...", "result": "passed" | "failed" }],
+  "visualEvidence": [{ "path": "artifacts/admin-issue-${record.issueNumber}/fixed-phone.png", "alt": "Accessible description of the fixed state", "caption": "Mock evidence: concise state and viewport description" }],
   "review": { "approved": true | false, "findings": ["..."] },
   "pr": { "title": "...", "body": "..." },
   "iosFollowUp": { "required": true | false, "reason": "..." },
   "reason": "..."
 }
 
-For needs_input, provide at least one question. For ready_for_pr, changeSummary and tests must be non-empty, review.approved must be true, and pr title/body must be present. For blocked, explain the blocker. Omit fields that do not apply.
+For needs_input, provide at least one question. For ready_for_pr, changeSummary and tests must be non-empty, review.approved must be true, pr title/body must be present, and visualEvidence must follow the runtime-change rule above. For blocked, explain the blocker. Omit fields that do not apply.
 
-Always include schemaVersion, decision, summary, questions, and iosFollowUp. Use an empty questions array for ready_for_pr and blocked. A ready_for_pr outcome is valid only when every listed test passed.
+Always include schemaVersion, decision, summary, questions, visualEvidence, and iosFollowUp. Use empty questions and visualEvidence arrays when they do not apply. A ready_for_pr outcome is valid only when every listed test passed.
 
 ${issueContext}`
 }
@@ -1715,6 +1724,143 @@ function validationCommands(files: string[]) {
   ]
 }
 
+const MAX_VISUAL_EVIDENCE_BYTES = 10 * 1024 * 1024
+
+function visualEvidenceMediaType(bytes: Buffer) {
+  if (
+    bytes.length >= 20 &&
+    bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) &&
+    bytes.subarray(-8).equals(Buffer.from([0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]))
+  ) {
+    return 'image/png' as const
+  }
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff &&
+    bytes.at(-2) === 0xff &&
+    bytes.at(-1) === 0xd9
+  ) {
+    return 'image/jpeg' as const
+  }
+  if (
+    bytes.length >= 12 &&
+    bytes.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    bytes.subarray(8, 12).toString('ascii') === 'WEBP' &&
+    bytes.readUInt32LE(4) + 8 === bytes.length
+  ) {
+    return 'image/webp' as const
+  }
+  throw new Error('Visual evidence is not a valid PNG, JPEG, or WebP image')
+}
+
+export function collectVisualEvidenceReceipts(
+  record: Pick<AdminIssueRecord, 'issueNumber' | 'worktreePath'>,
+  diff: AdminIssueDiffReceipt,
+  drafts: AdminIssueVisualEvidenceDraft[],
+  existing: AdminIssueVisualEvidenceReceipt[] = [],
+) {
+  if (!record.worktreePath) throw new Error('Worker worktree is missing')
+  if (candidateRequiresVisualEvidence(diff.files) && drafts.length === 0) {
+    throw new Error(
+      'Dashboard runtime changes require one to four proposed fixed-behavior images',
+    )
+  }
+  if (drafts.length > 4) throw new Error('Visual evidence exceeds the four-image limit')
+  const worktreePath = realpathSync(record.worktreePath)
+  const evidenceRoot = resolve(worktreePath, 'artifacts', `admin-issue-${record.issueNumber}`)
+  const hashes = new Set<string>()
+  return drafts.map((draft, index) => {
+    const absolutePath = resolve(worktreePath, draft.path)
+    const evidenceRelativePath = relative(evidenceRoot, absolutePath)
+    if (
+      evidenceRelativePath === '' ||
+      evidenceRelativePath === '..' ||
+      evidenceRelativePath.startsWith('../')
+    ) {
+      throw new Error(
+        `Visual evidence ${index + 1} must be below artifacts/admin-issue-${record.issueNumber}/`,
+      )
+    }
+    const prior = existing.find((item) =>
+      item.path === draft.path &&
+      item.alt === draft.alt &&
+      item.caption === draft.caption &&
+      item.diffManifestSha256 === diff.manifestSha256,
+    )
+    if (!existsSync(absolutePath)) {
+      if (prior?.url) {
+        if (hashes.has(prior.sha256)) throw new Error('Visual evidence contains duplicate images')
+        hashes.add(prior.sha256)
+        return prior
+      }
+      throw new Error(`Visual evidence file does not exist: ${draft.path}`)
+    }
+    const file = lstatSync(absolutePath)
+    if (file.isSymbolicLink() || !file.isFile() || realpathSync(absolutePath) !== absolutePath) {
+      throw new Error(`Visual evidence must be a regular non-symlink file: ${draft.path}`)
+    }
+    if (file.size <= 0 || file.size > MAX_VISUAL_EVIDENCE_BYTES) {
+      throw new Error(
+        `Visual evidence must be between 1 byte and ${MAX_VISUAL_EVIDENCE_BYTES} bytes: ${draft.path}`,
+      )
+    }
+    if (!/\b(?:live|mock)\b/i.test(draft.caption)) {
+      throw new Error(`Visual evidence ${index + 1} caption must identify live or mock provenance`)
+    }
+    const bytes = readFileSync(absolutePath)
+    const mediaType = visualEvidenceMediaType(bytes)
+    const extension = extname(absolutePath).toLowerCase()
+    const expectedExtensions =
+      mediaType === 'image/png'
+        ? ['.png']
+        : mediaType === 'image/jpeg'
+          ? ['.jpg', '.jpeg']
+          : ['.webp']
+    if (!expectedExtensions.includes(extension)) {
+      throw new Error(`Visual evidence extension does not match its bytes: ${draft.path}`)
+    }
+    const sha256 = createHash('sha256').update(bytes).digest('hex')
+    if (hashes.has(sha256)) throw new Error('Visual evidence contains duplicate images')
+    hashes.add(sha256)
+    return {
+      ...draft,
+      diffManifestSha256: diff.manifestSha256,
+      mediaType,
+      sha256,
+      sizeBytes: bytes.length,
+      ...(prior?.sha256 === sha256 && prior.url ? { url: prior.url } : {}),
+    } satisfies AdminIssueVisualEvidenceReceipt
+  })
+}
+
+async function validateAndPersistVisualEvidence(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+  outcome: Extract<AdminIssueWorkerOutcome, { decision: 'ready_for_pr' }>,
+  originalDiffManifestSha256: string,
+) {
+  const { candidate } = assertCandidateAuthorized(record)
+  if (
+    candidateRequiresVisualEvidence(candidate.diff.files) &&
+    originalDiffManifestSha256 !== candidate.diff.manifestSha256
+  ) {
+    throw new Error(
+      'Master synchronization changed the committed diff; regenerate proposed fixed-behavior images',
+    )
+  }
+  candidate.visualEvidence = collectVisualEvidenceReceipts(
+    record,
+    candidate.diff,
+    outcome.visualEvidence ?? [],
+    candidate.visualEvidence,
+  )
+  assertCandidateVisualEvidence(record)
+  writeState(config, state)
+}
+
 async function validateCommittedCandidate(
   config: AdminIssueControllerConfig,
   record: AdminIssueRecord,
@@ -1886,6 +2032,7 @@ async function getPullRequest(
   ) {
     throw new AdminIssueProvenanceError('Live pull request identity does not match controller state')
   }
+  assertPullRequestContainsVisualEvidence(record, pullRequest)
   return pullRequest
 }
 
@@ -2557,6 +2704,7 @@ export async function synchronizeCandidateBase(
         transition.toHeadSha,
       )
     }
+    const previousVisualEvidence = provenance.candidate?.visualEvidence
     provenance.candidate = {
       diff: transition.provisionalDiff,
       ...(transition.expectedRemoteHeadSha
@@ -2566,6 +2714,11 @@ export async function synchronizeCandidateBase(
       targetBaseSha: transition.targetBaseSha,
       treeSha: transition.toTreeSha,
       validation: transition.provisionalValidation,
+      ...(previousVisualEvidence?.every(
+        (item) => item.diffManifestSha256 === transition.provisionalDiff?.manifestSha256,
+      )
+        ? { visualEvidence: previousVisualEvidence }
+        : {}),
     }
     provenance.transition = undefined
     provenance.merge = undefined
@@ -2590,6 +2743,136 @@ async function findPullRequest(config: AdminIssueControllerConfig, branch: strin
   return pulls.at(0)
 }
 
+function markdownText(value: string) {
+  return neutralizeGitHubClosingReferences(value)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[<>]/g, '')
+    .trim()
+}
+
+export function pullRequestBodyWithVisualEvidence(
+  body: string,
+  evidence: AdminIssueVisualEvidenceReceipt[],
+) {
+  const startMarker = '<!-- admin-issue-visual-evidence:start -->'
+  const endMarker = '<!-- admin-issue-visual-evidence:end -->'
+  const withoutPrevious = body
+    .replace(/<!-- admin-issue-visual-evidence:start -->[\s\S]*?<!-- admin-issue-visual-evidence:end -->/g, '')
+    .trim()
+  if (evidence.length === 0) return withoutPrevious
+  const images = evidence.map((item) => {
+    if (!item.url) throw new Error(`Visual evidence has not been uploaded: ${item.path}`)
+    const alt = markdownText(item.alt).replace(/[\\[\]]/g, '\\$&')
+    return `![${alt}](${item.url})\n\n_${markdownText(item.caption)}_`
+  })
+  return [
+    withoutPrevious,
+    startMarker,
+    '## Proposed fixed behavior',
+    ...images,
+    endMarker,
+  ].filter(Boolean).join('\n\n')
+}
+
+export function assertPullRequestContainsVisualEvidence(
+  record: AdminIssueRecord,
+  pullRequest: Pick<GitHubPullRequest, 'body'>,
+) {
+  const { evidence } = assertCandidateVisualEvidence(record, true)
+  const body = pullRequest.body ?? ''
+  const start = body.indexOf('<!-- admin-issue-visual-evidence:start -->')
+  const end = body.indexOf('<!-- admin-issue-visual-evidence:end -->', start + 1)
+  if (evidence.length > 0 && (start < 0 || end < 0 || end <= start)) {
+    throw new AdminIssueProvenanceError(
+      'Pull request body is missing the proposed fixed-behavior section',
+    )
+  }
+  const evidenceSection = start >= 0 && end > start ? body.slice(start, end) : ''
+  for (const item of evidence) {
+    const target = `](${item.url})`
+    const targetIndex = evidenceSection.indexOf(target)
+    const lineStart = evidenceSection.lastIndexOf('\n', targetIndex) + 1
+    if (
+      !item.url ||
+      targetIndex < 0 ||
+      !evidenceSection.slice(lineStart, targetIndex).startsWith('![')
+    ) {
+      throw new AdminIssueProvenanceError(
+        `Pull request body is missing proposed fixed-behavior image ${item.path}`,
+      )
+    }
+  }
+}
+
+async function publishCandidateVisualEvidence(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+) {
+  const { candidate } = assertCandidateAuthorized(record)
+  const evidence = candidate.visualEvidence ?? []
+  if (evidence.every((item) => item.url)) {
+    assertCandidateVisualEvidence(record, true)
+    return
+  }
+  const githubToken = (
+    await runCommand('gh', ['auth', 'token'], {
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    })
+  ).stdout.trim()
+  if (!githubToken) throw new Error('gh auth token returned an empty token')
+  for (const item of evidence) {
+    if (item.url) continue
+    const [verified] = collectVisualEvidenceReceipts(
+      record,
+      candidate.diff,
+      [{ alt: item.alt, caption: item.caption, path: item.path }],
+      [item],
+    )
+    if (
+      verified.sha256 !== item.sha256 ||
+      verified.sizeBytes !== item.sizeBytes ||
+      verified.mediaType !== item.mediaType
+    ) {
+      throw new AdminIssueProvenanceError(
+        `Visual evidence changed after validation: ${item.path}`,
+      )
+    }
+    if (!record.worktreePath) throw new Error('Worker worktree is missing')
+    const uploadUrl = new URL('https://uploads.github.com/user-attachments/assets')
+    uploadUrl.searchParams.set('name', basename(item.path))
+    uploadUrl.searchParams.set('content_type', item.mediaType)
+    uploadUrl.searchParams.set('repository_id', String(config.repositoryId))
+    const response = await fetch(uploadUrl, {
+      body: readFileSync(resolve(realpathSync(record.worktreePath), item.path)),
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${githubToken}`,
+        'Content-Type': 'application/octet-stream',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+      method: 'POST',
+    })
+    const responseBody = await response.text()
+    if (!response.ok) {
+      throw new Error(
+        `GitHub visual-evidence upload failed with ${response.status}: ${truncate(responseBody, 2_000)}`,
+      )
+    }
+    const uploaded = JSON.parse(responseBody) as { url?: unknown }
+    if (
+      typeof uploaded.url !== 'string' ||
+      !/^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(uploaded.url)
+    ) {
+      throw new Error('GitHub visual-evidence upload returned an invalid attachment URL')
+    }
+    item.url = uploaded.url
+    writeState(config, state)
+  }
+  assertCandidateVisualEvidence(record, true)
+}
+
 async function createOrUpdatePullRequest(
   config: AdminIssueControllerConfig,
   record: AdminIssueRecord,
@@ -2600,10 +2883,12 @@ async function createOrUpdatePullRequest(
   if (await remoteBranchHead(config, record) !== candidate.headSha) {
     throw new AdminIssueProvenanceError('Remote branch does not match the authorized candidate')
   }
-  const body = truncate(
-    `${neutralizeGitHubClosingReferences(outcome.pr.body.trim())}\n\nTracked issue: #${record.issueNumber}\n\n<!-- admin-issue-controller:pr -->`,
-    MAX_GITHUB_BODY_BYTES,
-  )
+  const { evidence } = assertCandidateVisualEvidence(record, true)
+  const proposedBody = pullRequestBodyWithVisualEvidence(outcome.pr.body.trim(), evidence)
+  const body = `${neutralizeGitHubClosingReferences(proposedBody)}\n\nTracked issue: #${record.issueNumber}\n\n<!-- admin-issue-controller:pr -->`
+  if (Buffer.byteLength(body) > MAX_GITHUB_BODY_BYTES) {
+    throw new Error(`Pull request body exceeds ${MAX_GITHUB_BODY_BYTES} bytes`)
+  }
   let pullRequest = await findPullRequest(config, record.branch)
   if (!pullRequest) {
     pullRequest = await ghApi<GitHubPullRequest>(
@@ -2629,6 +2914,7 @@ async function createOrUpdatePullRequest(
     )
   }
   assertPullRequestBinding(config.repository, record.branch, pullRequest, candidate.headSha)
+  assertPullRequestContainsVisualEvidence(record, pullRequest)
   record.pr = {
     number: pullRequest.number,
     url: pullRequest.html_url,
@@ -3224,6 +3510,7 @@ async function handleWorkerOutcome(
   writeState(config, state)
   try {
     const candidate = await prepareCommittedCandidate(config, state, record, outcome)
+    const originalDiffManifestSha256 = candidate.diff.manifestSha256
     if (
       !candidate.validation ||
       candidate.validation.headSha !== candidate.headSha ||
@@ -3237,6 +3524,13 @@ async function handleWorkerOutcome(
     if (currentBaseSha !== authorized.targetBaseSha) {
       await synchronizeCandidateBase(config, state, record, currentBaseSha)
     }
+    await validateAndPersistVisualEvidence(
+      config,
+      state,
+      record,
+      outcome,
+      originalDiffManifestSha256,
+    )
   } catch (error) {
     if (error instanceof AdminIssueProvenanceError) {
       if (error instanceof AdminIssueWorktreeIntegrityError) {
@@ -3275,6 +3569,7 @@ async function handleWorkerOutcome(
   if (!(await refreshInputs())) return false
   try {
     await pushCandidate(config, state, record)
+    await publishCandidateVisualEvidence(config, state, record)
     await createOrUpdatePullRequest(config, record, outcome)
   } catch (error) {
     if (error instanceof AdminIssueProvenanceError) {
@@ -3300,6 +3595,7 @@ async function blockRecord(
     reason,
     schemaVersion: 1,
     summary: 'The autonomous fix could not pass its required validation.',
+    visualEvidence: [],
   }
   record.lastOutcome = outcome
   record.phase = 'blocked'
@@ -3311,6 +3607,42 @@ async function blockRecord(
     formatBlockedComment(record.uid, record.inputRevision, outcome),
   )
   writeState(config, state)
+}
+
+async function queueVisualEvidenceRefreshAfterBaseSync(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+) {
+  const { candidate } = assertCandidateAuthorized(record)
+  if (!candidateRequiresVisualEvidence(candidate.diff.files)) return false
+  try {
+    assertCandidateVisualEvidence(record, true)
+    return false
+  } catch (error) {
+    if (record.repairAttempts >= config.maxRepairAttempts) {
+      await blockRecord(
+        config,
+        state,
+        record,
+        `Base synchronization invalidated proposed fixed-behavior evidence after ${record.repairAttempts} repair attempts.`,
+      )
+      return true
+    }
+    record.repairAttempts += 1
+    appendIssueInput(record, {
+      body: `Master synchronization changed the authorized candidate. Regenerate the proposed fixed-behavior images against the current committed diff.\n\n${truncate(
+        error instanceof Error ? error.message : String(error),
+        4_000,
+      )}`,
+      createdAt: now(),
+      externalId: `visual-evidence-refresh:${candidate.headSha}`,
+      source: 'ci-failure',
+    })
+    record.phase = 'queued'
+    writeState(config, state)
+    return true
+  }
 }
 
 async function processRecord(
@@ -3352,6 +3684,9 @@ async function processRecord(
       if (record.provenance.kind === 'active' && record.provenance.transition) {
         try {
           await synchronizeCandidateBase(config, state, record)
+          if (record.phase === 'pull-request') {
+            await queueVisualEvidenceRefreshAfterBaseSync(config, state, record)
+          }
         } catch (error) {
           if (error instanceof AdminIssueProvenanceError) {
             await blockRecord(config, state, record, error.message)
@@ -3417,6 +3752,7 @@ async function processRecord(
           const currentCandidate = assertCandidateAuthorized(record).candidate
           if (currentBaseSha !== currentCandidate.targetBaseSha) {
             await synchronizeCandidateBase(config, state, record, currentBaseSha)
+            await queueVisualEvidenceRefreshAfterBaseSync(config, state, record)
             return
           }
           const checks = await waitForRequiredChecks(
@@ -3427,6 +3763,7 @@ async function processRecord(
           if ('interrupted' in checks) return
           if ('baseAdvancedTo' in checks) {
             await synchronizeCandidateBase(config, state, record, checks.baseAdvancedTo)
+            await queueVisualEvidenceRefreshAfterBaseSync(config, state, record)
             return
           }
           if (!checks.success) {
@@ -3461,6 +3798,7 @@ async function processRecord(
             delete record.receipts.checksPassedAt
             writeState(config, state)
             await synchronizeCandidateBase(config, state, record, merged.baseAdvancedTo)
+            await queueVisualEvidenceRefreshAfterBaseSync(config, state, record)
             return
           }
           writeState(config, state)

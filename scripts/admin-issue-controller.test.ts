@@ -15,7 +15,9 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   statSync,
+  truncateSync,
   writeFileSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
@@ -27,13 +29,16 @@ import {
   assertWorkerHostConfigurationSafe,
   assertWorkerChangesSafe,
   assertPullRequestBinding,
+  assertPullRequestContainsVisualEvidence,
   buildWorkerPrompt,
+  collectVisualEvidenceReceipts,
   createCommittedDiffReceipt,
   findExactMergeCommit,
   githubRepositoryFromRemote,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
   prepareCopilotHome,
+  pullRequestBodyWithVisualEvidence,
   readWorktreeSnapshot,
   selectWorkerHassMcpConfig,
   synchronizeCandidateBase,
@@ -45,10 +50,12 @@ import {
   appendIssueInput,
   assertAdminIssueControllerState,
   assertCandidateAuthorized,
+  assertCandidateVisualEvidence,
   assertFinalizationAuthorized,
   baselineAdminIssueState,
   beginAdminIssueGeneration,
   branchNameForIssue,
+  candidateRequiresVisualEvidence,
   controllerReceiptMarker,
   deploymentReceiptIsAccepted,
   formatBlockedComment,
@@ -167,6 +174,18 @@ function authorizeRecord(issue: AdminIssueRecord) {
         revision: issue.processedRevision,
         treeSha,
       },
+      visualEvidence: [
+        {
+          alt: 'Fixed dashboard spacing',
+          caption: 'Mock evidence: phone viewport with the corrected spacing.',
+          diffManifestSha256: '1'.repeat(64),
+          mediaType: 'image/png',
+          path: 'artifacts/admin-issue-321/fixed.png',
+          sha256: '5'.repeat(64),
+          sizeBytes: 123,
+          url: 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111',
+        },
+      ],
     },
     deployment: {
       deployedSha: 'e'.repeat(40),
@@ -505,11 +524,23 @@ describe('admin issue controller domain', () => {
         schemaVersion: 1,
         summary: 'The spacing is now consistent.',
         tests: [{ command: 'npx playwright test e2e/feedback-regressions.spec.ts', result: 'passed' }],
+        visualEvidence: [
+          {
+            alt: 'Phone page with matching bottom gaps',
+            caption: 'Mock evidence: 393 by 852 phone viewport.',
+            path: 'artifacts/admin-issue-321/fixed-phone.png',
+          },
+        ],
       }),
     )
     expect(ready).toMatchObject({
       changeSummary: ['Aligned terminal spacing with the dock-to-navigation gap.'],
       decision: 'ready_for_pr',
+      visualEvidence: [
+        {
+          path: 'artifacts/admin-issue-321/fixed-phone.png',
+        },
+      ],
     })
 
     expect(() =>
@@ -542,6 +573,28 @@ describe('admin issue controller domain', () => {
         }),
       ),
     ).toThrow('result must be passed')
+    expect(() =>
+      parseWorkerOutcome(
+        JSON.stringify({
+          changeSummary: ['Changed CSS.'],
+          decision: 'ready_for_pr',
+          iosFollowUp: { reason: '', required: false },
+          pr: { body: 'Body', title: 'Title' },
+          questions: [],
+          review: { approved: true, findings: [] },
+          schemaVersion: 1,
+          summary: 'Ready.',
+          tests: [{ command: 'npm test', result: 'passed' }],
+          visualEvidence: [
+            {
+              alt: 'Unsafe image',
+              caption: 'Mock evidence: unsafe path.',
+              path: '../fixed.png',
+            },
+          ],
+        }),
+      ),
+    ).toThrow('must be an image below')
   })
 
   it('formats idempotent issue comments with decision and release evidence', () => {
@@ -650,6 +703,150 @@ describe('admin issue controller domain', () => {
 })
 
 describe('admin issue controller security configuration', () => {
+  it('classifies dashboard runtime files for proposed-behavior evidence', () => {
+    expect(candidateRequiresVisualEvidence(['src/App.tsx'])).toBe(true)
+    expect(candidateRequiresVisualEvidence(['public/icon.svg'])).toBe(true)
+    expect(candidateRequiresVisualEvidence(['index.html'])).toBe(true)
+    expect(candidateRequiresVisualEvidence(['src/App.test.tsx', 'e2e/app.spec.ts', 'docs/app.md'])).toBe(false)
+  })
+
+  it('validates bounded issue-scoped visual evidence from real image bytes', () => {
+    const worktreePath = mkdtempSync(join(homedir(), '.admin-issue-controller-evidence-test-'))
+    temporaryDirectories.push(worktreePath)
+    const evidenceDirectory = join(worktreePath, 'artifacts/admin-issue-321')
+    mkdirSync(evidenceDirectory, { recursive: true })
+    const pngBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlO89sAAAAASUVORK5CYII=',
+      'base64',
+    )
+    writeFileSync(join(evidenceDirectory, 'fixed.png'), pngBytes)
+    const issue = record()
+    issue.worktreePath = worktreePath
+    const diff: AdminIssueDiffReceipt = {
+      baseSha: 'a'.repeat(40),
+      entryCount: 1,
+      epoch: 'epoch-1',
+      files: ['src/App.tsx'],
+      generation: 1,
+      headSha: 'b'.repeat(40),
+      manifestSha256: '1'.repeat(64),
+      mergeBaseSha: 'a'.repeat(40),
+      revision: 1,
+      treeSha: 'c'.repeat(40),
+    }
+    const drafts = [
+      {
+        alt: 'Fixed dashboard state',
+        caption: 'Mock evidence: 393 by 852 phone viewport.',
+        path: 'artifacts/admin-issue-321/fixed.png',
+      },
+    ]
+    expect(collectVisualEvidenceReceipts(issue, diff, drafts)).toEqual([
+      expect.objectContaining({
+        diffManifestSha256: diff.manifestSha256,
+        mediaType: 'image/png',
+        path: drafts[0].path,
+        sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        sizeBytes: pngBytes.length,
+      }),
+    ])
+    expect(() => collectVisualEvidenceReceipts(issue, diff, [])).toThrow(
+      'require one to four',
+    )
+    expect(() =>
+      collectVisualEvidenceReceipts(
+        issue,
+        { ...diff, files: ['src/App.test.tsx'] },
+        [],
+      ),
+    ).not.toThrow()
+
+    writeFileSync(join(worktreePath, 'outside.png'), pngBytes)
+    symlinkSync(join(worktreePath, 'outside.png'), join(evidenceDirectory, 'linked.png'))
+    expect(() =>
+      collectVisualEvidenceReceipts(issue, diff, [
+        {
+          alt: 'Linked image',
+          caption: 'Mock evidence: linked file.',
+          path: 'artifacts/admin-issue-321/linked.png',
+        },
+      ]),
+    ).toThrow('non-symlink')
+
+    writeFileSync(join(evidenceDirectory, 'invalid.png'), 'not an image')
+    expect(() =>
+      collectVisualEvidenceReceipts(issue, diff, [
+        {
+          alt: 'Invalid image',
+          caption: 'Mock evidence: invalid bytes.',
+          path: 'artifacts/admin-issue-321/invalid.png',
+        },
+      ]),
+    ).toThrow('valid PNG, JPEG, or WebP')
+
+    writeFileSync(join(evidenceDirectory, 'large.png'), pngBytes)
+    truncateSync(join(evidenceDirectory, 'large.png'), 10 * 1024 * 1024 + 1)
+    expect(() =>
+      collectVisualEvidenceReceipts(issue, diff, [
+        {
+          alt: 'Large image',
+          caption: 'Mock evidence: oversized file.',
+          path: 'artifacts/admin-issue-321/large.png',
+        },
+      ]),
+    ).toThrow('10485760 bytes')
+
+    writeFileSync(join(evidenceDirectory, 'duplicate.png'), pngBytes)
+    expect(() =>
+      collectVisualEvidenceReceipts(issue, diff, [
+        drafts[0],
+        {
+          alt: 'Duplicate dashboard state',
+          caption: 'Mock evidence: duplicate bytes.',
+          path: 'artifacts/admin-issue-321/duplicate.png',
+        },
+      ]),
+    ).toThrow('duplicate images')
+
+    mkdirSync(join(worktreePath, 'artifacts/admin-issue-999'), { recursive: true })
+    writeFileSync(join(worktreePath, 'artifacts/admin-issue-999/fixed.png'), pngBytes)
+    expect(() =>
+      collectVisualEvidenceReceipts(issue, diff, [
+        {
+          alt: 'Wrong issue image',
+          caption: 'Mock evidence: wrong issue path.',
+          path: 'artifacts/admin-issue-999/fixed.png',
+        },
+      ]),
+    ).toThrow('artifacts/admin-issue-321')
+  })
+
+  it('requires published images in the live pull request body', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate?.visualEvidence) {
+      throw new Error('Expected authorized visual evidence')
+    }
+    const evidence = issue.provenance.candidate.visualEvidence
+    const body = pullRequestBodyWithVisualEvidence('Implements the fix.', evidence)
+    expect(body).toContain('## Proposed fixed behavior')
+    expect(body).toContain(evidence[0].url)
+    expect(() => assertPullRequestContainsVisualEvidence(issue, { body })).not.toThrow()
+    expect(() =>
+      assertPullRequestContainsVisualEvidence(issue, { body: 'Implements the fix.' }),
+    ).toThrow('missing the proposed fixed-behavior section')
+    expect(() =>
+      assertPullRequestContainsVisualEvidence(issue, {
+        body: body.replace('![Fixed dashboard spacing]', '[Fixed dashboard spacing]'),
+      }),
+    ).toThrow('missing proposed fixed-behavior image')
+    expect(() => assertCandidateVisualEvidence(issue, true)).not.toThrow()
+    issue.provenance.candidate.visualEvidence = []
+    expect(() => assertCandidateVisualEvidence(issue, true)).toThrow(
+      'has no proposed fixed-behavior images',
+    )
+  })
+
   it('recognizes only GitHub repository remotes', () => {
     expect(githubRepositoryFromRemote('https://github.com/SFenton/ha-sfenton-react-dash.git')).toBe(
       'SFenton/ha-sfenton-react-dash',
@@ -1284,6 +1481,9 @@ describe('admin issue controller security configuration', () => {
     expect(prompt).toContain('Use the configured Home Assistant MCP server directly')
     expect(prompt).toContain('operator-equivalent Home Assistant access')
     expect(prompt).toContain('Gather available Home Assistant evidence yourself')
+    expect(prompt).toContain('artifacts/admin-issue-321/')
+    expect(prompt).toContain('"visualEvidence"')
+    expect(prompt).toContain('Images supplement tests')
     expect(prompt).not.toContain('Do not use host filesystem, shell, GitHub, Home Assistant')
   })
 })
