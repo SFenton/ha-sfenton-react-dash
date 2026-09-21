@@ -8,16 +8,27 @@
 // @covers .gitignore
 
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   assertWorkerHostConfigurationSafe,
   assertWorkerChangesSafe,
+  buildWorkerPrompt,
   githubRepositoryFromRemote,
   loadAdminIssueControllerConfig,
+  prepareCopilotHome,
   recoverableCommittedHead,
+  selectWorkerHassMcpConfig,
 } from './admin-issue-controller'
 import {
   CONTROLLER_COMMENT_MARKER,
@@ -472,6 +483,12 @@ describe('admin issue controller security configuration', () => {
     )
     rmSync(join(repositoryPath, '.github'), { force: true, recursive: true })
 
+    writeFileSync(join(repositoryPath, '.mcp.json'), '{}\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
+      'Project MCP configuration is not allowed',
+    )
+    rmSync(join(repositoryPath, '.mcp.json'))
+
     writeFileSync(join(policyPath, 'mandatory.json'), '{}\n')
     expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
       'Copilot policy hooks are not allowed',
@@ -484,16 +501,29 @@ describe('admin issue controller security configuration', () => {
     const repositoryPath = join(root, 'repository')
     const workerExtensionPath = join(root, 'worker-extension.mjs')
     const tandemSkillPath = join(root, 'tandem-research', 'SKILL.md')
+    const hassMcpConfigPath = join(root, 'mcp-config.json')
     mkdirSync(repositoryPath, { recursive: true })
     mkdirSync(resolve(tandemSkillPath, '..'), { recursive: true })
     writeFileSync(workerExtensionPath, 'export {};\n')
     writeFileSync(tandemSkillPath, '# Tandem research\n')
+    writeFileSync(
+      hassMcpConfigPath,
+      JSON.stringify({
+        mcpServers: {
+          hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test' },
+          playwright: { command: '/usr/bin/false' },
+        },
+      }),
+      { mode: 0o600 },
+    )
     const configPath = join(root, 'controller.json')
     const base = {
       completionReceiptEntityId: 'input_text.admin_todo_completion_receipt',
       completionScript: 'script.complete_admin_todo_item',
       deploymentPollSeconds: 20,
       deploymentTimeoutMinutes: 90,
+      hassMcpConfigPath,
+      hassMcpServerName: 'hass',
       issueLabels: ['bug'],
       maxRepairAttempts: 3,
       ownerId: 3988463,
@@ -515,11 +545,33 @@ describe('admin issue controller security configuration', () => {
       worktreeRoot: join(root, 'worktrees'),
     }
     writeFileSync(configPath, JSON.stringify(base))
-    expect(loadAdminIssueControllerConfig(configPath)).toMatchObject({
+    const loaded = loadAdminIssueControllerConfig(configPath)
+    expect(loaded).toMatchObject({
       repository: base.repository,
       requiredCheckAppId: 15368,
+      hassMcpConfigPath,
+      hassMcpServerName: 'hass',
       workerImageId: base.workerImageId,
     })
+    expect(
+      selectWorkerHassMcpConfig(JSON.parse(readFileSync(hassMcpConfigPath, 'utf8')), 'hass'),
+    ).toEqual({
+      mcpServers: {
+        hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test' },
+      },
+    })
+    prepareCopilotHome(loaded)
+    expect(
+      JSON.parse(readFileSync(join(base.workerHome, '.copilot/mcp-config.json'), 'utf8')),
+    ).toEqual({
+      mcpServers: {
+        hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test' },
+      },
+    })
+    expect(statSync(join(base.workerHome, '.copilot/mcp-config.json')).mode & 0o777).toBe(0o600)
+    expect(() =>
+      selectWorkerHassMcpConfig(JSON.parse(readFileSync(hassMcpConfigPath, 'utf8')), 'missing'),
+    ).toThrow('is not configured')
 
     writeFileSync(configPath, JSON.stringify({ ...base, workerHome: homedir() }))
     expect(() => loadAdminIssueControllerConfig(configPath)).toThrow('must be a child')
@@ -531,6 +583,26 @@ describe('admin issue controller security configuration', () => {
 
     writeFileSync(configPath, JSON.stringify({ ...base, workerImageId: 'node:latest' }))
     expect(() => loadAdminIssueControllerConfig(configPath)).toThrow('immutable sha256 image ID')
+
+    chmodSync(hassMcpConfigPath, 0o644)
+    writeFileSync(configPath, JSON.stringify(base))
+    expect(() => loadAdminIssueControllerConfig(configPath)).toThrow(
+      'must not be readable by group or other users',
+    )
+
+    const overlappingMcpConfigPath = join(base.workerHome, 'source-mcp.json')
+    writeFileSync(
+      overlappingMcpConfigPath,
+      JSON.stringify({ mcpServers: { hass: { url: 'http://127.0.0.1:9583/private-test' } } }),
+      { mode: 0o600 },
+    )
+    writeFileSync(
+      configPath,
+      JSON.stringify({ ...base, hassMcpConfigPath: overlappingMcpConfigPath }),
+    )
+    expect(() => loadAdminIssueControllerConfig(configPath)).toThrow(
+      'hassMcpConfigPath must not overlap workerHome',
+    )
   })
 
   it('keeps the extension networkless and exposes only bounded repository mounts', () => {
@@ -563,7 +635,11 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain("'gpt-5.6-sol'")
     expect(controller).toContain("'max'")
     expect(controller).toContain("'--disable-builtin-mcps'")
+    expect(controller).toContain("'--enable-mcp-server'")
+    expect(controller).toContain("'--allow-all-mcp-server-instructions'")
+    expect(controller).toContain('mcp:*')
     expect(controller).toContain("'custom-tool(admin_issue_workspace)'")
+    expect(controller).toContain('config.hassMcpServerName')
     expect(controller).toContain("'GH_TOKEN'")
     expect(controller).toContain('disableAllHooks: true')
     expect(controller).toContain("'installed-plugins'")
@@ -575,5 +651,13 @@ describe('admin issue controller security configuration', () => {
     expect(completionReceipt).toBeGreaterThan(-1)
     expect(cleanup).toBeGreaterThan(completionReceipt)
     expect(completed).toBeGreaterThan(cleanup)
+  })
+
+  it('directs workers to gather Home Assistant evidence before asking the operator', () => {
+    const prompt = buildWorkerPrompt(record())
+    expect(prompt).toContain('Use the configured Home Assistant MCP server directly')
+    expect(prompt).toContain('operator-equivalent Home Assistant access')
+    expect(prompt).toContain('Gather available Home Assistant evidence yourself')
+    expect(prompt).not.toContain('Do not use host filesystem, shell, GitHub, Home Assistant')
   })
 })

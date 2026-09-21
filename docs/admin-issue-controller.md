@@ -16,10 +16,19 @@ The host controller owns every privileged action:
 - verifies protected checks and the exact deployment receipt;
 - closes the GitHub issue and removes the worktree.
 
-Copilot receives no Home Assistant token and no GitHub mutation tool. Its only
-repository tool is `admin_issue_workspace`, implemented by the project
-asset in `ops/admin-issue-controller/worker-extension.mjs`. Each command runs in Docker
-with no network, a read-only root filesystem, dropped capabilities,
+Copilot receives Home Assistant capabilities through only the configured
+`hass` MCP server, while the model and Docker workspace receive no raw Home
+Assistant credential or GitHub mutation tool. Before each run, the controller
+copies only that server entry from the operator's private MCP configuration into the dedicated worker home;
+it does not inherit Playwright, Plex, UniFi, ARR, GitHub, or other user MCP
+servers. The model can use the same guarded Home Assistant tools available to
+the operator for issue-scoped state, history, trace, configuration, service,
+and validation work, while the MCP server retains its own safety contracts and
+secret handling.
+
+The worker's only repository tool remains `admin_issue_workspace`, implemented
+by the project asset in `ops/admin-issue-controller/worker-extension.mjs`.
+Each repository command runs in Docker with no network, a read-only root filesystem, dropped capabilities,
 `no-new-privileges`, resource limits, a writable issue worktree, and read-only
 Git metadata. The extension accepts only an immutable Docker image ID.
 The controller rejects changes outside the auto-deployed dashboard surfaces:
@@ -33,7 +42,10 @@ a worker when project extensions or machine policy hooks are present.
 
 The controller passes `GH_TOKEN` to Copilot only so the CLI can authenticate
 its model session. The variable is declared secret and is not requested by the
-extension or mounted into its containers.
+extension or mounted into its containers. The private HASS MCP endpoint remains
+in a `0600` MCP configuration file outside the worktree; neither it nor the HA
+token is mounted into the Docker workspace or included in worker prompts and
+logs.
 
 The dedicated worker home and Copilot home are seeded with the reviewed
 `ops/admin-issue-controller/tandem-research/SKILL.md`; it does not inherit
@@ -48,8 +60,10 @@ mutable user extensions or unrelated personal skills.
 4. Accept follow-up comments only when the numeric user ID, login, and
    `OWNER` association all match the pinned repository owner.
 5. Create or resume the stable named Copilot session with `gpt-5.6-sol`,
-   `max` effort, and `/tandem-research`.
-6. Post a structured question and pause when a consequential decision remains.
+   `max` effort, `/tandem-research`, the isolated repository tool, and the
+   operator's configured `hass` MCP server.
+6. Gather available repository and live Home Assistant evidence, then post a
+   structured question only when a consequential decision still remains.
 7. Otherwise validate the isolated worktree, commit and push it, open a pull
    request, and repair failed protected checks from the pinned GitHub App up to
    the configured limit.
@@ -75,6 +89,8 @@ Prerequisites:
 - Docker and Copilot CLI are available to the user service;
 - Node 22 is installed at `~/.local/bin/node`;
 - `.env.development` supplies the existing Home Assistant URL and token;
+- `~/.copilot/mcp-config.json` contains an enabled `hass` MCP server and is
+  readable only by the owning user;
 - the worker image contains Node 22 and the Playwright 1.60 browser/runtime
   dependencies required by this repository.
 
@@ -116,7 +132,10 @@ install -m 0600 \
 
 Confirm that `workerImageId` in the installed JSON matches the exact
 `sha256:...` result. Update it whenever the pinned worker image changes, and
-keep the configuration mode `0600`.
+keep the configuration mode `0600`. Keep `hassMcpConfigPath` pointed at the
+operator's private MCP configuration and `hassMcpServerName` matched to the
+trusted Home Assistant server entry. The controller fails closed if the file
+is not private, the server is missing, or the transport is malformed.
 
 Before starting the service, baseline every pre-existing Admin To-Do item.
 This is a mandatory fail-closed migration step:
