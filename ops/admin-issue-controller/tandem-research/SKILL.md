@@ -14,8 +14,11 @@ researchers. Never trigger it from task importance alone.
 1. The operator's exact prompt is canonical. Give it unchanged to both
    researchers and never replace it with a normalized question.
 2. The current owner gathers deterministic evidence directly or through
-   bounded non-Claude readers. For a named recurring system, search relevant
-   session history with the original nouns before the first research pass.
+   bounded non-Claude readers. Use the configured Home Assistant MCP for
+   current state, history, traces, configuration, and service evidence before
+   asking the operator to provide diagnostics already available there. For a
+   named recurring system, search relevant session history with the original
+   nouns before the first research pass.
 3. Sol `max/default` and Astra `medium/default` receive the same raw prompt and
    the same evidence bundle. They reason independently before seeing the other
    report.
