@@ -38,6 +38,7 @@ import {
   formatCompletionComment,
   formatPullRequestComment,
   formatQuestionsComment,
+  formatVisualEvidenceMarkdown,
   isTrustedIssueComment,
   issueBody,
   issueTitle,
@@ -794,17 +795,31 @@ async function postIssueCommentOnce(
   body: string,
 ) {
   const marker = controllerReceiptMarker(uid, receipt)
-  const comments = await listIssueComments(config, issueNumber)
-  const existing = comments.find((comment) => comment.body?.includes(marker))
-  if (existing) return existing
   const controllerBody = body.includes(CONTROLLER_COMMENT_MARKER)
     ? body
     : `${CONTROLLER_COMMENT_MARKER}\n${body}`
+  const desiredBody = controllerBody.includes(marker)
+    ? controllerBody
+    : `${controllerBody}\n\n${marker}`
+  if (Buffer.byteLength(desiredBody) > MAX_GITHUB_BODY_BYTES) {
+    throw new Error(`GitHub issue comment exceeds ${MAX_GITHUB_BODY_BYTES} bytes`)
+  }
+  const comments = await listIssueComments(config, issueNumber)
+  const existing = comments.find((comment) => comment.body?.includes(marker))
+  if (existing) {
+    if (existing.body === desiredBody) return existing
+    return await ghApi<GitHubIssueComment>(
+      config,
+      'PATCH',
+      `repos/${config.repository}/issues/comments/${existing.id}`,
+      { body: desiredBody },
+    )
+  }
   return await ghApi<GitHubIssueComment>(
     config,
     'POST',
     `repos/${config.repository}/issues/${issueNumber}/comments`,
-    { body: controllerBody.includes(marker) ? controllerBody : `${controllerBody}\n\n${marker}` },
+    { body: desiredBody },
   )
 }
 
@@ -1232,7 +1247,7 @@ Use the tandem-research workflow to investigate the issue before implementation.
 
 Gather available Home Assistant evidence yourself before asking the operator for diagnostics or authorization. Do not offer an input option that merely authorizes a capability already available to you. If a consequential product or design decision remains after repository and Home Assistant investigation, stop and return needs_input with concise options and your recommendation. Otherwise implement the complete fix in the assigned worktree, update the directly owned tests, run the relevant tests through admin_issue_workspace, iterate until they pass, and perform a meaningful code review. Treat iOS/WebKit-specific behavior as requiring explicit manual follow-up.
 
-When the committed fix changes production dashboard runtime files (index.html, public/**, or non-test src/**), generate one to four deterministic PNG, JPEG, or WebP images showing the proposed fixed behavior. Store them only below artifacts/admin-issue-${record.issueNumber}/; this ignored directory is not part of the commit. Use focused states and viewports that make the fix reviewable, label mock-backed evidence visibly, and never actuate devices merely to capture an image. Each caption must explicitly say whether the image is mock or live evidence. Non-runtime, test-only, documentation-only, Home Assistant-only, and controller-only outcomes use an empty visualEvidence array. Images supplement tests and do not replace required manual iOS/WebKit verification.
+When the committed fix changes production dashboard runtime files (index.html, public/**, or non-test src/**), generate one to four deterministic PNG, JPEG, or WebP images showing the proposed fixed behavior. Store them only below artifacts/admin-issue-${record.issueNumber}/; this ignored directory is not part of the commit. Use focused states and viewports that make the fix reviewable, label mock-backed evidence visibly, and never actuate devices merely to capture an image. Each caption must explicitly say whether the image is mock or live evidence. The host controller embeds the same uploaded images in both the pull request and the GitHub issue update. Non-runtime, test-only, documentation-only, Home Assistant-only, and controller-only outcomes use an empty visualEvidence array. Images supplement tests and do not replace required manual iOS/WebKit verification.
 
 Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.
 
@@ -2743,13 +2758,6 @@ async function findPullRequest(config: AdminIssueControllerConfig, branch: strin
   return pulls.at(0)
 }
 
-function markdownText(value: string) {
-  return neutralizeGitHubClosingReferences(value)
-    .replace(/[\r\n]+/g, ' ')
-    .replace(/[<>]/g, '')
-    .trim()
-}
-
 export function pullRequestBodyWithVisualEvidence(
   body: string,
   evidence: AdminIssueVisualEvidenceReceipt[],
@@ -2760,16 +2768,10 @@ export function pullRequestBodyWithVisualEvidence(
     .replace(/<!-- admin-issue-visual-evidence:start -->[\s\S]*?<!-- admin-issue-visual-evidence:end -->/g, '')
     .trim()
   if (evidence.length === 0) return withoutPrevious
-  const images = evidence.map((item) => {
-    if (!item.url) throw new Error(`Visual evidence has not been uploaded: ${item.path}`)
-    const alt = markdownText(item.alt).replace(/[\\[\]]/g, '\\$&')
-    return `![${alt}](${item.url})\n\n_${markdownText(item.caption)}_`
-  })
   return [
     withoutPrevious,
     startMarker,
-    '## Proposed fixed behavior',
-    ...images,
+    formatVisualEvidenceMarkdown(evidence),
     endMarker,
   ].filter(Boolean).join('\n\n')
 }
@@ -2788,20 +2790,65 @@ export function assertPullRequestContainsVisualEvidence(
     )
   }
   const evidenceSection = start >= 0 && end > start ? body.slice(start, end) : ''
+  assertRenderedVisualEvidence(evidenceSection, evidence, 'Pull request body')
+}
+
+function assertRenderedVisualEvidence(
+  body: string,
+  evidence: readonly AdminIssueVisualEvidenceReceipt[],
+  surface: string,
+) {
   for (const item of evidence) {
     const target = `](${item.url})`
-    const targetIndex = evidenceSection.indexOf(target)
-    const lineStart = evidenceSection.lastIndexOf('\n', targetIndex) + 1
+    const targetIndex = body.indexOf(target)
+    const lineStart = body.lastIndexOf('\n', targetIndex) + 1
     if (
       !item.url ||
       targetIndex < 0 ||
-      !evidenceSection.slice(lineStart, targetIndex).startsWith('![')
+      !body.slice(lineStart, targetIndex).startsWith('![')
     ) {
       throw new AdminIssueProvenanceError(
-        `Pull request body is missing proposed fixed-behavior image ${item.path}`,
+        `${surface} is missing proposed fixed-behavior image ${item.path}`,
       )
     }
   }
+}
+
+export function assertIssueCommentBodyContainsVisualEvidence(
+  record: AdminIssueRecord,
+  body: string | null | undefined,
+) {
+  const { evidence } = assertCandidateVisualEvidence(record, true)
+  if (evidence.length === 0) return
+  const commentBody = body ?? ''
+  const heading = commentBody.indexOf('## Proposed fixed behavior')
+  if (heading < 0) {
+    throw new AdminIssueProvenanceError(
+      'GitHub issue update is missing the proposed fixed-behavior section',
+    )
+  }
+  assertRenderedVisualEvidence(
+    commentBody.slice(heading),
+    evidence,
+    'GitHub issue update',
+  )
+}
+
+async function verifyIssueVisualEvidenceComment(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+) {
+  const { evidence } = assertCandidateVisualEvidence(record, true)
+  if (evidence.length === 0) return
+  const marker = controllerReceiptMarker(record.uid, `pr-r${record.processedRevision}`)
+  const comments = await listIssueComments(config, record.issueNumber)
+  const comment = comments.find((entry) => entry.body?.includes(marker))
+  if (!comment) {
+    throw new AdminIssueProvenanceError(
+      'GitHub issue is missing its pull-request evidence update',
+    )
+  }
+  assertIssueCommentBodyContainsVisualEvidence(record, comment.body)
 }
 
 async function publishCandidateVisualEvidence(
@@ -2921,13 +2968,20 @@ async function createOrUpdatePullRequest(
   }
   record.phase = 'pull-request'
   record.receipts.prOpenedAt ??= now()
-  await postIssueCommentOnce(
+  const issueComment = await postIssueCommentOnce(
     config,
     record.issueNumber,
     record.uid,
     `pr-r${record.processedRevision}`,
-    formatPullRequestComment(record.uid, record.processedRevision, record.pr, outcome),
+    formatPullRequestComment(
+      record.uid,
+      record.processedRevision,
+      record.pr,
+      outcome,
+      evidence,
+    ),
   )
+  assertIssueCommentBodyContainsVisualEvidence(record, issueComment.body)
   return pullRequest
 }
 
@@ -2938,6 +2992,7 @@ async function waitForRequiredChecks(
 ) {
   if (!record.pr) throw new Error('Pull request is missing')
   const { candidate, provenance } = assertCandidateAuthorized(record)
+  await verifyIssueVisualEvidenceComment(config, record)
   const deadline = Date.now() + config.deploymentTimeoutMinutes * 60_000
   while (Date.now() < deadline) {
     await getPullRequest(config, record)
@@ -2987,6 +3042,7 @@ async function waitForRequiredChecks(
       ) {
         if (!(await refreshInputs())) return { interrupted: true as const }
         await getPullRequest(config, record)
+        await verifyIssueVisualEvidenceComment(config, record)
         const verifiedBaseSha = await fetchMaster(config, record)
         if (verifiedBaseSha !== candidate.targetBaseSha) {
           return { baseAdvancedTo: verifiedBaseSha }
@@ -3115,6 +3171,7 @@ async function mergePullRequest(
   if (!record.pr) throw new Error('Pull request is missing')
   const { candidate, provenance } = assertCandidateAuthorized(record, true)
   let merged = await getPullRequest(config, record)
+  await verifyIssueVisualEvidenceComment(config, record)
   await assertRequiredChecksCurrent(config, candidate)
   if (!merged.merged_at) {
     const currentBaseSha = await fetchMaster(config, record)
@@ -3278,6 +3335,7 @@ async function verifyMergedPullRequest(
     throw new AdminIssueProvenanceError('Issue does not have a matching verified merge receipt')
   }
   const pullRequest = await getPullRequest(config, record)
+  await verifyIssueVisualEvidenceComment(config, record)
   if (
     !pullRequest.merged_at ||
     pullRequest.merge_commit_sha !== merge.mergeSha ||
