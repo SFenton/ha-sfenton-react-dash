@@ -172,6 +172,9 @@ const MEASUREMENT_STATUSES = new Set<VacuumOutcomeMeasurementStatus>(['not_requi
 const ITERATION_STATUSES = new Set<VacuumOutcomeIterationStatus>(['verified', 'unverified'])
 const COMPLETION_STATUSES = new Set<VacuumOutcomeCompletionStatus>(['completed', 'incomplete', 'uncertain'])
 const TELEMETRY_STATUSES = new Set<VacuumOutcomeTelemetryStatus>(['recovered', 'unresolved'])
+const LEGACY_REASON_ALIASES = new Map<string, Pick<VacuumOutcomeReason, 'category' | 'code'>>([
+  ['Lost mop pad', { category: 'mop', code: 'mop.attachment_missing' }],
+])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -224,6 +227,12 @@ function isReason(value: unknown): value is VacuumOutcomeReason {
 
 function isNullableReason(value: unknown): value is VacuumOutcomeReason | null {
   return value === null || isReason(value)
+}
+
+function normalizeVacuumOutcomeReason(reason: VacuumOutcomeReason | null) {
+  if (!reason || reason.code !== 'unknown') return reason
+  const alias = LEGACY_REASON_ALIASES.get(reason.raw)
+  return alias ? { ...reason, ...alias } : reason
 }
 
 function attemptResults(version: VacuumOutcomeContractVersion) {
@@ -443,7 +452,7 @@ function normalizeAttempt(
     ...(evidence ? { evidence } : {}),
     event_id: value.event_id as string,
     mode: value.mode as VacuumOutcomeAttemptMode,
-    reason: value.reason as VacuumOutcomeReason | null,
+    reason: normalizeVacuumOutcomeReason(value.reason as VacuumOutcomeReason | null),
     result: value.result as VacuumOutcomeAttemptResult,
   }
 }
@@ -462,7 +471,12 @@ function normalizeRoom(
       ? null
       : normalizeAttempt(value.latest_attempt as Record<string, unknown>, version),
     occurrence_count: value.occurrence_count as number,
-    outstanding: value.outstanding as VacuumOutcomeOutstanding | null,
+    outstanding: value.outstanding === null
+      ? null
+      : {
+          ...value.outstanding as VacuumOutcomeOutstanding,
+          reason: normalizeVacuumOutcomeReason((value.outstanding as VacuumOutcomeOutstanding).reason),
+        },
     reasons_coincide: value.reasons_coincide as boolean,
     required_operation: value.required_operation as VacuumOutcomeRoom['required_operation'],
     room_id: value.room_id as string,
@@ -480,7 +494,7 @@ function normalizeEvent(
     id: value.id as string,
     kind: value.kind as VacuumOutcomeEvent['kind'],
     occurred_at: value.occurred_at as string,
-    reason: value.reason as VacuumOutcomeReason | null,
+    reason: normalizeVacuumOutcomeReason(value.reason as VacuumOutcomeReason | null),
     room_id: value.room_id as string,
     room_name: value.room_name as string | null,
     sequence: value.sequence as number,
@@ -499,7 +513,7 @@ function normalizeEvent(
   return {
     ...base,
     outstanding_operation: value.outstanding_operation as VacuumOutcomeOperation,
-    reason: value.reason as VacuumOutcomeReason,
+    reason: normalizeVacuumOutcomeReason(value.reason as VacuumOutcomeReason) as VacuumOutcomeReason,
     type: 'deferral',
   }
 }

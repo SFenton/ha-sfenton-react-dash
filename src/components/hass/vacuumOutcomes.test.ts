@@ -31,6 +31,22 @@ function record(value: unknown) {
   return value as Record<string, unknown>
 }
 
+function v2PayloadWithLivingRoomReason(reason: Record<string, unknown>) {
+  const payload = cloneV2Payload()
+  const room = record(payload.rooms[2])
+  const attempt = record(room.latest_attempt)
+  const event = record(payload.events[2])
+  room.status = 'interrupted'
+  attempt.result = 'interrupted'
+  attempt.reason = structuredClone(reason)
+  room.credit = { operation: null, status: 'none' }
+  room.outstanding = { operation: 'vacuum_mop', reason: structuredClone(reason) }
+  event.kind = 'failed'
+  event.attempt_result = 'interrupted'
+  event.reason = structuredClone(reason)
+  return payload
+}
+
 describe('vacuum outcome contract parsing', () => {
   it('accepts the complete v1 contract and preserves backend order', () => {
     const parsed = parseVacuumOutcomeContract(cloneV1Contract())
@@ -110,6 +126,48 @@ describe('vacuum outcome contract parsing', () => {
     })
     expect(parsed.contract.rooms[0].latest_attempt).not.toHaveProperty('evidence')
     expect(parsed.contract.events[0]).not.toHaveProperty('evidence')
+  })
+
+  it('normalizes the exact legacy lost-mop reason without overriding canonical or unrelated reasons', () => {
+    const historicalReason = { category: 'unknown', code: 'unknown', data: {}, raw: 'Lost mop pad' }
+    const parsedHistorical = parseVacuumOutcomeReport(v2PayloadWithLivingRoomReason(historicalReason))
+
+    expect(parsedHistorical.kind).toBe('valid')
+    if (parsedHistorical.kind !== 'valid') throw new Error('Expected valid historical lost-mop payload')
+    expect(parsedHistorical.contract.rooms[2]).toMatchObject({
+      latest_attempt: {
+        reason: {
+          category: 'mop',
+          code: 'mop.attachment_missing',
+          data: {},
+          raw: 'Lost mop pad',
+        },
+      },
+      outstanding: {
+        reason: {
+          category: 'mop',
+          code: 'mop.attachment_missing',
+          raw: 'Lost mop pad',
+        },
+      },
+    })
+    expect(parsedHistorical.contract.events[2].reason).toMatchObject({
+      category: 'mop',
+      code: 'mop.attachment_missing',
+      raw: 'Lost mop pad',
+    })
+
+    const canonicalReason = { category: 'mop', code: 'mop.clean_water_empty', data: {}, raw: 'Lost mop pad' }
+    const parsedCanonical = parseVacuumOutcomeReport(v2PayloadWithLivingRoomReason(canonicalReason))
+    expect(parsedCanonical.kind).toBe('valid')
+    if (parsedCanonical.kind !== 'valid') throw new Error('Expected valid canonical payload')
+    expect(parsedCanonical.contract.rooms[2].latest_attempt?.reason?.code).toBe('mop.clean_water_empty')
+
+    const unrelatedReason = { category: 'unknown', code: 'unknown', data: {}, raw: 'Lost side brush' }
+    const parsedUnrelated = parseVacuumOutcomeReport(v2PayloadWithLivingRoomReason(unrelatedReason))
+    expect(parsedUnrelated.kind).toBe('valid')
+    if (parsedUnrelated.kind !== 'valid') throw new Error('Expected valid unrelated unknown payload')
+    expect(parsedUnrelated.contract.rooms[2].latest_attempt?.reason).toEqual(unrelatedReason)
   })
 
   it('preserves a valid v2 core while marking malformed optional evidence unavailable', () => {
