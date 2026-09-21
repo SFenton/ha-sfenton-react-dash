@@ -29,13 +29,13 @@ interface TodoListPanelProps {
   layout?: 'list' | 'responsive-grid'
   onEditTask?: (target: DonetickTaskEditTarget) => void
   onEditTodoItem?: (target: AdminTodoEditTarget) => void
+  onErrorChange?: (hasError: boolean) => void
   onVisibleItemsChange?: (count: number) => void
   optimisticStatuses?: TodoOptimisticStatuses
   reloadVersion?: number
   rowVariant?: 'settings' | 'summary'
   title: string
 }
-
 const EDIT_MODAL_SEMANTICS = { kind: 'modal' } satisfies ControlSemantics
 
 interface HassConnection {
@@ -119,7 +119,7 @@ function applyPendingTodoStatuses(items: TodoItem[], pendingStatuses: TodoOptimi
   })
 }
 
-export function TodoListPanel({ completionScript, entityId, hideCompleted = true, layout = 'list', onEditTask, onEditTodoItem, onVisibleItemsChange, optimisticStatuses, reloadVersion = 0, rowVariant, title }: TodoListPanelProps) {
+export function TodoListPanel({ completionScript, entityId, hideCompleted = true, layout = 'list', onEditTask, onEditTodoItem, onErrorChange, onVisibleItemsChange, optimisticStatuses, reloadVersion = 0, rowVariant, title }: TodoListPanelProps) {
   const copy = useCopy(TODO_LIST_I18N.namespace)
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const connection = useHass((state) => state.connection) as unknown as HassConnection | undefined
@@ -176,10 +176,10 @@ export function TodoListPanel({ completionScript, entityId, hideCompleted = true
   const visibleItems = hideCompleted ? displayedItems.filter((item) => item.status !== 'completed') : displayedItems
 
   useEffect(() => {
+    onErrorChange?.(Boolean(error))
     if (!items || error) return
     onVisibleItemsChange?.(visibleItems.length)
-  }, [error, items, onVisibleItemsChange, visibleItems.length])
-
+  }, [error, items, onErrorChange, onVisibleItemsChange, visibleItems.length])
   const toggleItem = (item: TodoItem) => {
     const identity = todoIdentity(item)
     if (!identity || !connection?.sendMessagePromise) return

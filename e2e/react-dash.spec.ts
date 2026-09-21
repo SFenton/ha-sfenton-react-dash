@@ -5429,8 +5429,14 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeVisible()
 
   await nav.getByRole('tab', { name: /^Upcoming Chores/ }).click()
-  await expect(dialog.getByRole('region', { name: 'Upcoming Chores' })).toBeVisible()
-  await expect(dialog.getByRole('region', { name: 'Upcoming Chores' }).getByRole('button', { name: 'Edit Mock task one' })).toBeVisible()
+  const upcomingRegion = dialog.getByRole('region', { name: 'Upcoming Chores', exact: true })
+  await expect(upcomingRegion).toBeVisible()
+  const upcomingList = upcomingRegion.getByRole('article', { name: 'Upcoming Chores todo list', exact: true })
+  await expect(upcomingList.getByRole('button', { name: 'Edit Mock task one', exact: true })).toBeVisible()
+  const noDueDateRegion = upcomingRegion.getByRole('region', { name: 'No Due Date', exact: true })
+  await expect(noDueDateRegion.getByRole('heading', { level: 2, name: 'No Due Date', exact: true })).toBeVisible()
+  const noDueDateList = noDueDateRegion.getByRole('article', { name: 'No Due Date todo list', exact: true })
+  await expect(noDueDateList.getByRole('button', { name: 'Edit Mock task one', exact: true })).toBeVisible()
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toHaveCount(0)
 
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeVisible()
