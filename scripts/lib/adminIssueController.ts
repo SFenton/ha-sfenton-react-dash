@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 
 export const ADMIN_ISSUE_MARKER_PREFIX = 'admin-todo-uid:'
 export const CONTROLLER_COMMENT_MARKER = '<!-- admin-issue-controller -->'
+export const ADMIN_ISSUE_STATE_VERSION = 2 as const
 export const REQUIRED_DEPLOYMENT_VERIFIED_PATHS = [
   'deployment.json',
   'index.html',
@@ -37,11 +38,162 @@ export interface AdminIssueInput {
 }
 
 export interface AdminIssuePullRequest {
-  headSha: string
-  mergeSha?: string
   number: number
   url: string
 }
+
+export interface AdminIssueDiffReceipt {
+  baseSha: string
+  entryCount: number
+  epoch: string
+  files: string[]
+  generation: number
+  headSha: string
+  manifestSha256: string
+  mergeBaseSha: string
+  revision: number
+  treeSha: string
+}
+
+export interface AdminIssueValidationReceipt {
+  commands: string[]
+  commandsSha256: string
+  completedAt: string
+  diffManifestSha256: string
+  epoch: string
+  generation: number
+  headSha: string
+  revision: number
+  treeSha: string
+}
+
+export interface AdminIssueChecksReceipt {
+  epoch: string
+  generation: number
+  headSha: string
+  observedAt: string
+  requiredSetSha256: string
+  revision: number
+  runs: Array<{
+    appId: number
+    checkRunId: number
+    completedAt: string
+    conclusion: 'success'
+    name: string
+  }>
+}
+
+export interface AdminIssueCandidate {
+  checks?: AdminIssueChecksReceipt
+  diff: AdminIssueDiffReceipt
+  expectedRemoteHeadSha?: string
+  headSha: string
+  targetBaseSha: string
+  treeSha: string
+  validation?: AdminIssueValidationReceipt
+}
+
+export interface AdminIssueBaseSyncTransition {
+  attempt: number
+  confirmation?: {
+    localHeadSha: string
+    observedAt: string
+    prHeadSha?: string
+    prNumber?: number
+    remoteHeadSha: string
+  }
+  diagnostics?: {
+    outputSha256: string
+    outputTail: string
+    statusSha256: string
+    unmergedPaths: string[]
+  }
+  epoch: string
+  expectedRemoteHeadSha?: string
+  fromBaseSha: string
+  fromHeadSha: string
+  fromTreeSha: string
+  generation: number
+  id: string
+  provisionalDiff?: AdminIssueDiffReceipt
+  provisionalValidation?: AdminIssueValidationReceipt
+  restoration?: {
+    clean: true
+    headSha: string
+    noGitOperationInProgress: true
+    treeSha: string
+    verifiedAt: string
+  }
+  revision: number
+  stage:
+    | 'intent'
+    | 'local-created'
+    | 'validated'
+    | 'pushed'
+    | 'confirmed'
+    | 'conflict-observed'
+    | 'aborted'
+    | 'failed'
+    | 'quarantined'
+  startedAt: string
+  targetBaseSha: string
+  toHeadSha?: string
+  toTreeSha?: string
+}
+
+export interface AdminIssueMergeReceipt {
+  baseSha: string
+  candidateHeadSha: string
+  epoch: string
+  generation: number
+  mergeSha: string
+  mergedAt: string
+  observedAt: string
+  prNumber: number
+  revision: number
+}
+
+export interface AdminIssueDeploymentBinding {
+  deployedSha: string
+  disposition: string
+  epoch: string
+  generation: number
+  mergeSha: string
+  receiptHash: string
+  revision: number
+  sourceSha: string
+  workflowHeadSha: string
+  workflowRunAttempt: number
+  workflowRunId: number
+}
+
+export type AdminIssueProvenance =
+  | { kind: 'none' }
+  | {
+    kind: 'legacy-untrusted'
+    migratedAt: string
+    observedBaseSha?: string
+    observedHeadSha?: string
+    observedMergeSha?: string
+    reason: 'v1-missing-exact-provenance'
+  }
+  | {
+    candidate?: AdminIssueCandidate
+    deployment?: AdminIssueDeploymentBinding
+    epoch: string
+    generation: number
+    kind: 'active'
+    merge?: AdminIssueMergeReceipt
+    preparedBaseSha: string
+    quarantine?: {
+      detectedAt: string
+      diagnosticsSha256: string
+      reason: string
+    }
+    resyncAttempts: number
+    revision: number
+    transition?: AdminIssueBaseSyncTransition
+  }
 
 export interface AdminIssueDeployment {
   conclusion?: string
@@ -53,7 +205,6 @@ export interface AdminIssueDeployment {
 }
 
 export interface AdminIssueRecord {
-  baseSha?: string
   branch?: string
   commentCursor: number
   createdAt: string
@@ -68,6 +219,7 @@ export interface AdminIssueRecord {
   phase: AdminIssuePhase
   pr?: AdminIssuePullRequest
   processedRevision: number
+  provenance: AdminIssueProvenance
   repairAttempts: number
   receipts: Record<string, string>
   sessionName: string
@@ -85,7 +237,7 @@ export interface AdminIssueControllerState {
   ignoredUids: string[]
   issues: Record<string, AdminIssueRecord>
   updatedAt: string
-  version: 1
+  version: 2
 }
 
 export interface AdminIssueQuestion {
@@ -173,6 +325,452 @@ function iosFollowUp(value: unknown): AdminIssueIosFollowUp {
   }
 }
 
+const SHA_PATTERN = /^[a-f0-9]{40}$/
+const HASH_PATTERN = /^[a-f0-9]{64}$/
+const ADMIN_ISSUE_PHASES = new Set<AdminIssuePhase>([
+  'queued',
+  'researching',
+  'implementing',
+  'awaiting-user',
+  'ready-for-pr',
+  'pull-request',
+  'deploying',
+  'completed',
+  'paused',
+  'blocked',
+])
+
+function nonEmptyString(value: unknown, field: string) {
+  assert(typeof value === 'string' && value.trim().length > 0, `${field} must be a non-empty string`)
+  return value
+}
+
+function sha(value: unknown, field: string) {
+  assert(typeof value === 'string' && SHA_PATTERN.test(value), `${field} must be a full Git SHA`)
+  return value
+}
+
+function sha256(value: unknown, field: string) {
+  assert(typeof value === 'string' && HASH_PATTERN.test(value), `${field} must be a SHA-256 hash`)
+  return value
+}
+
+function nonNegativeInteger(value: unknown, field: string) {
+  assert(Number.isInteger(value) && Number(value) >= 0, `${field} must be a non-negative integer`)
+  return Number(value)
+}
+
+function positiveInteger(value: unknown, field: string) {
+  assert(Number.isInteger(value) && Number(value) > 0, `${field} must be a positive integer`)
+  return Number(value)
+}
+
+function isoTimestamp(value: unknown, field: string) {
+  assert(
+    typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value)),
+    `${field} must be an ISO timestamp`,
+  )
+  return value
+}
+
+function assertReceiptContext(
+  value: Record<string, unknown>,
+  field: string,
+  provenance: Extract<AdminIssueProvenance, { kind: 'active' }>,
+) {
+  assert(value.epoch === provenance.epoch, `${field}.epoch does not match provenance`)
+  assert(value.generation === provenance.generation, `${field}.generation does not match provenance`)
+  assert(value.revision === provenance.revision, `${field}.revision does not match provenance`)
+}
+
+function assertDiffReceipt(
+  value: unknown,
+  field: string,
+  provenance: Extract<AdminIssueProvenance, { kind: 'active' }>,
+) {
+  assert(object(value), `${field} must be an object`)
+  assertReceiptContext(value, field, provenance)
+  sha(value.baseSha, `${field}.baseSha`)
+  sha(value.headSha, `${field}.headSha`)
+  sha(value.treeSha, `${field}.treeSha`)
+  sha(value.mergeBaseSha, `${field}.mergeBaseSha`)
+  sha256(value.manifestSha256, `${field}.manifestSha256`)
+  nonNegativeInteger(value.entryCount, `${field}.entryCount`)
+  stringArray(value.files, `${field}.files`)
+}
+
+function assertValidationReceipt(
+  value: unknown,
+  field: string,
+  provenance: Extract<AdminIssueProvenance, { kind: 'active' }>,
+) {
+  assert(object(value), `${field} must be an object`)
+  assertReceiptContext(value, field, provenance)
+  sha(value.headSha, `${field}.headSha`)
+  sha(value.treeSha, `${field}.treeSha`)
+  sha256(value.diffManifestSha256, `${field}.diffManifestSha256`)
+  sha256(value.commandsSha256, `${field}.commandsSha256`)
+  stringArray(value.commands, `${field}.commands`)
+  isoTimestamp(value.completedAt, `${field}.completedAt`)
+}
+
+function assertChecksReceipt(
+  value: unknown,
+  field: string,
+  provenance: Extract<AdminIssueProvenance, { kind: 'active' }>,
+) {
+  assert(object(value), `${field} must be an object`)
+  assertReceiptContext(value, field, provenance)
+  sha(value.headSha, `${field}.headSha`)
+  sha256(value.requiredSetSha256, `${field}.requiredSetSha256`)
+  isoTimestamp(value.observedAt, `${field}.observedAt`)
+  assert(Array.isArray(value.runs) && value.runs.length > 0, `${field}.runs must be non-empty`)
+  for (const [index, run] of value.runs.entries()) {
+    assert(object(run), `${field}.runs[${index}] must be an object`)
+    nonEmptyString(run.name, `${field}.runs[${index}].name`)
+    positiveInteger(run.appId, `${field}.runs[${index}].appId`)
+    positiveInteger(run.checkRunId, `${field}.runs[${index}].checkRunId`)
+    assert(run.conclusion === 'success', `${field}.runs[${index}].conclusion must be success`)
+    isoTimestamp(run.completedAt, `${field}.runs[${index}].completedAt`)
+  }
+}
+
+function assertProvenance(value: unknown, field: string) {
+  assert(object(value), `${field} must be an object`)
+  if (value.kind === 'none') return
+  if (value.kind === 'legacy-untrusted') {
+    assert(value.reason === 'v1-missing-exact-provenance', `${field}.reason is invalid`)
+    isoTimestamp(value.migratedAt, `${field}.migratedAt`)
+    for (const key of ['observedBaseSha', 'observedHeadSha', 'observedMergeSha'] as const) {
+      if (value[key] !== undefined) sha(value[key], `${field}.${key}`)
+    }
+    return
+  }
+  assert(value.kind === 'active', `${field}.kind is invalid`)
+  const provenance = value as Extract<AdminIssueProvenance, { kind: 'active' }>
+  nonEmptyString(provenance.epoch, `${field}.epoch`)
+  positiveInteger(provenance.generation, `${field}.generation`)
+  nonNegativeInteger(provenance.revision, `${field}.revision`)
+  sha(provenance.preparedBaseSha, `${field}.preparedBaseSha`)
+  nonNegativeInteger(provenance.resyncAttempts, `${field}.resyncAttempts`)
+  if (provenance.candidate) {
+    sha(provenance.candidate.headSha, `${field}.candidate.headSha`)
+    sha(provenance.candidate.treeSha, `${field}.candidate.treeSha`)
+    sha(provenance.candidate.targetBaseSha, `${field}.candidate.targetBaseSha`)
+    if (provenance.candidate.expectedRemoteHeadSha) {
+      sha(
+        provenance.candidate.expectedRemoteHeadSha,
+        `${field}.candidate.expectedRemoteHeadSha`,
+      )
+    }
+    assertDiffReceipt(provenance.candidate.diff, `${field}.candidate.diff`, provenance)
+    assert(
+      provenance.candidate.diff.baseSha === provenance.candidate.targetBaseSha &&
+      provenance.candidate.diff.mergeBaseSha === provenance.candidate.targetBaseSha &&
+      provenance.candidate.diff.headSha === provenance.candidate.headSha &&
+      provenance.candidate.diff.treeSha === provenance.candidate.treeSha,
+      `${field}.candidate.diff does not match the candidate`,
+    )
+    if (provenance.candidate.validation) {
+      assertValidationReceipt(
+        provenance.candidate.validation,
+        `${field}.candidate.validation`,
+        provenance,
+      )
+      assert(
+        provenance.candidate.validation.headSha === provenance.candidate.headSha &&
+        provenance.candidate.validation.treeSha === provenance.candidate.treeSha &&
+        provenance.candidate.validation.diffManifestSha256 ===
+          provenance.candidate.diff.manifestSha256,
+        `${field}.candidate.validation does not match the candidate`,
+      )
+    }
+    if (provenance.candidate.checks) {
+      assertChecksReceipt(provenance.candidate.checks, `${field}.candidate.checks`, provenance)
+      assert(
+        provenance.candidate.validation &&
+        provenance.candidate.checks.headSha === provenance.candidate.headSha,
+        `${field}.candidate.checks do not match a validated candidate`,
+      )
+    }
+  }
+  if (provenance.transition) {
+    const transition = provenance.transition
+    assertReceiptContext(transition as unknown as Record<string, unknown>, `${field}.transition`, provenance)
+    nonEmptyString(transition.id, `${field}.transition.id`)
+    positiveInteger(transition.attempt, `${field}.transition.attempt`)
+    sha(transition.fromHeadSha, `${field}.transition.fromHeadSha`)
+    sha(transition.fromTreeSha, `${field}.transition.fromTreeSha`)
+    sha(transition.fromBaseSha, `${field}.transition.fromBaseSha`)
+    sha(transition.targetBaseSha, `${field}.transition.targetBaseSha`)
+    if (transition.expectedRemoteHeadSha) {
+      sha(transition.expectedRemoteHeadSha, `${field}.transition.expectedRemoteHeadSha`)
+    }
+    if (transition.toHeadSha) sha(transition.toHeadSha, `${field}.transition.toHeadSha`)
+    if (transition.toTreeSha) sha(transition.toTreeSha, `${field}.transition.toTreeSha`)
+    isoTimestamp(transition.startedAt, `${field}.transition.startedAt`)
+    assert(
+      [
+        'intent',
+        'local-created',
+        'validated',
+        'pushed',
+        'confirmed',
+        'conflict-observed',
+        'aborted',
+        'failed',
+        'quarantined',
+      ].includes(transition.stage),
+      `${field}.transition.stage is invalid`,
+    )
+    if (transition.provisionalDiff) {
+      assertDiffReceipt(transition.provisionalDiff, `${field}.transition.provisionalDiff`, provenance)
+      assert(
+        transition.toHeadSha === transition.provisionalDiff.headSha &&
+        transition.toTreeSha === transition.provisionalDiff.treeSha &&
+        transition.targetBaseSha === transition.provisionalDiff.baseSha,
+        `${field}.transition.provisionalDiff does not match the target`,
+      )
+    }
+    if (transition.provisionalValidation) {
+      assertValidationReceipt(
+        transition.provisionalValidation,
+        `${field}.transition.provisionalValidation`,
+        provenance,
+      )
+      assert(
+        transition.provisionalDiff &&
+        transition.provisionalValidation.headSha === transition.provisionalDiff.headSha &&
+        transition.provisionalValidation.treeSha === transition.provisionalDiff.treeSha &&
+        transition.provisionalValidation.diffManifestSha256 ===
+          transition.provisionalDiff.manifestSha256,
+        `${field}.transition.provisionalValidation does not match the target diff`,
+      )
+    }
+  }
+  if (provenance.merge) {
+    const merge = provenance.merge
+    assertReceiptContext(merge as unknown as Record<string, unknown>, `${field}.merge`, provenance)
+    positiveInteger(merge.prNumber, `${field}.merge.prNumber`)
+    sha(merge.candidateHeadSha, `${field}.merge.candidateHeadSha`)
+    sha(merge.baseSha, `${field}.merge.baseSha`)
+    sha(merge.mergeSha, `${field}.merge.mergeSha`)
+    isoTimestamp(merge.mergedAt, `${field}.merge.mergedAt`)
+    isoTimestamp(merge.observedAt, `${field}.merge.observedAt`)
+    assert(
+      provenance.candidate?.checks &&
+      merge.candidateHeadSha === provenance.candidate.headSha &&
+      merge.baseSha === provenance.candidate.targetBaseSha,
+      `${field}.merge does not match a checked candidate`,
+    )
+  }
+  if (provenance.deployment) {
+    const deployment = provenance.deployment
+    assertReceiptContext(
+      deployment as unknown as Record<string, unknown>,
+      `${field}.deployment`,
+      provenance,
+    )
+    sha(deployment.mergeSha, `${field}.deployment.mergeSha`)
+    sha(deployment.workflowHeadSha, `${field}.deployment.workflowHeadSha`)
+    sha(deployment.sourceSha, `${field}.deployment.sourceSha`)
+    sha(deployment.deployedSha, `${field}.deployment.deployedSha`)
+    sha256(deployment.receiptHash, `${field}.deployment.receiptHash`)
+    positiveInteger(deployment.workflowRunId, `${field}.deployment.workflowRunId`)
+    positiveInteger(deployment.workflowRunAttempt, `${field}.deployment.workflowRunAttempt`)
+    nonEmptyString(deployment.disposition, `${field}.deployment.disposition`)
+    assert(
+      provenance.merge &&
+      deployment.mergeSha === provenance.merge.mergeSha &&
+      deployment.workflowHeadSha === provenance.merge.mergeSha &&
+      deployment.sourceSha === provenance.merge.mergeSha,
+      `${field}.deployment does not match the verified merge`,
+    )
+  }
+  if (provenance.quarantine) {
+    nonEmptyString(provenance.quarantine.reason, `${field}.quarantine.reason`)
+    isoTimestamp(provenance.quarantine.detectedAt, `${field}.quarantine.detectedAt`)
+    sha256(provenance.quarantine.diagnosticsSha256, `${field}.quarantine.diagnosticsSha256`)
+  }
+}
+
+export function assertAdminIssueControllerState(
+  value: unknown,
+): asserts value is AdminIssueControllerState {
+  assert(object(value), 'Controller state must be an object')
+  assert(value.version === ADMIN_ISSUE_STATE_VERSION, `Unsupported controller state version ${value.version}`)
+  isoTimestamp(value.baselineCompletedAt, 'state.baselineCompletedAt')
+  isoTimestamp(value.updatedAt, 'state.updatedAt')
+  stringArray(value.ignoredUids, 'state.ignoredUids')
+  if (value.activeUid !== undefined) nonEmptyString(value.activeUid, 'state.activeUid')
+  assert(object(value.issues), 'state.issues must be an object')
+  for (const [uid, rawRecord] of Object.entries(value.issues)) {
+    assert(object(rawRecord), `state.issues.${uid} must be an object`)
+    assert(rawRecord.uid === uid, `state.issues.${uid}.uid must match its map key`)
+    nonEmptyString(rawRecord.title, `state.issues.${uid}.title`)
+    nonEmptyString(rawRecord.issueUrl, `state.issues.${uid}.issueUrl`)
+    positiveInteger(rawRecord.issueNumber, `state.issues.${uid}.issueNumber`)
+    positiveInteger(rawRecord.generation, `state.issues.${uid}.generation`)
+    nonNegativeInteger(rawRecord.inputRevision, `state.issues.${uid}.inputRevision`)
+    nonNegativeInteger(rawRecord.processedRevision, `state.issues.${uid}.processedRevision`)
+    assert(
+      Number(rawRecord.processedRevision) <= Number(rawRecord.inputRevision),
+      `state.issues.${uid}.processedRevision exceeds inputRevision`,
+    )
+    assert(
+      typeof rawRecord.phase === 'string' && ADMIN_ISSUE_PHASES.has(rawRecord.phase as AdminIssuePhase),
+      `state.issues.${uid}.phase is invalid`,
+    )
+    assert(Array.isArray(rawRecord.inputs), `state.issues.${uid}.inputs must be an array`)
+    assert(object(rawRecord.receipts), `state.issues.${uid}.receipts must be an object`)
+    assert(
+      Object.values(rawRecord.receipts).every((receipt) => typeof receipt === 'string'),
+      `state.issues.${uid}.receipts must contain only strings`,
+    )
+    if (rawRecord.pr !== undefined) {
+      assert(object(rawRecord.pr), `state.issues.${uid}.pr must be an object`)
+      positiveInteger(rawRecord.pr.number, `state.issues.${uid}.pr.number`)
+      nonEmptyString(rawRecord.pr.url, `state.issues.${uid}.pr.url`)
+      assert(
+        rawRecord.pr.headSha === undefined && rawRecord.pr.mergeSha === undefined,
+        `state.issues.${uid}.pr cannot contain legacy authorization SHAs`,
+      )
+    }
+    assertProvenance(rawRecord.provenance, `state.issues.${uid}.provenance`)
+    if (object(rawRecord.provenance) && rawRecord.provenance.kind === 'active') {
+      assert(
+        rawRecord.provenance.generation === rawRecord.generation,
+        `state.issues.${uid}.provenance generation does not match the issue`,
+      )
+    }
+  }
+}
+
+export function migrateAdminIssueControllerState(
+  value: unknown,
+  migratedAt: string,
+): AdminIssueControllerState {
+  assert(object(value), 'Controller state must be an object')
+  assert(value.version === 1, `Cannot migrate controller state version ${value.version}`)
+  isoTimestamp(value.baselineCompletedAt, 'state.baselineCompletedAt')
+  isoTimestamp(value.updatedAt, 'state.updatedAt')
+  stringArray(value.ignoredUids, 'state.ignoredUids')
+  assert(object(value.issues), 'state.issues must be an object')
+  const migrated = JSON.parse(JSON.stringify(value)) as Record<string, unknown>
+  const migratedIssues = migrated.issues as Record<string, Record<string, unknown>>
+  for (const [uid, record] of Object.entries(migratedIssues)) {
+    assert(object(record), `state.issues.${uid} must be an object`)
+    assert(record.uid === uid, `state.issues.${uid}.uid must match its map key`)
+    const legacyPr = object(record.pr) ? record.pr : undefined
+    const observedBaseSha = typeof record.baseSha === 'string' && SHA_PATTERN.test(record.baseSha)
+      ? record.baseSha
+      : undefined
+    const observedHeadSha = typeof legacyPr?.headSha === 'string' && SHA_PATTERN.test(legacyPr.headSha)
+      ? legacyPr.headSha
+      : undefined
+    const observedMergeSha = typeof legacyPr?.mergeSha === 'string' && SHA_PATTERN.test(legacyPr.mergeSha)
+      ? legacyPr.mergeSha
+      : undefined
+    const receipts = object(record.receipts) ? record.receipts : {}
+    const hasAuthorizationReceipt = [
+      'validatedAt',
+      'validatedWorkerInput',
+      'checksPassedAt',
+      'mergedAt',
+      'deployedAt',
+    ].some((key) => typeof receipts[key] === 'string')
+    const terminalOrPristine = record.phase === 'completed' || (
+      record.phase === 'queued' &&
+      record.branch === undefined &&
+      record.worktreePath === undefined &&
+      record.pr === undefined &&
+      !hasAuthorizationReceipt
+    )
+    record.provenance = terminalOrPristine
+      ? { kind: 'none' }
+      : {
+        kind: 'legacy-untrusted',
+        migratedAt,
+        reason: 'v1-missing-exact-provenance',
+        ...(observedBaseSha ? { observedBaseSha } : {}),
+        ...(observedHeadSha ? { observedHeadSha } : {}),
+        ...(observedMergeSha ? { observedMergeSha } : {}),
+      }
+    delete record.baseSha
+    if (legacyPr) {
+      record.pr = {
+        number: legacyPr.number,
+        url: legacyPr.url,
+      }
+    }
+  }
+  migrated.version = ADMIN_ISSUE_STATE_VERSION
+  migrated.updatedAt = migratedAt
+  assertAdminIssueControllerState(migrated)
+  return migrated
+}
+
+export function assertCandidateAuthorized(record: AdminIssueRecord, requireChecks = false) {
+  assert(record.provenance.kind === 'active', 'Issue does not have active provenance')
+  const provenance = record.provenance
+  assert(provenance.generation === record.generation, 'Provenance generation does not match issue')
+  assert(provenance.revision === record.processedRevision, 'Provenance revision does not match issue')
+  assert(!provenance.transition, 'Issue has an unfinished head transition')
+  assert(!provenance.quarantine, 'Issue provenance is quarantined')
+  const candidate = provenance.candidate
+  assert(candidate, 'Issue does not have a committed candidate')
+  const diff = candidate.diff
+  assert(diff.epoch === provenance.epoch, 'Candidate diff epoch does not match provenance')
+  assert(diff.generation === provenance.generation, 'Candidate diff generation does not match provenance')
+  assert(diff.revision === provenance.revision, 'Candidate diff revision does not match provenance')
+  assert(diff.baseSha === candidate.targetBaseSha, 'Candidate diff base does not match target base')
+  assert(diff.mergeBaseSha === candidate.targetBaseSha, 'Candidate merge base does not match target base')
+  assert(diff.headSha === candidate.headSha, 'Candidate diff head does not match candidate')
+  assert(diff.treeSha === candidate.treeSha, 'Candidate diff tree does not match candidate')
+  const validation = candidate.validation
+  assert(validation, 'Candidate has not passed trusted validation')
+  assert(validation.epoch === provenance.epoch, 'Validation epoch does not match provenance')
+  assert(validation.generation === provenance.generation, 'Validation generation does not match provenance')
+  assert(validation.revision === provenance.revision, 'Validation revision does not match provenance')
+  assert(validation.headSha === candidate.headSha, 'Validation head does not match candidate')
+  assert(validation.treeSha === candidate.treeSha, 'Validation tree does not match candidate')
+  assert(
+    validation.diffManifestSha256 === diff.manifestSha256,
+    'Validation diff does not match candidate diff',
+  )
+  if (requireChecks) {
+    const checks = candidate.checks
+    assert(checks, 'Candidate has not passed required checks')
+    assert(checks.epoch === provenance.epoch, 'Checks epoch does not match provenance')
+    assert(checks.generation === provenance.generation, 'Checks generation does not match provenance')
+    assert(checks.revision === provenance.revision, 'Checks revision does not match provenance')
+    assert(checks.headSha === candidate.headSha, 'Checks head does not match candidate')
+  }
+  return { candidate, provenance }
+}
+
+export function assertFinalizationAuthorized(record: AdminIssueRecord) {
+  const { candidate, provenance } = assertCandidateAuthorized(record, true)
+  assert(record.pr, 'Issue does not have a pull request')
+  const merge = provenance.merge
+  assert(merge, 'Issue does not have a verified merge')
+  assert(merge.epoch === provenance.epoch, 'Merge epoch does not match provenance')
+  assert(merge.generation === provenance.generation, 'Merge generation does not match provenance')
+  assert(merge.revision === provenance.revision, 'Merge revision does not match provenance')
+  assert(merge.prNumber === record.pr.number, 'Merge pull request does not match issue')
+  assert(merge.candidateHeadSha === candidate.headSha, 'Merge candidate does not match provenance')
+  assert(merge.baseSha === candidate.targetBaseSha, 'Merge base does not match candidate')
+  const deployment = provenance.deployment
+  assert(deployment, 'Issue does not have a verified deployment')
+  assert(deployment.epoch === provenance.epoch, 'Deployment epoch does not match provenance')
+  assert(deployment.generation === provenance.generation, 'Deployment generation does not match provenance')
+  assert(deployment.revision === provenance.revision, 'Deployment revision does not match provenance')
+  assert(deployment.mergeSha === merge.mergeSha, 'Deployment merge does not match verified merge')
+  assert(deployment.workflowHeadSha === merge.mergeSha, 'Deployment workflow head does not match merge')
+  assert(deployment.sourceSha === merge.mergeSha, 'Deployment source does not match merge')
+  return { candidate, deployment, merge, provenance }
+}
+
 export function adminIssueMarker(uid: string) {
   return `<!-- ${ADMIN_ISSUE_MARKER_PREFIX}${uid} -->`
 }
@@ -257,7 +855,7 @@ export function baselineAdminIssueState(
     ignoredUids: normalizedUids,
     issues: {},
     updatedAt: completedAt,
-    version: 1,
+    version: ADMIN_ISSUE_STATE_VERSION,
   }
 }
 
@@ -265,14 +863,26 @@ export function beginAdminIssueGeneration(record: AdminIssueRecord, updatedAt: s
   record.generation += 1
   record.branch = undefined
   record.worktreePath = undefined
-  record.baseSha = undefined
   record.pr = undefined
+  record.deployment = undefined
+  record.provenance = { kind: 'none' }
   record.lastOutcome = undefined
   record.repairAttempts = 0
   record.phase = 'queued'
   record.updatedAt = updatedAt
-  delete record.receipts.awaitingIosVerificationAt
-  delete record.receipts.iosVerifiedAt
+  for (const receipt of [
+    'awaitingIosVerificationAt',
+    'checksPassedAt',
+    'deployedAt',
+    'deploymentRunUrl',
+    'iosVerifiedAt',
+    'mergedAt',
+    'prOpenedAt',
+    'validatedAt',
+    'validatedWorkerInput',
+  ]) {
+    delete record.receipts[receipt]
+  }
 }
 
 export function markIssueInputsProcessed(
@@ -484,6 +1094,7 @@ export function formatCompletionComment(input: {
 }) {
   const outcome = input.issue.lastOutcome
   assert(outcome?.decision === 'ready_for_pr', 'Completion requires a ready_for_pr outcome')
+  const { merge } = assertFinalizationAuthorized(input.issue)
   const changes = outcome.changeSummary.map((entry) => `- ${entry}`).join('\n')
   const tests = outcome.tests.map((entry) => `- \`${entry.command}\` — ${entry.result}`).join('\n')
   const ios = outcome.iosFollowUp.required
@@ -503,7 +1114,7 @@ ${changes}
 ${tests}
 
 **Pull request:** ${input.issue.pr?.url}
-**Merged commit:** \`${input.issue.pr?.mergeSha ?? input.issue.pr?.headSha}\`
+**Merged commit:** \`${merge.mergeSha}\`
 **Deployment:** ${input.deployment.url}
 **Production result:** ${input.deployment.disposition} at \`${input.deployment.deployedSha}\`${ios}`
 }
