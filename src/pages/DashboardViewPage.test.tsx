@@ -8600,10 +8600,11 @@ describe('DashboardViewPage', () => {
     expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
     expect(within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
-    expect(within(dialog).getAllByLabelText('Dining Room Failed')).toHaveLength(1)
-    expect(within(dialog).queryByRole('button', { name: 'Show Dining Room History' })).not.toBeInTheDocument()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Office History' }))
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Show Office Technical Vacuum Diagnostics' }))
+    const detail = dialog.querySelector<HTMLElement>('[data-vacuum-outcome-detail="true"]')!
+    expect(within(detail).getByRole('group', {
+      name: "Dining Room Failed The mop dock's clean-water tank was empty; refill it.",
+    })).toBeInTheDocument()
+    expect(within(detail).queryByRole('button')).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Vacuum Controls' }))
@@ -8630,9 +8631,11 @@ describe('DashboardViewPage', () => {
 
     fireEvent.click(summary)
 
-    const office = within(dialog).getByLabelText('Office Completion Unverified')
+    const office = within(dialog).getByRole('group', {
+      name: 'Office Completion Unverified Vacuuming completion could not be verified.',
+    })
     expect(office).toHaveTextContent('Vacuuming completion could not be verified.')
-    expect(office).toHaveTextContent('Vacuuming remains due.')
+    expect(office).not.toHaveTextContent('Vacuuming remains due.')
     expect(office).not.toHaveTextContent('Could not clean')
     expect(mockCallServiceCalls).toEqual([])
   })
@@ -8689,7 +8692,9 @@ describe('DashboardViewPage', () => {
 
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
     expect(within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })).toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Dining Room Failed')).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', {
+      name: "Dining Room Failed The mop dock's clean-water tank was empty; refill it.",
+    })).toBeInTheDocument()
     expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Back to Vacuum Controls' }))

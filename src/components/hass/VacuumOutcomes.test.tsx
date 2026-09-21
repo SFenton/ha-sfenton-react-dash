@@ -146,83 +146,89 @@ describe('VacuumOutcomeOverview', () => {
 })
 
 describe('VacuumOutcomeDetail', () => {
-  it('groups one authoritative row per room under static separators', () => {
+  it('renders one noninteractive status chip per room in backend order', () => {
     render(<VacuumOutcomeDetail contract={cloneContract()} vacuum={vacuum} />)
 
-    const groupHeaders = [...document.querySelectorAll<HTMLElement>('[data-group] > div:first-child')]
-    expect(groupHeaders.map((header) => header.textContent)).toEqual([
-      'Error',
-      'Interrupted',
-      'Work Still Due',
-      'Completed',
+    const detail = document.querySelector('[data-vacuum-outcome-detail="true"]')
+    const grid = screen.getByRole('group', { name: 'Main Floor Cleaning Report' })
+    const chips = [...document.querySelectorAll<HTMLElement>('[data-vacuum-outcome-chip="true"]')]
+
+    expect(detail).toHaveAttribute('data-modal-detail-autofocus', 'true')
+    expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'uniform')
+    expect(grid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+    expect(chips.map((chip) => chip.dataset.roomId)).toEqual([
+      'dining_room',
+      'kitchen',
+      'master_bathroom',
+      'guest_bathroom',
+      'gym',
+      'office',
+      'guest_room',
+      'master_bedroom_closet',
+      'hallway',
     ])
-    const failed = screen.getByLabelText('Dining Room Failed')
-    expect(failed).toBeInTheDocument()
-    expect(within(failed).getByText('Failed')).toHaveClass(/visuallyHidden/)
-    expect(within(failed).queryByRole('button')).not.toBeInTheDocument()
-    expect(within(failed).queryByText('Room Event History')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Hallway Interrupted')).toBeInTheDocument()
-    expect(screen.getByLabelText('Kitchen Not Attempted')).toBeInTheDocument()
-    expect(screen.getByLabelText('Master Bedroom Closet Completed')).toBeInTheDocument()
-    const interrupted = screen.getByLabelText('Hallway Interrupted')
-    expect(within(interrupted).getByText('Interrupted')).toHaveClass(/visuallyHidden/)
+    expect(chips.every((chip) => chip.dataset.actionKind === 'state')).toBe(true)
+    expect(document.querySelector('[data-group]')).not.toBeInTheDocument()
+    expect(document.querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+    expect(screen.queryByText('Room Event History')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cleaning Evidence')).not.toBeInTheDocument()
+    expect(screen.queryByText('Vacuum Diagnostics')).not.toBeInTheDocument()
+    expect(within(detail as HTMLElement).queryByRole('button')).not.toBeInTheDocument()
+
+    const failed = document.querySelector<HTMLElement>('[data-room-id="dining_room"]')!
+    const failedPill = within(failed).getByRole('group')
+    expect(failedPill).toHaveAttribute('data-tone', 'danger')
+    expect(failedPill).toHaveAttribute('data-icon', 'mdi:alert-circle')
+    expect(failedPill).toHaveAccessibleName(
+      "Dining Room Failed The mop dock's clean-water tank was empty; refill it.",
+    )
+
+    const deferred = document.querySelector<HTMLElement>('[data-room-id="kitchen"]')!
+    expect(within(deferred).getByRole('group')).toHaveAttribute('data-tone', 'warning')
+    expect(within(deferred).getByRole('group')).toHaveAttribute('data-icon', 'mdi:clock-outline')
+    expect(deferred).toHaveTextContent("The mop dock's clean-water tank was empty; refill it.")
+    expect(deferred).not.toHaveTextContent('Vacuuming and mopping were deferred before any attempt.')
+
+    const completed = document.querySelector<HTMLElement>('[data-room-id="gym"]')!
+    expect(within(completed).getByRole('group')).toHaveAttribute('data-tone', 'ok')
+    expect(within(completed).getByRole('group')).toHaveAttribute('data-icon', 'mdi:check-circle')
+    expect(completed).toHaveTextContent('Vacuuming completed for the room.')
+
+    const interrupted = document.querySelector<HTMLElement>('[data-room-id="hallway"]')!
+    expect(within(interrupted).getByRole('group')).toHaveAttribute('data-tone', 'warning')
+    expect(within(interrupted).getByRole('group')).toHaveAttribute('data-icon', 'mdi:pause-circle')
     expect(interrupted).toHaveTextContent('Cleaning was interrupted because someone returned home.')
-    expect(interrupted).not.toHaveTextContent('The vacuum-only attempt was interrupted before completion.')
-    expect(interrupted).not.toHaveTextContent('Vacuuming remains due.')
-    expect(within(interrupted).queryByRole('button')).not.toBeInTheDocument()
-    expect(within(interrupted).queryByText('Room Event History')).not.toBeInTheDocument()
-    expect(within(screen.getByLabelText('Gym Completed')).getByText('Completed')).toHaveClass(/visuallyHidden/)
-    expect(document.querySelector('[data-vacuum-outcome-detail="true"]')).toHaveAttribute('data-modal-detail-autofocus', 'true')
-    expect(document.querySelectorAll('[data-group] > button')).toHaveLength(0)
-    expect(document.querySelector('[data-modal-disclosure="right-chevron"]')).not.toBeInTheDocument()
   })
 
-  it('renders v2 uncertainty, partial credit, and structured evidence without treating uncertainty as failure', () => {
+  it('uses one concise status detail for uncertainty and partial completion', () => {
     render(<VacuumOutcomeDetail contract={parsedContract(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD)} vacuum={vacuum} />)
 
-    const groupHeaders = [...document.querySelectorAll<HTMLElement>('[data-group] > div:first-child')]
-    expect(groupHeaders.map((header) => header.textContent)).toEqual([
-      'Completion Unverified',
-      'Work Still Due',
-    ])
-
-    const gym = screen.getByLabelText('Gym Completion Unverified')
-    expect(gym).toHaveAttribute('data-status', 'uncertain')
-    expect(gym).toHaveTextContent('Vacuuming completion could not be verified.')
+    const gym = document.querySelector<HTMLElement>('[data-room-id="gym"]')!
+    expect(within(gym).getByRole('group')).toHaveAttribute('data-tone', 'warning')
+    expect(within(gym).getByRole('group')).toHaveAttribute('data-icon', 'mdi:help-circle-outline')
+    expect(gym).toHaveTextContent('Completion Unverified')
     expect(gym).toHaveTextContent('Observed 1 of 2 requested iterations.')
-    expect(within(gym).getAllByText('Physical Work')[0]).toBeInTheDocument()
-    expect(within(gym).getAllByText('Substantial')[0]).toBeInTheDocument()
-    expect(gym).toHaveTextContent('Vacuuming remains due.')
-    expect(gym).not.toHaveTextContent('Failed')
+    expect(gym).not.toHaveTextContent('Vacuuming completion could not be verified.')
+    expect(gym).not.toHaveTextContent('Vacuuming remains due.')
+    expect(gym).not.toHaveTextContent('Physical Work')
 
-    const gymEvidence = within(gym).getByRole('button', { name: 'Show Gym Cleaning Evidence' })
-    expect(gymEvidence).toHaveAttribute('data-action-kind', 'command')
-    fireEvent.click(gymEvidence)
-    expect(within(gym).getByText('Duration').nextElementSibling).toHaveTextContent(
-      'Passed • Observed: 1,500 seconds • Minimum: 120 seconds • Reset Count: 1',
-    )
-    expect(within(gym).getByText('Iterations').nextElementSibling).toHaveTextContent(
-      'Unverified • Observed: 1 • Requested: 2',
-    )
-    expect(within(gym).getByText('Completion').nextElementSibling).toHaveTextContent('Uncertain')
-
-    const office = screen.getByLabelText('Office Completion Unverified')
+    const office = document.querySelector<HTMLElement>('[data-room-id="office"]')!
     expect(office).toHaveTextContent('Telemetry recovery was not coherent within 300 seconds.')
-    fireEvent.click(within(office).getByRole('button', { name: 'Show Office Cleaning Evidence' }))
-    expect(within(office).getByText('Duration').nextElementSibling).toHaveTextContent(
-      'Passed Lower Bound • Lower Bound: 1,440 seconds • Minimum: 120 seconds • Reset Count: 1 • Attribution Uncertain',
-    )
-    expect(within(office).getByText('Telemetry').nextElementSibling).toHaveTextContent('Unresolved')
-    expect(within(office).getByText('Source Outage Duration').nextElementSibling).toHaveTextContent('258 seconds')
+    expect(office).not.toHaveTextContent('Passed Lower Bound')
+    expect(office).not.toHaveTextContent('Source Outage Duration')
 
-    const livingRoom = screen.getByLabelText('Living Room Partially Complete')
-    expect(livingRoom).toHaveTextContent('The vacuuming and mopping attempt was partially completed.')
-    expect(livingRoom).toHaveTextContent('Home Assistant credited vacuuming; work may remain.')
+    const livingRoom = document.querySelector<HTMLElement>('[data-room-id="living_room"]')!
+    expect(within(livingRoom).getByRole('group')).toHaveAttribute('data-tone', 'warning')
+    expect(within(livingRoom).getByRole('group')).toHaveAttribute('data-icon', 'mdi:progress-check')
+    expect(livingRoom).toHaveTextContent('Partially Complete')
     expect(livingRoom).toHaveTextContent('Mopping remains due.')
-    expect(livingRoom).not.toHaveTextContent('Failed')
+    expect(livingRoom).not.toHaveTextContent('Home Assistant credited vacuuming')
+    expect(livingRoom).not.toHaveTextContent("The mop dock's clean-water tank was empty")
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('presents an explicitly reconciled attempt as complete while retaining its diagnostic evidence and history', () => {
+  it('presents a reconciled attempt as a consistent completed chip', () => {
     const presentation = vacuumWhileAwayPresentation(
       { while_away_outcomes: structuredClone(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD) },
       { gym: 'session-v2:gym:attempt' },
@@ -231,75 +237,56 @@ describe('VacuumOutcomeDetail', () => {
 
     render(<VacuumOutcomeDetail contract={presentation.contract} vacuum={vacuum} />)
 
-    const gym = screen.getByLabelText('Gym Completed')
+    const gym = document.querySelector<HTMLElement>('[data-room-id="gym"]')!
     expect(gym).toHaveAttribute('data-reconciled', 'true')
+    expect(gym).toHaveAttribute('data-status', 'completed')
+    expect(within(gym).getByRole('group')).toHaveAttribute('data-tone', 'ok')
+    expect(gym).toHaveTextContent('Completed')
     expect(gym).toHaveTextContent('Vacuuming completed for the room.')
-    expect(within(gym).queryByText('Vacuuming remains due.')).not.toBeInTheDocument()
-    const retainedReason = within(gym).getByText('Observed 1 of 2 requested iterations.')
-    expect(retainedReason).not.toBeVisible()
-
-    fireEvent.click(within(gym).getByRole('button', { name: 'Show Gym Cleaning Evidence' }))
-    expect(within(gym).getByText('Completion').nextElementSibling).toHaveTextContent('Uncertain')
-    fireEvent.click(within(gym).getByRole('button', { name: 'Show Gym History' }))
-    expect(retainedReason).toBeVisible()
-    expect(screen.getByLabelText('Office Completion Unverified')).toBeInTheDocument()
+    expect(gym).not.toHaveTextContent('Observed 1 of 2 requested iterations.')
+    expect(gym).not.toHaveTextContent('Vacuuming remains due.')
   })
 
-  it('renders current evidence-free v2 uncertainty without legacy or raw failure wording', () => {
-    render(<VacuumOutcomeDetail contract={parsedContract(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD)} vacuum={vacuum} />)
+  it('falls back to the safe primary outcome when a reason is unknown or optional evidence is malformed', () => {
+    const evidenceFree = parsedContract(EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD)
+    const view = render(<VacuumOutcomeDetail contract={evidenceFree} vacuum={vacuum} />)
 
-    const office = screen.getByLabelText('Office Completion Unverified')
+    const office = document.querySelector<HTMLElement>('[data-room-id="office"]')!
     expect(office).toHaveTextContent('Vacuuming completion could not be verified.')
-    expect(office).toHaveTextContent('Vacuuming remains due.')
-    expect(office).not.toHaveTextContent('Could not clean')
     expect(office).not.toHaveTextContent('The vacuum outcome reason was not recognized.')
-    expect(within(office).getByText('Floor completion time was unavailable during dock servicing after error sensor is unavailable')).not.toBeVisible()
-    expect(within(office).queryByRole('button', { name: /Cleaning Evidence/ })).not.toBeInTheDocument()
-  })
+    expect(office).not.toHaveTextContent('Floor completion time was unavailable during dock servicing after error sensor is unavailable')
 
-  it('keeps the core v2 outcome when only its optional evidence is malformed', () => {
     const payload = structuredClone(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD)
     const room = record(payload.rooms[0])
     const attempt = record(room.latest_attempt)
     record(record(attempt.evidence).duration).minimum = 'bad'
+    view.rerender(<VacuumOutcomeDetail contract={parsedContract(payload)} vacuum={vacuum} />)
 
-    render(<VacuumOutcomeDetail contract={parsedContract(payload)} vacuum={vacuum} />)
-
-    const gym = screen.getByLabelText('Gym Completion Unverified')
-    expect(gym).toHaveTextContent('Vacuuming completion could not be verified.')
-    expect(gym).toHaveTextContent('Evidence Unavailable')
-    expect(within(gym).queryByRole('button', { name: /Cleaning Evidence/ })).not.toBeInTheDocument()
+    const gym = document.querySelector<HTMLElement>('[data-room-id="gym"]')!
+    expect(gym).toHaveTextContent('Observed 1 of 2 requested iterations.')
+    expect(gym).not.toHaveTextContent('Evidence Unavailable')
   })
 
-  it('shows a full vacuum-and-mop failure as one cause plus concise remaining work', () => {
-    render(<VacuumOutcomeDetail contract={cloneContract()} vacuum={vacuum} />)
-
-    const row = screen.getByLabelText('Dining Room Failed')
-    const collapsed = row.children[1] as HTMLElement
-    expect(within(collapsed).queryByText('Vacuuming and mopping the room failed.')).not.toBeInTheDocument()
-    expect(within(collapsed).getAllByText("The mop dock's clean-water tank was empty; refill it.")).toHaveLength(1)
-    expect(within(collapsed).getByText('Vacuuming and mopping remain.')).toHaveClass(/errorOutstandingLine/)
-    expect(within(collapsed).queryByText('Combined vacuuming and mopping remain due.')).not.toBeInTheDocument()
-    expect(within(row).getByText('Failed')).toHaveClass(/visuallyHidden/)
-    expect(within(row).queryByRole('button')).not.toBeInTheDocument()
-    expect(within(row).queryByText('Room Event History')).not.toBeInTheDocument()
-  })
-
-  it('shows the completed and remaining operations when a failed room has partial cleaning credit', () => {
+  it('keeps failed rooms to one principal explanation even when partial credit exists', () => {
     const contract = contractForRooms(['dining_room'])
-    const room = contract.rooms[0]
-    room.credit = { operation: 'vacuum', status: 'partial' }
-    room.outstanding = { operation: 'mop', reason: room.outstanding?.reason ?? null }
+    const view = render(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
 
-    render(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
+    const fullFailure = document.querySelector<HTMLElement>('[data-room-id="dining_room"]')!
+    expect(fullFailure).toHaveTextContent("The mop dock's clean-water tank was empty; refill it.")
+    expect(fullFailure).not.toHaveTextContent('Vacuuming and mopping remain.')
+    expect(fullFailure).not.toHaveTextContent('Vacuuming and mopping the room failed.')
 
-    const row = screen.getByLabelText('Dining Room Failed')
-    expect(row).toHaveTextContent("The mop dock's clean-water tank was empty; refill it.")
-    expect(within(row).getByText('Vacuuming is complete; mopping remains.')).toHaveClass(/errorOutstandingLine/)
-    expect(row).not.toHaveTextContent('Mopping remains due.')
+    contract.rooms[0].credit = { operation: 'vacuum', status: 'partial' }
+    contract.rooms[0].outstanding = { operation: 'mop', reason: contract.rooms[0].outstanding?.reason ?? null }
+    view.rerender(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
+
+    const partialFailure = document.querySelector<HTMLElement>('[data-room-id="dining_room"]')!
+    expect(partialFailure).toHaveTextContent("The mop dock's clean-water tank was empty; refill it.")
+    expect(partialFailure).not.toHaveTextContent('Vacuuming is complete; mopping remains.')
+    expect(partialFailure).not.toHaveTextContent('Mopping remains due.')
   })
 
-  it('keeps a vacuum-only failure cause-only because the remaining work is implicit', () => {
+  it('keeps a vacuum-only failure concise and does not manufacture remaining-work copy', () => {
     const contract = contractForRooms(['office'])
     const room = contract.rooms[0]
     const failedEvent = contract.events[0]
@@ -316,145 +303,12 @@ describe('VacuumOutcomeDetail', () => {
 
     render(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
 
-    const office = screen.getByLabelText('Office Failed')
+    const office = document.querySelector<HTMLElement>('[data-room-id="office"]')!
     expect(office).toHaveTextContent('The auto-empty dock dust bag was full or its dust duct was blocked.')
     expect(office).not.toHaveTextContent('Vacuuming remains')
-    expect(within(office).queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('keeps Office completed while retaining its prior failed attempt in history', () => {
-    render(<VacuumOutcomeDetail contract={cloneContract()} vacuum={vacuum} />)
-
-    const office = screen.getByLabelText('Office Completed')
-    expect(within(office.children[1] as HTMLElement).getByText('Vacuuming completed for the room.')).toBeInTheDocument()
-    const history = within(office).getByRole('button', { name: 'Show Office History' })
-    fireEvent.click(history)
-    const events = within(office).getAllByRole('listitem')
-    expect(events).toHaveLength(2)
-    expect(events[0]).toHaveTextContent('Vacuuming the room without mopping failed.')
-    expect(events[0]).toHaveTextContent('The auto-empty dock dust bag was full or its dust duct was blocked.')
-    expect(events[1]).toHaveTextContent('Vacuuming completed for the room.')
-    const diagnostics = within(office).getByRole('button', { name: 'Show Office Technical Vacuum Diagnostics' })
-    expect(within(office).getByText('Auto-Empty Dock dust bag full or dust duct clogged')).not.toBeVisible()
-    fireEvent.click(diagnostics)
-    expect(within(office).getByText('Auto-Empty Dock dust bag full or dust duct clogged')).toBeVisible()
-  })
-
-  it('leaves a routine one-event completion as noninteractive state', () => {
-    render(<VacuumOutcomeDetail contract={contractForRooms(['gym'])} vacuum={vacuum} />)
-
-    const gym = screen.getByLabelText('Gym Completed')
-    expect(gym).toHaveAttribute('data-action-kind', 'state')
-    expect(within(gym).queryByRole('button')).not.toBeInTheDocument()
-  })
-
-  it('keeps an interrupted room to one truthful fallback sentence when no cause is available', () => {
-    const contract = contractForRooms(['hallway'])
-    const room = contract.rooms[0]
-    contract.events[0].reason = null
-    room.latest_attempt = { ...room.latest_attempt!, reason: null }
-    room.outstanding = { operation: 'vacuum', reason: null }
-
-    render(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
-
-    const hallway = screen.getByLabelText('Hallway Interrupted')
-    expect(hallway).toHaveTextContent('The vacuum-only attempt was interrupted before completion.')
-    expect(hallway).not.toHaveTextContent('Cleaning was interrupted because someone returned home.')
-    expect(hallway).not.toHaveTextContent('Vacuuming remains due.')
-    expect(within(hallway).queryByRole('button')).not.toBeInTheDocument()
-  })
-
-  it('renders fallback partial credit and distinct fallback failure reasons truthfully', () => {
-    const partial = contractForRooms(['dining_room'])
-    const partialRoom = partial.rooms[0]
-    const fallbackEvent = partial.events.find((event) => event.id === 'session-two:dining-room:attempt')!
-    if (fallbackEvent.type !== 'attempt') throw new Error('Expected attempt fixture')
-    fallbackEvent.attempt_mode = 'fallback_vacuum'
-    fallbackEvent.attempt_result = 'completed'
-    fallbackEvent.reason = null
-    partialRoom.status = 'partial'
-    partialRoom.credit = { operation: 'vacuum', status: 'partial' }
-    partialRoom.latest_attempt = {
-      event_id: fallbackEvent.id,
-      mode: 'fallback_vacuum',
-      reason: null,
-      result: 'completed',
-    }
-    partialRoom.outstanding = {
-      operation: 'mop',
-      reason: partial.events[0].reason,
-    }
-    partialRoom.reasons_coincide = false
-
-    const view = render(<VacuumOutcomeDetail contract={partial} vacuum={vacuum} />)
-    const partialRow = screen.getByLabelText('Dining Room Partially Complete')
-    expect(partialRow).toHaveTextContent('Fallback vacuuming completed for the room; mopping was not confirmed.')
-    expect(partialRow).toHaveTextContent('Mopping remains due.')
-
-    const failed = contractForRooms(['dining_room'])
-    const failedRoom = failed.rooms[0]
-    const failedEvent = failed.events.find((event) => event.id === 'session-two:dining-room:attempt')!
-    if (failedEvent.type !== 'attempt') throw new Error('Expected attempt fixture')
-    const unreachable = reason('navigation.room_unreachable')
-    failedEvent.attempt_mode = 'fallback_vacuum'
-    failedEvent.attempt_result = 'failed'
-    failedEvent.reason = unreachable
-    failedRoom.latest_attempt = {
-      event_id: failedEvent.id,
-      mode: 'fallback_vacuum',
-      reason: unreachable,
-      result: 'failed',
-    }
-    failedRoom.outstanding = {
-      operation: 'vacuum_mop',
-      reason: failed.events[1].reason,
-    }
-    failedRoom.reasons_coincide = false
-
-    view.rerender(<VacuumOutcomeDetail contract={failed} vacuum={vacuum} />)
-    const failedRow = screen.getByLabelText('Dining Room Failed')
-    expect(failedRow).toHaveTextContent('The vacuum could not reach the requested room.')
-    expect(failedRow).toHaveTextContent('Vacuuming and mopping remain.')
-    expect(failedRow).not.toHaveTextContent('Attempt Reason')
-    expect(failedRow).not.toHaveTextContent('Work Blocker')
-    expect(failedRow).not.toHaveTextContent("The mop dock's clean-water tank was empty; refill it.")
-  })
-
-  it('deduplicates different raw reasons that render to the same household sentence', () => {
-    const contract = contractForRooms(['dining_room'])
-    const room = contract.rooms[0]
-    const resultReason = { ...room.latest_attempt!.reason!, raw: 'Firmware clean-water empty A' }
-    const outstandingReason = { ...room.outstanding!.reason!, raw: 'Firmware clean-water empty B' }
-    room.latest_attempt = { ...room.latest_attempt!, reason: resultReason }
-    room.outstanding = { ...room.outstanding!, reason: outstandingReason }
-    room.reasons_coincide = false
-
-    render(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
-    const collapsed = screen.getByLabelText('Dining Room Failed').children[1] as HTMLElement
-    expect(within(collapsed).getAllByText("The mop dock's clean-water tank was empty; refill it.")).toHaveLength(1)
-    expect(within(collapsed).queryByText('Attempt Reason')).not.toBeInTheDocument()
-    expect(within(collapsed).queryByText('Work Blocker')).not.toBeInTheDocument()
-  })
-
-  it('uses the latest failed-attempt cause when the outstanding reason differs', () => {
-    const contract = contractForRooms(['dining_room'])
-    const room = contract.rooms[0]
-    const resultReason = reason('verification.duration_below_minimum', { minimum_seconds: 120, observed_seconds: 60 })
-    const outstandingReason = reason('verification.duration_below_minimum', { minimum_seconds: 120, observed_seconds: 30 })
-    room.latest_attempt = { ...room.latest_attempt!, reason: resultReason }
-    room.outstanding = { ...room.outstanding!, reason: outstandingReason }
-    room.reasons_coincide = false
-
-    render(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
-    const collapsed = screen.getByLabelText('Dining Room Failed').children[1] as HTMLElement
-    expect(collapsed).toHaveTextContent('Room cleaning lasted 60 seconds, below the required minimum of 120 seconds.')
-    expect(collapsed).toHaveTextContent('Vacuuming and mopping remain.')
-    expect(collapsed).not.toHaveTextContent('Attempt Reason')
-    expect(collapsed).not.toHaveTextContent('Work Blocker')
-    expect(collapsed).not.toHaveTextContent('Room cleaning lasted 30 seconds, below the required minimum of 120 seconds.')
-  })
-
-  it('keeps an unknown failed reason household-safe without exposing raw diagnostics', () => {
+  it('uses the primary attempt sentence instead of raw or parser-oriented unknown reason copy', () => {
     const contract = contractForRooms(['dining_room'])
     const room = contract.rooms[0]
     const event = contract.events.find((candidate) => candidate.id === room.latest_attempt?.event_id)!
@@ -465,32 +319,19 @@ describe('VacuumOutcomeDetail', () => {
     room.reasons_coincide = true
 
     render(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
-    const row = screen.getByLabelText('Dining Room Failed')
-    expect(row).toHaveTextContent('The vacuum outcome reason was not recognized.')
-    expect(within(row).queryByText(unknown.raw)).not.toBeInTheDocument()
-    expect(within(row).queryByRole('button')).not.toBeInTheDocument()
+
+    const chip = document.querySelector<HTMLElement>('[data-room-id="dining_room"]')!
+    expect(chip).toHaveTextContent('Vacuuming and mopping the room failed.')
+    expect(chip).not.toHaveTextContent('The vacuum outcome reason was not recognized.')
+    expect(chip).not.toHaveTextContent(unknown.raw)
   })
 
-  it('uses 44px command targets and defines no press-only or chevron treatment', () => {
-    expect(styles).toMatch(/\.historyButton\s*\{[^}]*min-height:\s*44px;/s)
-    expect(styles).toMatch(/\.diagnosticsButton\s*\{[^}]*min-height:\s*44px;/s)
-    expect(styles).toMatch(/\.evidenceButton\s*\{[^}]*min-height:\s*44px;/s)
-    expect(styles).toMatch(/\.protocolButton\s*\{[^}]*min-height:\s*44px;/s)
-    expect(styles).toMatch(/\.attemptBadge\s*\{[^}]*min-width:\s*22px;[^}]*padding:\s*0 5px;/s)
-    expect(styles).toMatch(/\.errorOutstandingLine\s*\{[^}]*color:\s*var\(--color-text\);/s)
-    expect(styles).not.toMatch(/\.groupButton/)
+  it('defines only the status-chip layout for room outcomes', () => {
+    expect(styles).toMatch(/\.outcomeGrid\s*\{[^}]*width:\s*100%;/s)
+    expect(styles).toMatch(/\.roomChip\s*\{[^}]*min-width:\s*0;[^}]*height:\s*100%;/s)
+    expect(styles).not.toMatch(/\.roomRow|\.groupHeader|\.historyButton|\.evidenceButton|\.diagnosticsButton/)
     expect(styles).not.toMatch(/:active/)
     expect(styles).not.toMatch(/chevron/i)
-  })
-
-  it('renders a two-digit attempt badge without changing the disclosure width', () => {
-    const contract = contractForRooms(['office'])
-    contract.rooms[0].occurrence_count = 12
-    render(<VacuumOutcomeDetail contract={contract} vacuum={vacuum} />)
-
-    const history = screen.getByRole('button', { name: 'Show Office History' })
-    expect(history).toHaveAttribute('data-has-attempt-count', 'true')
-    expect(within(history).getByText('12')).toBeInTheDocument()
   })
 })
 
