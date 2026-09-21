@@ -58,6 +58,8 @@ interface AdminIssueControllerConfig {
   completionScript: string
   deploymentPollSeconds: number
   deploymentTimeoutMinutes: number
+  hassMcpConfigPath: string
+  hassMcpServerName: string
   issueLabels: string[]
   maxRepairAttempts: number
   ownerId: number
@@ -231,6 +233,41 @@ function parseStringArray(value: unknown, field: string) {
   return value.map((entry) => entry.trim())
 }
 
+function object(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function selectWorkerHassMcpConfig(value: unknown, serverName: string) {
+  if (!object(value) || !object(value.mcpServers)) {
+    throw new Error('HASS MCP config must contain an mcpServers object')
+  }
+  const server = value.mcpServers[serverName]
+  if (!object(server)) {
+    throw new Error(`HASS MCP server ${serverName} is not configured`)
+  }
+  const hasUrl = typeof server.url === 'string' && server.url.trim().length > 0
+  const hasCommand = typeof server.command === 'string' && server.command.trim().length > 0
+  if (hasUrl === hasCommand) {
+    throw new Error(`HASS MCP server ${serverName} must configure exactly one transport`)
+  }
+  if (hasUrl) {
+    let protocol: string
+    try {
+      protocol = new URL(String(server.url)).protocol
+    } catch {
+      throw new Error(`HASS MCP server ${serverName} URL is invalid`)
+    }
+    if (!['http:', 'https:'].includes(protocol)) {
+      throw new Error(`HASS MCP server ${serverName} must use HTTP or HTTPS`)
+    }
+  }
+  return {
+    mcpServers: {
+      [serverName]: server,
+    },
+  }
+}
+
 function resolveInside(basePath: string, candidate: string, field: string) {
   const absolute = resolve(candidate.replace(/^~(?=\/|$)/, homedir()))
   const relativePath = relative(resolve(basePath), absolute)
@@ -287,6 +324,37 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
       homedir(),
     ),
   )
+  const hassMcpConfigPath = resolveInside(
+    homedir(),
+    realpathSync(
+      parseNonEmptyString(raw.hassMcpConfigPath, 'hassMcpConfigPath').replace(
+        /^~(?=\/|$)/,
+        homedir(),
+      ),
+    ),
+    'hassMcpConfigPath',
+  )
+  const hassMcpConfigStat = statSync(hassMcpConfigPath)
+  if (!hassMcpConfigStat.isFile()) {
+    throw new Error('hassMcpConfigPath must reference a regular file')
+  }
+  if (process.platform !== 'win32' && (hassMcpConfigStat.mode & 0o077) !== 0) {
+    throw new Error('hassMcpConfigPath must not be readable by group or other users')
+  }
+  const hassMcpServerName = parseNonEmptyString(
+    raw.hassMcpServerName ?? 'hass',
+    'hassMcpServerName',
+  )
+  if (
+    !/^[A-Za-z0-9_.-]+$/.test(hassMcpServerName) ||
+    ['__proto__', 'constructor', 'prototype'].includes(hassMcpServerName)
+  ) {
+    throw new Error('hassMcpServerName contains unsupported characters')
+  }
+  selectWorkerHassMcpConfig(
+    JSON.parse(readFileSync(hassMcpConfigPath, 'utf8')) as unknown,
+    hassMcpServerName,
+  )
   const workerImageId = parseNonEmptyString(raw.workerImageId, 'workerImageId')
   if (!/^sha256:[a-f0-9]{64}$/.test(workerImageId)) {
     throw new Error('workerImageId must be an immutable sha256 image ID')
@@ -307,6 +375,12 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
     if (pathsOverlap(repositoryPath, path)) {
       throw new Error(`${field} must not overlap repositoryPath`)
     }
+    if (pathsOverlap(path, hassMcpConfigPath)) {
+      throw new Error(`hassMcpConfigPath must not overlap ${field}`)
+    }
+  }
+  if (pathsOverlap(repositoryPath, hassMcpConfigPath)) {
+    throw new Error('hassMcpConfigPath must not overlap repositoryPath')
   }
   for (let index = 0; index < mutablePaths.length; index += 1) {
     for (let other = index + 1; other < mutablePaths.length; other += 1) {
@@ -330,6 +404,8 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
       raw.deploymentTimeoutMinutes ?? 90,
       'deploymentTimeoutMinutes',
     ),
+    hassMcpConfigPath,
+    hassMcpServerName,
     issueLabels: parseStringArray(raw.issueLabels ?? ['bug'], 'issueLabels'),
     maxRepairAttempts: parsePositiveInteger(raw.maxRepairAttempts ?? 3, 'maxRepairAttempts'),
     ownerId: parsePositiveInteger(raw.ownerId, 'ownerId'),
@@ -943,7 +1019,7 @@ async function ensureWorktree(
   return record.worktreePath
 }
 
-function prepareCopilotHome(config: AdminIssueControllerConfig) {
+export function prepareCopilotHome(config: AdminIssueControllerConfig) {
   const copilotHome = join(config.workerHome, '.copilot')
   const extensionDirectory = join(copilotHome, 'extensions', 'admin-issue-worker')
   const skillDirectory = join(copilotHome, 'skills', 'tandem-research')
@@ -973,6 +1049,15 @@ function prepareCopilotHome(config: AdminIssueControllerConfig) {
     join(skillDirectory, 'SKILL.md'),
   )
   chmodSync(join(skillDirectory, 'SKILL.md'), 0o600)
+  const hassMcpConfig = selectWorkerHassMcpConfig(
+    JSON.parse(readFileSync(config.hassMcpConfigPath, 'utf8')) as unknown,
+    config.hassMcpServerName,
+  )
+  writeFileSync(
+    join(copilotHome, 'mcp-config.json'),
+    `${JSON.stringify(hassMcpConfig, null, 2)}\n`,
+    { mode: 0o600 },
+  )
   writeFileSync(
     join(copilotHome, 'settings.json'),
     `${JSON.stringify(
@@ -999,6 +1084,12 @@ export function assertWorkerHostConfigurationSafe(
   const projectExtensions = join(worktreePath, '.github/extensions')
   if (existsSync(projectExtensions) && readdirSync(projectExtensions, { recursive: true }).length > 0) {
     throw new Error('Project Copilot extensions are not allowed in autonomous worker sessions')
+  }
+  if (
+    existsSync(join(worktreePath, '.mcp.json')) ||
+    existsSync(join(worktreePath, '.github/mcp.json'))
+  ) {
+    throw new Error('Project MCP configuration is not allowed in autonomous worker sessions')
   }
   if (
     existsSync(policyHookDirectory) &&
@@ -1035,7 +1126,7 @@ function buildWorkerEnvironment(
   return environment
 }
 
-function buildWorkerPrompt(record: AdminIssueRecord) {
+export function buildWorkerPrompt(record: AdminIssueRecord) {
   const pendingInputs = record.inputs.filter((input) => input.revision > record.processedRevision)
   const issueContext = pendingInputs
     .map(
@@ -1047,9 +1138,9 @@ function buildWorkerPrompt(record: AdminIssueRecord) {
 
 You are working on GitHub issue #${record.issueNumber} in ${record.issueUrl}.
 
-Use the tandem-research workflow to investigate the issue before implementation. The operator's issue text and follow-up comments below are canonical. Make changes only through the admin_issue_workspace tool. Do not use host filesystem, shell, GitHub, Home Assistant, network, commit, push, merge, deployment, or issue-mutation tools. The trusted host controller owns those operations.
+Use the tandem-research workflow to investigate the issue before implementation. The operator's issue text and follow-up comments below are canonical. Make repository changes only through the admin_issue_workspace tool. Use the configured Home Assistant MCP server directly whenever current HA state, history, traces, configuration, services, or validation are relevant. It is a trusted local execution surface with operator-equivalent Home Assistant access. Follow the server's skill-guide and safety contracts, prefer read-only diagnosis before mutation, perform only issue-scoped HA actions, verify their results, and never expose credentials or secret-bearing configuration. Do not use host filesystem, host shell, GitHub, general network, commit, push, merge, deployment, or issue-mutation tools. The trusted host controller owns those operations.
 
-If a consequential product or design decision remains, stop and return needs_input with concise options and your recommendation. Otherwise implement the complete fix in the assigned worktree, update the directly owned tests, run the relevant tests through admin_issue_workspace, iterate until they pass, and perform a meaningful code review. Treat iOS/WebKit-specific behavior as requiring explicit manual follow-up.
+Gather available Home Assistant evidence yourself before asking the operator for diagnostics or authorization. Do not offer an input option that merely authorizes a capability already available to you. If a consequential product or design decision remains after repository and Home Assistant investigation, stop and return needs_input with concise options and your recommendation. Otherwise implement the complete fix in the assigned worktree, update the directly owned tests, run the relevant tests through admin_issue_workspace, iterate until they pass, and perform a meaningful code review. Treat iOS/WebKit-specific behavior as requiring explicit manual follow-up.
 
 Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.
 
@@ -1134,6 +1225,9 @@ async function runCopilotWorker(
     '--context',
     'default',
     '--disable-builtin-mcps',
+    '--enable-mcp-server',
+    config.hassMcpServerName,
+    '--allow-all-mcp-server-instructions',
     '--no-ask-user',
     '--no-color',
     '--output-format',
@@ -1143,9 +1237,11 @@ async function runCopilotWorker(
     '--secret-env-vars',
     'GH_TOKEN',
     '--available-tools',
-    'admin_issue_workspace,skill,task,read_agent,write_agent',
+    'admin_issue_workspace,skill,task,read_agent,write_agent,tool_search_tool,mcp:*',
     '--allow-tool',
     'custom-tool(admin_issue_workspace)',
+    '--allow-tool',
+    config.hassMcpServerName,
     '-p',
     buildWorkerPrompt(record),
   ]

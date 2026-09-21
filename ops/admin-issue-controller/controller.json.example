@@ -9,6 +9,8 @@
   "workerHome": "~/.local/share/admin-issue-controller/worker-home",
   "workerExtensionPath": "~/.local/share/admin-issue-controller/worker-extension.mjs",
   "tandemSkillPath": "~/.local/share/admin-issue-controller/tandem-research/SKILL.md",
+  "hassMcpConfigPath": "~/.copilot/mcp-config.json",
+  "hassMcpServerName": "hass",
   "workerImageId": "sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948",
   "workerTimeoutMinutes": 90,
   "todoEntityId": "todo.groceries",
