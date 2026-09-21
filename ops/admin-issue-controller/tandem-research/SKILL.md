@@ -35,3 +35,14 @@ researchers. Never trigger it from task importance alone.
    the repository's normal safety and validation rules.
 
 Do not use Claude models in tandem or as fallback researchers.
+
+## Autonomous issue evidence
+
+When the host controller invokes this skill for an Admin To-Do issue, its
+prompt defines the final handoff contract. A `ready_for_pr` result that changes
+production dashboard runtime files must include one to four deterministic
+PNG, JPEG, or WebP images under the issue-specific ignored artifact directory.
+The images must show the proposed fixed behavior, and each caption must say
+whether it is mock or live evidence. Test-only, documentation-only, Home
+Assistant-only, and controller-only outcomes are exempt. Visual evidence
+supplements tests and never substitutes for required manual iOS verification.

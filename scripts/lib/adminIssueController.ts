@@ -91,6 +91,7 @@ export interface AdminIssueCandidate {
   targetBaseSha: string
   treeSha: string
   validation?: AdminIssueValidationReceipt
+  visualEvidence?: AdminIssueVisualEvidenceReceipt[]
 }
 
 export interface AdminIssueBaseSyncTransition {
@@ -261,6 +262,20 @@ export interface AdminIssuePullRequestDraft {
   title: string
 }
 
+export interface AdminIssueVisualEvidenceDraft {
+  alt: string
+  caption: string
+  path: string
+}
+
+export interface AdminIssueVisualEvidenceReceipt extends AdminIssueVisualEvidenceDraft {
+  diffManifestSha256: string
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp'
+  sha256: string
+  sizeBytes: number
+  url?: string
+}
+
 export type AdminIssueWorkerOutcome =
   | {
     decision: 'needs_input'
@@ -268,6 +283,7 @@ export type AdminIssueWorkerOutcome =
     questions: AdminIssueQuestion[]
     schemaVersion: 1
     summary: string
+    visualEvidence: []
   }
   | {
     changeSummary: string[]
@@ -279,6 +295,7 @@ export type AdminIssueWorkerOutcome =
     schemaVersion: 1
     summary: string
     tests: Array<{ command: string; result: string }>
+    visualEvidence: AdminIssueVisualEvidenceDraft[]
   }
   | {
     decision: 'blocked'
@@ -287,6 +304,7 @@ export type AdminIssueWorkerOutcome =
     reason: string
     schemaVersion: 1
     summary: string
+    visualEvidence: []
   }
 
 export interface GitHubIssueComment {
@@ -312,6 +330,32 @@ function stringArray(value: unknown, field: string) {
   assert(Array.isArray(value), `${field} must be an array`)
   assert(value.every((entry) => typeof entry === 'string'), `${field} must contain only strings`)
   return value as string[]
+}
+
+function visualEvidenceDrafts(value: unknown) {
+  if (value === undefined) return []
+  assert(Array.isArray(value), 'visualEvidence must be an array')
+  assert(value.length <= 4, 'visualEvidence supports at most four images')
+  const paths = new Set<string>()
+  return value.map((entry, index) => {
+    assert(object(entry), `visualEvidence[${index}] must be an object`)
+    const path = nonEmptyString(entry.path, `visualEvidence[${index}].path`).trim()
+    const alt = nonEmptyString(entry.alt, `visualEvidence[${index}].alt`).trim()
+    const caption = nonEmptyString(entry.caption, `visualEvidence[${index}].caption`).trim()
+    assert(
+      path.startsWith('artifacts/admin-issue-') &&
+      !path.startsWith('/') &&
+      !path.includes('\\') &&
+      !path.split('/').includes('..') &&
+      /\.(?:jpe?g|png|webp)$/i.test(path),
+      `visualEvidence[${index}].path must be an image below artifacts/admin-issue-<number>/`,
+    )
+    assert(alt.length <= 240, `visualEvidence[${index}].alt is too long`)
+    assert(caption.length <= 1_000, `visualEvidence[${index}].caption is too long`)
+    assert(!paths.has(path), `visualEvidence path ${path} is duplicated`)
+    paths.add(path)
+    return { alt, caption, path }
+  })
 }
 
 function iosFollowUp(value: unknown): AdminIssueIosFollowUp {
@@ -435,6 +479,39 @@ function assertChecksReceipt(
   }
 }
 
+function assertVisualEvidenceReceipt(value: unknown, field: string) {
+  assert(object(value), `${field} must be an object`)
+  const path = nonEmptyString(value.path, `${field}.path`)
+  const alt = nonEmptyString(value.alt, `${field}.alt`)
+  const caption = nonEmptyString(value.caption, `${field}.caption`)
+  assert(
+    path.startsWith('artifacts/admin-issue-') &&
+    !path.startsWith('/') &&
+    !path.includes('\\') &&
+    !path.split('/').includes('..') &&
+    /\.(?:jpe?g|png|webp)$/i.test(path),
+    `${field}.path is invalid`,
+  )
+  assert(alt.length <= 240, `${field}.alt is too long`)
+  assert(caption.length <= 1_000, `${field}.caption is too long`)
+  assert(/\b(?:live|mock)\b/i.test(caption), `${field}.caption lacks evidence provenance`)
+  sha256(value.sha256, `${field}.sha256`)
+  sha256(value.diffManifestSha256, `${field}.diffManifestSha256`)
+  const sizeBytes = positiveInteger(value.sizeBytes, `${field}.sizeBytes`)
+  assert(sizeBytes <= 10 * 1024 * 1024, `${field}.sizeBytes exceeds the limit`)
+  assert(
+    ['image/jpeg', 'image/png', 'image/webp'].includes(String(value.mediaType)),
+    `${field}.mediaType is invalid`,
+  )
+  if (value.url !== undefined) {
+    assert(
+      typeof value.url === 'string' &&
+      /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(value.url),
+      `${field}.url is not a GitHub user attachment`,
+    )
+  }
+}
+
 function assertProvenance(value: unknown, field: string) {
   assert(object(value), `${field} must be an object`)
   if (value.kind === 'none') return
@@ -492,6 +569,31 @@ function assertProvenance(value: unknown, field: string) {
         provenance.candidate.checks.headSha === provenance.candidate.headSha,
         `${field}.candidate.checks do not match a validated candidate`,
       )
+    }
+    if (provenance.candidate.visualEvidence) {
+      assert(
+        Array.isArray(provenance.candidate.visualEvidence) &&
+        provenance.candidate.visualEvidence.length <= 4,
+        `${field}.candidate.visualEvidence is invalid`,
+      )
+      const evidenceHashes = new Set<string>()
+      const evidencePaths = new Set<string>()
+      for (const [index, evidence] of provenance.candidate.visualEvidence.entries()) {
+        assertVisualEvidenceReceipt(
+          evidence,
+          `${field}.candidate.visualEvidence[${index}]`,
+        )
+        assert(
+          evidence.diffManifestSha256 === provenance.candidate.diff.manifestSha256,
+          `${field}.candidate.visualEvidence[${index}] does not match the candidate diff`,
+        )
+        assert(
+          !evidenceHashes.has(evidence.sha256) && !evidencePaths.has(evidence.path),
+          `${field}.candidate.visualEvidence contains duplicates`,
+        )
+        evidenceHashes.add(evidence.sha256)
+        evidencePaths.add(evidence.path)
+      }
     }
   }
   if (provenance.transition) {
@@ -751,6 +853,7 @@ export function assertCandidateAuthorized(record: AdminIssueRecord, requireCheck
 
 export function assertFinalizationAuthorized(record: AdminIssueRecord) {
   const { candidate, provenance } = assertCandidateAuthorized(record, true)
+  assertCandidateVisualEvidence(record, true)
   assert(record.pr, 'Issue does not have a pull request')
   const merge = provenance.merge
   assert(merge, 'Issue does not have a verified merge')
@@ -935,6 +1038,8 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
   const ios = iosFollowUp(value.iosFollowUp)
 
   if (value.decision === 'needs_input') {
+    const visualEvidence = visualEvidenceDrafts(value.visualEvidence)
+    assert(visualEvidence.length === 0, 'needs_input visualEvidence must be empty')
     assert(Array.isArray(value.questions) && value.questions.length > 0, 'needs_input requires questions')
     const questions = value.questions.map((entry, index) => {
       assert(object(entry), `questions[${index}] must be an object`)
@@ -961,10 +1066,13 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
       summary: value.summary.trim(),
       questions,
       iosFollowUp: ios,
+      visualEvidence: [],
     }
   }
 
   if (value.decision === 'blocked') {
+    const visualEvidence = visualEvidenceDrafts(value.visualEvidence)
+    assert(visualEvidence.length === 0, 'blocked visualEvidence must be empty')
     assert(typeof value.reason === 'string' && value.reason.trim(), 'blocked requires a reason')
     return {
       schemaVersion: 1,
@@ -973,6 +1081,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
       questions: [],
       reason: value.reason.trim(),
       iosFollowUp: ios,
+      visualEvidence: [],
     }
   }
 
@@ -995,6 +1104,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
   assert(object(value.pr), 'ready_for_pr requires pr')
   assert(typeof value.pr.title === 'string' && value.pr.title.trim(), 'pr.title is required')
   assert(typeof value.pr.body === 'string' && value.pr.body.trim(), 'pr.body is required')
+  const visualEvidence = visualEvidenceDrafts(value.visualEvidence)
   return {
     schemaVersion: 1,
     decision: 'ready_for_pr',
@@ -1011,7 +1121,51 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
       title: neutralizeGitHubClosingReferences(value.pr.title.trim()).slice(0, 240),
       body: neutralizeGitHubClosingReferences(value.pr.body.trim()),
     },
+    visualEvidence,
   }
+}
+
+function isTestOnlyPath(path: string) {
+  return path.startsWith('src/test/') ||
+    path.includes('/__tests__/') ||
+    /\.(?:spec|test)\.[cm]?[jt]sx?$/.test(path)
+}
+
+export function candidateRequiresVisualEvidence(files: readonly string[]) {
+  return files.some((path) =>
+    path === 'index.html' ||
+    path.startsWith('public/') ||
+    (path.startsWith('src/') && !isTestOnlyPath(path)),
+  )
+}
+
+export function assertCandidateVisualEvidence(
+  record: AdminIssueRecord,
+  requirePublished = false,
+) {
+  const { candidate, provenance } = assertCandidateAuthorized(record)
+  const evidence = candidate.visualEvidence ?? []
+  if (candidateRequiresVisualEvidence(candidate.diff.files)) {
+    assert(
+      evidence.length > 0,
+      'Candidate changes dashboard runtime files but has no proposed fixed-behavior images',
+    )
+  }
+  assert(evidence.length <= 4, 'Candidate visual evidence exceeds the four-image limit')
+  for (const [index, item] of evidence.entries()) {
+    assert(
+      item.diffManifestSha256 === candidate.diff.manifestSha256,
+      `Candidate visual evidence ${index + 1} does not match the committed diff`,
+    )
+    if (requirePublished) {
+      assert(
+        typeof item.url === 'string' &&
+        /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(item.url),
+        `Candidate visual evidence ${index + 1} has not been published to GitHub`,
+      )
+    }
+  }
+  return { candidate, evidence, provenance }
 }
 
 export function formatQuestionsComment(
@@ -1069,6 +1223,10 @@ export function formatPullRequestComment(
 ) {
   const changes = outcome.changeSummary.map((entry) => `- ${entry}`).join('\n')
   const tests = outcome.tests.map((entry) => `- \`${entry.command}\` — ${entry.result}`).join('\n')
+  const evidenceCount = outcome.visualEvidence?.length ?? 0
+  const evidence = evidenceCount > 0
+    ? `\n\n**Proposed fixed behavior**\n- ${evidenceCount} GitHub-hosted image${evidenceCount === 1 ? '' : 's'} embedded in the pull request`
+    : ''
   const ios = outcome.iosFollowUp.required
     ? `\n\n> **iOS follow-up required:** ${outcome.iosFollowUp.reason}`
     : ''
@@ -1085,7 +1243,7 @@ ${changes}
 **Validation**
 ${tests}
 
-**Pull request:** ${pullRequest.url}${ios}`
+**Pull request:** ${pullRequest.url}${evidence}${ios}`
 }
 
 export function formatCompletionComment(input: {
@@ -1097,6 +1255,10 @@ export function formatCompletionComment(input: {
   const { merge } = assertFinalizationAuthorized(input.issue)
   const changes = outcome.changeSummary.map((entry) => `- ${entry}`).join('\n')
   const tests = outcome.tests.map((entry) => `- \`${entry.command}\` — ${entry.result}`).join('\n')
+  const evidenceCount = outcome.visualEvidence?.length ?? 0
+  const evidence = evidenceCount > 0
+    ? `\n**Proposed fixed behavior:** ${evidenceCount} GitHub-hosted image${evidenceCount === 1 ? '' : 's'} in the pull request`
+    : ''
   const ios = outcome.iosFollowUp.required
     ? `\n\n> **Manual iOS follow-up:** ${outcome.iosFollowUp.reason}`
     : ''
@@ -1116,7 +1278,7 @@ ${tests}
 **Pull request:** ${input.issue.pr?.url}
 **Merged commit:** \`${merge.mergeSha}\`
 **Deployment:** ${input.deployment.url}
-**Production result:** ${input.deployment.disposition} at \`${input.deployment.deployedSha}\`${ios}`
+**Production result:** ${input.deployment.disposition} at \`${input.deployment.deployedSha}\`${evidence}${ios}`
 }
 
 export function deploymentReceiptIsAccepted(

@@ -66,16 +66,23 @@ mutable user extensions or unrelated personal skills.
    structured question only when a consequential decision still remains.
 7. Otherwise create a local candidate commit, authorize its complete committed
    diff, and validate that exact clean commit in the isolated runner.
-8. Merge current `origin/master` into a stale candidate only through a
+8. For a candidate that changes production dashboard runtime files, validate
+   one to four issue-scoped PNG, JPEG, or WebP images of the proposed fixed
+   behavior, bind their hashes to the committed-diff manifest, upload them to
+   GitHub, and place them in the pull-request body. Test-only,
+   documentation-only, Home Assistant-only, and controller-only outcomes are
+   exempt.
+9. Merge current `origin/master` into a stale candidate only through a
    controller-journaled, conflict-free normal merge. Every new candidate is
    revalidated before a normal push.
-9. Require the live pull request repository, base, branch, and head SHA to
-   match the candidate. Bind protected checks from the pinned GitHub App to
-   that exact SHA and merge with `--match-head-commit`.
-10. Require the successful v2 deployment artifact for the exact merge SHA,
+10. Require the live pull request repository, base, branch, head SHA, and every
+   persisted visual-evidence URL to match the candidate. Bind protected checks
+   from the pinned GitHub App to that exact SHA and merge with
+   `--match-head-commit`.
+11. Require the successful v2 deployment artifact for the exact merge SHA,
    including accepted disposition, verified paths, panel registration, and
    released deployment lease.
-11. Post the completion evidence, close the issue, complete the Home Assistant
+12. Post the completion evidence, close the issue, complete the Home Assistant
     item, verify its completion receipt, and remove the issue worktree.
 
 A manually closed issue pauses automation and does not complete Home
@@ -88,8 +95,10 @@ deployment with a manual-device follow-up comment.
 Controller state version 2 uses one provenance record as the sole lifecycle
 authority. It keeps the prepared base, current candidate head and tree,
 committed-diff manifest, validation receipt, protected-check runs, PR merge
-receipt, and deployment binding distinct. Timestamp receipts remain useful for
-audit but cannot authorize a merge or completion.
+receipt, deployment binding, and optional visual-evidence receipts distinct.
+Each visual receipt records the relative artifact path, media type, byte size,
+SHA-256, committed-diff manifest, and GitHub attachment URL. Timestamp receipts
+remain useful for audit but cannot authorize a merge or completion.
 
 The following rules are fail closed:
 
@@ -101,6 +110,13 @@ The following rules are fail closed:
   attributed to the worker;
 - the live PR must remain in this repository, target `master`, use the recorded
   controller branch, and expose the exact candidate head;
+- dashboard runtime candidates cannot advance without valid issue-scoped image
+  files. The controller rejects traversal, symlinks, mismatched extensions or
+  magic bytes, duplicate content, files above 10 MiB, and captions that omit
+  mock/live provenance;
+- uploaded attachment URLs must use GitHub's user-attachment host and every URL
+  must remain embedded under `## Proposed fixed behavior` in the live PR body
+  before checks are accepted and again before merge;
 - checks must be the latest successful runs for the exact candidate and pinned
   GitHub App;
 - already-merged PRs pass the same provenance guard and must report a
@@ -206,6 +222,14 @@ history and pristine queued records remain readable, but no legacy SHA or
 timestamp is promoted into trusted provenance. Version-1 binaries reject the
 new journal; rollback requires stopping the service and explicitly restoring
 the retained backup.
+
+Visual-evidence enforcement is additive within state version 2. Existing
+runtime candidates without a complete attachment receipt cannot pass live-PR
+verification or finalization. An owner comment starts a fresh worker revision
+that can generate the required issue-scoped images; existing non-runtime
+candidates remain exempt. Uploaded URLs are journaled one at a time so a
+restart does not duplicate successful uploads, while the local source images
+remain in the ignored worktree artifact directory until normal issue cleanup.
 
 ## Operation and recovery
 
