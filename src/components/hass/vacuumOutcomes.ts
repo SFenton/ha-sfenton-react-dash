@@ -92,6 +92,8 @@ export interface VacuumOutcomeRoom {
   latest_attempt: VacuumOutcomeAttempt | null
   occurrence_count: number
   outstanding: VacuumOutcomeOutstanding | null
+  /** Derived from an explicit Home Assistant reconciliation marker, never from producer payloads. */
+  reconciled_event_id?: string
   reasons_coincide: boolean
   required_operation: Extract<VacuumOutcomeOperation, 'vacuum' | 'vacuum_mop'>
   room_id: string
@@ -153,6 +155,8 @@ export type VacuumWhileAwayPresentation =
   | ({ kind: 'malformed'; version?: VacuumOutcomeContractVersion } & VacuumOutcomeLegacyData)
   | ({ kind: 'incompatible'; version: number } & VacuumOutcomeLegacyData)
   | { kind: 'empty' }
+
+export type VacuumOutcomeReconciledAttempts = Readonly<Record<string, string | null | undefined>>
 
 const ATTEMPT_MODES = new Set<VacuumOutcomeAttemptMode>(['fallback_vacuum', 'vacuum', 'vacuum_mop'])
 const V1_ATTEMPT_RESULTS = new Set<VacuumOutcomeAttemptResult>(['completed', 'failed', 'interrupted'])
@@ -573,6 +577,37 @@ export function parseVacuumOutcomeContract(value: unknown): VacuumOutcomeContrac
   return parsed.kind === 'valid' ? parsed.contract : null
 }
 
+function reconcileVacuumOutcomeContract(
+  contract: VacuumOutcomeContract,
+  reconciledAttemptEventIds: VacuumOutcomeReconciledAttempts,
+) {
+  let changed = false
+  const rooms = contract.rooms.map((room) => {
+    const reconciledEventId = reconciledAttemptEventIds[room.room_id]
+    if (
+      room.status === 'completed'
+      || !reconciledEventId
+      || room.latest_attempt?.event_id !== reconciledEventId
+    ) {
+      return room
+    }
+
+    changed = true
+    return {
+      ...room,
+      credit: {
+        operation: room.required_operation,
+        status: 'full' as const,
+      },
+      outstanding: null,
+      reconciled_event_id: reconciledEventId,
+      status: 'completed' as const,
+    }
+  })
+
+  return changed ? { ...contract, rooms } : contract
+}
+
 function stringListAttribute(attributes: Record<string, unknown>, name: string) {
   const value = attributes[name]
   return Array.isArray(value)
@@ -580,15 +615,19 @@ function stringListAttribute(attributes: Record<string, unknown>, name: string) 
     : []
 }
 
-export function vacuumWhileAwayPresentation(attributes: Record<string, unknown> | null | undefined): VacuumWhileAwayPresentation {
+export function vacuumWhileAwayPresentation(
+  attributes: Record<string, unknown> | null | undefined,
+  reconciledAttemptEventIds: VacuumOutcomeReconciledAttempts = {},
+): VacuumWhileAwayPresentation {
   if (!attributes) return { kind: 'empty' }
   const cleaned = stringListAttribute(attributes, 'while_away_cleaned')
   const issues = stringListAttribute(attributes, 'while_away_issues')
   const legacy = { cleaned, issues }
   const parsed = parseVacuumOutcomeReport(attributes.while_away_outcomes)
   if (parsed.kind === 'valid') {
-    return parsed.contract.rooms.length > 0
-      ? { contract: parsed.contract, kind: 'typed' }
+    const contract = reconcileVacuumOutcomeContract(parsed.contract, reconciledAttemptEventIds)
+    return contract.rooms.length > 0
+      ? { contract, kind: 'typed' }
       : { kind: 'empty' }
   }
   if (parsed.kind === 'incomplete') return { ...legacy, kind: 'incomplete', version: parsed.version }

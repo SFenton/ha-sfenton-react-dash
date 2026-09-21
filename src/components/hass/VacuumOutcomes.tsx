@@ -420,11 +420,15 @@ export function VacuumOutcomeRow({
   const roomNameId = useId()
   const statusId = useId()
   const visual = STATUS_VISUAL[room.status]
+  const reconciled = Boolean(
+    room.reconciled_event_id
+    && room.latest_attempt?.event_id === room.reconciled_event_id,
+  )
   const evidenceResult = room.latest_attempt?.evidence
   const availableEvidence = evidenceResult?.kind === 'available' ? evidenceResult.data : null
   const evidenceMalformed = evidenceResult?.kind === 'malformed'
-  const resultReason = room.latest_attempt?.reason ?? null
-  const outstandingReason = room.outstanding?.reason ?? null
+  const resultReason = reconciled ? null : room.latest_attempt?.reason ?? null
+  const outstandingReason = reconciled ? null : room.outstanding?.reason ?? null
   const resultReasonValue = resultReason && !(room.status === 'uncertain' && resultReason.code === 'unknown')
     ? vacuumOutcomeReasonValue(copy, resultReason, roomNames, reasonVariant)
     : null
@@ -434,7 +438,7 @@ export function VacuumOutcomeRow({
   const bothReasons = Boolean(resultReasonValue && outstandingReasonValue)
   const reasonsDiffer = bothReasons && resultReasonValue !== outstandingReasonValue
   const primary = room.latest_attempt
-    ? primaryAttemptSentence(copy, room.latest_attempt.mode, room.latest_attempt.result)
+    ? primaryAttemptSentence(copy, room.latest_attempt.mode, reconciled ? 'completed' : room.latest_attempt.result)
     : deferredSentence(copy, room.required_operation)
   const compactReason = isFailed || isInterrupted
     ? resultReasonValue ?? outstandingReasonValue ?? primary
@@ -455,6 +459,7 @@ export function VacuumOutcomeRow({
       aria-labelledby={[roomNameId, statusId].join(' ')}
       className={styles.roomRow}
       data-action-kind="state"
+      data-reconciled={reconciled ? 'true' : undefined}
       data-room-id={room.room_id}
       data-status={room.status}
       data-tone={visual.tone}

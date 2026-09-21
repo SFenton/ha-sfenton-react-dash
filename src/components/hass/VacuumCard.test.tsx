@@ -1,11 +1,13 @@
 // @covers src/components/core/ModalTabNav.tsx
 // @covers src/components/hass/VacuumCard.tsx
+// @covers src/constants/portedDashboard.ts
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { VACUUMS } from '../../constants/portedDashboard'
+import { VACUUM_OUTCOME_RECONCILIATIONS, VACUUMS } from '../../constants/portedDashboard'
 import {
   EVIDENCE_FREE_V2_VACUUM_OUTCOME_PAYLOAD,
+  EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD,
   FUTURE_VACUUM_OUTCOME_PAYLOAD,
   MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
 } from '../../test/fixtures/vacuumOutcomes'
@@ -20,6 +22,17 @@ if (!mainFloorVacuum) throw new Error('Expected Main Floor vacuum fixture')
 if (!mainFloorVacuum.dockControls) throw new Error('Expected Main Floor dock controls fixture')
 
 const mainFloorDockControls = mainFloorVacuum.dockControls
+const mainFloorOutcomeReconciliations = VACUUM_OUTCOME_RECONCILIATIONS[mainFloorVacuum.vacuumMapId]
+const reconciliationEntityIdsByRoom = Object.fromEntries(
+  (mainFloorOutcomeReconciliations ?? []).map(({ entityId, id }) => [id, entityId]),
+)
+const gymReconciliationEntityId = reconciliationEntityIdsByRoom.gym
+const livingRoomReconciliationEntityId = reconciliationEntityIdsByRoom.living_room
+const officeReconciliationEntityId = reconciliationEntityIdsByRoom.office
+
+if (!mainFloorOutcomeReconciliations || !gymReconciliationEntityId || !livingRoomReconciliationEntityId || !officeReconciliationEntityId) {
+  throw new Error('Expected Main Floor outcome reconciliation helpers')
+}
 
 function setMainFloorRuntime({
   error = 'No error',
@@ -125,14 +138,35 @@ describe('VacuumCard runtime mode', () => {
 describe('VacuumRoomSourceModalContent', () => {
   beforeEach(() => {
     resetMockHass()
+    const helperTemplate = mockEntities['input_text.main_floor_vacuum_error_message']
+    for (const { entityId } of mainFloorOutcomeReconciliations) {
+      mockEntities[entityId] = {
+        ...helperTemplate,
+        attributes: {},
+        entity_id: entityId,
+        state: '',
+      }
+    }
     setMainFloorRuntime({ state: 'docked' })
     setMainFloorDockStatus('idle')
     window.__vacuumModalPreview?.setMode('live')
   })
 
   afterEach(() => {
+    for (const { entityId } of mainFloorOutcomeReconciliations) delete mockEntities[entityId]
     window.__vacuumModalPreview?.setMode('live')
     vi.unstubAllEnvs()
+  })
+
+  it('configures a reconciliation receipt for every Main Floor report room', () => {
+    expect([...mainFloorOutcomeReconciliations].sort(({ id: left }, { id: right }) => left.localeCompare(right))).toEqual(
+      Object.keys(mainFloorVacuum.outcomeRoomNames ?? {})
+        .sort((left, right) => left.localeCompare(right))
+        .map((id) => ({
+          entityId: `input_text.main_floor_vacuum_${id}_reconciled_attempt`,
+          id,
+        })),
+    )
   })
 
   it('shows full tabs and setup controls for a normal startable snapshot', () => {
@@ -163,6 +197,29 @@ describe('VacuumRoomSourceModalContent', () => {
     )
     expect(screen.queryByText(MISLEADING_V2_LEGACY_VACUUM_OUTCOMES.while_away_issues[0])).not.toBeInTheDocument()
     expect(screen.queryByRole('note', { name: 'Issues' })).not.toBeInTheDocument()
+  })
+
+  it('reacts to exact Home Assistant reconciliation markers for configured vacuum and vacuum-mop rooms', async () => {
+    mockEntities[mainFloorVacuum.coordinatorSessionEntityId].attributes = {
+      while_away_outcomes: structuredClone(EVIDENCE_RICH_V2_VACUUM_OUTCOME_PAYLOAD),
+    }
+
+    renderMainFloorRoomSource()
+
+    const summary = document.querySelector('[data-action-kind="state"][data-icon="mdi:help-circle-outline"]')
+    expect(summary).toHaveTextContent('2 Rooms Unverified • 3 Rooms Need Attention')
+
+    act(() => setMockEntityState(gymReconciliationEntityId, 'session-v2:gym:attempt'))
+
+    await waitFor(() => expect(summary).toHaveTextContent(
+      '1 Room Completed • 1 Room Unverified • 2 Rooms Need Attention',
+    ))
+
+    act(() => setMockEntityState(livingRoomReconciliationEntityId, 'session-v2:living-room:attempt'))
+
+    await waitFor(() => expect(summary).toHaveTextContent(
+      '2 Rooms Completed • 1 Room Unverified • 1 Room Needs Attention',
+    ))
   })
 
   it('shows an incompatible report state while keeping legacy strings collapsed', () => {
