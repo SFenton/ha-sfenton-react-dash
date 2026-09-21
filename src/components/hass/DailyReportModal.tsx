@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useHass } from '@hakit/core'
 import { ModalSheet } from '../core/ModalSheet'
 import { SectionHeader } from '../core/SectionHeader'
 import { DailyReportModalContent, DailyReportModalNav } from './DailyReportModalContent'
@@ -39,7 +40,6 @@ function clearTabRequest() {
   const query = params.toString()
   replaceDashboardUrl(`${pathname}${query ? `?${query}` : ''}${DAILY_REPORT_HASH}`)
 }
-
 function DailyReportModalView({ activeTab, context, editingTask, inventoryDetails, inventoryDetailsTarget, onCloseHash, onEditTask, onOpenInventoryDetails, onSetActiveTab, onSetEditingTask, onSetInventoryDetailsTarget, open, reloadVersion, taskForm }: {
   activeTab: DailyReportTab
   context: DailyReportContext
@@ -120,6 +120,7 @@ export function DailyReportModal() {
   const { closeHash, hash } = useHashModal({ appLevel: true })
   const dashboardUrl = useDashboardUrl()
   const context = useDailyReportContext()
+  const noDueDateCount = useHass((state) => actionableCount(context.user ? state.entities[context.user.todoEntityIds.noDueDate]?.state : undefined))
   const [activeTab, setActiveTab] = useState<DailyReportTab>('overdue')
   const [previousOpen, setPreviousOpen] = useState(false)
   const [consumedTabUrl, setConsumedTabUrl] = useState<string | undefined>()
@@ -135,7 +136,7 @@ export function DailyReportModal() {
       const requested = dailyReportTabRequestFromUrl(dashboardUrl)
       if (requested) {
         setActiveTab(requested === DAILY_REPORT_AUTO_TAB
-          ? dailyReportAutoTab({ expiredFood: context.expiredFoodCount, overdue: context.overdueCount, upcoming: context.upcomingCount })
+          ? dailyReportAutoTab({ expiredFood: context.expiredFoodCount, overdue: context.overdueCount, upcoming: context.upcomingCount + noDueDateCount })
           : requested)
         setConsumedTabUrl(dashboardUrl)
       }
@@ -204,4 +205,9 @@ export function DailyReportModal() {
       )}
     </EverShelfInventoryDetailsPageHost>
   )
+}
+
+function actionableCount(state: string | undefined) {
+  const count = Number(state)
+  return Number.isFinite(count) && count > 0 ? count : 0
 }
