@@ -46,3 +46,5 @@ The images must show the proposed fixed behavior, and each caption must say
 whether it is mock or live evidence. Test-only, documentation-only, Home
 Assistant-only, and controller-only outcomes are exempt. Visual evidence
 supplements tests and never substitutes for required manual iOS verification.
+The host publishes the same rendered images in both the pull request and the
+GitHub issue update so the bug itself remains a complete review surface.
