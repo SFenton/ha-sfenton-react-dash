@@ -500,7 +500,7 @@ test('cleaning report detail remains usable in a fine-pointer desktop context', 
     await expect(dialog.locator('[data-group] > button')).toHaveCount(0)
     await expect(dialog.locator('[data-room-id="dining_room"]').getByRole('button')).toHaveCount(0)
     await expect(dialog.locator('[data-room-id="dining_room"]')).toContainText(
-      'Vacuuming and mopping remain.',
+      "The mop dock's clean-water tank was empty; refill it.",
     )
     expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(0)
     expect(await page.evaluate(() => window.__mockHass?.calls ?? [])).toEqual([])
