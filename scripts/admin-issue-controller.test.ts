@@ -46,6 +46,7 @@ import {
   pullRequestBodyWithVisualEvidence,
   readWorktreeSnapshot,
   selectWorkerHassMcpConfig,
+  shouldVerifyExistingPullRequestVisualEvidence,
   synchronizeCandidateBase,
   waitForMergedPullRequest,
 } from './admin-issue-controller'
@@ -931,6 +932,19 @@ describe('admin issue controller security configuration', () => {
     ).toThrow('missing proposed fixed-behavior image')
   })
 
+  it('defers only the image block while a synchronized candidate awaits fresh evidence', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate) {
+      throw new Error('Expected authorized candidate')
+    }
+    expect(shouldVerifyExistingPullRequestVisualEvidence(issue.provenance.candidate)).toBe(true)
+    issue.provenance.candidate.visualEvidence = []
+    expect(shouldVerifyExistingPullRequestVisualEvidence(issue.provenance.candidate)).toBe(false)
+    issue.provenance.candidate.diff.files = ['docs/admin-issue-controller.md']
+    expect(shouldVerifyExistingPullRequestVisualEvidence(issue.provenance.candidate)).toBe(true)
+  })
+
   it('recognizes only GitHub repository remotes', () => {
     expect(githubRepositoryFromRemote('https://github.com/SFenton/ha-sfenton-react-dash.git')).toBe(
       'SFenton/ha-sfenton-react-dash',
@@ -1730,9 +1744,11 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('verifyMergedPullRequest(')
     expect(controller).toContain('verifyIssueVisualEvidenceComment(')
     expect(controller).toContain('issues/comments/${existing.id}')
-    expect(controller).toContain('getPullRequest(config, record, previousCandidate)')
     expect(controller).toContain('assertDeploymentRunSucceeded(run)')
     expect(controller).toContain('waitForPullRequestHead(')
+    expect(controller).toContain(
+      'shouldVerifyExistingPullRequestVisualEvidence(previousCandidate)',
+    )
     expect(controller).toContain('assertFinalizationAuthorized(record)')
     expect(controller).not.toContain("'--force-with-lease'")
     expect(controller).not.toContain("'--amend'")
