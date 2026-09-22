@@ -6,6 +6,11 @@
 // @covers src/components/core/dynamicGridLayout.ts
 // @covers src/components/core/ModalSheet.tsx
 // @covers src/constants/roomPages.ts
+// @covers src/components/hass/HlsCamera.module.css
+// @covers src/components/hass/CameraModalContent.module.css
+// @covers src/test/mocks/hakitCoreState.ts
+// @covers src/pages/AtAGlancePage.tsx
+// @covers src/pages/AtAGlancePage.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { navigationLayoutForViewport } from '../src/constants/navigationLayout'
 import { ROOM_PAGE_CONFIGS, ROOM_PAGE_ORDER } from '../src/constants/roomPages'
@@ -567,9 +572,8 @@ test('Home cameras and Security tiles keep stable equal tracks at every tier', a
 
 test('camera tracks do not resize while streams hydrate on phone portrait', async ({ page }) => {
   await page.setViewportSize({ width: 402, height: 874 })
-  await page.route('**/webrtc/webrtc-camera.js*', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 1_200))
-    await route.fallback()
+  await page.addInitScript(() => {
+    ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 1_200
   })
   await page.goto('/at-a-glance/security?feedback-camera-hydration=402')
 
@@ -596,7 +600,64 @@ test('camera tracks do not resize while streams hydrate on phone portrait', asyn
   await expect(cameraGrid.locator('[data-loaded="false"]')).toHaveCount(4)
   const loadingGeometry = await readGeometry()
   await expect(cameraGrid.locator('[data-loaded="true"]')).toHaveCount(4)
-  expect(await readGeometry()).toEqual(loadingGeometry)
+  const loadedGeometry = await readGeometry()
+  expect(loadedGeometry.box).toEqual(loadingGeometry.box)
+  expect(loadedGeometry.cells).toHaveLength(loadingGeometry.cells.length)
+  for (const [index, loadedCell] of loadedGeometry.cells.entries()) {
+    const loadingCell = loadingGeometry.cells[index]
+    expect(loadedCell.height).toBe(loadingCell.height)
+    expect(loadedCell.span).toBe(loadingCell.span)
+    expect(loadedCell.width).toBe(loadingCell.width)
+    expect(Math.abs(loadedCell.x - loadingCell.x)).toBeLessThanOrEqual(0.1)
+    expect(Math.abs(loadedCell.y - loadingCell.y)).toBeLessThanOrEqual(0.1)
+  }
+})
+
+test('camera modal media keeps its configured geometry while the stream hydrates on phone portrait', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 852 })
+  await page.addInitScript(() => {
+    ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 1_200
+  })
+
+  for (const surface of [
+    { route: 'overview', url: '/at-a-glance/overview?feedback-camera-modal-hydration=home' },
+    { route: 'security', url: '/at-a-glance/security?feedback-camera-modal-hydration=security' },
+  ]) {
+    await page.goto(surface.url)
+
+    const root = activeRoute(page, surface.route)
+    await root.getByRole('button', { name: 'Open Front Door camera' }).click()
+    const dialog = page.getByRole('dialog')
+    const frame = dialog.locator('[data-camera-transport="hls"][data-variant="modal"]')
+    const readGeometry = () => frame.evaluate((element) => {
+      const dimensions = (rect: DOMRect) => ({
+        height: Number(rect.height.toFixed(2)),
+        width: Number(rect.width.toFixed(2)),
+      })
+      const focus = element.parentElement!.getBoundingClientRect()
+      const cameraFrame = element.getBoundingClientRect()
+      const host = element.firstElementChild!.getBoundingClientRect()
+      const video = element.querySelector('video')!.getBoundingClientRect()
+      return {
+        focus: dimensions(focus),
+        frame: dimensions(cameraFrame),
+        host: dimensions(host),
+        video: dimensions(video),
+      }
+    })
+
+    await expect(frame).toHaveAttribute('data-fill', 'true')
+    await expect(frame).toHaveAttribute('data-loaded', 'false')
+    const loadingGeometry = await readGeometry()
+    expect(loadingGeometry.focus.width / loadingGeometry.focus.height).toBeCloseTo(4 / 3, 2)
+    expect(loadingGeometry.frame).toEqual(loadingGeometry.focus)
+    expect(loadingGeometry.host).toEqual(loadingGeometry.focus)
+    expect(loadingGeometry.video).toEqual(loadingGeometry.focus)
+
+    await expect(frame).toHaveAttribute('data-loaded', 'true')
+    const liveGeometry = await readGeometry()
+    expect(liveGeometry).toEqual(loadingGeometry)
+  }
 })
 
 test('room source grids stay within two columns and fill every row', async ({ page }) => {

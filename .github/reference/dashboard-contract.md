@@ -207,7 +207,7 @@ Preferred layout:
 | `src/pages/` | Page-level views such as `AtAGlancePage`, `SecurityPage`, room pages, chores pages |
 | `src/pages/Page.tsx` | Shared page shell: scroll container, scroll restoration, loading/error spacing |
 | `src/components/core/` | Reusable dashboard primitives: cards, buttons, headers, modals, sliders, section headers |
-| `src/components/hass/` | HA entity-aware controls: light sliders, climate cards, alarm controls, todo controls, camera/WebRTC cards |
+| `src/components/hass/` | HA entity-aware controls: light sliders, climate cards, alarm controls, todo controls, camera/HLS cards |
 | `src/components/shell/` | App shell, mobile header, bottom navigation, route chrome |
 | `src/constants/` | Reused route, entity, area, section, icon, timing, and animation constants |
 | `src/hooks/` | Reusable UI and Home Assistant hooks |
@@ -325,17 +325,32 @@ Do not infer that every legacy WebSocket reconnect recreates its iframe, or use
 current corrected source to explain an older run without matching provenance.
 Synthetic local host tests do not certify deployed Home Assistant behavior.
 
-## WebRTC And Cameras
+Both maintained wrappers keep their same-origin app iframe in the stable top
+document and hand it to an immediate replacement host. This lets stock Home
+Assistant rebuild the Lovelace card or embedded custom panel after reconnect
+without remounting the React app. Source changes, route departure, and abandoned
+hosts still dispose the frame.
 
-Camera implementation must support real WebRTC behavior, not static placeholders.
+## Cameras And HLS
 
-The custom `webrtc-camera-sfenton` card owns camera audio state. It exposes `window.__webrtcGetMuteState(cardId)`, emits `webrtc-audio-state`, and handles `webrtc-mute`, `webrtc-unmute`, `webrtc-toggle-mute`, and `webrtc-screenshot` events. React controls should dispatch these events and listen for `webrtc-audio-state`; do not shadow-click the card's internal `.volume` control or maintain a separate body-class-based mute source of truth.
+Camera implementation must support real Home Assistant stream playback, not
+static placeholders.
+
+React camera surfaces request Home Assistant Core's `camera/stream` WebSocket
+command with `format: "hls"` through the shared HAKit connection. Use native
+HLS where the browser supports it and the direct `hls.js` light dependency
+elsewhere. The React adapter owns URL refresh, recovery, visibility cleanup,
+mute state, and snapshots. Keep this as the only browser camera transport: do
+not add a runtime transport selector, direct browser RTSP, direct Frigate
+go2rtc APIs, a parallel custom-card path, or a dependency on the
+`webrtc-camera-sfenton` integration. RTSP remains the server-side transport
+from Frigate to Home Assistant.
 
 When implementing camera sections or modals:
 
 - Inspect the Home Assistant camera cards/modals first.
 - Identify stream entities, controls, aspect ratios, loading states, unavailable states, and modal behavior.
-- Use an appropriate WebRTC-capable implementation for the HA backend and document any dependency or Home Assistant integration requirement in code comments or project docs.
+- Use the authenticated HA-origin HLS URL returned for the configured camera entity and document any dependency or Home Assistant integration requirement in code comments or project docs.
 - Add Playwright coverage for opening camera views/modals and confirming a non-empty rendered stream container when feasible.
 
 ## Testing
@@ -356,7 +371,7 @@ Add tests as features are implemented.
   evaluates the actual Git change set and rejects implementation-only patches.
   Do not touch an unrelated test solely to make the gate pass.
 - Unit tests: component rendering, hooks, entity formatting, service-call behavior, modal open/close behavior, navigation state.
-- Playwright tests: page routing, bottom nav behavior, expected visible sections, modal open/close, core entity controls, WebRTC/camera containers.
+- Playwright tests: page routing, bottom nav behavior, expected visible sections, modal open/close, core entity controls, HLS/camera containers.
 - UX completion requires the canonical responsive matrix in
   `docs/ux/validation-matrix.md`; mobile-only or resized-mobile desktop
   coverage is insufficient.
@@ -368,7 +383,7 @@ Add tests as features are implemented.
 
 1. Build shell, route structure, shared Page shell, mobile bottom nav, and shared styling tokens.
 2. Recreate `at-a-glance/overview` content and its modals.
-3. Add reusable entity controls as they appear: light slider, climate display, occupancy/contact status, alarm/security controls, todo list controls, camera/WebRTC cards.
+3. Add reusable entity controls as they appear: light slider, climate display, occupancy/contact status, alarm/security controls, todo list controls, camera/HLS cards.
 4. Move page-by-page through the Home Assistant dashboard tabs, planning each page before implementing it.
 5. Add Playwright tests alongside each completed page behavior.
 

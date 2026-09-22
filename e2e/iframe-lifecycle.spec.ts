@@ -26,7 +26,10 @@ async function openLifecycleHost(page: Page, path: string, entryModule?: string)
     await route.fulfill({
       body: `<!doctype html>
         <html>
-          <head><title>Lifecycle host</title></head>
+          <head>
+            <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+            <title>Lifecycle host</title>
+          </head>
           <body>
             ${entryModule ? `<script type="module" src="${entryModule}"></script>` : ''}
           </body>
@@ -191,10 +194,10 @@ test('notification landing remains correct on tablet and fine-pointer desktop', 
   }
 })
 
-test('legacy wrapper disposal prevents lifecycle accumulation across replacements', async ({ page }) => {
+test('legacy wrapper preserves one lifecycle across reconnect replacements', async ({ page }) => {
   await openLifecycleHost(
     page,
-    '/sfenton-react-dash/settings',
+    '/sfenton-react-dash/home',
     '/sfenton-react-app-card.js',
   )
   await page.waitForFunction((tag) => Boolean(customElements.get(tag)), SFENTON_REACT_APP_CARD_TAG)
@@ -220,11 +223,12 @@ test('legacy wrapper disposal prevents lifecycle accumulation across replacement
     expect(mounted.listenerCount).toBe(mountedListenerCount)
 
     await page.locator('[data-lifecycle-host="true"]').evaluate((element) => element.remove())
-    await expectDisposed(page)
   }
 
-  expect(instanceIds.size).toBe(5)
-  expect(timeOrigins.size).toBe(5)
+  expect(instanceIds.size).toBe(1)
+  expect(timeOrigins.size).toBe(1)
+  await page.waitForTimeout(5_100)
+  await expectDisposed(page)
   await expect.poll(() => page.evaluate(() => (
     (window as unknown as LifecycleHostWindow).__lifecycleHostAudit.supersededReason
   ))).toBe('superseded-by-new-instance')
@@ -232,15 +236,13 @@ test('legacy wrapper disposal prevents lifecycle accumulation across replacement
   const history = await page.evaluate(({ historyProperty }) => JSON.parse(
     (window as unknown as LifecycleHostWindow)[historyProperty] ?? '[]',
   ), { historyProperty: REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY })
-  expect(history.filter((entry: { event: string }) => entry.event === 'mounted')).toHaveLength(5)
+  expect(history.filter((entry: { event: string }) => entry.event === 'mounted')).toHaveLength(1)
   const disposals = history.filter((entry: { event: string }) => entry.event === 'disposed')
-  expect(disposals).toHaveLength(5)
-  for (const disposal of disposals) {
-    expect(disposal.reason).toBe('pagehide')
-  }
+  expect(disposals).toHaveLength(1)
+  expect(disposals[0].reason).toBe('legacy-card-disconnected')
 })
 
-test('custom panel disposal prevents lifecycle accumulation across outer-frame replacements', async ({ page }) => {
+test('custom panel preserves one lifecycle across outer-frame replacements', async ({ page }) => {
   await openLifecycleHost(
     page,
     '/sfenton-react-panel?path=settings',
@@ -270,18 +272,61 @@ test('custom panel disposal prevents lifecycle accumulation across outer-frame r
     expect(mounted.listenerCount).toBe(mountedListenerCount)
 
     await page.locator('[data-lifecycle-host="true"]').evaluate((element) => element.remove())
-    await expectDisposed(page)
   }
 
+  await page.waitForTimeout(5_100)
+  await expectDisposed(page)
   const history = await page.evaluate(({ historyProperty }) => JSON.parse(
     (window as unknown as LifecycleHostWindow)[historyProperty] ?? '[]',
   ), { historyProperty: REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY })
-  expect(history.filter((entry: { event: string }) => entry.event === 'mounted')).toHaveLength(5)
+  expect(history.filter((entry: { event: string }) => entry.event === 'mounted')).toHaveLength(1)
   const disposals = history.filter((entry: { event: string }) => entry.event === 'disposed')
-  expect(disposals).toHaveLength(5)
-  for (const disposal of disposals) {
-    expect(disposal.reason).toBe('pagehide')
-  }
+  expect(disposals).toHaveLength(1)
+  expect(disposals[0].reason).toBe('panel-host-disconnected')
+})
+
+test('custom panel keeps its persistent iframe inside the native panel viewport', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await openLifecycleHost(
+    page,
+    '/sfenton-react-panel?path=settings',
+    '/sfenton-react-panel.js',
+  )
+  await page.waitForFunction((tag) => Boolean(customElements.get(tag)), SFENTON_REACT_PANEL_TAG)
+  await page.evaluate(({ tag }) => {
+    const panel = document.createElement(tag) as HTMLElement & {
+      panel: {
+        config: { app_url: string }
+        title: string
+      }
+    }
+    panel.dataset.lifecycleHost = 'true'
+    panel.style.left = '256px'
+    panel.style.width = 'calc(100vw - 256px)'
+    panel.panel = {
+      config: { app_url: '/index.html' },
+      title: 'Lifecycle panel',
+    }
+    document.body.append(panel)
+  }, { tag: SFENTON_REACT_PANEL_TAG })
+
+  const iframe = page.locator('iframe[data-sfenton-react-panel-frame="true"]')
+  await expect(iframe).toHaveCSS('left', '256px')
+  await expect(iframe).toHaveCSS('width', '1184px')
+  await expect(iframe).toHaveCSS('height', '900px')
+  const mounted = await waitForMountedApp(page)
+
+  await page.setViewportSize({ width: 852, height: 393 })
+  await page.locator('[data-lifecycle-host="true"]').evaluate((element) => {
+    const panel = element as HTMLElement
+    panel.style.left = '0'
+    panel.style.width = '100vw'
+  })
+
+  await expect(iframe).toHaveCSS('left', '0px')
+  await expect(iframe).toHaveCSS('width', '852px')
+  await expect(iframe).toHaveCSS('height', '393px')
+  expect((await waitForMountedApp(page)).timeOrigin).toBe(mounted.timeOrigin)
 })
 
 test('legacy replacements keep post-GC heap bounded', async ({ browserName, page }) => {

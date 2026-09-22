@@ -237,6 +237,39 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
   if (scenario === 'recipe-grocery') {
     facts.recipeGrocery = await recipeGroceryFacts(dialog, state)
   }
+  if (scenario === 'camera') {
+    const frame = dialog.locator('[data-variant="modal"]')
+    await expect(frame).toHaveAttribute('data-status', state)
+    const media = await frame.evaluate((element) => {
+      const focus = element.parentElement as HTMLElement | null
+      const host = element.firstElementChild as HTMLElement | null
+      const video = element.querySelector<HTMLVideoElement>('video[data-camera-entity]')
+      const focusBox = focus?.getBoundingClientRect()
+      const frameBox = element.getBoundingClientRect()
+      const hostBox = host?.getBoundingClientRect()
+      const videoBox = video?.getBoundingClientRect()
+      return {
+        entityId: video?.dataset.cameraEntity,
+        focus: focusBox ? { height: focusBox.height, width: focusBox.width } : null,
+        frame: { height: frameBox.height, width: frameBox.width },
+        host: hostBox ? { height: hostBox.height, width: hostBox.width } : null,
+        status: element.getAttribute('data-status'),
+        video: videoBox ? { height: videoBox.height, width: videoBox.width } : null,
+      }
+    })
+    expect(media.entityId).toBe('camera.front_door_camera')
+    expect(media.focus).not.toBeNull()
+    expect(media.host).not.toBeNull()
+    expect(media.video).not.toBeNull()
+    expect(Math.abs(media.focus!.width / media.focus!.height - (4 / 3))).toBeLessThanOrEqual(0.01)
+    expect(Math.abs(media.focus!.height - media.frame.height)).toBeLessThanOrEqual(1)
+    expect(Math.abs(media.focus!.width - media.frame.width)).toBeLessThanOrEqual(1)
+    expect(Math.abs(media.frame.height - media.host!.height)).toBeLessThanOrEqual(1)
+    expect(Math.abs(media.frame.width - media.host!.width)).toBeLessThanOrEqual(1)
+    expect(Math.abs(media.host!.height - media.video!.height)).toBeLessThanOrEqual(1)
+    expect(Math.abs(media.host!.width - media.video!.width)).toBeLessThanOrEqual(1)
+    facts.camera = media
+  }
   if (scenario === 'form') {
     await expect(dialog.getByRole('textbox', { name: 'Task' })).toHaveValue('Layout validation draft')
     facts.draft = 'preserved'
@@ -735,6 +768,18 @@ for (const scenario of SCENARIO_IDS) {
           await checkpoint(page, page, testInfo, obligation, capabilities, facts)
           await closeMounted(dialog)
         }
+      }
+      return
+    }
+    if (scenario === 'camera') {
+      for (const state of SURFACE_CONTRACTS.camera.states) {
+        const dialog = await openSurface(page, scenario, state)
+        for (const obligation of obligations.filter((entry) => entry.state === state)) {
+          await applyProfile(page, obligation.profile)
+          const facts = await stateFacts(page, dialog, scenario, state)
+          await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+        }
+        await closeMounted(dialog)
       }
       return
     }

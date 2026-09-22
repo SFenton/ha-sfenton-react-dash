@@ -1,5 +1,5 @@
 import { useEntity, useHass, useUser } from '@hakit/core'
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import type { HassEntity } from 'home-assistant-js-websocket'
 import { ClimateCard } from '../components/cards/ClimateCard'
 import { ContactSensorCard } from '../components/cards/ContactSensorCard'
@@ -9,15 +9,14 @@ import { RoomCard } from '../components/cards/RoomCard'
 import { AppShell } from '../components/shell/AppShell'
 import { BottomNav } from '../components/shell/BottomNav'
 import { DashboardPageLoading, type DashboardPageLoadingPhase } from '../components/shell/DashboardPageLoading'
-import { ActionPill } from '../components/core/ActionPill'
 import { DynamicGrid } from '../components/core/DynamicGrid'
 import { GlassTile } from '../components/core/GlassTile'
 import { Icon, MaterialIcon } from '../components/core/Icon'
 import { ModalSheet, type ModalCenteredGeometry, type ModalSheetSize } from '../components/core/ModalSheet'
-import { useModalSheetPresentation } from '../components/core/modalSheetPresentation'
 import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
+import { CameraModalContent } from '../components/hass/CameraModalContent'
 import { CameraTile } from '../components/hass/CameraTile'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { SECURITY_SYSTEM_CENTERED_GEOMETRY, securitySystemModalSubtitle } from '../components/hass/securityControlsConfig'
@@ -26,7 +25,6 @@ import { StatusRail } from '../components/hass/StatusRail'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { formatAirMetricState } from '../components/hass/airQualityState'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen, isOccupancyActive } from '../components/hass/entityState'
-import { WebRtcCamera } from '../components/hass/WebRtcCamera'
 import {
   AREA_ITEMS,
   AIR_QUALITY_ROOMS,
@@ -51,12 +49,6 @@ import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
 import { COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS, PAGE_CHORES_COPY_KEYS, PAGE_CHORES_COPY_NAMESPACE, copy } from '../i18n'
 import { householdResidentForHaUserId, householdResidentName } from '../constants/householdResidents'
-
-declare global {
-  interface Window {
-    __webrtcGetMuteState?: (targetId: string) => boolean
-  }
-}
 
 const SHEET_TITLES: Record<string, string> = {
   '#lights-overview': 'Lights',
@@ -353,14 +345,6 @@ function contactGroupSensorSubtitle(group: EntityGroupConfig, entities: Record<s
   return contactGroupOpenSummary(group, entities)
 }
 
-function dispatchWebRtcAction(eventName: 'webrtc-screenshot' | 'webrtc-mute' | 'webrtc-unmute', targetId: string) {
-  window.dispatchEvent(new CustomEvent(eventName, { detail: { target_id: targetId } }))
-}
-
-function getMuteState(targetId: string) {
-  return window.__webrtcGetMuteState?.(targetId) ?? true
-}
-
 function roomTitleFromLightGroup(group: EntityGroupConfig) {
   if (group.title.endsWith(LIGHTS_SUFFIX)) return group.title.slice(0, -LIGHTS_SUFFIX.length)
   if (group.title.endsWith(LIGHT_SUFFIX)) return group.title.slice(0, -LIGHT_SUFFIX.length)
@@ -450,70 +434,6 @@ function SettingsPreviewSheet({ closeHash, onNavigate }: { closeHash: () => void
     <nav aria-label="Settings pages" className={styles.previewList}>
       {SETTINGS_PAGE_ITEMS.map((item) => <SettingsPreviewLink closeHash={closeHash} item={item} key={item.title} onNavigate={onNavigate} />)}
     </nav>
-  )
-}
-
-function CameraSheet({ hash, live = true }: { hash: string; live?: boolean }) {
-  const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
-  const presentation = useModalSheetPresentation()
-  const recordingEntity = useEntity(asEntityName(camera?.recordingEntityId ?? 'input_boolean.unknown'), { returnNullIfNotFound: true })
-  const callService = useHass((state) => state.helpers.callService)
-  const targetId = camera?.popupCardId ?? ''
-  const [isMuted, setIsMuted] = useState(() => (targetId ? getMuteState(targetId) : true))
-  const [snapshotPulse, setSnapshotPulse] = useState(false)
-
-  useEffect(() => {
-    if (!targetId) return undefined
-
-    const handleAudioState = (event: Event) => {
-      const detail = (event as CustomEvent<{ target_id?: string; muted?: boolean }>).detail
-      if (detail?.target_id === targetId && typeof detail.muted === 'boolean') {
-        setIsMuted(detail.muted)
-      }
-    }
-
-    window.addEventListener('webrtc-audio-state', handleAudioState)
-    return () => window.removeEventListener('webrtc-audio-state', handleAudioState)
-  }, [targetId])
-
-  if (!camera) return null
-
-  const toggleRecording = () => {
-    if (!camera.recordingScriptEntityId) return
-    callService({ domain: 'script', service: 'turn_on', target: camera.recordingScriptEntityId })
-  }
-
-  const takeSnapshot = () => {
-    setSnapshotPulse(true)
-    window.setTimeout(() => setSnapshotPulse(false), 900)
-    dispatchWebRtcAction('webrtc-screenshot', camera.popupCardId)
-  }
-  const toggleMute = () => {
-    const nextMuted = !getMuteState(camera.popupCardId)
-    setIsMuted(nextMuted)
-    dispatchWebRtcAction(nextMuted ? 'webrtc-mute' : 'webrtc-unmute', camera.popupCardId)
-  }
-  const isRecording = recordingEntity?.state === 'on'
-
-  return (
-    <div className={styles.cameraSheet} data-modal-landscape-layout="media-split">
-      <div className={styles.cameraFocus} style={{ '--camera-aspect-ratio': camera.aspectRatio } as CSSProperties}>
-        {live ? <WebRtcCamera camera={camera} controls fill={presentation !== 'sheet'} minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
-      </div>
-      <div className={styles.cameraControls} aria-label={`${camera.title} camera controls`}>
-        <ActionPill active={snapshotPulse} label="Snapshot" onClick={takeSnapshot} pulse={snapshotPulse}>
-          <MaterialIcon name="mdi:camera" size={24} />
-        </ActionPill>
-        <ActionPill active={isMuted} label={isMuted ? 'Muted' : 'Audio'} onClick={toggleMute}>
-          <MaterialIcon name={isMuted ? 'mdi:volume-off' : 'mdi:volume-high'} size={24} />
-        </ActionPill>
-        {camera.recordingScriptEntityId && (
-          <ActionPill active={isRecording} danger label={isRecording ? 'Recording' : 'Record'} onClick={toggleRecording} pulse={isRecording}>
-            <MaterialIcon name="mdi:record-circle" size={25} />
-          </ActionPill>
-        )}
-      </div>
-    </div>
   )
 }
 
@@ -1202,7 +1122,8 @@ function SheetContent({
   if (hash === '#settings-preview') return <SettingsPreviewSheet closeHash={closeHash} onNavigate={onNavigate} />
   if (hash === '#security-system') return <SecurityControls />
   if (hash === GUEST_PRESENCE_SECURITY_HASH) return <GuestPresenceSecurityModalContent />
-  if (CAMERA_ITEMS.some((item) => item.hash === hash)) return <CameraSheet hash={hash} key={hash} live={!preload} />
+  const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
+  if (camera) return <CameraModalContent camera={camera} live={!preload} />
 
   return <p className={styles.sheetText}>This overview section is not available from Home.</p>
 }

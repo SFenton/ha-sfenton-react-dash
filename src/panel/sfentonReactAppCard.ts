@@ -1,6 +1,9 @@
 export const SFENTON_REACT_APP_CARD_TAG = 'sfenton-react-app-card'
 export const DEFAULT_REACT_DASHBOARD_CARD_URL = '/local/ha-sfenton-react-dash/index.html'
 const REACT_DASHBOARD_DISPOSE_PROPERTY = '__sfentonReactDashboardDispose'
+const REACT_DASHBOARD_FRAME_PROPERTY = '__sfentonReactDashboardCardFrame'
+const REACT_DASHBOARD_REATTACH_GRACE_MS = 5_000
+const LEGACY_REACT_DASHBOARD_PATH = '/sfenton-react-dash/home'
 const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
 
 type DisposableDashboardWindow = Window & {
@@ -82,30 +85,116 @@ interface CustomCardMetadata {
   type: string
 }
 
+interface PersistentReactDashboardFrame {
+  iframe: HTMLIFrameElement
+  owner?: SfentonReactAppCard
+  releaseTimer?: number
+}
+
 type CustomCardWindow = Window & {
+  [REACT_DASHBOARD_FRAME_PROPERTY]?: PersistentReactDashboardFrame
   customCards?: CustomCardMetadata[]
+}
+
+function cardWindow(card: SfentonReactAppCard) {
+  const ownerWindow = card.ownerDocument.defaultView
+  if (!ownerWindow) throw new Error('The React dashboard card requires a browser window.')
+  return ownerWindow as CustomCardWindow
+}
+
+function createPersistentFrame(ownerDocument: Document) {
+  const iframe = ownerDocument.createElement('iframe')
+  iframe.allow = 'autoplay; camera; microphone; fullscreen'
+  iframe.dataset.sfentonReactAppFrame = 'true'
+  iframe.referrerPolicy = 'same-origin'
+  iframe.style.cssText = `
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    height: 100lvh;
+    border: 0;
+    background: #0b0f14;
+  `
+  ownerDocument.documentElement.append(iframe)
+  return iframe
+}
+
+function disposePersistentFrame(
+  ownerWindow: CustomCardWindow,
+  frame: PersistentReactDashboardFrame,
+  reason: string,
+) {
+  if (frame.releaseTimer !== undefined) {
+    ownerWindow.clearTimeout(frame.releaseTimer)
+    frame.releaseTimer = undefined
+  }
+  disposeReactDashboardFrame(frame.iframe, reason)
+  frame.iframe.remove()
+  if (ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] === frame) {
+    delete ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY]
+  }
+}
+
+function acquirePersistentFrame(card: SfentonReactAppCard) {
+  const ownerWindow = cardWindow(card)
+  let frame = ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY]
+  if (
+    !frame
+    || frame.iframe.ownerDocument !== card.ownerDocument
+    || !frame.iframe.isConnected
+  ) {
+    frame = { iframe: createPersistentFrame(card.ownerDocument) }
+    ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] = frame
+  }
+
+  if (frame.releaseTimer !== undefined) {
+    ownerWindow.clearTimeout(frame.releaseTimer)
+    frame.releaseTimer = undefined
+  }
+  frame.owner = card
+  frame.iframe.hidden = false
+  return frame
+}
+
+function releasePersistentFrame(card: SfentonReactAppCard) {
+  const ownerWindow = cardWindow(card)
+  const frame = ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY]
+  if (!frame || frame.owner !== card) return
+
+  frame.owner = undefined
+  const currentPath = card.ownerDocument.location.pathname.replace(/\/+$/, '')
+  if (currentPath !== LEGACY_REACT_DASHBOARD_PATH) {
+    disposePersistentFrame(ownerWindow, frame, 'legacy-card-disconnected')
+    return
+  }
+
+  frame.releaseTimer = ownerWindow.setTimeout(() => {
+    if (frame.owner || ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] !== frame) return
+    disposePersistentFrame(ownerWindow, frame, 'legacy-card-disconnected')
+  }, REACT_DASHBOARD_REATTACH_GRACE_MS)
 }
 
 export class SfentonReactAppCard extends HTMLElement {
   private config: ReactDashboardCardConfig = {}
-  private needsReload = false
   private releaseSafeAreaBridge?: () => void
 
   setConfig(config: ReactDashboardCardConfig | undefined) {
     this.config = config ?? {}
+    this.configuredUrl()
     this.render()
   }
 
   connectedCallback() {
     this.render()
-    this.connectSafeAreaBridge()
   }
 
   disconnectedCallback() {
     this.releaseSafeAreaBridge?.()
     this.releaseSafeAreaBridge = undefined
-    disposeReactDashboardFrame(this.currentIframe(), 'legacy-card-disconnected')
-    this.needsReload = true
+    releasePersistentFrame(this)
   }
 
   private configuredUrl() {
@@ -140,53 +229,29 @@ export class SfentonReactAppCard extends HTMLElement {
           :host {
             position: fixed;
             inset: 0;
-            z-index: 1;
             display: block;
-            width: 100vw;
-            height: 100vh;
-            height: 100lvh;
-            overflow: hidden;
-            background: #0b0f14;
-          }
-
-          iframe {
-            display: block;
-            width: 100%;
-            height: 100%;
-            border: 0;
-            background: #0b0f14;
+            width: 0;
+            height: 0;
+            pointer-events: none;
           }
         </style>
-        <iframe
-          allow="autoplay; camera; microphone; fullscreen"
-          referrerpolicy="same-origin"
-        ></iframe>
       `
     }
+    if (!this.isConnected) return
 
     const iframe = this.iframe()
     const configuredUrl = this.configuredUrl()
-    if (this.needsReload || iframe.src !== configuredUrl.resolvedUrl.href) {
-      disposeReactDashboardFrame(
-        iframe,
-        this.needsReload ? 'legacy-card-reconnected' : 'legacy-card-source-change',
-      )
+    if (iframe.dataset.configuredAppUrl !== configuredUrl.resolvedUrl.href) {
+      disposeReactDashboardFrame(iframe, 'legacy-card-source-change')
+      iframe.dataset.configuredAppUrl = configuredUrl.resolvedUrl.href
       iframe.src = configuredUrl.source
-      this.needsReload = false
     }
     iframe.title = this.iframeTitle()
     this.connectSafeAreaBridge()
   }
 
-  private currentIframe() {
-    const iframe = this.shadowRoot?.querySelector('iframe')
-    return iframe instanceof HTMLIFrameElement ? iframe : undefined
-  }
-
   private iframe() {
-    const iframe = this.currentIframe()
-    if (!iframe) throw new Error('The React dashboard card iframe was not created.')
-    return iframe
+    return acquirePersistentFrame(this).iframe
   }
 
   private connectSafeAreaBridge() {

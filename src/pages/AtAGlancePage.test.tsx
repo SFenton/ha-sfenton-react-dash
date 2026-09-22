@@ -81,6 +81,18 @@ describe('AtAGlancePage', () => {
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
   })
 
+  it('opens an HA HLS camera modal with working audio controls', async () => {
+    render(<AtAGlancePage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Front Door camera' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: 'Front Door' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-camera-transport="hls"]')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Muted' }))
+    expect(within(dialog).getByRole('button', { name: 'Audio' })).toBeInTheDocument()
+  })
+
   it('moves the Home Quick Links grid into the global floating action', () => {
     render(<AtAGlancePage />)
 

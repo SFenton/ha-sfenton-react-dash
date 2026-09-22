@@ -257,7 +257,7 @@ Useful dedicated unit targets remain `ExpandingSearchAction`,
 `FloatingActionButton`/`Slot`, `Stepper`, `NativePickerField`,
 `RadioRow`, `useModalDetailPageScroll`, `useScheduleDetailPage`, `useScrollMask`,
 `useDonetickTaskForm`, `useTodoOptimisticStatuses`, `useGarageDoorCommand`,
-`SecurityControls`, `SprinklerController`, and `WebRtcCamera`/`CameraModalContent`.
+`SecurityControls`, `SprinklerController`, and `HlsCamera`/`CameraModalContent`.
 Some already have substantial page-level or browser coverage.
 `RangeField` already has dedicated unit coverage in the current master.
 
@@ -273,7 +273,7 @@ Most tests use mocked HAKit and jsdom or a mock browser transport. Real HAKit
 automation is opt-in and covers dials and iframe subscriptions, not the full
 device-service matrices or cascading Home Assistant side effects. Read-only
 live UI inspection supplements that evidence but does not prove mutating
-service success, real WebRTC media, platform keyboard behavior, or deployed
+service success, real HLS media, platform keyboard behavior, or deployed
 three-frame inset inheritance.
 
 ### Remaining Playwright state gaps

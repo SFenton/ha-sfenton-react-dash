@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -148,6 +148,17 @@ describe('Home Assistant production metadata adapter', () => {
         'b'.repeat(64),
       ),
     ).toThrow('HA_DEPLOY_SSH_HOST_KEY_SHA256')
+  })
+
+  // @covers home-assistant/packages/sfenton_react_panel.yaml
+  it('cache-busts the persistent custom-panel bridge', async () => {
+    const panelPackage = await readFile(
+      join(process.cwd(), 'home-assistant/packages/sfenton_react_panel.yaml'),
+      'utf8',
+    )
+    expect(panelPackage).toContain(
+      'module_url: /local/ha-sfenton-react-dash/sfenton-react-panel.js?v=5',
+    )
   })
 
   it('captures the exact wrapper, card resource, panel, and restore payload', async () => {

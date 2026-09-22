@@ -5,6 +5,7 @@
 }
 
 .cameraFocus {
+  aspect-ratio: var(--camera-aspect-ratio, 1.7778);
   overflow: hidden;
   border-radius: 28px;
   background: rgba(0, 0, 0, 0.28);

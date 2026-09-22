@@ -137,7 +137,7 @@ Before choosing React colors for a ported card, control, popup, separator, butto
 - Preserve the React dashboard's established visual language unless source fidelity requires a specific deviation. For repeated Lovelace/bubble controls, prefer adapting the existing React `Card`/`GlassTile` over creating a page-specific visual surface.
 - Account for interactivity changes from card type, action config, entity state, locked/disabled states, and conditional rendering.
 - Treat popups and modal sheets as part of the port, including internal scrolling, dismiss behavior, and controls inside the modal.
-- For camera/WebRTC surfaces, follow the repo instructions for `webrtc-camera-sfenton` and do not replace live behavior with static placeholders.
+- For camera surfaces, follow the repo's HA-origin HLS adapter contract and do not replace live behavior with static placeholders.
 
 ## Reuse And Refactoring
 
