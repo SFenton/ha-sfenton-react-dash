@@ -34,6 +34,15 @@
   );
 }
 
+.shell[data-navigation-layout='drawer-only'].hasFloatingAction {
+  --floating-action-bottom: max(12px, var(--rd-safe-bottom));
+  --page-bottom-extra-padding: calc(
+    var(--floating-action-size)
+    + var(--floating-action-bottom)
+    + var(--floating-action-bottom)
+  );
+}
+
 .shell[data-page-measure='dashboard'] {
   --active-page-measure: var(--page-measure-dashboard);
 }
@@ -153,5 +162,5 @@
 }
 
 .shell[data-navigation-layout='drawer-only'] .floatingAction {
-  bottom: max(12px, var(--rd-safe-bottom));
+  bottom: var(--floating-action-bottom);
 }
