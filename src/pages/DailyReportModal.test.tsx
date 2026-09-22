@@ -2,12 +2,16 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AtAGlancePage } from './AtAGlancePage'
 import { DashboardViewPage } from './DashboardViewPage'
-import { mockDonetickTasksById, mockEntities, mockState, mockTodoItemsByEntity, resetMockHass } from '../test/mocks/hakitCoreState'
+import { mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState } from '../test/mocks/hakitCoreState'
 
+// @covers src/components/hass/DailyReportModal.tsx
+// @covers src/components/hass/DailyReportModalContent.tsx
+// @covers src/components/hass/TodoListPanel.tsx
 // @covers src/components/hass/dailyReportModal.ts
 
 const OVERDUE_ENTITY_ID = 'todo.stephen_s_past_due_with_unassigned'
 const UPCOMING_ENTITY_ID = 'todo.stephen_s_due_today_with_unassigned'
+const NO_DUE_DATE_ENTITY_ID = 'todo.stephen_s_no_due_date_with_unassigned'
 const EXPIRED_ITEMS_ENTITY_ID = 'sensor.evershelf_expired_items'
 const VACATION_MODE_ENTITY_ID = 'input_boolean.vacation_mode'
 const DEFAULT_EXPIRED_LIST = mockEntities[EXPIRED_ITEMS_ENTITY_ID].attributes.expired_list
@@ -53,6 +57,9 @@ describe('Daily summary modal', () => {
     mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = [
       { uid: '222--2026-12-31 23:30:00+00:00', summary: 'Water the plants', status: 'needs_action', due: '2026-12-31T23:30:00+00:00' },
     ]
+    mockTodoItemsByEntity[NO_DUE_DATE_ENTITY_ID] = [
+      { uid: '333--None', summary: 'Replace air filter', status: 'needs_action' },
+    ]
     mockDonetickTasksById[240] = {
       assignees: [1],
       assigned_to: 1,
@@ -78,6 +85,19 @@ describe('Daily summary modal', () => {
       name: 'Water the plants',
       next_due_date: '2026-12-31T23:30:00+00:00',
       priority: 1,
+    }
+    mockDonetickTasksById[333] = {
+      assignees: [1],
+      assigned_to: 1,
+      description: 'Use the spare filter',
+      frequency: 1,
+      frequency_metadata: {},
+      frequency_type: 'monthly',
+      hide_on_vacation: true,
+      id: 333,
+      name: 'Replace air filter',
+      next_due_date: null,
+      priority: 2,
     }
     setDashboardUrl(summaryUrl('?path=overview&user=stephen'))
   })
@@ -176,18 +196,26 @@ describe('Daily summary modal', () => {
     expect(within(nav).getByRole('tab', { name: 'Expired Food' }).querySelector('[data-count]')).toBeNull()
   })
 
-  it('keeps a section header for the active tab outside the modal scroller', async () => {
+  it('keeps Upcoming inside the modal scroller while other section headers stay outside', async () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const bodyHeader = dialog.querySelector('[data-modal-sheet-body-header="true"]')
-    expect(bodyHeader).not.toBeNull()
-    expect(bodyHeader?.contains(dialog.querySelector('[data-modal-sheet-body="true"]'))).toBe(false)
-    expect(within(bodyHeader as HTMLElement).getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeInTheDocument()
+    const body = dialog.querySelector('[data-modal-sheet-body="true"]') as HTMLElement
+    const overdueHeader = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(overdueHeader.contains(body)).toBe(false)
+    expect(within(overdueHeader).getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeInTheDocument()
 
     const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
+    const upcomingHeading = await within(body).findByRole('heading', { level: 2, name: 'Upcoming Chores' })
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
+    expect(within(dialog).getAllByRole('heading', { level: 2, name: 'Upcoming Chores' })).toHaveLength(1)
+    expect(upcomingHeading.parentElement?.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
+
     fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
-    expect(within(bodyHeader as HTMLElement).getByRole('heading', { level: 2, name: 'Expired Food' })).toBeInTheDocument()
+    const expiredHeader = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(expiredHeader.contains(body)).toBe(false)
+    expect(within(expiredHeader).getByRole('heading', { level: 2, name: 'Expired Food' })).toBeInTheDocument()
   })
 
   it('switches between the overdue, upcoming, and expired food tabs', async () => {
@@ -199,6 +227,12 @@ describe('Daily summary modal', () => {
 
     fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
     expect(await within(dialog).findByText('Water the plants')).toBeInTheDocument()
+    const upcomingHeading = within(dialog).getByRole('heading', { level: 2, name: 'Upcoming Chores' })
+    expect(upcomingHeading.parentElement?.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
+    const noDueDateSection = within(dialog).getByRole('region', { name: 'No Due Date' })
+    const noDueDateHeading = within(noDueDateSection).getByRole('heading', { level: 2, name: 'No Due Date' })
+    expect(noDueDateHeading.parentElement?.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
+    expect(await within(noDueDateSection).findByText('Replace air filter')).toBeInTheDocument()
     expect(within(dialog).queryByText('Take out the trash')).not.toBeInTheDocument()
 
     fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
@@ -206,7 +240,39 @@ describe('Daily summary modal', () => {
     expect(within(dialog).queryByText('Water the plants')).not.toBeInTheDocument()
   })
 
-  it('opens the shared task editor from overdue and upcoming chore rows', async () => {
+  it('shows only the no-due-date section when the upcoming list is empty', async () => {
+    mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
+
+    const noDueDateSection = await within(dialog).findByRole('region', { name: 'No Due Date' })
+    expect(within(noDueDateSection).getByText('Replace air filter')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
+    await waitFor(() => expect(dialog.querySelector('[data-daily-report-todo-section="upcoming"]')).toHaveAttribute('hidden'))
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
+  })
+
+  it('omits the no-due-date section when only upcoming chores remain', async () => {
+    mockTodoItemsByEntity[NO_DUE_DATE_ENTITY_ID] = []
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
+
+    expect(await within(dialog).findByText('Water the plants')).toBeInTheDocument()
+    const upcomingHeading = within(dialog).getByRole('heading', { level: 2, name: 'Upcoming Chores' })
+    expect(dialog.querySelector('[data-modal-sheet-body="true"]')?.contains(upcomingHeading)).toBe(true)
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
+    await waitFor(() => expect(within(dialog).queryByRole('region', { name: 'No Due Date' })).not.toBeInTheDocument())
+    expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
+  })
+
+  it('opens the shared task editor from overdue, upcoming, and no-due-date chore rows', async () => {
     renderHome()
 
     const summaryDialog = await screen.findByRole('dialog', { name: "Your Summary" })
@@ -229,6 +295,11 @@ describe('Daily summary modal', () => {
     fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
     const upcomingRegion = await within(summaryDialog).findByRole('region', { name: 'Upcoming Chores' })
     expect(await within(upcomingRegion).findByRole('button', { name: 'Edit Water the plants' })).toBeInTheDocument()
+
+    const noDueDateRegion = within(summaryDialog).getByRole('region', { name: 'No Due Date' })
+    fireEvent.click(within(noDueDateRegion).getByRole('button', { name: 'Edit Replace air filter' }))
+    await waitFor(() => expect(within(summaryDialog).getByLabelText('Task Name')).toHaveValue('Replace air filter'))
+    expect(within(summaryDialog).getByLabelText('Description')).toHaveValue('Use the spare filter')
   })
 
   it('keeps a failed in-flight save visible after external summary dismissal', async () => {
@@ -386,9 +457,100 @@ describe('Daily summary modal', () => {
     expect(within(emptySection as HTMLElement).getByText('You are all caught up on chores that slipped past their due date.')).toBeInTheDocument()
   })
 
+  it.each([UPCOMING_ENTITY_ID, NO_DUE_DATE_ENTITY_ID])('waits for %s before showing the combined upcoming empty state', async (delayedEntityId) => {
+    mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    mockTodoItemsByEntity[NO_DUE_DATE_ENTITY_ID] = []
+    const originalSendMessage = mockState.connection.sendMessagePromise
+    let resolveDelayed: ((value: { items: never[] }) => void) | undefined
+    const delayedResponse = new Promise<{ items: never[] }>((resolve) => {
+      resolveDelayed = resolve
+    })
+    vi.spyOn(mockState.connection, 'sendMessagePromise').mockImplementation(<T,>(message: Record<string, unknown>) => {
+      if (message.type === 'todo/item/list' && message.entity_id === delayedEntityId) return delayedResponse as Promise<T>
+      return originalSendMessage<T>(message)
+    })
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
+
+    await waitFor(() => {
+      const resolvedEntityId = delayedEntityId === UPCOMING_ENTITY_ID ? NO_DUE_DATE_ENTITY_ID : UPCOMING_ENTITY_ID
+      expect(dialog.querySelector(`[data-daily-report-todo-section="${resolvedEntityId === UPCOMING_ENTITY_ID ? 'upcoming' : 'no-due-date'}"]`)).toHaveAttribute('hidden')
+    })
+    expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
+    if (delayedEntityId === UPCOMING_ENTITY_ID) {
+      expect(within(dialog).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    } else {
+      expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    }
+
+    await act(async () => {
+      resolveDelayed?.({ items: [] })
+      await delayedResponse
+    })
+    expect(await within(dialog).findByRole('heading', { name: 'No Chores Upcoming' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'No Due Date' })).not.toBeInTheDocument()
+  })
+
+  it('keeps a failed no-due-date reload visible instead of restoring the combined empty state', async () => {
+    mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    mockTodoItemsByEntity[NO_DUE_DATE_ENTITY_ID] = []
+    mockEntities[UPCOMING_ENTITY_ID].state = '0'
+    mockEntities[NO_DUE_DATE_ENTITY_ID].state = '0'
+    const originalSendMessage = mockState.connection.sendMessagePromise
+    let failNoDueDateReload = false
+    vi.spyOn(mockState.connection, 'sendMessagePromise').mockImplementation(<T,>(message: Record<string, unknown>) => {
+      if (failNoDueDateReload && message.type === 'todo/item/list' && message.entity_id === NO_DUE_DATE_ENTITY_ID) {
+        return Promise.reject(new Error('Unable to refresh chores'))
+      }
+      return originalSendMessage<T>(message)
+    })
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
+    expect(await within(dialog).findByRole('heading', { name: 'No Chores Upcoming' })).toBeInTheDocument()
+
+    failNoDueDateReload = true
+    act(() => setMockEntityState(NO_DUE_DATE_ENTITY_ID, '1'))
+
+    expect(await within(dialog).findByText('Unable to refresh chores')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { level: 2, name: 'No Due Date' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-daily-report-todo-section="no-due-date"]')).not.toHaveAttribute('hidden')
+  })
+
+  it('shows the combined empty state after completing the last no-due-date chore', async () => {
+    mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
+    const noDueDateSection = await within(dialog).findByRole('region', { name: 'No Due Date' })
+
+    fireEvent.click(within(noDueDateSection).getByRole('button', { name: 'Replace air filter' }))
+
+    expect(mockCallServiceCalls).toContainEqual({
+      domain: 'todo',
+      service: 'update_item',
+      target: NO_DUE_DATE_ENTITY_ID,
+      serviceData: { item: '333--None', status: 'completed' },
+    })
+    expect(await within(dialog).findByRole('heading', { name: 'No Chores Upcoming' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'No Due Date' })).not.toBeInTheDocument()
+  })
+
   // Titles stay identical across vacation and non-vacation; only the supporting line changes.
   it('keeps empty state titles consistent between vacation and non-vacation', async () => {
     mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    mockTodoItemsByEntity[NO_DUE_DATE_ENTITY_ID] = []
     setExpiredFood(0)
     renderHome()
 
@@ -408,6 +570,7 @@ describe('Daily summary modal', () => {
     mockEntities[VACATION_MODE_ENTITY_ID].state = 'on'
     mockTodoItemsByEntity[OVERDUE_ENTITY_ID] = []
     mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    mockTodoItemsByEntity[NO_DUE_DATE_ENTITY_ID] = []
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
@@ -491,10 +654,11 @@ describe('Daily summary modal', () => {
     expect(profile).toHaveAccessibleName("Open Your Summary, 7 items need attention")
   })
 
-  it('excludes upcoming chores from the profile badge', async () => {
+  it('excludes upcoming and no-due-date chores from the profile badge', async () => {
     setDashboardUrl('/sfenton-react-dash/home?path=overview')
     mockEntities[OVERDUE_ENTITY_ID].state = '1'
     mockEntities[UPCOMING_ENTITY_ID].state = '5'
+    mockEntities[NO_DUE_DATE_ENTITY_ID].state = '6'
     setExpiredFood(0)
     renderHome()
 
@@ -563,8 +727,26 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
-    expect(within(header).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    const body = dialog.querySelector('[data-modal-sheet-body="true"]') as HTMLElement
+    expect(await within(body).findByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
+  })
+
+  it('falls through to upcoming when only no-due-date chores remain', async () => {
+    mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
+    mockEntities[OVERDUE_ENTITY_ID].state = '0'
+    mockEntities[UPCOMING_ENTITY_ID].state = '0'
+    mockEntities[NO_DUE_DATE_ENTITY_ID].state = '4'
+    setExpiredFood(0)
+    setDashboardUrl(summaryUrl('?path=overview&user=stephen&tab=auto'))
+    renderHome()
+
+    const dialog = await screen.findByRole('dialog')
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    expect(within(nav).getByRole('tab', { name: /^Upcoming Chores/ })).toHaveAttribute('aria-selected', 'true')
+    expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Due Date' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
   })
 
   it('honours an explicit tab request from a link', async () => {
@@ -573,8 +755,9 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
-    expect(within(header).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    const body = dialog.querySelector('[data-modal-sheet-body="true"]') as HTMLElement
+    expect(await within(body).findByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
   })
 
   it('consumes the tab request so a later manual open keeps the chosen tab', async () => {
