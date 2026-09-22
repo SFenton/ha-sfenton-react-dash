@@ -71,7 +71,8 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
               ? 'vacuums'
               : 'overview'
   const recipeDelay = scenario === 'recipe-grocery' ? `&__mockRecipeGroceryDelayMs=${state === 'loading' ? 60000 : 300}` : ''
-  await page.goto(`/index.html?path=${route}${recipeDelay}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
+  const cameraDelay = scenario === 'camera' && state === 'loading' ? '&__mockCameraDelayMs=60000' : ''
+  await page.goto(`/index.html?path=${route}${recipeDelay}${cameraDelay}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
   await waitForRoute(page, route, scenario === 'summary')
   if (scenario === 'solo-trip-settings') {
     const fixtureState = state === 'active-home-viewer' || state === 'active-unknown-viewer'
@@ -129,6 +130,7 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
     await page.getByRole('textbox', { name: 'Task', exact: true }).fill('Layout validation draft')
     await page.getByRole('textbox', { name: 'Task', exact: true }).blur()
   }
+  if (scenario === 'camera') await page.getByRole('button', { name: 'Open Front Door camera' }).click()
   if (scenario === 'admin-todo-edit') {
     await page.evaluate(() => {
       const mock = window.__mockHass!
@@ -273,7 +275,17 @@ export async function applyHostProfile(page: Page, frame: Frame, state: string, 
     host.style.width = narrow ? 'calc(100vw - 256px)' : '100vw'
     host.style.left = narrow ? '256px' : '0'
   }, state === 'panel' && profile === 'desktop')
+  const expected = layoutProfile(profile)
+  await expect.poll(() => frame.evaluate(() => ({
+    height: innerHeight,
+    width: innerWidth,
+  }))).toEqual({
+    height: expected.viewport.height,
+    width: state === 'panel' && profile === 'desktop'
+      ? expected.viewport.width - 256
+      : expected.viewport.width,
+  })
   await expect.poll(() => frame.evaluate(() => Object.fromEntries(['top', 'right', 'bottom', 'left'].map((edge) => [
     edge, Number.parseFloat(document.documentElement.style.getPropertyValue(`--safe-area-inset-${edge}`)) || 0,
-  ])))).toEqual(layoutProfile(profile).insets)
+  ])))).toEqual(expected.insets)
 }

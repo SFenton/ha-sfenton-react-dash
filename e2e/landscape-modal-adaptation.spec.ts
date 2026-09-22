@@ -1,4 +1,6 @@
 // @covers src/components/core/ModalSheet.module.css
+// @covers src/components/hass/HlsCamera.module.css
+// @covers src/test/mocks/hakitCoreState.ts
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import type { ModalBodyTier } from '../src/components/core/modalSheetPresentation'
 import { setSafeAreaInsets } from './safe-area'
@@ -253,11 +255,8 @@ test.describe('non-room landscape modal adaptation', () => {
 
   test('keeps the initial camera loading frame flush with its landscape wrapper', async ({ page }) => {
     await page.setViewportSize({ height: 820, width: 1180 })
-    let releaseModule!: () => void
-    const moduleGate = new Promise<void>((resolve) => { releaseModule = resolve })
-    await page.route('**/webrtc/webrtc-camera.js**', async (route) => {
-      await moduleGate
-      await route.abort()
+    await page.addInitScript(() => {
+      ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 60_000
     })
 
     const dialog = await openButtonModal(page, 'overview', /Open Upper Deck camera/i)
@@ -274,7 +273,6 @@ test.describe('non-room landscape modal adaptation', () => {
       }
     })).toEqual({ frameFlush: true, hostFlush: true })
 
-    releaseModule()
     await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
     await expect(dialog).toHaveCount(0, { timeout: 700 })
   })

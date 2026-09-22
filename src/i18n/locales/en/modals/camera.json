@@ -6,5 +6,8 @@
     "recording": "Recording",
     "snapshot": "Snapshot"
   },
-  "controls": "{{title}} camera controls"
+  "controls": "{{title}} camera controls",
+  "status": {
+    "unavailable": "Camera unavailable"
+  }
 }

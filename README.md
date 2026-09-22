@@ -9,7 +9,13 @@ The production build currently ships to two Home Assistant sidebar hosts:
 
 Both hosts use the same files under `/local/ha-sfenton-react-dash/`. Use `npm run deploy:both` for the SSH build/deploy/sync flow, or copy `dist/` over SMB and then run `npm run deploy:sync`. Include the chat history component/package installation below in either flow. Deployment sync also keeps the legacy `sfenton-react-app-card` resource on the repository-owned, versioned module instead of an out-of-band inline resource. The custom-panel registration is versioned in `home-assistant/packages/sfenton_react_panel.yaml`; changes to that package/bridge or the chat history component/package require an explicitly approved Home Assistant restart, unlike asset-only updates.
 
-Both iframe hosts explicitly dispose the React root before replacing an app frame. Frame removal normally cleans up through non-BFCache `pagehide`; host `disconnectedCallback` is a best-effort fallback, and a newly mounted frame disposes any stale prior generation if the browser skipped teardown. Current lifecycle state is exposed on `window.top.__sfentonReactDashboardLifecycle`; the bounded primitive-only event history is stored as JSON in `window.top.__sfentonReactDashboardLifecycleHistory` for device diagnostics.
+Both iframe hosts keep the same app frame in the stable top document across an
+immediate Home Assistant host replacement. Source changes, route departure, or
+an abandoned host dispose the React root; a newly mounted frame also disposes
+any stale prior generation if the browser skipped teardown. Current lifecycle
+state is exposed on `window.top.__sfentonReactDashboardLifecycle`; the bounded
+primitive-only event history is stored as JSON in
+`window.top.__sfentonReactDashboardLifecycleHistory` for device diagnostics.
 
 The install hook applies a fail-closed compatibility patch to `home-assistant-js-websocket@9.6.0`: it removes the exact `ready` callback that was registered, and embedded collections tear down synchronously before their iframe timer realm disappears.
 

@@ -345,7 +345,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'chat', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source', 'solo-trip-settings', 'solo-trip-bed'] as const
+export const SCENARIO_IDS = ['quick-links', 'chat', 'camera', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source', 'solo-trip-settings', 'solo-trip-bed'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -377,6 +377,12 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     owners: ['src/components/hass/chat/', 'src/components/hass/LightColorPicker', 'src/components/hass/lightColor', 'src/components/shell/GlobalQuickLinksAction', 'src/i18n/locales/en/modals/chat.json'],
     legacy: ['chat-ux.spec.ts', 'modal-rotation-regressions.spec.ts'],
     question: 'Are roles, genuine pending dots, 14-day history visibility, versioned Chat Settings, embedded room/color/brightness controls and same-sheet custom color details using the shared exterior-light picker clear, with resume warnings, errors, long messages, a usable composer above bottom tabs and one safe scroll owner?',
+  },
+  camera: {
+    family: 'modal', states: ['loading', 'live'],
+    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera', 'src/components/hass/haHlsSession', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/hls-js-light.d.ts'],
+    legacy: ['feedback-regressions.spec.ts', 'landscape-modal-adaptation.spec.ts'],
+    question: 'Do camera tiles and modal media preserve their geometry while the Home Assistant HLS stream transitions from loading to decoded live video?',
   },
   summary: {
     family: 'modal', states: ['overdue', 'upcoming', 'expired'],

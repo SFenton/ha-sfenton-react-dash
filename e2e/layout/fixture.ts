@@ -12,7 +12,12 @@ export function assertGuardedContext(context: BrowserContext) {
   if (!guardedContexts.has(context)) throw new Error('Layout isolation was not installed on the actual Playwright context')
 }
 
-export function networkDecision(raw: string, method: string, origins: readonly string[]) {
+export function networkDecision(
+  raw: string,
+  method: string,
+  origins: readonly string[],
+  legacyWebRtcOrigin?: string,
+) {
   try {
     const url = new URL(raw)
     let pathname = url.pathname
@@ -21,23 +26,31 @@ export function networkDecision(raw: string, method: string, origins: readonly s
     // Reserved mock origin never goes onto the network; unavailable media is an explicit fixture.
     if (url.hostname === 'mock-hass.local' && ['http:', 'https:'].includes(url.protocol)) return 'mock'
     if (!origins.includes(url.origin) || !['http:', 'https:'].includes(url.protocol)) return 'deny'
+    if (url.origin === legacyWebRtcOrigin && pathname === '/webrtc/webrtc-camera.js') return 'legacy-webrtc'
     if (/^\/(?:api|local|webrtc|hacsfiles|__evershelf)(?:\/|$)|^\/assets\/valetudo(?:\/|$)/i.test(pathname)) return 'deny'
     return 'allow'
   } catch { return 'deny' }
 }
 
-export async function guardContext(context: BrowserContext, origins: string[], violations: string[]) {
+export async function guardContext(
+  context: BrowserContext,
+  origins: string[],
+  violations: string[],
+  legacyWebRtcOrigin?: string,
+) {
   await context.route('**/*', async (route) => {
     const request = route.request()
-    const requestedUrl = new URL(request.url())
-    const decision = networkDecision(request.url(), request.method(), origins)
-    if (origins.includes(requestedUrl.origin) && request.method() === 'GET' && requestedUrl.pathname === '/webrtc/webrtc-camera.js') {
+    const decision = networkDecision(request.url(), request.method(), origins, legacyWebRtcOrigin)
+    if (decision === 'legacy-webrtc') {
       await route.fulfill({
         contentType: 'application/javascript',
         body: `if (!customElements.get('webrtc-camera-sfenton')) {
           customElements.define('webrtc-camera-sfenton', class extends HTMLElement {
             setConfig() {}
-            connectedCallback() { this.dataset.layoutMockCamera = 'true'; this.style.cssText = 'display:block;width:100%;height:100%'; }
+            connectedCallback() {
+              this.dataset.layoutMockCamera = 'true';
+              this.style.cssText = 'display:block;width:100%;height:100%';
+            }
           });
         }`,
       })
@@ -102,10 +115,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       ? readJson<RunIdentity>(resolve(process.env.LAYOUT_RUN_DIR, 'run.json'))
       : null
     const origins = run ? [run.candidate.origin, run.baseline.origin] : [`http://127.0.0.1:${process.env.PLAYWRIGHT_PORT ?? 5174}`]
+    const legacyWebRtcOrigin = run?.baseline.origin
     const original = browser.newContext.bind(browser)
     browser.newContext = async (options?: BrowserContextOptions) => {
       const context = await original({ ...options, serviceWorkers: 'block' })
-      await guardContext(context, origins, layoutNetworkAudit)
+      await guardContext(context, origins, layoutNetworkAudit, legacyWebRtcOrigin)
       return context
     }
     try { await provide(browser) } finally { browser.newContext = original }
