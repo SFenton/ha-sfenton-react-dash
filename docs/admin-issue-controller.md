@@ -86,6 +86,10 @@ mutable user extensions or unrelated personal skills.
 12. Post the completion evidence, close the issue, complete the Home Assistant
     item, verify its completion receipt, and remove the issue worktree.
 
+A completed deployment workflow with a non-success conclusion blocks that
+issue once and releases the serialized queue. It is not retried indefinitely;
+the GitHub issue and Home Assistant task remain open for operator recovery.
+
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
 stable Copilot session. A worker-classified iOS/WebKit fix remains open after
