@@ -8,9 +8,19 @@ function setIframeDisposer(iframe: HTMLIFrameElement | null | undefined, dispose
   })
 }
 
+function persistentIframe() {
+  return document.documentElement.querySelector(
+    'iframe[data-sfenton-react-panel-frame="true"]',
+  ) as HTMLIFrameElement | null
+}
+
 describe('Sfenton React custom panel', () => {
   afterEach(() => {
+    vi.clearAllTimers()
+    vi.useRealTimers()
+    persistentIframe()?.remove()
     document.body.replaceChildren()
+    window.history.replaceState({}, '', '/')
     vi.restoreAllMocks()
   })
 
@@ -35,7 +45,7 @@ describe('Sfenton React custom panel', () => {
     }
     document.body.append(panel)
 
-    const initialIframe = panel.shadowRoot?.querySelector('iframe')
+    const initialIframe = persistentIframe()
     expect(initialIframe).toBeInstanceOf(HTMLIFrameElement)
     expect(initialIframe).toHaveAttribute('title', 'React Dash Panel')
     expect(initialIframe).toHaveAttribute(
@@ -49,12 +59,61 @@ describe('Sfenton React custom panel', () => {
     }
     panel.connectedCallback()
 
-    expect(panel.shadowRoot?.querySelector('iframe')).toBe(initialIframe)
+    expect(persistentIframe()).toBe(initialIframe)
     expect(initialIframe).toHaveAttribute('title', 'Updated Panel Title')
     expect(initialIframe).toHaveAttribute(
       'src',
       `${window.location.origin}/local/ha-sfenton-react-dash/index.html?v=5678`,
     )
+  })
+
+  it('keeps the persistent iframe aligned to the native panel viewport', () => {
+    let panelRect = {
+      x: 256,
+      y: 0,
+      left: 256,
+      top: 0,
+      right: 1440,
+      bottom: 900,
+      width: 1184,
+      height: 900,
+      toJSON: () => ({}),
+    } as DOMRect
+    const panel = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
+    vi.spyOn(panel, 'getBoundingClientRect').mockImplementation(() => panelRect)
+    panel.panel = {
+      config: { app_url: DEFAULT_REACT_DASHBOARD_URL },
+      title: 'React Dash Panel',
+    }
+    document.body.append(panel)
+
+    const iframe = persistentIframe()
+    expect(iframe).toHaveStyle({
+      left: '256px',
+      top: '0px',
+      width: '1184px',
+      height: '900px',
+    })
+
+    panelRect = {
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 852,
+      bottom: 393,
+      width: 852,
+      height: 393,
+      toJSON: () => ({}),
+    } as DOMRect
+    window.dispatchEvent(new Event('resize'))
+
+    expect(iframe).toHaveStyle({
+      left: '0px',
+      top: '0px',
+      width: '852px',
+      height: '393px',
+    })
   })
 
   it('forwards outer panel safe-area variables into the React iframe', async () => {
@@ -67,7 +126,7 @@ describe('Sfenton React custom panel', () => {
     }
     document.body.append(panel)
 
-    const iframe = panel.shadowRoot?.querySelector('iframe')
+    const iframe = persistentIframe()
     const iframeDocument = document.implementation.createHTMLDocument()
     Object.defineProperty(iframe, 'contentDocument', {
       configurable: true,
@@ -91,7 +150,7 @@ describe('Sfenton React custom panel', () => {
       title: 'React Dash Panel',
     }
     document.body.append(panel)
-    const iframe = panel.shadowRoot?.querySelector('iframe')
+    const iframe = persistentIframe()
     const dispose = vi.fn(() => true)
     setIframeDisposer(iframe, dispose)
 
@@ -107,6 +166,33 @@ describe('Sfenton React custom panel', () => {
     )
   })
 
+  it('keeps the same app frame across an immediate panel replacement', () => {
+    vi.useFakeTimers()
+    vi.spyOn(Date, 'now').mockReturnValue(5678)
+    window.history.replaceState({}, '', '/sfenton-react-panel')
+    const firstPanel = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
+    firstPanel.panel = {
+      config: { app_url: DEFAULT_REACT_DASHBOARD_URL },
+      title: 'React Dash Panel',
+    }
+    document.body.append(firstPanel)
+    const iframe = persistentIframe()
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    firstPanel.remove()
+    const replacement = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
+    replacement.panel = {
+      config: { app_url: DEFAULT_REACT_DASHBOARD_URL },
+      title: 'React Dash Panel',
+    }
+    document.body.append(replacement)
+    vi.advanceTimersByTime(5_000)
+
+    expect(persistentIframe()).toBe(iframe)
+    expect(dispose).not.toHaveBeenCalled()
+  })
+
   it('disposes the current app when Home Assistant removes the panel', () => {
     const panel = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
     panel.panel = {
@@ -114,12 +200,13 @@ describe('Sfenton React custom panel', () => {
       title: 'React Dash Panel',
     }
     document.body.append(panel)
-    const iframe = panel.shadowRoot?.querySelector('iframe')
+    const iframe = persistentIframe()
     const dispose = vi.fn(() => true)
     setIframeDisposer(iframe, dispose)
 
     panel.remove()
 
     expect(dispose).toHaveBeenCalledWith('panel-host-disconnected')
+    expect(iframe).not.toBeInTheDocument()
   })
 })

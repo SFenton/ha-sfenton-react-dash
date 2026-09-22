@@ -1,0 +1,48 @@
+.frame {
+  position: relative;
+  width: 100%;
+  min-height: var(--camera-min-height, 190px);
+  overflow: hidden;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-modal-overlay) 55%, var(--rd-transparent));
+}
+
+.frame[data-loaded='true']:not([data-variant='tile']) {
+  min-height: 0;
+}
+
+.host {
+  width: 100%;
+  min-height: var(--camera-min-height, 190px);
+}
+
+.frame[data-loaded='true']:not([data-variant='tile']) .host {
+  min-height: 0;
+}
+
+.frame[data-variant='tile'],
+.frame[data-variant='tile'] .host,
+.frame[data-variant='tile'] video,
+.frame[data-fill='true'],
+.frame[data-fill='true'] .host,
+.frame[data-fill='true'] video {
+  height: 100%;
+  min-height: 0;
+}
+
+.host video {
+  display: block;
+  width: 100%;
+}
+
+.message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 720;
+  text-align: center;
+}

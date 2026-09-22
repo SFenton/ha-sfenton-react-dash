@@ -6818,10 +6818,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByLabelText('PC Window Closed')).not.toHaveClass(/bubble/)
   })
 
-  it('opens Security camera popups with WebRTC actions and recording script payloads', async () => {
-    const firedEvents: string[] = []
-    window.addEventListener('webrtc-screenshot', () => firedEvents.push('webrtc-screenshot'), { once: true })
-    window.addEventListener('webrtc-toggle-mute', () => firedEvents.push('webrtc-toggle-mute'), { once: true })
+  it('opens Security camera popups with HLS media actions and recording script payloads', async () => {
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Front Door camera' }))
@@ -6830,9 +6827,9 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('heading', { name: 'Front Door Camera' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Snapshot' }))
     fireEvent.click(screen.getByRole('button', { name: 'Muted' }))
+    expect(screen.getByRole('button', { name: 'Audio' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Record' }))
 
-    expect(firedEvents).toEqual(['webrtc-screenshot', 'webrtc-toggle-mute'])
     expect(mockCallServiceCalls).toEqual([{ domain: 'script', service: 'turn_on', target: 'script.front_door_manual_recording' }])
   })
 

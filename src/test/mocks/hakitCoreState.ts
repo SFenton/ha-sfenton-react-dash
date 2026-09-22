@@ -17,8 +17,13 @@ export interface MockHassState {
   connection: {
     readonly connected: boolean
     options?: { auth?: { accessToken?: string } }
+    socket?: object
     sendMessagePromise: <T>(message: Record<string, unknown>) => Promise<T>
-    subscribeMessage: <T>(callback: (value: T) => void, message: Record<string, unknown>) => Promise<() => void | Promise<void>>
+    subscribeMessage: <T>(
+      callback: (value: T) => void,
+      message: Record<string, unknown>,
+      options?: { preCheck?: () => boolean | Promise<boolean>; resubscribe?: boolean },
+    ) => Promise<() => void | Promise<void>>
     addEventListener: (event: 'ready' | 'disconnected', listener: () => void) => void
     removeEventListener: (event: 'ready' | 'disconnected', listener: () => void) => void
   }
@@ -57,6 +62,7 @@ let recipeQueryFailureConfig: string | null | undefined
 const pendingWakeCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
 const pendingHouseholdAwayCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
 let mockWakeEpisodeSequence = 0
+let mockCameraSessionSequence = 0
 // Generic deferred queue for any domain/service held with a 'pending' outcome so a test can
 // deterministically hold a request (e.g. todo.remove_item) and resolve it on its own schedule,
 // unlike the permanently-hanging `new Promise(() => undefined)` used elsewhere for pending outcomes.
@@ -187,6 +193,7 @@ export function setMockConnectionStatus(status: MockConnectionStatus) {
   const changed = mockState.connectionStatus !== status
   mockState.connectionStatus = status
   if (changed) {
+    mockState.connection.socket = status === 'connected' ? {} : undefined
     for (const listener of mockConnectionListeners.get(status === 'connected' ? 'ready' : 'disconnected') ?? []) listener()
   }
   notifyMockHass()
@@ -1389,7 +1396,7 @@ export const explicitMockEntities: Record<string, MockEntity> = {
   'button.master_bedroom_sleepypod_eight_pod_left_alarm_stop': entity('button.master_bedroom_sleepypod_eight_pod_left_alarm_stop', 'unknown'),
   'button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze': entity('button.master_bedroom_sleepypod_eight_pod_right_alarm_snooze', 'unknown'),
   'button.master_bedroom_sleepypod_eight_pod_right_alarm_stop': entity('button.master_bedroom_sleepypod_eight_pod_right_alarm_stop', 'unknown'),
-  'camera.doorbell_camera': entity('camera.doorbell_camera', 'idle'),
+  'camera.front_door_camera': entity('camera.front_door_camera', 'recording'),
   'camera.garage_camera': entity('camera.garage_camera', 'recording'),
   'camera.lower_deck_camera': entity('camera.lower_deck_camera', 'recording'),
   'camera.upper_deck_camera_2': entity('camera.upper_deck_camera_2', 'recording'),
@@ -1945,6 +1952,7 @@ export function resetMockHass() {
   mockDailyWeatherForecast = initialMockDailyWeatherForecast.map((forecast) => ({ ...forecast }))
   mockHourlyWeatherForecast = createMockHourlyWeatherForecast()
   mockState.connectionStatus = 'connected'
+  mockState.connection.socket = {}
   mockState.user = { id: '64089b5683944c39b4f944c8f76830b0', is_admin: true, name: 'Stephen' }
   mockEntities['input_boolean.show_outdoor_faucets'].state = 'off'
   mockEntities['binary_sensor.front_yard_fault'].state = 'off'
@@ -2106,6 +2114,7 @@ export const mockState: MockHassState = {
   connection: {
     get connected() { return mockState.connectionStatus === 'connected' },
     options: { auth: { accessToken: 'mock-ha-access-token' } },
+    socket: {},
     addEventListener: (name, listener) => {
       const listeners = mockConnectionListeners.get(name) ?? new Set()
       listeners.add(listener)
@@ -2113,11 +2122,14 @@ export const mockState: MockHassState = {
     },
     removeEventListener: (name, listener) => { mockConnectionListeners.get(name)?.delete(listener) },
     subscribeMessage: (callback, message) => {
-      if (message.type !== 'frontend/subscribe_user_data') return Promise.reject(new Error('Unsupported mocked subscription'))
-      return mockChatSubscribe(mockState.user?.id ?? '', callback)
+      if (message.type === 'frontend/subscribe_user_data') return mockChatSubscribe(mockState.user?.id ?? '', callback)
+      return Promise.reject(new Error('Unsupported mocked subscription'))
     },
     sendMessagePromise: async <T,>(message: Record<string, unknown>) => {
       if (isChatMockCommand(message)) return mockChatRequest(mockState.user?.id ?? '', message) as Promise<T>
+      if (message.type === 'camera/stream') {
+        return { url: `/api/hls/mock-camera-${++mockCameraSessionSequence}/master_playlist.m3u8` } as T
+      }
       if (message.type === 'schedule/list') return [cloneRecord(mockHumidifierSchedule)] as T
       if (message.type === 'schedule/update') {
         mockScheduleMessages.push(cloneRecord(message))

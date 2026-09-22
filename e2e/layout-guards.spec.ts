@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { assertGuardedContext, guardContext, test as guardedTest } from './layout/fixture'
+import { assertGuardedContext, guardContext, networkDecision, test as guardedTest } from './layout/fixture'
 import { modalFacts, waitForModalReady } from './layout/evidence'
 import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
 import { createServer } from 'node:http'
@@ -61,8 +61,10 @@ test('readiness rejects missing and outgoing selected panels, then accepts the a
 
 test('isolation blocks HTTP, WebSockets, workers and service workers before upstream I/O', async ({ browser }) => {
   const violations: string[] = []
+  let legacyWebRtcRequests = 0
   let serviceWorkerRequests = 0
   const server = createServer((request, response) => {
+    if (request.url === '/webrtc/webrtc-camera.js') legacyWebRtcRequests += 1
     if (request.url === '/sw.js') serviceWorkerRequests += 1
     response.setHeader('Content-Type', 'text/html')
     response.end('<!doctype html><title>Owned service-worker guard fixture</title>')
@@ -72,7 +74,7 @@ test('isolation blocks HTTP, WebSockets, workers and service workers before upst
   // Prove the init guard independently of Playwright's additional serviceWorkers:block defense.
   const context = await browser.newContext({ serviceWorkers: 'allow' })
   expect(() => assertGuardedContext(context)).toThrow('Layout isolation was not installed')
-  await guardContext(context, ['http://127.0.0.1:9', origin], violations)
+  await guardContext(context, ['http://127.0.0.1:9', origin], violations, origin)
   expect(() => assertGuardedContext(context)).not.toThrow()
   try {
     const page = await context.newPage()
@@ -87,6 +89,9 @@ test('isolation blocks HTTP, WebSockets, workers and service workers before upst
     await expect.poll(() => violations.includes('Worker/SharedWorker construction blocked')).toBe(true)
     await expect.poll(() => violations.some((entry) => entry.startsWith('WebSocket blocked:'))).toBe(true)
     await workerPage.goto(origin)
+    await workerPage.addScriptTag({ url: `${origin}/webrtc/webrtc-camera.js` })
+    expect(await workerPage.evaluate(() => Boolean(customElements.get('webrtc-camera-sfenton')))).toBe(true)
+    expect(legacyWebRtcRequests).toBe(0)
     const error = await workerPage.evaluate(() => navigator.serviceWorker.register('/sw.js').catch((caught: unknown) => String(caught)))
     expect(String(error)).toContain('Service workers are disabled')
     await expect.poll(() => violations.includes('ServiceWorker registration blocked')).toBe(true)
@@ -96,6 +101,31 @@ test('isolation blocks HTTP, WebSockets, workers and service workers before upst
     server.closeAllConnections()
     await new Promise<void>((done) => server.close(() => done()))
   }
+})
+
+test('legacy WebRTC fixture is restricted to the managed baseline origin', () => {
+  const baselineOrigin = 'http://127.0.0.1:4001'
+  const candidateOrigin = 'http://127.0.0.1:4002'
+  const origins = [baselineOrigin, candidateOrigin]
+
+  expect(networkDecision(
+    `${baselineOrigin}/webrtc/webrtc-camera.js?v=v3.10.1`,
+    'GET',
+    origins,
+    baselineOrigin,
+  )).toBe('legacy-webrtc')
+  expect(networkDecision(
+    `${candidateOrigin}/webrtc/webrtc-camera.js?v=v3.10.1`,
+    'GET',
+    origins,
+    baselineOrigin,
+  )).toBe('deny')
+  expect(networkDecision(
+    `${baselineOrigin}/webrtc/webrtc-camera.js`,
+    'POST',
+    origins,
+    baselineOrigin,
+  )).toBe('deny')
 })
 
 test('equal character and word counts do not imply equal proportional-font width', async ({ page }) => {

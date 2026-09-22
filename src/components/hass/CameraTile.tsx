@@ -3,8 +3,8 @@ import { useEntity } from '@hakit/core'
 import type { CameraConfig } from '../../constants/atAGlance'
 import { MaterialIcon } from '../core/Icon'
 import { asEntityName, titleCaseState } from './entityState'
-import { WebRtcCamera } from './WebRtcCamera'
-import type { WebRtcStatus } from './webRtcStatus'
+import { HlsCamera } from './HlsCamera'
+import type { CameraStreamStatus } from './cameraStreamStatus'
 import styles from './CameraTile.module.css'
 
 interface CameraTileProps {
@@ -13,19 +13,17 @@ interface CameraTileProps {
   onOpen: (hash: string) => void
 }
 
-// The go2rtc stream is served independently of the Home Assistant camera entity, so an
-// unavailable entity (e.g. a Frigate integration outage) must not hide a stream that still plays.
-// The HA camera state (idle/recording/unavailable) describes HA's own stream session rather than
-// the feed on screen, so a playing tile always reads "Live".
-function tileStateLabel(entityState: string | undefined, streamStatus: WebRtcStatus) {
+// Transport status is authoritative while frames are playing. The entity state remains the
+// fallback label while the Home Assistant stream is loading or unavailable.
+function tileStateLabel(entityState: string | undefined, streamStatus: CameraStreamStatus) {
   if (streamStatus === 'live') return 'Live'
   return titleCaseState(entityState)
 }
 
 export function CameraTile({ camera, live = true, onOpen }: CameraTileProps) {
   const entity = useEntity(asEntityName(camera.entityId), { returnNullIfNotFound: true })
-  const [streamStatus, setStreamStatus] = useState<WebRtcStatus>('loading')
-  const handleStatusChange = useCallback((status: WebRtcStatus) => setStreamStatus(status), [])
+  const [streamStatus, setStreamStatus] = useState<CameraStreamStatus>('loading')
+  const handleStatusChange = useCallback((status: CameraStreamStatus) => setStreamStatus(status), [])
 
   return (
     <div className={styles.tile}>
@@ -36,7 +34,7 @@ export function CameraTile({ camera, live = true, onOpen }: CameraTileProps) {
       ) : (
         <>
           <div className={styles.camera}>
-            <WebRtcCamera camera={camera} minHeight={190} variant="tile" onStatusChange={handleStatusChange} />
+            <HlsCamera camera={camera} minHeight={190} variant="tile" onStatusChange={handleStatusChange} />
           </div>
           {streamStatus === 'error' && <div className={`${styles.placeholder} ${styles.streamError}`}>Camera unavailable</div>}
         </>

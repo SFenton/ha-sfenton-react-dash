@@ -12,9 +12,19 @@ function setIframeDisposer(iframe: HTMLIFrameElement | null | undefined, dispose
   })
 }
 
+function persistentIframe() {
+  return document.documentElement.querySelector(
+    'iframe[data-sfenton-react-app-frame="true"]',
+  ) as HTMLIFrameElement | null
+}
+
 describe('Sfenton React app card', () => {
   afterEach(() => {
+    vi.clearAllTimers()
+    vi.useRealTimers()
+    persistentIframe()?.remove()
     document.body.replaceChildren()
+    window.history.replaceState({}, '', '/')
     vi.restoreAllMocks()
   })
 
@@ -23,7 +33,7 @@ describe('Sfenton React app card', () => {
     card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=test` })
     document.body.append(card)
 
-    const iframe = card.shadowRoot?.querySelector('iframe')
+    const iframe = persistentIframe()
     expect(iframe).toBeInstanceOf(HTMLIFrameElement)
     expect(iframe).toHaveAttribute(
       'src',
@@ -43,7 +53,7 @@ describe('Sfenton React app card', () => {
     card.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
     document.body.append(card)
 
-    const iframe = card.shadowRoot?.querySelector('iframe')
+    const iframe = persistentIframe()
     const iframeDocument = document.implementation.createHTMLDocument()
     Object.defineProperty(iframe, 'contentDocument', {
       configurable: true,
@@ -70,7 +80,7 @@ describe('Sfenton React app card', () => {
     const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
     card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=first` })
     document.body.append(card)
-    const iframe = card.shadowRoot?.querySelector('iframe')
+    const iframe = persistentIframe()
     const dispose = vi.fn(() => true)
     setIframeDisposer(iframe, dispose)
 
@@ -83,16 +93,37 @@ describe('Sfenton React app card', () => {
     )
   })
 
+  it('keeps the same app frame across an immediate Lovelace replacement', () => {
+    vi.useFakeTimers()
+    window.history.replaceState({}, '', '/sfenton-react-dash/home')
+    const firstCard = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    firstCard.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+    document.body.append(firstCard)
+    const iframe = persistentIframe()
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    firstCard.remove()
+    const replacement = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    replacement.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+    document.body.append(replacement)
+    vi.advanceTimersByTime(5_000)
+
+    expect(persistentIframe()).toBe(iframe)
+    expect(dispose).not.toHaveBeenCalled()
+  })
+
   it('disposes the current app when Home Assistant removes the card', () => {
     const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
     card.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
     document.body.append(card)
-    const iframe = card.shadowRoot?.querySelector('iframe')
+    const iframe = persistentIframe()
     const dispose = vi.fn(() => true)
     setIframeDisposer(iframe, dispose)
 
     card.remove()
 
     expect(dispose).toHaveBeenCalledWith('legacy-card-disconnected')
+    expect(iframe).not.toBeInTheDocument()
   })
 })

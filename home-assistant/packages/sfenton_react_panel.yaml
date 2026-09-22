@@ -3,7 +3,7 @@ panel_custom:
     sidebar_title: React Dash Panel
     sidebar_icon: mdi:flask-outline
     url_path: sfenton-react-panel
-    module_url: /local/ha-sfenton-react-dash/sfenton-react-panel.js?v=3
+    module_url: /local/ha-sfenton-react-dash/sfenton-react-panel.js?v=5
     embed_iframe: true
     handle_safe_area: true
     require_admin: false
