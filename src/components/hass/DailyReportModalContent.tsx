@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { EmptyState } from '../core/EmptyState'
 import { GlassTile } from '../core/GlassTile'
 import { ModalIconTabNav } from '../core/ModalTabNav'
+import { SectionHeader } from '../core/SectionHeader'
 import { modalTabId, modalTabPanelId } from '../core/modalTabIds'
 import { EverShelfInventoryPanel, type EverShelfInventoryDetailsTarget } from './EverShelfInventoryPanel'
 import { useEverShelfInventoryControls } from './EverShelfInventoryControls'
@@ -9,11 +10,10 @@ import { TodoListPanel } from './TodoListPanel'
 import { DAILY_REPORT_EXPIRED_FOOD_SCOPE, dailyReportExpiredFoodControls, useExpiredFoodCount, type DailyReportContext } from './dailyReportModal'
 import { DAILY_REPORT_TABS, DAILY_REPORT_USERS, dailyReportRouteUrl, type DailyReportTab } from '../../constants/dailyReport'
 import { dashboardHref, pushDashboardUrl } from '../../hooks/dashboardLocation'
-import { VACATION_EMPTY_DESCRIPTION } from '../../constants/portedDashboard'
+import { TODO_PAGES, VACATION_EMPTY_DESCRIPTION } from '../../constants/portedDashboard'
 import { CORE_COPY_KEYS, CORE_COPY_NAMESPACE, useCopy } from '../../i18n'
 import type { DonetickTaskEditTarget } from './donetickTaskForm'
 import styles from './DailyReportModalContent.module.css'
-
 const NO_EXPIRED_FOOD_EMPTY_STATE = {
   description: 'Everything in the kitchen is still within date.',
   layout: 'modal',
@@ -115,8 +115,34 @@ export function DailyReportModalContent({ activeTab, context, onEditTask, onOpen
   return (
     <div aria-labelledby={modalTabId(DAILY_REPORT_TAB_ID_PREFIX, activeTab)} className={styles.panel} data-tab={activeTab} id={DAILY_REPORT_TAB_PANEL_ID} role="tabpanel">
       {activeTab === 'overdue' && <DailyReportTodoTab emptyDescription="You are all caught up on chores that slipped past their due date." emptyTitle="No Chores Due" entityId={user.todoEntityIds.overdue} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Overdue Chores" vacationMode={vacationMode} />}
-      {activeTab === 'upcoming' && <DailyReportTodoTab emptyDescription="There is nothing else on your schedule for the rest of today." emptyTitle="No Chores Upcoming" entityId={user.todoEntityIds.upcoming} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Upcoming Chores" vacationMode={vacationMode} />}
+      {activeTab === 'upcoming' && <DailyReportUpcomingTab emptyDescription="There is nothing else on your schedule for the rest of today." emptyTitle="No Chores Upcoming" noDueDateEntityId={user.todoEntityIds.noDueDate} noDueDateTitle={dailyReportNoDueDateTitle(user.choresPath)} onEditTask={onEditTask} reloadVersion={reloadVersion} title="Upcoming Chores" upcomingEntityId={user.todoEntityIds.upcoming} vacationMode={vacationMode} />}
       {activeTab === 'expired-food' && <DailyReportExpiredFoodTab onOpenDetails={onOpenInventoryDetails} vacationMode={vacationMode} />}
     </div>
+  )
+}
+
+function dailyReportNoDueDateTitle(choresPath: string) {
+  return TODO_PAGES[choresPath].lists.find((list) => list.countBucket === 'no-due-date')!.title
+}
+
+function DailyReportUpcomingTab({ emptyDescription, emptyTitle, noDueDateEntityId, noDueDateTitle, onEditTask, reloadVersion, title, upcomingEntityId, vacationMode }: { emptyDescription: string; emptyTitle: string; noDueDateEntityId: string; noDueDateTitle: string; onEditTask: (target: DonetickTaskEditTarget) => void; reloadVersion: number; title: string; upcomingEntityId: string; vacationMode: boolean }) {
+  const [upcomingItemCount, setUpcomingItemCount] = useState<number | null>(null)
+  const [noDueDateItemCount, setNoDueDateItemCount] = useState<number | null>(null)
+  const [upcomingError, setUpcomingError] = useState(false)
+  const [noDueDateError, setNoDueDateError] = useState(false)
+  const empty = upcomingItemCount === 0 && noDueDateItemCount === 0 && !upcomingError && !noDueDateError
+
+  return (
+    <section aria-label={title} className={styles.tabSection} data-empty={empty ? 'true' : undefined}>
+      <div data-daily-report-todo-section="upcoming" hidden={upcomingItemCount === 0 && !upcomingError}>
+        <SectionHeader className={styles.summarySectionHeader} title={title} />
+        <TodoListPanel entityId={upcomingEntityId} hideCompleted layout="responsive-grid" onEditTask={onEditTask} onErrorChange={setUpcomingError} onVisibleItemsChange={setUpcomingItemCount} reloadVersion={reloadVersion} rowVariant="summary" title={title} />
+      </div>
+      <section aria-label={noDueDateTitle} data-daily-report-todo-section="no-due-date" hidden={noDueDateItemCount === 0 && !noDueDateError}>
+        <SectionHeader className={styles.summarySectionHeader} title={noDueDateTitle} />
+        <TodoListPanel entityId={noDueDateEntityId} hideCompleted layout="responsive-grid" onEditTask={onEditTask} onErrorChange={setNoDueDateError} onVisibleItemsChange={setNoDueDateItemCount} reloadVersion={reloadVersion} rowVariant="summary" title={noDueDateTitle} />
+      </section>
+      {empty && <EmptyState description={vacationMode ? VACATION_EMPTY_DESCRIPTION : emptyDescription} layout="modal" title={emptyTitle} />}
+    </section>
   )
 }
