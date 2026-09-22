@@ -69,7 +69,8 @@ mutable user extensions or unrelated personal skills.
 8. For a candidate that changes production dashboard runtime files, validate
    one to four issue-scoped PNG, JPEG, or WebP images of the proposed fixed
    behavior, bind their hashes to the committed-diff manifest, upload them to
-   GitHub, and place them in the pull-request body. Test-only,
+   GitHub, and render them inline in both the pull-request body and the
+   controller's GitHub issue update. Test-only,
    documentation-only, Home Assistant-only, and controller-only outcomes are
    exempt.
 9. Merge current `origin/master` into a stale candidate only through a
@@ -84,6 +85,10 @@ mutable user extensions or unrelated personal skills.
    released deployment lease.
 12. Post the completion evidence, close the issue, complete the Home Assistant
     item, verify its completion receipt, and remove the issue worktree.
+
+A completed deployment workflow with a non-success conclusion blocks that
+issue once and releases the serialized queue. It is not retried indefinitely;
+the GitHub issue and Home Assistant task remain open for operator recovery.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
@@ -110,13 +115,18 @@ The following rules are fail closed:
   attributed to the worker;
 - the live PR must remain in this repository, target `master`, use the recorded
   controller branch, and expose the exact candidate head;
+- when owner feedback produces a replacement candidate for an existing PR, the
+  controller first verifies that PR against the prior candidate and its
+  published images, then replaces the authorization with the new committed
+  revision;
 - dashboard runtime candidates cannot advance without valid issue-scoped image
   files. The controller rejects traversal, symlinks, mismatched extensions or
   magic bytes, duplicate content, files above 10 MiB, and captions that omit
   mock/live provenance;
 - uploaded attachment URLs must use GitHub's user-attachment host and every URL
-  must remain embedded under `## Proposed fixed behavior` in the live PR body
-  before checks are accepted and again before merge;
+  must remain embedded under `## Proposed fixed behavior` in both the live PR
+  body and the controller-owned issue update before checks are accepted and
+  again before merge;
 - checks must be the latest successful runs for the exact candidate and pinned
   GitHub App;
 - already-merged PRs pass the same provenance guard and must report a
@@ -230,6 +240,9 @@ that can generate the required issue-scoped images; existing non-runtime
 candidates remain exempt. Uploaded URLs are journaled one at a time so a
 restart does not duplicate successful uploads, while the local source images
 remain in the ignored worktree artifact directory until normal issue cleanup.
+Controller issue comments are upserted by their stable receipt marker, so a
+retry or corrected candidate replaces stale text or images instead of leaving
+the bug with an outdated evidence comment.
 
 ## Operation and recovery
 

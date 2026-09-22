@@ -25,7 +25,9 @@ import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   AdminIssueProvenanceError,
+  assertDeploymentRunSucceeded,
   assertExactCandidateSnapshot,
+  assertIssueCommentBodyContainsVisualEvidence,
   assertWorkerHostConfigurationSafe,
   assertWorkerChangesSafe,
   assertPullRequestBinding,
@@ -62,6 +64,7 @@ import {
   formatCompletionComment,
   formatPullRequestComment,
   formatQuestionsComment,
+  formatVisualEvidenceMarkdown,
   isTrustedIssueComment,
   issueBody,
   issueTitle,
@@ -650,8 +653,20 @@ describe('admin issue controller domain', () => {
     if (readyOutcome.decision !== 'ready_for_pr') throw new Error('Expected ready_for_pr')
     issue.lastOutcome = readyOutcome
     authorizeRecord(issue)
-    expect(formatPullRequestComment(issue.uid, issue.inputRevision, issue.pr, readyOutcome)).toContain(
-      issue.pr.url,
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate?.visualEvidence) {
+      throw new Error('Expected visual evidence')
+    }
+    const pullRequestComment = formatPullRequestComment(
+      issue.uid,
+      issue.inputRevision,
+      issue.pr,
+      readyOutcome,
+      issue.provenance.candidate.visualEvidence,
+    )
+    expect(pullRequestComment).toContain(issue.pr.url)
+    expect(pullRequestComment).toContain('## Proposed fixed behavior')
+    expect(pullRequestComment).toContain(
+      '![Fixed dashboard spacing](https://github.com/user-attachments/assets/',
     )
     expect(
       formatCompletionComment({
@@ -699,6 +714,21 @@ describe('admin issue controller domain', () => {
     expect(
       deploymentReceiptIsAccepted(receipt, sha, { id: 124, runAttempt: 2 }),
     ).toBe(false)
+  })
+
+  it('treats a completed failed deployment as a terminal blocked record', () => {
+    expect(() =>
+      assertDeploymentRunSucceeded({
+        conclusion: 'failure',
+        html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/123',
+      }),
+    ).toThrow(AdminIssueProvenanceError)
+    expect(() =>
+      assertDeploymentRunSucceeded({
+        conclusion: 'success',
+        html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/123',
+      }),
+    ).not.toThrow()
   })
 })
 
@@ -821,7 +851,7 @@ describe('admin issue controller security configuration', () => {
     ).toThrow('artifacts/admin-issue-321')
   })
 
-  it('requires published images in the live pull request body', () => {
+  it('requires published images in both the pull request and issue update', () => {
     const issue = record()
     authorizeRecord(issue)
     if (issue.provenance.kind !== 'active' || !issue.provenance.candidate?.visualEvidence) {
@@ -840,11 +870,62 @@ describe('admin issue controller security configuration', () => {
         body: body.replace('![Fixed dashboard spacing]', '[Fixed dashboard spacing]'),
       }),
     ).toThrow('missing proposed fixed-behavior image')
+    const issueComment = [
+      '## Pull request opened',
+      formatVisualEvidenceMarkdown(evidence),
+    ].join('\n\n')
+    expect(() =>
+      assertIssueCommentBodyContainsVisualEvidence(issue, issueComment),
+    ).not.toThrow()
+    expect(() =>
+      assertIssueCommentBodyContainsVisualEvidence(
+        issue,
+        issueComment.replace('![Fixed dashboard spacing]', '[Fixed dashboard spacing]'),
+      ),
+    ).toThrow('GitHub issue update is missing proposed fixed-behavior image')
+    expect(() =>
+      assertIssueCommentBodyContainsVisualEvidence(issue, '## Pull request opened'),
+    ).toThrow('missing the proposed fixed-behavior section')
     expect(() => assertCandidateVisualEvidence(issue, true)).not.toThrow()
     issue.provenance.candidate.visualEvidence = []
     expect(() => assertCandidateVisualEvidence(issue, true)).toThrow(
       'has no proposed fixed-behavior images',
     )
+  })
+
+  it('verifies the prior PR candidate while a newer issue revision is being prepared', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate?.visualEvidence) {
+      throw new Error('Expected authorized visual evidence')
+    }
+    const previousCandidate = issue.provenance.candidate
+    const body = pullRequestBodyWithVisualEvidence(
+      'Implements the previous candidate.',
+      previousCandidate.visualEvidence,
+    )
+
+    appendIssueInput(issue, {
+      body: 'Move the Upcoming heading into the scrollable body.',
+      createdAt: '2026-09-20T12:06:00.000Z',
+      externalId: 'comment:2',
+      source: 'issue-comment',
+    })
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-20T12:07:00.000Z')
+
+    expect(() => assertPullRequestContainsVisualEvidence(issue, { body })).toThrow(
+      'Provenance revision does not match issue',
+    )
+    expect(() =>
+      assertPullRequestContainsVisualEvidence(issue, { body }, previousCandidate),
+    ).not.toThrow()
+    expect(() =>
+      assertPullRequestContainsVisualEvidence(
+        issue,
+        { body: body.replace('![Fixed dashboard spacing]', '[Fixed dashboard spacing]') },
+        previousCandidate,
+      ),
+    ).toThrow('missing proposed fixed-behavior image')
   })
 
   it('recognizes only GitHub repository remotes', () => {
@@ -1461,6 +1542,10 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('assertPullRequestBinding(')
     expect(controller).toContain('assertRequiredChecksCurrent(')
     expect(controller).toContain('verifyMergedPullRequest(')
+    expect(controller).toContain('verifyIssueVisualEvidenceComment(')
+    expect(controller).toContain('issues/comments/${existing.id}')
+    expect(controller).toContain('getPullRequest(config, record, previousCandidate)')
+    expect(controller).toContain('assertDeploymentRunSucceeded(run)')
     expect(controller).toContain('assertFinalizationAuthorized(record)')
     expect(controller).not.toContain("'--force-with-lease'")
     expect(controller).not.toContain("'--amend'")
@@ -1483,6 +1568,7 @@ describe('admin issue controller security configuration', () => {
     expect(prompt).toContain('Gather available Home Assistant evidence yourself')
     expect(prompt).toContain('artifacts/admin-issue-321/')
     expect(prompt).toContain('"visualEvidence"')
+    expect(prompt).toContain('both the pull request and the GitHub issue update')
     expect(prompt).toContain('Images supplement tests')
     expect(prompt).not.toContain('Do not use host filesystem, shell, GitHub, Home Assistant')
   })

@@ -1144,6 +1144,14 @@ export function assertCandidateVisualEvidence(
   requirePublished = false,
 ) {
   const { candidate, provenance } = assertCandidateAuthorized(record)
+  const evidence = assertVisualEvidenceForCandidate(candidate, requirePublished)
+  return { candidate, evidence, provenance }
+}
+
+export function assertVisualEvidenceForCandidate(
+  candidate: AdminIssueCandidate,
+  requirePublished = false,
+) {
   const evidence = candidate.visualEvidence ?? []
   if (candidateRequiresVisualEvidence(candidate.diff.files)) {
     assert(
@@ -1165,7 +1173,26 @@ export function assertCandidateVisualEvidence(
       )
     }
   }
-  return { candidate, evidence, provenance }
+  return evidence
+}
+
+function visualEvidenceMarkdownText(value: string) {
+  return neutralizeGitHubClosingReferences(value)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/[<>]/g, '')
+    .trim()
+}
+
+export function formatVisualEvidenceMarkdown(
+  evidence: readonly AdminIssueVisualEvidenceReceipt[],
+) {
+  if (evidence.length === 0) return ''
+  const images = evidence.map((item) => {
+    assert(item.url, `Visual evidence has not been uploaded: ${item.path}`)
+    const alt = visualEvidenceMarkdownText(item.alt).replace(/[\\[\]]/g, '\\$&')
+    return `![${alt}](${item.url})\n\n_${visualEvidenceMarkdownText(item.caption)}_`
+  })
+  return ['## Proposed fixed behavior', ...images].join('\n\n')
 }
 
 export function formatQuestionsComment(
@@ -1220,12 +1247,12 @@ export function formatPullRequestComment(
   revision: number,
   pullRequest: AdminIssuePullRequest,
   outcome: Extract<AdminIssueWorkerOutcome, { decision: 'ready_for_pr' }>,
+  visualEvidence: readonly AdminIssueVisualEvidenceReceipt[] = [],
 ) {
   const changes = outcome.changeSummary.map((entry) => `- ${entry}`).join('\n')
   const tests = outcome.tests.map((entry) => `- \`${entry.command}\` — ${entry.result}`).join('\n')
-  const evidenceCount = outcome.visualEvidence?.length ?? 0
-  const evidence = evidenceCount > 0
-    ? `\n\n**Proposed fixed behavior**\n- ${evidenceCount} GitHub-hosted image${evidenceCount === 1 ? '' : 's'} embedded in the pull request`
+  const evidence = visualEvidence.length > 0
+    ? `\n\n${formatVisualEvidenceMarkdown(visualEvidence)}`
     : ''
   const ios = outcome.iosFollowUp.required
     ? `\n\n> **iOS follow-up required:** ${outcome.iosFollowUp.reason}`
