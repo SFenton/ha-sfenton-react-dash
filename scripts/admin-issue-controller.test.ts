@@ -33,6 +33,7 @@ import {
   assertPullRequestBinding,
   assertPullRequestContainsVisualEvidence,
   buildWorkerPrompt,
+  classifyPullRequestHead,
   collectVisualEvidenceReceipts,
   createCommittedDiffReceipt,
   findExactMergeCommit,
@@ -1273,6 +1274,55 @@ describe('admin issue controller security configuration', () => {
     ).toThrow('expected master')
   })
 
+  it('allows only the exact prior head while GitHub propagates a pushed PR update', () => {
+    const priorHeadSha = 'b'.repeat(40)
+    const candidateHeadSha = 'c'.repeat(40)
+    const pullRequest = {
+      base: {
+        ref: 'master',
+        repo: { full_name: 'SFenton/ha-sfenton-react-dash' },
+      },
+      head: {
+        ref: 'copilot/admin-todo-321-g1-fix',
+        repo: { full_name: 'SFenton/ha-sfenton-react-dash' },
+        sha: priorHeadSha,
+      },
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
+      merge_commit_sha: null,
+      merged_at: null,
+      number: 400,
+      state: 'open' as const,
+    }
+
+    expect(
+      classifyPullRequestHead(
+        'SFenton/ha-sfenton-react-dash',
+        'copilot/admin-todo-321-g1-fix',
+        pullRequest,
+        candidateHeadSha,
+        priorHeadSha,
+      ),
+    ).toBe('stale')
+    expect(
+      classifyPullRequestHead(
+        'SFenton/ha-sfenton-react-dash',
+        'copilot/admin-todo-321-g1-fix',
+        { ...pullRequest, head: { ...pullRequest.head, sha: candidateHeadSha } },
+        candidateHeadSha,
+        priorHeadSha,
+      ),
+    ).toBe('current')
+    expect(() =>
+      classifyPullRequestHead(
+        'SFenton/ha-sfenton-react-dash',
+        'copilot/admin-todo-321-g1-fix',
+        { ...pullRequest, head: { ...pullRequest.head, sha: 'd'.repeat(40) } },
+        candidateHeadSha,
+        priorHeadSha,
+      ),
+    ).toThrow('does not match authorized candidate')
+  })
+
   it('treats committed-candidate worktree drift as a provenance failure', () => {
     const issue = record()
     issue.branch = 'copilot/admin-todo-321-g1-fix'
@@ -1546,6 +1596,7 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('issues/comments/${existing.id}')
     expect(controller).toContain('getPullRequest(config, record, previousCandidate)')
     expect(controller).toContain('assertDeploymentRunSucceeded(run)')
+    expect(controller).toContain('waitForPullRequestHead(')
     expect(controller).toContain('assertFinalizationAuthorized(record)')
     expect(controller).not.toContain("'--force-with-lease'")
     expect(controller).not.toContain("'--amend'")
