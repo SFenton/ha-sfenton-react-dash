@@ -185,6 +185,7 @@ type ActionableTodoItem = HassTodoItem & {
 const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
 const MAX_BASE_RESYNCS_PER_GENERATION = 2
+const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
 const PROTECTED_WORKER_PATHS = [
   '.gitattributes',
@@ -2006,6 +2007,16 @@ export function assertPullRequestBinding(
   pullRequest: GitHubPullRequest,
   candidateHeadSha: string,
 ) {
+  classifyPullRequestHead(repository, branch, pullRequest, candidateHeadSha)
+}
+
+export function classifyPullRequestHead(
+  repository: string,
+  branch: string,
+  pullRequest: GitHubPullRequest,
+  candidateHeadSha: string,
+  allowedStaleHeadSha?: string,
+): 'current' | 'stale' {
   const expectedRepository = repository.toLowerCase()
   if (
     pullRequest.base.repo?.full_name.toLowerCase() !== expectedRepository ||
@@ -2025,17 +2036,17 @@ export function assertPullRequestBinding(
       `Pull request #${pullRequest.number} uses head ${pullRequest.head.ref}, expected ${branch}`,
     )
   }
-  if (pullRequest.head.sha !== candidateHeadSha) {
-    throw new AdminIssueProvenanceError(
-      `Pull request #${pullRequest.number} head ${pullRequest.head.sha} does not match authorized candidate ${candidateHeadSha}`,
-    )
-  }
   const expectedUrl = `https://github.com/${repository}/pull/${pullRequest.number}`.toLowerCase()
   if (pullRequest.html_url.toLowerCase() !== expectedUrl) {
     throw new AdminIssueProvenanceError(
       `Pull request #${pullRequest.number} URL does not belong to ${repository}`,
     )
   }
+  if (pullRequest.head.sha === candidateHeadSha) return 'current'
+  if (allowedStaleHeadSha && pullRequest.head.sha === allowedStaleHeadSha) return 'stale'
+  throw new AdminIssueProvenanceError(
+    `Pull request #${pullRequest.number} head ${pullRequest.head.sha} does not match authorized candidate ${candidateHeadSha}`,
+  )
 }
 
 async function getPullRequest(
@@ -2079,6 +2090,38 @@ async function remoteBranchHead(
   return lines[0]?.split(/\s+/)[0]
 }
 
+async function waitForPullRequestHead(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+  candidateHeadSha: string,
+  allowedStaleHeadSha?: string,
+) {
+  if (!record.pr) throw new AdminIssueProvenanceError('Pull request is missing')
+  if (!record.branch) throw new AdminIssueProvenanceError('Worker branch is missing')
+  const deadline = Date.now() + PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS
+  while (true) {
+    const pullRequest = await ghApi<GitHubPullRequest>(
+      config,
+      'GET',
+      `repos/${config.repository}/pulls/${record.pr.number}`,
+    )
+    const headState = classifyPullRequestHead(
+      config.repository,
+      record.branch,
+      pullRequest,
+      candidateHeadSha,
+      allowedStaleHeadSha,
+    )
+    if (headState === 'current') return pullRequest
+    if (Date.now() >= deadline) {
+      throw new AdminIssueProvenanceError(
+        `Pull request #${pullRequest.number} did not advance from ${allowedStaleHeadSha} to ${candidateHeadSha}`,
+      )
+    }
+    await sleep(5_000)
+  }
+}
+
 async function fetchMaster(
   config: AdminIssueControllerConfig,
   record: AdminIssueRecord,
@@ -2093,7 +2136,7 @@ async function fetchMaster(
   ).stdout.trim()
 }
 
-async function prepareCommittedCandidate(
+export async function prepareCommittedCandidate(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
   record: AdminIssueRecord,
@@ -2132,13 +2175,25 @@ async function prepareCommittedCandidate(
   }
   const files = await changedFiles(record.worktreePath)
   if (files.length === 0) {
-    if (
-      previousCandidate &&
-      provenance.revision === record.processedRevision &&
-      snapshot.treeSha === previousCandidate.treeSha &&
-      snapshot.status === ''
-    ) {
-      return previousCandidate
+    if (previousCandidate && snapshot.treeSha === previousCandidate.treeSha && snapshot.status === '') {
+      if (provenance.revision === record.processedRevision) return previousCandidate
+      const diff = await createCommittedDiffReceipt(
+        record,
+        previousCandidate.targetBaseSha,
+        previousCandidate.headSha,
+      )
+      provenance.revision = record.processedRevision
+      provenance.candidate = {
+        diff,
+        ...(previousCandidate.expectedRemoteHeadSha
+          ? { expectedRemoteHeadSha: previousCandidate.expectedRemoteHeadSha }
+          : {}),
+        headSha: previousCandidate.headSha,
+        targetBaseSha: previousCandidate.targetBaseSha,
+        treeSha: previousCandidate.treeSha,
+      }
+      writeState(config, state)
+      return provenance.candidate
     }
     throw new Error('Worker reported ready_for_pr but made no repository changes')
   }
@@ -2673,16 +2728,11 @@ export async function synchronizeCandidateBase(
     let prHeadSha: string | undefined
     let prNumber: number | undefined
     if (record.pr) {
-      const pullRequest = await ghApi<GitHubPullRequest>(
+      const pullRequest = await waitForPullRequestHead(
         config,
-        'GET',
-        `repos/${config.repository}/pulls/${record.pr.number}`,
-      )
-      assertPullRequestBinding(
-        config.repository,
-        record.branch,
-        pullRequest,
+        record,
         transition.toHeadSha,
+        transition.expectedRemoteHeadSha,
       )
       prHeadSha = pullRequest.head.sha
       prNumber = pullRequest.number
@@ -3715,6 +3765,15 @@ async function queueVisualEvidenceRefreshAfterBaseSync(
   }
 }
 
+export function hasRecoverableTransition(record: AdminIssueRecord) {
+  return (
+    record.provenance.kind === 'active' &&
+    Boolean(record.provenance.transition) &&
+    !record.provenance.quarantine &&
+    !['aborted', 'failed', 'quarantined'].includes(record.provenance.transition?.stage ?? '')
+  )
+}
+
 async function processRecord(
   config: AdminIssueControllerConfig,
   client: HassAdminTodoClient,
@@ -3750,6 +3809,10 @@ async function processRecord(
           `Candidate provenance is quarantined: ${record.provenance.quarantine.reason}`,
         )
         return
+      }
+      if (record.phase === 'blocked' && hasRecoverableTransition(record)) {
+        record.phase = 'pull-request'
+        writeState(config, state)
       }
       if (record.provenance.kind === 'active' && record.provenance.transition) {
         try {
@@ -3955,10 +4018,13 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
     .filter((record) => record.inputRevision > record.processedRevision)
     .filter((record) => !['completed', 'paused', 'pull-request', 'deploying'].includes(record.phase))
     .sort((left, right) => left.inputs[0].createdAt.localeCompare(right.inputs[0].createdAt))
+  const recovering = Object.values(state.issues).find(
+    (record) => record.phase === 'blocked' && hasRecoverableTransition(record),
+  )
   const inFlight = Object.values(state.issues).find((record) =>
     ['pull-request', 'deploying', 'ready-for-pr'].includes(record.phase),
   )
-  const selected = inFlight ?? ready[0]
+  const selected = recovering ?? inFlight ?? ready[0]
   if (selected) await processRecord(config, client, state, selected)
 }
 
