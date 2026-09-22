@@ -5,7 +5,7 @@ import { MaterialIcon } from '../core/Icon'
 import { SectionHeader } from '../core/SectionHeader'
 import { StatusPill, type StatusPillTone } from '../core/StatusPill'
 import type { VacuumConfig } from '../../constants/portedDashboard'
-import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, type CopyKey, type CopyValues, useCopy } from '../../i18n'
+import { VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, formatNumber, type CopyKey, type CopyValues, useCopy } from '../../i18n'
 import {
   type VacuumOutcomeAttemptMode,
   type VacuumOutcomeAttemptResult,
@@ -301,7 +301,7 @@ export function VacuumOutcomeOverview({
 
   return (
     <section className={styles.overviewSection}>
-      <SectionHeader title={copy(OUTCOME_COPY_KEYS.sectionTitle, { room: vacuum.title })} />
+      <SectionHeader title={copy(OUTCOME_COPY_KEYS.sectionTitle, { room: vacuum.title }).concat(' (', formatNumber(contract.rooms.length), ')')} />
       <div data-modal-detail-trigger={onOpen ? 'vacuum-outcomes' : undefined}>
         <GlassTile
           ariaLabel={onOpen ? copy(OUTCOME_COPY_KEYS.openDetail, { date: formattedDay, room: vacuum.title }) : undefined}

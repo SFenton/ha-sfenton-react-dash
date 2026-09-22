@@ -102,7 +102,7 @@ describe('VacuumOutcomeOverview', () => {
     const onOpen = vi.fn()
     render(<VacuumOutcomeOverview contract={cloneContract()} onOpen={onOpen} vacuum={vacuum} />)
 
-    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report (9)' })).toBeInTheDocument()
     const opener = screen.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
     expect(opener).toHaveAttribute('data-action-kind', 'modal')
     expect(opener).toHaveAttribute('data-modal-opener', 'true')
@@ -147,6 +147,21 @@ describe('VacuumOutcomeOverview', () => {
     expect(opener).not.toHaveTextContent('Error')
     expect(opener).toHaveAttribute('data-tone', 'security')
     expect(opener).toHaveAttribute('data-icon', 'mdi:pause-circle')
+  })
+
+  it('states the all-room denominator when detail includes completed and interrupted rooms', () => {
+    const contract = contractForRooms(['dining_room', 'kitchen', 'master_bathroom', 'gym', 'hallway'])
+    render(
+      <>
+        <VacuumOutcomeOverview contract={contract} onOpen={() => undefined} vacuum={vacuum} />
+        <VacuumOutcomeDetail contract={contract} vacuum={vacuum} />
+      </>,
+    )
+
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report (5)' })).toBeInTheDocument()
+    const opener = screen.getByRole('button', { name: /Open Main Floor Automatic Cleaning Report/ })
+    expect(opener).toHaveTextContent('1 Room Completed • 3 Rooms Need Attention • 1 Error')
+    expect(document.querySelectorAll('[data-vacuum-outcome-chip="true"]')).toHaveLength(5)
   })
 
   it('keeps unverified completion distinct from errors and outstanding work', () => {

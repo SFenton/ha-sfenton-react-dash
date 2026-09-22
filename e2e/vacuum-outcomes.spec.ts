@@ -38,7 +38,7 @@ type ReviewRoomExpectation = {
   tone: 'danger' | 'ok' | 'warning'
 }
 
-const COMPACT_MIXED_REVIEW_ROOM_IDS = ['dining_room', 'kitchen', 'gym', 'hallway'] as const
+const COMPACT_MIXED_REVIEW_ROOM_IDS = ['dining_room', 'kitchen', 'master_bathroom', 'gym', 'hallway'] as const
 const ALL_COMPLETED_REVIEW_ROOM_IDS = ['gym', 'office', 'guest_room', 'master_bedroom_closet'] as const
 
 function projectedOutcomeContract(roomIds: readonly string[]) {
@@ -111,6 +111,28 @@ async function horizontalOverflow(dialog: Locator) {
   return dialog.evaluate((element) => element.scrollWidth - element.clientWidth)
 }
 
+async function labelMockEvidence(page: Page) {
+  await page.evaluate(() => {
+    const label = document.createElement('div')
+    label.dataset.adminIssueEvidence = 'mock'
+    label.textContent = 'MOCK EVIDENCE'
+    Object.assign(label.style, {
+      background: '#111827',
+      border: '1px solid #fbbf24',
+      borderRadius: '999px',
+      color: '#fbbf24',
+      font: '700 12px/1 system-ui, sans-serif',
+      letterSpacing: '0.08em',
+      padding: '7px 10px',
+      position: 'fixed',
+      right: '10px',
+      top: '10px',
+      zIndex: '2147483647',
+    })
+    document.body.append(label)
+  })
+}
+
 async function expectVacuumLoadingCentered(dialog: Locator) {
   const loading = dialog.getByRole('status', { name: 'Loading vacuum controls' })
   await expect(loading).toBeVisible()
@@ -140,7 +162,7 @@ test('typed vacuum outcomes use one same-sheet status-chip detail at 393x852', a
   await setOutcomeAttributes(page, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
   const dialog = await openVacuum(page)
   const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
-  const summarySection = dialog.getByRole('heading', { name: 'Main Floor Cleaning Report' }).locator('xpath=ancestor::section[1]')
+  const summarySection = dialog.getByRole('heading', { name: 'Main Floor Cleaning Report (9)' }).locator('xpath=ancestor::section[1]')
   const nav = dialog.getByRole('tablist', { name: 'Main Floor modal sections' })
 
   await expect(summary).toBeVisible()
@@ -161,7 +183,7 @@ test('typed vacuum outcomes use one same-sheet status-chip detail at 393x852', a
 
   await summary.click()
   await expect(page.getByRole('dialog')).toHaveCount(1)
-  await expect(dialog.getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })).toBeVisible()
+  await expect(dialog.getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report (9)' })).toBeVisible()
   await expect(nav).toHaveCount(0)
   await expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
   const detail = dialog.locator('[data-vacuum-outcome-detail="true"]')
@@ -243,6 +265,13 @@ test('mock review captures compact mixed room statuses at 393x852', async ({ pag
       tone: 'warning',
     },
     {
+      detail: "The mop dock's clean-water tank was empty; refill it.",
+      icon: 'mdi:clock-outline',
+      roomId: 'master_bathroom',
+      status: 'deferred',
+      tone: 'warning',
+    },
+    {
       detail: 'Vacuuming completed for the room.',
       icon: 'mdi:check-circle',
       roomId: 'gym',
@@ -264,8 +293,18 @@ test('mock review captures compact mixed room statuses at 393x852', async ({ pag
   await setOutcomeAttributes(page, projectedOutcomeContract(COMPACT_MIXED_REVIEW_ROOM_IDS))
   const dialog = await openVacuum(page)
   const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
-  await expect(summary).toContainText('1 Room Completed • 2 Rooms Need Attention • 1 Error')
+  await expect(dialog.getByRole('heading', { name: 'Main Floor Cleaning Report (5)' })).toBeVisible()
+  await expect(summary).toContainText('1 Room Completed • 3 Rooms Need Attention • 1 Error')
+  await labelMockEvidence(page)
+  await expect(page.locator('[data-admin-issue-evidence="mock"]')).toBeVisible()
+  await saveEvidence(page, dialog, 'vacuum-room-outcomes-compact-mixed-phone-393x852-overview.mock', {
+    mock: true,
+    summary: '1 Room Completed • 3 Rooms Need Attention • 1 Error',
+    totalRoomOutcomes: 5,
+    viewport: { height: 852, width: 393 },
+  })
   await summary.click()
+  await expect(dialog.getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report (5)' })).toBeVisible()
 
   const detail = dialog.locator('[data-vacuum-outcome-detail="true"]')
   const grid = dialog.getByRole('group', { name: 'Main Floor Cleaning Report' })
@@ -337,7 +376,7 @@ test('typed vacuum outcome chips wrap without overflow at 320x568', async ({ pag
   await setOutcomeAttributes(page, structuredClone(NINE_ROOM_VACUUM_OUTCOME_CONTRACT))
   const dialog = await openVacuum(page)
   const summary = dialog.getByRole('button', { name: 'Open Main Floor Automatic Cleaning Report for Aug 19, 2026' })
-  const summarySection = dialog.getByRole('heading', { name: 'Main Floor Cleaning Report' }).locator('xpath=ancestor::section[1]')
+  const summarySection = dialog.getByRole('heading', { name: 'Main Floor Cleaning Report (9)' }).locator('xpath=ancestor::section[1]')
 
   const summaryHeight = Math.round((await summary.boundingBox())?.height ?? 0)
   const summarySectionHeight = Math.round((await summarySection.boundingBox())?.height ?? 0)
@@ -629,6 +668,7 @@ test.describe('fine-pointer outcome details', () => {
       }
       await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
       await expectVacuumLoadingCentered(dialog)
+      await expect(dialog.locator('[data-layout-preparation-phase]')).toHaveAttribute('data-layout-preparation-phase', 'content', { timeout: 15_000 })
       await expect(summary).toBeFocused()
       await expect(dialog).toHaveAttribute('data-outcome-flow-node', 'original')
       expect(await vacuumActionCalls(page)).toEqual([])

@@ -191,7 +191,7 @@ describe('VacuumRoomSourceModalContent', () => {
 
     renderMainFloorRoomSource()
 
-    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report (1)' })).toBeInTheDocument()
     expect(document.querySelector('[data-action-kind="state"][data-icon="mdi:help-circle-outline"]')).toHaveTextContent(
       /Sep 17, 2026\s*1 Room Unverified • 1 Room Needs Attention/,
     )

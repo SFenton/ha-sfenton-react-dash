@@ -9,6 +9,10 @@ interface DetailPageSnapshot {
   focusKey?: string
 }
 
+interface ModalDetailPageScrollOptions {
+  restoreFocusReady?: boolean
+}
+
 function modalDetailFocusTarget(element: HTMLElement | null | undefined) {
   if (!element) return null
   if (element.hasAttribute('data-modal-detail-autofocus') && element.hasAttribute('tabindex')) return element
@@ -16,17 +20,27 @@ function modalDetailFocusTarget(element: HTMLElement | null | undefined) {
   return element.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? element
 }
 
-export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrollRef?: RefObject<HTMLElement | null>) {
+export function useModalDetailPageScroll(
+  pageKey: DetailPageKey,
+  additionalScrollRef?: RefObject<HTMLElement | null>,
+  { restoreFocusReady = true }: ModalDetailPageScrollOptions = {},
+) {
   const bodyElementRef = useRef<HTMLDivElement | null>(null)
   const pageSnapshotsRef = useRef<DetailPageSnapshot[]>([])
   const pendingEnterRef = useRef(false)
   const pendingRestoreRef = useRef<DetailPageSnapshot | null>(null)
+  const pendingRestoreDeferredRef = useRef(false)
 
   useLayoutEffect(() => {
     const pendingRestore = pendingRestoreRef.current
     if (pendingRestore) {
       if (bodyElementRef.current) bodyElementRef.current.scrollTop = pendingRestore.bodyScrollTop
       if (additionalScrollRef?.current) additionalScrollRef.current.scrollTop = pendingRestore.additionalScrollTop
+      if (!restoreFocusReady) {
+        pendingRestoreDeferredRef.current = true
+        return
+      }
+      const restoreWasDeferred = pendingRestoreDeferredRef.current
       const resolveFocusTarget = () => {
         if (!pendingRestore.focusKey) return modalDetailFocusTarget(pendingRestore.focusElement)
         const focusScope = bodyElementRef.current?.closest('[role="dialog"]') ?? bodyElementRef.current
@@ -43,9 +57,10 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
         const activeElement = document.activeElement
         const focusWasLost = activeElement === document.body || !activeElement?.isConnected || activeElement === restoredTarget
         restoredTarget = focusTarget
-        if (focusTarget?.isConnected && !focusMoved && (initial || focusWasLost)) focusTarget.focus({ preventScroll: true })
+        if (focusTarget?.isConnected && !focusMoved && ((!restoreWasDeferred && initial) || focusWasLost)) focusTarget.focus({ preventScroll: true })
       }
       restoreFocus(true)
+      pendingRestoreDeferredRef.current = false
       pendingRestoreRef.current = null
       const focusScope = bodyElementRef.current?.closest('[role="dialog"]') ?? bodyElementRef.current
       const onFocusIn = (event: Event) => {
@@ -71,7 +86,7 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
     if (additionalScrollRef?.current) additionalScrollRef.current.scrollTop = 0
     modalDetailFocusTarget(bodyElementRef.current?.querySelector<HTMLElement>('[data-modal-detail-autofocus="true"]'))?.focus({ preventScroll: true })
     pendingEnterRef.current = false
-  }, [additionalScrollRef, pageKey])
+  }, [additionalScrollRef, pageKey, restoreFocusReady])
 
   const enterDetailPage = (returnFocusKey?: string) => {
     pageSnapshotsRef.current.push({
@@ -81,6 +96,7 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
       focusKey: returnFocusKey,
     })
     pendingRestoreRef.current = null
+    pendingRestoreDeferredRef.current = false
     pendingEnterRef.current = true
   }
 
@@ -89,6 +105,7 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
     const snapshot = allPages ? snapshots[0] : snapshots.at(-1)
     pageSnapshotsRef.current = allPages ? [] : snapshots.slice(0, -1)
     pendingEnterRef.current = false
+    pendingRestoreDeferredRef.current = false
     pendingRestoreRef.current = snapshot ?? null
   }
 
@@ -96,6 +113,7 @@ export function useModalDetailPageScroll(pageKey: DetailPageKey, additionalScrol
     pageSnapshotsRef.current = []
     pendingEnterRef.current = false
     pendingRestoreRef.current = null
+    pendingRestoreDeferredRef.current = false
   }
 
   return { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll }
