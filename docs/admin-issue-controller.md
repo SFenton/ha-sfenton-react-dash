@@ -80,15 +80,26 @@ mutable user extensions or unrelated personal skills.
    persisted visual-evidence URL to match the candidate. Bind protected checks
    from the pinned GitHub App to that exact SHA and merge with
    `--match-head-commit`.
-11. Require the successful v2 deployment artifact for the exact merge SHA,
-   including accepted disposition, verified paths, panel registration, and
-   released deployment lease.
+11. Require a successful v2 deployment artifact with accepted disposition,
+   verified paths, panel registration, and a released deployment lease. The
+   normal path binds the exact merge SHA. If that exact run failed before
+   deployment, a later successful `master` deployment may recover the issue
+   only after the controller verifies the newer receipt and proves with Git
+   ancestry that its deployed SHA contains the issue merge.
 12. Post the completion evidence, close the issue, complete the Home Assistant
     item, verify its completion receipt, and remove the issue worktree.
 
 A completed deployment workflow with a non-success conclusion blocks that
 issue once and releases the serialized queue. It is not retried indefinitely;
-the GitHub issue and Home Assistant task remain open for operator recovery.
+the GitHub issue and Home Assistant task remain open for operator recovery. At
+a bounded polling cadence, the controller checks the latest completed
+`master` deployment. A failed or in-progress run leaves the record blocked. A
+successful run can recover it only when the receipt satisfies the full v2
+contract, the workflow and deployed SHAs remain on current `master`, the
+deployed SHA descends from the verified issue merge, and the retained worker
+outcome still matches the authorized visual evidence. This also lets an iOS
+follow-up reuse the verified descendant deployment without consulting the
+failed exact run again.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
@@ -131,8 +142,11 @@ The following rules are fail closed:
   GitHub App;
 - already-merged PRs pass the same provenance guard and must report a
   two-parent merge commit containing the exact authorized base and candidate;
-- deployment workflow `head_sha` and receipt `sourceSha` must both equal the
-  verified merge commit.
+- the normal deployment workflow `head_sha` and receipt `sourceSha` must both
+  equal the verified merge commit. A recovery binding may use a later workflow
+  head only when the controller records a separate descendant-coverage
+  verification and the receipt's deployed SHA contains the merge on current
+  `master`;
 
 Strict branch protection can make a valid candidate stale while checks run.
 The controller permits at most two base synchronizations per generation. Each

@@ -163,6 +163,9 @@ interface GitHubCommit {
 
 interface WorkflowRun {
   conclusion: string | null
+  created_at: string
+  event: string
+  head_branch: string | null
   head_sha: string
   html_url: string
   id: number
@@ -185,6 +188,7 @@ type ActionableTodoItem = HassTodoItem & {
 const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
 const MAX_BASE_RESYNCS_PER_GENERATION = 2
+const DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS = 5 * 60_000
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
 const PROTECTED_WORKER_PATHS = [
@@ -217,15 +221,24 @@ const PROTECTED_WORKER_PATHS = [
 
 export class AdminIssueProvenanceError extends Error {}
 
+export class AdminIssueDeploymentRunError extends AdminIssueProvenanceError {
+  constructor(
+    readonly run: Pick<WorkflowRun, 'conclusion' | 'html_url'> &
+      Partial<Pick<WorkflowRun, 'id' | 'run_attempt'>>,
+  ) {
+    super(
+      `Deployment run ${run.html_url} concluded ${run.conclusion ?? 'without a conclusion'}`,
+    )
+  }
+}
+
 class AdminIssueWorktreeIntegrityError extends AdminIssueProvenanceError {}
 
 export function assertDeploymentRunSucceeded(
   run: Pick<WorkflowRun, 'conclusion' | 'html_url'>,
 ) {
   if (run.conclusion !== 'success') {
-    throw new AdminIssueProvenanceError(
-      `Deployment run ${run.html_url} concluded ${run.conclusion ?? 'without a conclusion'}`,
-    )
+    throw new AdminIssueDeploymentRunError(run)
   }
 }
 
@@ -1310,6 +1323,59 @@ function extractFinalAssistantResponse(output: string) {
   const final = assistantMessages.at(-1)
   if (!final) throw new Error('Copilot worker emitted no final assistant message')
   return final
+}
+
+function assertReadyOutcomeMatchesCandidate(
+  record: AdminIssueRecord,
+  outcome: Extract<AdminIssueWorkerOutcome, { decision: 'ready_for_pr' }>,
+) {
+  const { candidate } = assertCandidateAuthorized(record, true)
+  const expectedEvidence = (candidate.visualEvidence ?? []).map((evidence) => ({
+    alt: evidence.alt,
+    caption: evidence.caption,
+    path: evidence.path,
+  }))
+  if (JSON.stringify(expectedEvidence) !== JSON.stringify(outcome.visualEvidence)) {
+    throw new AdminIssueProvenanceError(
+      'Recovered worker outcome visual evidence does not match the authorized candidate',
+    )
+  }
+}
+
+export function restoreReadyOutcomeFromWorkerLog(
+  config: Pick<AdminIssueControllerConfig, 'stateDirectory'>,
+  record: AdminIssueRecord,
+) {
+  if (record.lastOutcome?.decision === 'ready_for_pr') {
+    assertReadyOutcomeMatchesCandidate(record, record.lastOutcome)
+    return record.lastOutcome
+  }
+  if (record.workerRuns < 1) {
+    throw new AdminIssueProvenanceError(
+      'Blocked deployment has no successful worker run to restore',
+    )
+  }
+  const logPath = join(
+    config.stateDirectory,
+    'worker-logs',
+    `issue-${record.issueNumber}-run-${record.workerRuns}.jsonl`,
+  )
+  if (!existsSync(logPath)) {
+    throw new AdminIssueProvenanceError(
+      `Blocked deployment worker log is missing: ${logPath}`,
+    )
+  }
+  const outcome = parseWorkerOutcome(
+    extractFinalAssistantResponse(readFileSync(logPath, 'utf8')),
+  )
+  if (outcome.decision !== 'ready_for_pr') {
+    throw new AdminIssueProvenanceError(
+      'Latest successful worker run did not authorize the merged candidate',
+    )
+  }
+  assertReadyOutcomeMatchesCandidate(record, outcome)
+  record.lastOutcome = outcome
+  return outcome
 }
 
 async function runCopilotWorker(
@@ -3339,6 +3405,55 @@ async function mergePullRequest(
   return { mergeSha: merged.merge_commit_sha }
 }
 
+async function downloadAcceptedDeploymentReceipt(
+  config: AdminIssueControllerConfig,
+  run: WorkflowRun,
+) {
+  assertDeploymentRunSucceeded(run)
+  const artifactDirectory = mkdtempSync(join(tmpdir(), 'admin-issue-deployment-'))
+  try {
+    const artifactName = `dashboard-deployment-receipt-${run.head_sha}-${run.run_attempt}`
+    await runCommand(
+      'gh',
+      [
+        'run',
+        'download',
+        String(run.id),
+        '--repo',
+        config.repository,
+        '--name',
+        artifactName,
+        '--dir',
+        artifactDirectory,
+      ],
+      {
+        cwd: config.repositoryPath,
+        timeoutMs: 120_000,
+      },
+    )
+    const receiptPath = join(artifactDirectory, 'deployment-receipt.json')
+    if (!existsSync(receiptPath)) {
+      throw new AdminIssueProvenanceError(
+        `Deployment artifact ${artifactName} did not contain deployment-receipt.json`,
+      )
+    }
+    const receipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as DeploymentReceipt
+    if (
+      !deploymentReceiptIsAccepted(receipt, run.head_sha, {
+        id: run.id,
+        runAttempt: run.run_attempt,
+      })
+    ) {
+      throw new AdminIssueProvenanceError(
+        `Deployment receipt ${artifactName} did not satisfy the accepted v2 contract`,
+      )
+    }
+    return receipt
+  } finally {
+    rmSync(artifactDirectory, { force: true, recursive: true })
+  }
+}
+
 async function waitForDeploymentReceipt(
   config: AdminIssueControllerConfig,
   mergeSha: string,
@@ -3359,49 +3474,315 @@ async function waitForDeploymentReceipt(
       if (!(await refreshInputs())) return undefined
       continue
     }
-    assertDeploymentRunSucceeded(run)
-
-    const artifactDirectory = mkdtempSync(join(tmpdir(), 'admin-issue-deployment-'))
-    try {
-      const artifactName = `dashboard-deployment-receipt-${mergeSha}-${run.run_attempt}`
-      await runCommand(
-        'gh',
-        [
-          'run',
-          'download',
-          String(run.id),
-          '--repo',
-          config.repository,
-          '--name',
-          artifactName,
-          '--dir',
-          artifactDirectory,
-        ],
-        {
-          cwd: config.repositoryPath,
-          timeoutMs: 120_000,
-        },
-      )
-      const receiptPath = join(artifactDirectory, 'deployment-receipt.json')
-      if (!existsSync(receiptPath)) {
-        throw new Error(`Deployment artifact ${artifactName} did not contain deployment-receipt.json`)
-      }
-      const receipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as DeploymentReceipt
-      if (
-        !deploymentReceiptIsAccepted(receipt, mergeSha, {
-          id: run.id,
-          runAttempt: run.run_attempt,
-        })
-      ) {
-        throw new Error(`Deployment receipt ${artifactName} did not satisfy the accepted v2 contract`)
-      }
-      if (!(await refreshInputs())) return undefined
-      return { receipt, run }
-    } finally {
-      rmSync(artifactDirectory, { force: true, recursive: true })
-    }
+    const receipt = await downloadAcceptedDeploymentReceipt(config, run)
+    if (!(await refreshInputs())) return undefined
+    return { receipt, run }
   }
   throw new Error(`Deployment did not finish within ${config.deploymentTimeoutMinutes} minutes`)
+}
+
+export async function commitIsAncestor(
+  repositoryPath: string,
+  ancestorSha: string,
+  descendantSha: string,
+) {
+  const result = await runCommand(
+    'git',
+    ['merge-base', '--is-ancestor', ancestorSha, descendantSha],
+    { allowFailure: true, cwd: repositoryPath, timeoutMs: 30_000 },
+  )
+  if (result.exitCode === 0) return true
+  if (result.exitCode === 1) return false
+  throw new Error(
+    `Could not verify whether ${ancestorSha} is an ancestor of ${descendantSha}`,
+  )
+}
+
+async function fetchCurrentMaster(config: AdminIssueControllerConfig) {
+  await runCommand('git', ['fetch', '--quiet', 'origin', 'master'], {
+    cwd: config.repositoryPath,
+    timeoutMs: 120_000,
+  })
+  return (
+    await runCommand('git', ['rev-parse', 'origin/master'], {
+      cwd: config.repositoryPath,
+    })
+  ).stdout.trim()
+}
+
+function bindVerifiedDeployment(
+  record: AdminIssueRecord,
+  deployment: {
+    receipt: DeploymentReceipt
+    run: WorkflowRun
+  },
+  coverage: 'exact' | 'descendant',
+) {
+  if (record.provenance.kind !== 'active' || !record.provenance.merge) {
+    throw new AdminIssueProvenanceError(
+      'Cannot bind deployment without verified merge provenance',
+    )
+  }
+  const mergeSha = record.provenance.merge.mergeSha
+  record.provenance.deployment = {
+    ...(coverage === 'descendant'
+      ? { coverage, coverageVerifiedAt: now() }
+      : {}),
+    deployedSha: deployment.receipt.deployedSha,
+    disposition: deployment.receipt.disposition,
+    epoch: record.provenance.epoch,
+    generation: record.generation,
+    mergeSha,
+    receiptHash: createHash('sha256')
+      .update(JSON.stringify(deployment.receipt))
+      .digest('hex'),
+    revision: record.processedRevision,
+    sourceSha: String(deployment.receipt.sourceSha),
+    workflowHeadSha: deployment.run.head_sha,
+    workflowRunAttempt: deployment.run.run_attempt,
+    workflowRunId: deployment.run.id,
+  }
+  record.receipts.deployedAt = deployment.receipt.deployedAt
+  record.receipts.deploymentRunUrl = deployment.run.html_url
+}
+
+export function hasRecoverableDeployment(record: AdminIssueRecord) {
+  if (
+    record.phase !== 'blocked' ||
+    record.provenance.kind !== 'active' ||
+    !record.provenance.merge ||
+    record.provenance.deployment
+  ) {
+    return false
+  }
+  const reason = record.receipts.controllerBlockedReason ??
+    (record.lastOutcome?.decision === 'blocked' ? record.lastOutcome.reason : '')
+  return /^Deployment run \S+ concluded (?!success\b)/.test(reason)
+}
+
+export function deploymentRecoveryDue(
+  record: AdminIssueRecord,
+  currentTime = Date.now(),
+) {
+  if (!hasRecoverableDeployment(record)) return false
+  const checkedAt = Date.parse(record.receipts.deploymentRecoveryCheckedAt ?? '')
+  return Number.isNaN(checkedAt) ||
+    currentTime - checkedAt >= DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS
+}
+
+async function assertDeploymentCoversMerge(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+  deployment: {
+    receipt: DeploymentReceipt
+    run: WorkflowRun
+  },
+  currentMasterSha: string,
+) {
+  if (record.provenance.kind !== 'active' || !record.provenance.merge) {
+    throw new AdminIssueProvenanceError(
+      'Blocked deployment recovery is missing verified merge provenance',
+    )
+  }
+  const merge = record.provenance.merge
+  if (
+    Date.parse(deployment.receipt.deployedAt) < Date.parse(merge.mergedAt)
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Recovered deployment predates the verified issue merge',
+    )
+  }
+  const [workflowOnMaster, deployedOnMaster, mergeDeployed] = await Promise.all([
+    commitIsAncestor(config.repositoryPath, deployment.run.head_sha, currentMasterSha),
+    commitIsAncestor(
+      config.repositoryPath,
+      deployment.receipt.deployedSha,
+      currentMasterSha,
+    ),
+    commitIsAncestor(
+      config.repositoryPath,
+      merge.mergeSha,
+      deployment.receipt.deployedSha,
+    ),
+  ])
+  if (!workflowOnMaster || !deployedOnMaster || !mergeDeployed) {
+    throw new AdminIssueProvenanceError(
+      'Recovered deployment does not contain the verified issue merge on current master',
+    )
+  }
+}
+
+async function loadBoundDeploymentReceipt(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+) {
+  const { deployment, merge } = assertFinalizationAuthorized(record)
+  const run = await ghApi<WorkflowRun>(
+    config,
+    'GET',
+    `repos/${config.repository}/actions/runs/${deployment.workflowRunId}`,
+  )
+  if (
+    run.id !== deployment.workflowRunId ||
+    run.run_attempt !== deployment.workflowRunAttempt ||
+    run.head_sha !== deployment.workflowHeadSha ||
+    run.event !== 'push' ||
+    run.head_branch !== 'master' ||
+    run.status !== 'completed' ||
+    run.conclusion !== 'success'
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Bound deployment workflow no longer matches its verified run',
+    )
+  }
+  const receipt = await downloadAcceptedDeploymentReceipt(config, run)
+  const receiptHash = createHash('sha256')
+    .update(JSON.stringify(receipt))
+    .digest('hex')
+  if (
+    receiptHash !== deployment.receiptHash ||
+    receipt.deployedSha !== deployment.deployedSha ||
+    receipt.disposition !== deployment.disposition ||
+    String(receipt.sourceSha) !== deployment.sourceSha
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Bound deployment receipt no longer matches issue provenance',
+    )
+  }
+  const currentMasterSha = await fetchCurrentMaster(config)
+  await assertDeploymentCoversMerge(
+    config,
+    record,
+    { receipt, run },
+    currentMasterSha,
+  )
+  if (
+    deployment.coverage !== 'descendant' &&
+    (run.head_sha !== merge.mergeSha || receipt.sourceSha !== merge.mergeSha)
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Exact deployment binding no longer matches the verified merge',
+    )
+  }
+  return { receipt, run }
+}
+
+async function recoverBlockedDeployments(
+  config: AdminIssueControllerConfig,
+  client: HassAdminTodoClient,
+  state: AdminIssueControllerState,
+) {
+  const recoverable = Object.values(state.issues)
+    .filter((record) => deploymentRecoveryDue(record))
+    .sort((left, right) => {
+      const leftMergedAt = left.provenance.kind === 'active'
+        ? left.provenance.merge?.mergedAt ?? left.createdAt
+        : left.createdAt
+      const rightMergedAt = right.provenance.kind === 'active'
+        ? right.provenance.merge?.mergedAt ?? right.createdAt
+        : right.createdAt
+      return leftMergedAt.localeCompare(rightMergedAt)
+    })
+  if (recoverable.length === 0) return false
+
+  const response = await ghApi<{ workflow_runs: WorkflowRun[] }>(
+    config,
+    'GET',
+    `repos/${config.repository}/actions/workflows/${encodeURIComponent(
+      config.requiredWorkflow,
+    )}/runs?branch=master&event=push&per_page=1`,
+  )
+  const run = response.workflow_runs[0]
+  const checkedAt = now()
+  if (
+    !run ||
+    run.status !== 'completed' ||
+    run.conclusion !== 'success' ||
+    run.event !== 'push' ||
+    run.head_branch !== 'master'
+  ) {
+    for (const record of recoverable) {
+      record.receipts.deploymentRecoveryCheckedAt = checkedAt
+      if (run) record.receipts.deploymentRecoveryCheckedRunId = String(run.id)
+    }
+    writeState(config, state)
+    return false
+  }
+
+  let receipt: DeploymentReceipt
+  let currentMasterSha: string
+  try {
+    receipt = await downloadAcceptedDeploymentReceipt(config, run)
+    currentMasterSha = await fetchCurrentMaster(config)
+  } catch (error) {
+    const errorHash = createHash('sha256')
+      .update(error instanceof Error ? error.message : String(error))
+      .digest('hex')
+    for (const record of recoverable) {
+      record.receipts.deploymentRecoveryCheckedAt = checkedAt
+      record.receipts.deploymentRecoveryCheckedRunId = String(run.id)
+      record.receipts.deploymentRecoveryErrorHash = errorHash
+    }
+    writeState(config, state)
+    return false
+  }
+
+  for (const record of recoverable) {
+    record.receipts.deploymentRecoveryCheckedAt = checkedAt
+    record.receipts.deploymentRecoveryCheckedRunId = String(run.id)
+    try {
+      await assertDeploymentCoversMerge(
+        config,
+        record,
+        { receipt, run },
+        currentMasterSha,
+      )
+    } catch (error) {
+      record.receipts.deploymentRecoveryErrorHash = createHash('sha256')
+        .update(error instanceof Error ? error.message : String(error))
+        .digest('hex')
+      continue
+    }
+    let mergeSha: string
+    try {
+      restoreReadyOutcomeFromWorkerLog(config, record)
+      const recoveredMergeSha = record.provenance.kind === 'active'
+        ? record.provenance.merge?.mergeSha
+        : undefined
+      if (!recoveredMergeSha) {
+        throw new AdminIssueProvenanceError(
+          'Recovered deployment lost its verified merge provenance',
+        )
+      }
+      mergeSha = recoveredMergeSha
+    } catch (error) {
+      record.receipts.deploymentRecoveryErrorHash = createHash('sha256')
+        .update(error instanceof Error ? error.message : String(error))
+        .digest('hex')
+      continue
+    }
+    bindVerifiedDeployment(
+      record,
+      { receipt, run },
+      run.head_sha === mergeSha
+        ? 'exact'
+        : 'descendant',
+    )
+    record.phase = 'deploying'
+    record.receipts.deploymentRecoveredAt = now()
+    delete record.receipts.deploymentRecoveryErrorHash
+    state.activeUid = record.uid
+    writeState(config, state)
+    try {
+      await finalizeIssue(config, client, state, record, { receipt, run })
+    } finally {
+      state.activeUid = undefined
+      writeState(config, state)
+    }
+    return true
+  }
+  writeState(config, state)
+  return false
 }
 
 async function verifyMergedPullRequest(
@@ -3736,6 +4117,8 @@ async function blockRecord(
   }
   record.lastOutcome = outcome
   record.phase = 'blocked'
+  record.receipts.controllerBlockedAt = now()
+  record.receipts.controllerBlockedReason = reason
   await postIssueCommentOnce(
     config,
     record.issueNumber,
@@ -3971,34 +4354,30 @@ async function processRecord(
           }
           await verifyMergedPullRequest(config, record)
           const mergeSha = record.provenance.merge.mergeSha
-          const deployment = await waitForDeploymentReceipt(
-            config,
-            mergeSha,
-            () => refreshInputs('deploying'),
-          )
+          const deployment = record.provenance.deployment
+            ? await loadBoundDeploymentReceipt(config, record)
+            : await waitForDeploymentReceipt(
+                config,
+                mergeSha,
+                () => refreshInputs('deploying'),
+              )
           if (!deployment) return
-          record.provenance.deployment = {
-            deployedSha: deployment.receipt.deployedSha,
-            disposition: deployment.receipt.disposition,
-            epoch: record.provenance.epoch,
-            generation: record.generation,
-            mergeSha,
-            receiptHash: createHash('sha256')
-              .update(JSON.stringify(deployment.receipt))
-              .digest('hex'),
-            revision: record.processedRevision,
-            sourceSha: String(deployment.receipt.sourceSha),
-            workflowHeadSha: deployment.run.head_sha,
-            workflowRunAttempt: deployment.run.run_attempt,
-            workflowRunId: deployment.run.id,
+          if (!record.provenance.deployment) {
+            bindVerifiedDeployment(record, deployment, 'exact')
+            writeState(config, state)
           }
-          record.receipts.deployedAt = deployment.receipt.deployedAt
-          record.receipts.deploymentRunUrl = deployment.run.html_url
-          writeState(config, state)
           await finalizeIssue(config, client, state, record, deployment)
           return
         } catch (error) {
           if (error instanceof AdminIssueProvenanceError) {
+            if (error instanceof AdminIssueDeploymentRunError) {
+              record.deployment = {
+                conclusion: error.run.conclusion ?? undefined,
+                runAttempt: error.run.run_attempt,
+                runId: error.run.id,
+                url: error.run.html_url,
+              }
+            }
             await blockRecord(config, state, record, error.message)
             return
           }
@@ -4031,16 +4410,19 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
   const state = loadAdminIssueControllerState(config, true)
   await reconcileTodos(config, client, state)
   await reconcileGitHubInputs(config, state)
-  const ready = Object.values(state.issues)
-    .filter((record) => record.inputRevision > record.processedRevision)
-    .filter((record) => !['completed', 'paused', 'pull-request', 'deploying'].includes(record.phase))
-    .sort((left, right) => left.inputs[0].createdAt.localeCompare(right.inputs[0].createdAt))
   const recovering = Object.values(state.issues).find(
     (record) => record.phase === 'blocked' && hasRecoverableTransition(record),
   )
   const inFlight = Object.values(state.issues).find((record) =>
     ['pull-request', 'deploying', 'ready-for-pr'].includes(record.phase),
   )
+  if (!recovering && !inFlight && await recoverBlockedDeployments(config, client, state)) {
+    return
+  }
+  const ready = Object.values(state.issues)
+    .filter((record) => record.inputRevision > record.processedRevision)
+    .filter((record) => !['completed', 'paused', 'pull-request', 'deploying'].includes(record.phase))
+    .sort((left, right) => left.inputs[0].createdAt.localeCompare(right.inputs[0].createdAt))
   const selected = recovering ?? inFlight ?? ready[0]
   if (selected) await processRecord(config, client, state, selected)
 }
