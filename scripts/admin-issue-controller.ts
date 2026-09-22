@@ -22,6 +22,7 @@ import { basename, extname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   CONTROLLER_COMMENT_MARKER,
+  adminTodoCompletionRequired,
   adminIssueMarker,
   appendIssueInput,
   assertAdminIssueControllerState,
@@ -29,6 +30,7 @@ import {
   assertCandidateVisualEvidence,
   assertFinalizationAuthorized,
   assertVisualEvidenceForCandidate,
+  authorizedIosFollowUp,
   baselineAdminIssueState,
   beginAdminIssueGeneration,
   branchNameForIssue,
@@ -39,13 +41,18 @@ import {
   formatCompletionComment,
   formatPullRequestComment,
   formatQuestionsComment,
+  formatResolvedWithoutPrComment,
+  formatSubmittedImageMarkdown,
   formatVisualEvidenceMarkdown,
+  githubAutomationIssueMarker,
+  githubAutomationIssueUid,
   isTrustedIssueComment,
   issueBody,
   issueTitle,
   markIssueInputsProcessed,
   migrateAdminIssueControllerState,
   neutralizeGitHubClosingReferences,
+  parseAdminTodoAttachments,
   parseWorkerOutcome,
   sessionNameForIssue,
   todoFingerprint,
@@ -54,6 +61,7 @@ import {
   type AdminIssueChecksReceipt,
   type AdminIssueDiffReceipt,
   type AdminIssueInput,
+  type AdminIssueInputAttachment,
   type AdminIssueRecord,
   type AdminIssueValidationReceipt,
   type AdminIssueVisualEvidenceDraft,
@@ -111,12 +119,19 @@ interface CommandResult {
 }
 
 interface GitHubIssue {
+  author_association?: string
   body: string | null
+  created_at: string
   html_url: string
   number: number
+  pull_request?: unknown
   state: 'open' | 'closed'
   title: string
   updated_at: string
+  user?: {
+    id?: number
+    login?: string
+  } | null
 }
 
 export interface GitHubPullRequest {
@@ -191,6 +206,11 @@ const MAX_BASE_RESYNCS_PER_GENERATION = 2
 const DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS = 5 * 60_000
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
+const DEPLOYMENT_WORKER_MUTABLE_PATHS = [
+  '.github/workflows/deploy-dashboard.yml',
+  'scripts/deploy-dashboard-ci.test.ts',
+  'scripts/deploy-dashboard-ci.ts',
+] as const
 const PROTECTED_WORKER_PATHS = [
   '.gitattributes',
   '.git',
@@ -798,6 +818,33 @@ async function findIssueByUid(config: AdminIssueControllerConfig, uid: string) {
   throw new Error(`Repository exceeds the controller's 10,000-issue reconciliation safety limit`)
 }
 
+async function listOpenIssues(config: AdminIssueControllerConfig) {
+  const issues: GitHubIssue[] = []
+  for (let page = 1; page <= 100; page += 1) {
+    const batch = await ghApi<GitHubIssue[]>(
+      config,
+      'GET',
+      `repos/${config.repository}/issues?state=open&sort=created&direction=asc&per_page=100&page=${page}`,
+    )
+    issues.push(...batch.filter((issue) => !issue.pull_request))
+    if (batch.length < 100) return issues
+  }
+  throw new Error(`Repository exceeds the controller's 10,000-open-issue safety limit`)
+}
+
+function trustedGitHubAutomationIssue(
+  config: Pick<AdminIssueControllerConfig, 'ownerId' | 'ownerLogin'>,
+  issue: GitHubIssue,
+) {
+  const marker = githubAutomationIssueMarker(issue.body)
+  if (!marker) return undefined
+  const login = issue.user?.login?.toLowerCase()
+  const owner = issue.user?.id === config.ownerId &&
+    login === config.ownerLogin.toLowerCase() &&
+    issue.author_association === 'OWNER'
+  return owner || login === 'github-actions[bot]' ? marker : undefined
+}
+
 async function listIssueComments(config: AdminIssueControllerConfig, issueNumber: number) {
   const comments: GitHubIssueComment[] = []
   for (let page = 1; page <= 100; page += 1) {
@@ -848,15 +895,84 @@ async function postIssueCommentOnce(
   )
 }
 
-function buildInitialInput(item: ActionableTodoItem): AdminIssueInput {
+function buildInitialInput(
+  item: ActionableTodoItem,
+  body = item.description?.trim() || '',
+  attachments: AdminIssueInputAttachment[] = [],
+): AdminIssueInput {
   const fingerprint = todoFingerprint(item.summary, item.description)
   return {
-    body: item.description?.trim() || '',
+    ...(attachments.length > 0 ? { attachments } : {}),
+    body,
     createdAt: now(),
     externalId: `todo:${fingerprint}`,
     revision: 1,
     source: 'todo-created',
   }
+}
+
+async function loadTodoAttachments(
+  config: AdminIssueControllerConfig,
+  client: HassAdminTodoClient,
+  uid: string,
+  description: string | undefined,
+) {
+  const parsed = parseAdminTodoAttachments(description)
+  if (parsed.attachments.length === 0) {
+    return { attachments: [] as AdminIssueInputAttachment[], description: parsed.description }
+  }
+  const githubToken = (
+    await runCommand('gh', ['auth', 'token'], {
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    })
+  ).stdout.trim()
+  if (!githubToken) throw new Error('gh auth token returned an empty token')
+  const attachmentDirectory = join(
+    config.stateDirectory,
+    'input-attachments',
+    uid.replace(/[^A-Za-z0-9._-]+/g, '-'),
+  )
+  mkdirSync(attachmentDirectory, { mode: 0o700, recursive: true })
+  const attachments: AdminIssueInputAttachment[] = []
+  for (const attachment of parsed.attachments) {
+    const bytes = await client.getAdminTodoAttachment(attachment.id)
+    if (bytes.length !== attachment.sizeBytes) {
+      throw new Error(`Admin To-Do attachment ${attachment.id} size does not match its manifest`)
+    }
+    const digest = createHash('sha256').update(bytes).digest('hex')
+    if (digest !== attachment.sha256) {
+      throw new Error(`Admin To-Do attachment ${attachment.id} hash does not match its manifest`)
+    }
+    const mediaType = visualEvidenceMediaType(Buffer.from(bytes))
+    if (mediaType !== attachment.mediaType) {
+      throw new Error(`Admin To-Do attachment ${attachment.id} type does not match its manifest`)
+    }
+    const extension = mediaType === 'image/png'
+      ? '.png'
+      : mediaType === 'image/jpeg'
+        ? '.jpg'
+        : '.webp'
+    const localPath = join(attachmentDirectory, `${attachment.id}${extension}`)
+    writeFileSync(localPath, bytes, { mode: 0o600 })
+    const githubUrl = await uploadGitHubUserAttachment(
+      config,
+      githubToken,
+      bytes,
+      basename(attachment.name).slice(0, 240) || `${attachment.id}${extension}`,
+      mediaType,
+    )
+    attachments.push({
+      githubUrl,
+      id: attachment.id,
+      localPath,
+      mediaType,
+      name: attachment.name,
+      sha256: digest,
+      sizeBytes: bytes.length,
+    })
+  }
+  return { attachments, description: parsed.description }
 }
 
 async function reconcileTodos(
@@ -870,6 +986,12 @@ async function reconcileTodos(
     const fingerprint = todoFingerprint(item.summary, item.description)
     let record = state.issues[item.uid]
     if (!record) {
+      const attachmentInput = await loadTodoAttachments(
+        config,
+        client,
+        item.uid,
+        item.description,
+      )
       let issue = await findIssueByUid(config, item.uid)
       if (!issue) {
         issue = await ghApi<GitHubIssue>(
@@ -878,7 +1000,11 @@ async function reconcileTodos(
           `repos/${config.repository}/issues`,
           {
             body: issueBody({
-              description: item.description ?? '',
+              attachments: attachmentInput.attachments.map((attachment) => ({
+                alt: attachment.name,
+                url: attachment.githubUrl as string,
+              })),
+              description: attachmentInput.description,
               summary: item.summary,
               uid: item.uid,
             }),
@@ -886,15 +1012,38 @@ async function reconcileTodos(
             title: issueTitle(item.summary),
           },
         )
+      } else if (attachmentInput.attachments.length > 0) {
+        issue = await ghApi<GitHubIssue>(
+          config,
+          'PATCH',
+          `repos/${config.repository}/issues/${issue.number}`,
+          {
+            body: issueBody({
+              attachments: attachmentInput.attachments.map((attachment) => ({
+                alt: attachment.name,
+                url: attachment.githubUrl as string,
+              })),
+              description: attachmentInput.description,
+              summary: item.summary,
+              uid: item.uid,
+            }),
+          },
+        )
       }
       const createdAt = now()
       record = {
         commentCursor: 0,
         createdAt,
-        description: item.description?.trim() || '',
+        description: attachmentInput.description,
         generation: 1,
         inputRevision: 1,
-        inputs: [buildInitialInput(item)],
+        inputs: [
+          buildInitialInput(
+            item,
+            attachmentInput.description,
+            attachmentInput.attachments,
+          ),
+        ],
         issueNumber: issue.number,
         issueUrl: issue.html_url,
         phase: 'queued',
@@ -918,13 +1067,23 @@ async function reconcileTodos(
 
     if (record.taskFingerprint === fingerprint) continue
     const previousFingerprint = record.taskFingerprint
+    const attachmentInput = await loadTodoAttachments(
+      config,
+      client,
+      item.uid,
+      item.description,
+    )
     await ghApi(
       config,
       'PATCH',
       `repos/${config.repository}/issues/${record.issueNumber}`,
       {
         body: issueBody({
-          description: item.description ?? '',
+          attachments: attachmentInput.attachments.map((attachment) => ({
+            alt: attachment.name,
+            url: attachment.githubUrl as string,
+          })),
+          description: attachmentInput.description,
           summary: item.summary,
           uid: item.uid,
         }),
@@ -939,14 +1098,28 @@ async function reconcileTodos(
       [
         '**Admin To-Do updated**',
         '',
-        item.description?.trim() || '_No additional details were supplied._',
+        attachmentInput.description || '_No additional details were supplied._',
+        ...(attachmentInput.attachments.length > 0
+          ? [
+            '',
+            ...attachmentInput.attachments.map(
+              (attachment) => formatSubmittedImageMarkdown(
+                attachment.name,
+                attachment.githubUrl as string,
+              ),
+            ),
+          ]
+          : []),
       ].join('\n'),
     )
     record.taskFingerprint = fingerprint
     record.title = issueTitle(item.summary)
-    record.description = item.description?.trim() || ''
+    record.description = attachmentInput.description
     appendIssueInput(record, {
-      body: item.description?.trim() || '',
+      ...(attachmentInput.attachments.length > 0
+        ? { attachments: attachmentInput.attachments }
+        : {}),
+      body: attachmentInput.description,
       createdAt: now(),
       externalId: `todo:${fingerprint}`,
       source: 'todo-updated',
@@ -954,6 +1127,70 @@ async function reconcileTodos(
     if (previousFingerprint !== fingerprint && !['deploying', 'completed'].includes(record.phase)) {
       record.phase = 'queued'
     }
+    writeState(config, state)
+  }
+
+  for (const record of Object.values(state.issues)) {
+    for (const input of record.inputs) {
+      if (!['todo-created', 'todo-updated'].includes(input.source)) continue
+      for (const attachment of input.attachments ?? []) {
+        const receiptKey = `todoAttachmentDeleted:${attachment.id}`
+        if (record.receipts[receiptKey]) continue
+        await client.deleteAdminTodoAttachment(attachment.id)
+        record.receipts[receiptKey] = now()
+        writeState(config, state)
+      }
+    }
+  }
+}
+
+async function reconcileGitHubAutomationIssues(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+) {
+  const trackedIssueNumbers = new Set(
+    Object.values(state.issues).map((record) => record.issueNumber),
+  )
+  for (const issue of await listOpenIssues(config)) {
+    const marker = trustedGitHubAutomationIssue(config, issue)
+    if (trackedIssueNumbers.has(issue.number) || !marker) {
+      continue
+    }
+    const uid = githubAutomationIssueUid(issue.number)
+    const createdAt = issue.created_at || now()
+    const body = issue.body?.trim() || ''
+    const fingerprint = todoFingerprint(issue.title, body)
+    const record: AdminIssueRecord = {
+      automationKind: marker === 'layout-failure-commit-' ? 'layout' : 'deployment',
+      commentCursor: 0,
+      createdAt,
+      description: body,
+      generation: 1,
+      inputRevision: 1,
+      inputs: [{
+        body: `${issue.title}\n\n${body}`.trim(),
+        createdAt,
+        externalId: `github-issue:${issue.number}:${fingerprint}`,
+        revision: 1,
+        source: 'github-issue',
+      }],
+      issueNumber: issue.number,
+      issueUrl: issue.html_url,
+      origin: 'github-automation',
+      phase: 'queued',
+      processedRevision: 0,
+      provenance: { kind: 'none' },
+      receipts: { githubIssueDiscoveredAt: now() },
+      repairAttempts: 0,
+      sessionName: sessionNameForIssue(issue.number, uid),
+      taskFingerprint: fingerprint,
+      title: issueTitle(issue.title),
+      uid,
+      updatedAt: createdAt,
+      workerRuns: 0,
+    }
+    state.issues[uid] = record
+    trackedIssueNumbers.add(issue.number)
     writeState(config, state)
   }
 }
@@ -964,6 +1201,70 @@ async function getIssue(config: AdminIssueControllerConfig, issueNumber: number)
     'GET',
     `repos/${config.repository}/issues/${issueNumber}`,
   )
+}
+
+async function loadGitHubCommentAttachments(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+  comment: GitHubIssueComment,
+) {
+  const body = comment.body ?? ''
+  const matches = [...body.matchAll(
+    /!\[([^\]]*)\]\((https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+)\)/g,
+  )]
+  const unique = [...new Map(matches.map((match) => [match[2], match])).values()].slice(0, 4)
+  if (unique.length === 0) return [] as AdminIssueInputAttachment[]
+  const githubToken = (
+    await runCommand('gh', ['auth', 'token'], {
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    })
+  ).stdout.trim()
+  if (!githubToken) throw new Error('gh auth token returned an empty token')
+  const attachmentDirectory = join(
+    config.stateDirectory,
+    'input-attachments',
+    record.uid.replace(/[^A-Za-z0-9._-]+/g, '-'),
+    `comment-${comment.id}`,
+  )
+  mkdirSync(attachmentDirectory, { mode: 0o700, recursive: true })
+  const attachments: AdminIssueInputAttachment[] = []
+  for (const match of unique) {
+    const githubUrl = match[2]
+    const response = await fetch(githubUrl, {
+      headers: {
+        Accept: 'image/avif,image/webp,image/png,image/jpeg',
+        Authorization: `Bearer ${githubToken}`,
+      },
+      redirect: 'follow',
+    })
+    if (!response.ok) {
+      throw new Error(`GitHub issue attachment download failed with HTTP ${response.status}`)
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    if (bytes.length <= 0 || bytes.length > MAX_VISUAL_EVIDENCE_BYTES) {
+      throw new Error(`GitHub issue attachment exceeds the ${MAX_VISUAL_EVIDENCE_BYTES}-byte limit`)
+    }
+    const mediaType = visualEvidenceMediaType(Buffer.from(bytes))
+    const extension = mediaType === 'image/png'
+      ? '.png'
+      : mediaType === 'image/jpeg'
+        ? '.jpg'
+        : '.webp'
+    const id = githubUrl.split('/').at(-1) as string
+    const localPath = join(attachmentDirectory, `${id}${extension}`)
+    writeFileSync(localPath, bytes, { mode: 0o600 })
+    attachments.push({
+      githubUrl,
+      id,
+      localPath,
+      mediaType,
+      name: match[1].trim() || `Issue attachment ${attachments.length + 1}`,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      sizeBytes: bytes.length,
+    })
+  }
+  return attachments
 }
 
 async function reconcileGitHubInputs(
@@ -982,7 +1283,9 @@ async function reconcileGitHubInputs(
       if (!isTrustedIssueComment(comment, config.ownerId, config.ownerLogin)) {
         continue
       }
+      const attachments = await loadGitHubCommentAttachments(config, record, comment)
       appendIssueInput(record, {
+        ...(attachments.length > 0 ? { attachments } : {}),
         body: comment.body ?? '',
         createdAt: comment.created_at ?? now(),
         externalId: `comment:${comment.id}`,
@@ -1021,6 +1324,14 @@ async function reconcileGitHubInputs(
       const controllerCompleted = comments.some((comment) =>
         comment.body?.includes(controllerReceiptMarker(record.uid, 'completed')),
       )
+      const controllerResolvedWithoutPr = comments.some((comment) =>
+        comment.body?.includes(
+          controllerReceiptMarker(
+            record.uid,
+            `resolved-without-pr-r${record.processedRevision}`,
+          ),
+        ),
+      )
       if (
         controllerCompleted &&
         record.provenance.kind === 'active' &&
@@ -1028,6 +1339,12 @@ async function reconcileGitHubInputs(
         record.provenance.deployment
       ) {
         record.phase = 'deploying'
+        record.receipts.issueClosedAt = issue.updated_at
+      } else if (
+        controllerResolvedWithoutPr &&
+        record.lastOutcome?.decision === 'resolved_without_pr'
+      ) {
+        record.phase = 'resolving'
         record.receipts.issueClosedAt = issue.updated_at
       } else {
         record.phase = 'paused'
@@ -1239,12 +1556,16 @@ function buildWorkerEnvironment(
   worktreePath: string,
   gitCommonDirectory: string,
   githubToken: string,
+  record?: Pick<AdminIssueRecord, 'automationKind'>,
 ) {
   const copilotHome = join(config.workerHome, '.copilot')
   const environment: NodeJS.ProcessEnv = {
     ADMIN_ISSUE_GIT_COMMON_DIR: gitCommonDirectory,
     ADMIN_ISSUE_WORKER_IMAGE: config.workerImageId,
     ADMIN_ISSUE_WORKSPACE: worktreePath,
+    ...(record?.automationKind === 'deployment'
+      ? { ADMIN_ISSUE_MUTABLE_PATHS: DEPLOYMENT_WORKER_MUTABLE_PATHS.join(',') }
+      : {}),
     COPILOT_HOME: copilotHome,
     GH_TOKEN: githubToken,
     HOME: config.workerHome,
@@ -1260,30 +1581,48 @@ export function buildWorkerPrompt(record: AdminIssueRecord) {
   const pendingInputs = record.inputs.filter((input) => input.revision > record.processedRevision)
   const issueContext = pendingInputs
     .map(
-      (input) =>
-        `### Input ${input.revision} (${input.source}, ${input.createdAt})\n${input.body}`,
+      (input) => {
+        const attachments = input.attachments?.length
+          ? `\n\nSubmitted images:\n${input.attachments
+            .map((attachment) => `- ${workerAttachmentPath(record, input.revision, attachment)}`)
+            .join('\n')}`
+          : ''
+        return `### Input ${input.revision} (${input.source}, ${input.createdAt})\n${input.body}${attachments}`
+      },
     )
     .join('\n\n')
+  const protectedSurfaceGuidance = record.automationKind === 'deployment'
+    ? `This trusted deployment-failure issue may modify only these infrastructure paths in addition to ordinary dashboard paths: ${DEPLOYMENT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to deployment diagnosis, recovery, or regression coverage.`
+    : 'Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.'
   return `/tandem-research ${record.title}
 
 You are working on GitHub issue #${record.issueNumber} in ${record.issueUrl}.
 
 Use the tandem-research workflow to investigate the issue before implementation. The operator's issue text and follow-up comments below are canonical. Make repository changes only through the admin_issue_workspace tool. Use the configured Home Assistant MCP server directly whenever current HA state, history, traces, configuration, services, or validation are relevant. It is a trusted local execution surface with operator-equivalent Home Assistant access. Follow the server's skill-guide and safety contracts, prefer read-only diagnosis before mutation, perform only issue-scoped HA actions, verify their results, and never expose credentials or secret-bearing configuration. Do not use host filesystem, host shell, GitHub, general network, commit, push, merge, deployment, or issue-mutation tools. The trusted host controller owns those operations.
 
-Gather available Home Assistant evidence yourself before asking the operator for diagnostics or authorization. Do not offer an input option that merely authorizes a capability already available to you. If a consequential product or design decision remains after repository and Home Assistant investigation, stop and return needs_input with concise options and your recommendation. Otherwise implement the complete fix in the assigned worktree, update the directly owned tests, run the relevant tests through admin_issue_workspace, iterate until they pass, and perform a meaningful code review. Treat iOS/WebKit-specific behavior as requiring explicit manual follow-up.
+Gather available Home Assistant evidence yourself before asking the operator for diagnostics or authorization. Do not offer an input option that merely authorizes a capability already available to you. Treat submitted images as canonical issue evidence and inspect them when relevant. If a consequential product or design decision remains after repository and Home Assistant investigation, stop and return needs_input with concise options and your recommendation. Otherwise implement the complete fix in the assigned worktree, update the directly owned tests, run the relevant tests through admin_issue_workspace, iterate until they pass, and perform a meaningful code review.
 
-When the committed fix changes production dashboard runtime files (index.html, public/**, or non-test src/**), generate one to four deterministic PNG, JPEG, or WebP images showing the proposed fixed behavior. Store them only below artifacts/admin-issue-${record.issueNumber}/; this ignored directory is not part of the commit. Use focused states and viewports that make the fix reviewable, label mock-backed evidence visibly, and never actuate devices merely to capture an image. Each caption must explicitly say whether the image is mock or live evidence. The host controller embeds the same uploaded images in both the pull request and the GitHub issue update. Non-runtime, test-only, documentation-only, Home Assistant-only, and controller-only outcomes use an empty visualEvidence array. Images supplement tests and do not replace required manual iOS/WebKit verification.
+Classify whether the proposed result has a meaningful visible React state. CSS and visual-asset changes always require proposed fixed-behavior images. Logic-only focus, accessibility, Home Assistant, test, documentation, controller, and other non-demonstrable changes may set visualChange.required to false with a specific reason. When visual evidence is required, generate one to four deterministic PNG, JPEG, or WebP images and store them only below artifacts/admin-issue-${record.issueNumber}/; this ignored directory is not part of the commit. Use focused states and viewports that make the fix reviewable, label mock-backed evidence visibly, and never actuate devices merely to capture an image. Each caption must explicitly say whether the image is mock or live evidence. The host controller embeds the same uploaded images in both the pull request and the GitHub issue update. Images supplement tests.
 
-Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.
+Manual iOS follow-up is exceptional. Set iosFollowUp.required only when the canonical issue explicitly identifies iOS, Safari, WebKit, safe-area, or software-keyboard behavior, or discusses an iPhone/iPad in a browser-interface context; the repository candidate must also change a browser-facing surface, and the reason must name the platform-specific behavior that cannot be certified locally. An iPhone involved only as a Home Assistant presence device is not an iOS browser-verification gate. Generic responsive layout, wrapping, focus restoration, or Linux WebKit limitations do not create the gate by themselves.
+
+If Home Assistant work fully resolves the issue, or investigation proves that no repository change is appropriate, keep the worktree clean and return resolved_without_pr. Explain the verified resolution and why no pull request or deployment is needed. Never create an unrelated repository change merely to satisfy the lifecycle.
+
+${protectedSurfaceGuidance}
 
 Return a final response containing exactly one JSON object and no Markdown fence:
 {
   "schemaVersion": 1,
-  "decision": "needs_input" | "ready_for_pr" | "blocked",
+  "decision": "needs_input" | "ready_for_pr" | "resolved_without_pr" | "blocked",
   "summary": "concise current result",
   "questions": [{ "question": "...", "options": ["...", "..."], "recommendation": "..." }],
+  "issueTitle": "concise PR-quality issue title",
+  "resolutionType": "home_assistant" | "no_repository_change",
+  "resolution": "verified resolution and why no repository change is needed",
+  "verification": ["specific verified evidence"],
   "changeSummary": ["..."],
   "tests": [{ "command": "...", "result": "passed" | "failed" }],
+  "visualChange": { "required": true | false, "reason": "why images are or are not useful" },
   "visualEvidence": [{ "path": "artifacts/admin-issue-${record.issueNumber}/fixed-phone.png", "alt": "Accessible description of the fixed state", "caption": "Mock evidence: concise state and viewport description" }],
   "review": { "approved": true | false, "findings": ["..."] },
   "pr": { "title": "...", "body": "..." },
@@ -1291,11 +1630,42 @@ Return a final response containing exactly one JSON object and no Markdown fence
   "reason": "..."
 }
 
-For needs_input, provide at least one question. For ready_for_pr, changeSummary and tests must be non-empty, review.approved must be true, pr title/body must be present, and visualEvidence must follow the runtime-change rule above. For blocked, explain the blocker. Omit fields that do not apply.
+For needs_input, provide at least one question. For ready_for_pr, changeSummary and tests must be non-empty, review.approved must be true, pr title/body and visualChange must be present, and visualEvidence must follow the visual classification above. For resolved_without_pr, issueTitle, resolutionType, resolution, and verification must be present and the worktree must remain clean. For blocked, explain the blocker. Omit fields that do not apply.
 
 Always include schemaVersion, decision, summary, questions, visualEvidence, and iosFollowUp. Use empty questions and visualEvidence arrays when they do not apply. A ready_for_pr outcome is valid only when every listed test passed.
 
 ${issueContext}`
+}
+
+function workerAttachmentPath(
+  record: Pick<AdminIssueRecord, 'issueNumber'>,
+  revision: number,
+  attachment: Pick<AdminIssueInputAttachment, 'id' | 'mediaType'>,
+) {
+  const extension = attachment.mediaType === 'image/png'
+    ? '.png'
+    : attachment.mediaType === 'image/jpeg'
+      ? '.jpg'
+      : '.webp'
+  return `artifacts/admin-issue-${record.issueNumber}/reported/input-${revision}-${attachment.id}${extension}`
+}
+
+function materializeWorkerInputAttachments(record: AdminIssueRecord) {
+  if (!record.worktreePath) throw new Error('Worker worktree is missing')
+  for (const input of record.inputs) {
+    for (const attachment of input.attachments ?? []) {
+      if (!existsSync(attachment.localPath)) {
+        throw new Error(`Worker input attachment is missing: ${attachment.localPath}`)
+      }
+      const destination = resolve(
+        record.worktreePath,
+        workerAttachmentPath(record, input.revision, attachment),
+      )
+      mkdirSync(join(destination, '..'), { mode: 0o700, recursive: true })
+      copyFileSync(attachment.localPath, destination)
+      chmodSync(destination, 0o400)
+    }
+  }
 }
 
 function parseJsonLines(output: string) {
@@ -1340,6 +1710,14 @@ function assertReadyOutcomeMatchesCandidate(
       'Recovered worker outcome visual evidence does not match the authorized candidate',
     )
   }
+  if (
+    candidate.visualChange &&
+    JSON.stringify(candidate.visualChange) !== JSON.stringify(outcome.visualChange)
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Recovered worker outcome visual classification does not match the authorized candidate',
+    )
+  }
 }
 
 export function restoreReadyOutcomeFromWorkerLog(
@@ -1378,13 +1756,92 @@ export function restoreReadyOutcomeFromWorkerLog(
   return outcome
 }
 
+interface WorkerSessionCandidate {
+  id: string
+  name: string
+  summaryCount: number
+  updatedAt: string
+}
+
+export function selectWorkerSessionCandidate(
+  candidates: readonly WorkerSessionCandidate[],
+  sessionName: string,
+) {
+  const matching = candidates
+    .filter((candidate) => candidate.name.toLowerCase() === sessionName.toLowerCase())
+    .sort((left, right) =>
+      right.summaryCount - left.summaryCount ||
+      right.updatedAt.localeCompare(left.updatedAt) ||
+      left.id.localeCompare(right.id),
+    )
+  if (matching.length === 0) return undefined
+  if (
+    matching.length > 1 &&
+    matching[0].summaryCount === matching[1].summaryCount &&
+    matching[0].updatedAt === matching[1].updatedAt
+  ) {
+    throw new Error(`Multiple indistinguishable Copilot sessions match ${sessionName}`)
+  }
+  return matching[0]
+}
+
+function workerSessionCandidates(config: AdminIssueControllerConfig) {
+  const root = join(config.workerHome, '.copilot', 'session-state')
+  if (!existsSync(root)) return [] as WorkerSessionCandidate[]
+  const candidates: WorkerSessionCandidate[] = []
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    const workspacePath = join(root, entry.name, 'workspace.yaml')
+    if (!existsSync(workspacePath)) continue
+    const workspace = readFileSync(workspacePath, 'utf8')
+    const field = (name: string) =>
+      workspace.match(new RegExp(`^${name}:\\s*(.*)$`, 'm'))?.[1]?.trim()
+    const id = field('id')
+    const name = field('name')
+    const updatedAt = field('updated_at')
+    const summaryCount = Number(field('summary_count') ?? '0')
+    if (
+      id &&
+      name &&
+      updatedAt &&
+      !Number.isNaN(Date.parse(updatedAt)) &&
+      Number.isInteger(summaryCount)
+    ) {
+      candidates.push({ id, name, summaryCount, updatedAt })
+    }
+  }
+  return candidates
+}
+
+function bindWorkerSessionId(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+) {
+  if (record.sessionId) return { id: record.sessionId, resume: Boolean(record.receipts.sessionCreatedAt) }
+  const existing = selectWorkerSessionCandidate(
+    workerSessionCandidates(config),
+    record.sessionName,
+  )
+  if (existing) {
+    record.sessionId = existing.id
+    record.receipts.sessionCreatedAt ??= now()
+    writeState(config, state)
+    return { id: existing.id, resume: true }
+  }
+  record.sessionId = randomUUID()
+  writeState(config, state)
+  return { id: record.sessionId, resume: false }
+}
+
 async function runCopilotWorker(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
   record: AdminIssueRecord,
 ) {
   const worktreePath = await ensureWorktree(config, state, record)
-  assertProtectedPathsUntouched(await changedFiles(worktreePath))
+  materializeWorkerInputAttachments(record)
+  assertProtectedPathsUntouched(await changedFiles(worktreePath), record)
   assertWorkerHostConfigurationSafe(worktreePath)
   prepareCopilotHome(config)
   const githubToken = (
@@ -1400,7 +1857,9 @@ async function runCopilotWorker(
     worktreePath,
     gitCommonDirectory,
     githubToken,
+    record,
   )
+  const session = bindWorkerSessionId(config, state, record)
   const commonArgs = [
     '-C',
     worktreePath,
@@ -1431,10 +1890,13 @@ async function runCopilotWorker(
     '-p',
     buildWorkerPrompt(record),
   ]
-  const shouldResume = Boolean(record.receipts.sessionCreatedAt)
-  let result = await runCommand(
+  const result = await runCommand(
     'copilot',
-    [shouldResume ? `--resume=${record.sessionName}` : '--name', ...(shouldResume ? [] : [record.sessionName]), ...commonArgs],
+    [
+      `--session-id=${session.id}`,
+      ...(session.resume ? [] : ['--name', record.sessionName]),
+      ...commonArgs,
+    ],
     {
       allowFailure: true,
       cwd: worktreePath,
@@ -1443,19 +1905,6 @@ async function runCopilotWorker(
       timeoutMs: config.workerTimeoutMinutes * 60_000,
     },
   )
-  if (
-    result.exitCode !== 0 &&
-    !shouldResume &&
-    /already exists|session.*exists|duplicate/i.test(`${result.stderr}\n${result.stdout}`)
-  ) {
-    result = await runCommand('copilot', [`--resume=${record.sessionName}`, ...commonArgs], {
-      allowFailure: true,
-      cwd: worktreePath,
-      env: environment,
-      maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
-      timeoutMs: config.workerTimeoutMinutes * 60_000,
-    })
-  }
 
   mkdirSync(join(config.stateDirectory, 'worker-logs'), { mode: 0o700, recursive: true })
   const logPath = join(
@@ -1543,9 +1992,22 @@ async function changedFiles(worktreePath: string) {
   return [...new Set([...tracked, ...untracked, ...ignoredProtected])].sort()
 }
 
-function assertProtectedPathsUntouched(files: string[]) {
+function workerMutableInfrastructurePaths(record?: Pick<AdminIssueRecord, 'automationKind'>) {
+  return new Set<string>(
+    record?.automationKind === 'deployment' ? DEPLOYMENT_WORKER_MUTABLE_PATHS : [],
+  )
+}
+
+function assertProtectedPathsUntouched(
+  files: string[],
+  record?: Pick<AdminIssueRecord, 'automationKind'>,
+) {
+  const mutableInfrastructurePaths = workerMutableInfrastructurePaths(record)
   for (const file of files) {
     const normalized = file.replaceAll('\\', '/')
+    if (mutableInfrastructurePaths.has(normalized)) {
+      continue
+    }
     if (
       normalized.startsWith('/') ||
       normalized.split('/').includes('..') ||
@@ -1560,16 +2022,26 @@ function assertProtectedPathsUntouched(files: string[]) {
   }
 }
 
-export function assertWorkerChangesSafe(worktreePath: string, files: string[]) {
+export function assertWorkerChangesSafe(
+  worktreePath: string,
+  files: string[],
+  record?: Pick<AdminIssueRecord, 'automationKind'>,
+) {
   if (files.length === 0) throw new Error('Worker reported ready_for_pr but made no repository changes')
-  assertProtectedPathsUntouched(files)
+  const mutableInfrastructurePaths = workerMutableInfrastructurePaths(record)
+  assertProtectedPathsUntouched(files, record)
   for (const file of files) {
     const normalized = file.replaceAll('\\', '/')
     if (
       normalized !== 'index.html' &&
-      !ALLOWED_WORKER_PATHS.some((allowedPath) => normalized.startsWith(allowedPath))
+      !ALLOWED_WORKER_PATHS.some((allowedPath) => normalized.startsWith(allowedPath)) &&
+      !mutableInfrastructurePaths.has(normalized)
     ) {
-      throw new Error(`Worker changed a path outside the auto-deployed dashboard: ${file}`)
+      throw new Error(
+        mutableInfrastructurePaths.size > 0
+          ? `Worker changed a path outside its authorized repair scope: ${file}`
+          : `Worker changed a path outside the auto-deployed dashboard: ${file}`,
+      )
     }
     const absolute = resolve(worktreePath, file)
     if (existsSync(absolute)) {
@@ -1776,7 +2248,7 @@ export async function createCommittedDiffReceipt(
     }),
   ])
   const files = names.stdout.split('\0').filter(Boolean).sort()
-  assertWorkerChangesSafe(record.worktreePath, files)
+  assertWorkerChangesSafe(record.worktreePath, files, record)
   return {
     baseSha,
     entryCount: files.length,
@@ -1853,9 +2325,10 @@ export function collectVisualEvidenceReceipts(
   diff: AdminIssueDiffReceipt,
   drafts: AdminIssueVisualEvidenceDraft[],
   existing: AdminIssueVisualEvidenceReceipt[] = [],
+  visualChange?: AdminIssueCandidate['visualChange'],
 ) {
   if (!record.worktreePath) throw new Error('Worker worktree is missing')
-  if (candidateRequiresVisualEvidence(diff.files) && drafts.length === 0) {
+  if (candidateRequiresVisualEvidence(diff.files, visualChange) && drafts.length === 0) {
     throw new Error(
       'Dashboard runtime changes require one to four proposed fixed-behavior images',
     )
@@ -1937,7 +2410,7 @@ async function validateAndPersistVisualEvidence(
 ) {
   const { candidate } = assertCandidateAuthorized(record)
   if (
-    candidateRequiresVisualEvidence(candidate.diff.files) &&
+    candidateRequiresVisualEvidence(candidate.diff.files, candidate.visualChange) &&
     originalDiffManifestSha256 !== candidate.diff.manifestSha256
   ) {
     throw new Error(
@@ -1949,6 +2422,7 @@ async function validateAndPersistVisualEvidence(
     candidate.diff,
     outcome.visualEvidence ?? [],
     candidate.visualEvidence,
+    candidate.visualChange,
   )
   assertCandidateVisualEvidence(record)
   writeState(config, state)
@@ -2209,7 +2683,7 @@ export function shouldVerifyExistingPullRequestVisualEvidence(
   candidate: AdminIssueCandidate,
 ) {
   return (
-    !candidateRequiresVisualEvidence(candidate.diff.files) ||
+    !candidateRequiresVisualEvidence(candidate.diff.files, candidate.visualChange) ||
     (candidate.visualEvidence?.length ?? 0) > 0
   )
 }
@@ -2259,7 +2733,11 @@ export async function prepareCommittedCandidate(
   const files = await changedFiles(record.worktreePath)
   if (files.length === 0) {
     if (previousCandidate && snapshot.treeSha === previousCandidate.treeSha && snapshot.status === '') {
-      if (provenance.revision === record.processedRevision) return previousCandidate
+      previousCandidate.visualChange = outcome.visualChange
+      if (provenance.revision === record.processedRevision) {
+        writeState(config, state)
+        return previousCandidate
+      }
       const diff = await createCommittedDiffReceipt(
         record,
         previousCandidate.targetBaseSha,
@@ -2274,6 +2752,7 @@ export async function prepareCommittedCandidate(
         headSha: previousCandidate.headSha,
         targetBaseSha: previousCandidate.targetBaseSha,
         treeSha: previousCandidate.treeSha,
+        visualChange: outcome.visualChange,
       }
       writeState(config, state)
       return provenance.candidate
@@ -2324,6 +2803,7 @@ export async function prepareCommittedCandidate(
     headSha: committed.headSha,
     targetBaseSha,
     treeSha: committed.treeSha,
+    visualChange: outcome.visualChange,
   }
   writeState(config, state)
   return provenance.candidate
@@ -2864,6 +3344,7 @@ export async function synchronizeCandidateBase(
       )
     }
     const previousVisualEvidence = provenance.candidate?.visualEvidence
+    const previousVisualChange = provenance.candidate?.visualChange
     provenance.candidate = {
       diff: transition.provisionalDiff,
       ...(transition.expectedRemoteHeadSha
@@ -2873,6 +3354,9 @@ export async function synchronizeCandidateBase(
       targetBaseSha: transition.targetBaseSha,
       treeSha: transition.toTreeSha,
       validation: transition.provisionalValidation,
+      ...(previousVisualChange
+        ? { visualChange: previousVisualChange }
+        : {}),
       ...(previousVisualEvidence?.every(
         (item) => item.diffManifestSha256 === transition.provisionalDiff?.manifestSha256,
       )
@@ -3034,37 +3518,53 @@ async function publishCandidateVisualEvidence(
       )
     }
     if (!record.worktreePath) throw new Error('Worker worktree is missing')
-    const uploadUrl = new URL('https://uploads.github.com/user-attachments/assets')
-    uploadUrl.searchParams.set('name', basename(item.path))
-    uploadUrl.searchParams.set('content_type', item.mediaType)
-    uploadUrl.searchParams.set('repository_id', String(config.repositoryId))
-    const response = await fetch(uploadUrl, {
-      body: readFileSync(resolve(realpathSync(record.worktreePath), item.path)),
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${githubToken}`,
-        'Content-Type': 'application/octet-stream',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-      method: 'POST',
-    })
-    const responseBody = await response.text()
-    if (!response.ok) {
-      throw new Error(
-        `GitHub visual-evidence upload failed with ${response.status}: ${truncate(responseBody, 2_000)}`,
-      )
-    }
-    const uploaded = JSON.parse(responseBody) as { url?: unknown }
-    if (
-      typeof uploaded.url !== 'string' ||
-      !/^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(uploaded.url)
-    ) {
-      throw new Error('GitHub visual-evidence upload returned an invalid attachment URL')
-    }
-    item.url = uploaded.url
+    item.url = await uploadGitHubUserAttachment(
+      config,
+      githubToken,
+      readFileSync(resolve(realpathSync(record.worktreePath), item.path)),
+      basename(item.path),
+      item.mediaType,
+    )
     writeState(config, state)
   }
   assertCandidateVisualEvidence(record, true)
+}
+
+async function uploadGitHubUserAttachment(
+  config: Pick<AdminIssueControllerConfig, 'repositoryId'>,
+  githubToken: string,
+  bytes: Uint8Array,
+  name: string,
+  mediaType: AdminIssueInputAttachment['mediaType'],
+) {
+  const uploadUrl = new URL('https://uploads.github.com/user-attachments/assets')
+  uploadUrl.searchParams.set('name', name)
+  uploadUrl.searchParams.set('content_type', mediaType)
+  uploadUrl.searchParams.set('repository_id', String(config.repositoryId))
+  const response = await fetch(uploadUrl, {
+    body: bytes,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${githubToken}`,
+      'Content-Type': 'application/octet-stream',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+    method: 'POST',
+  })
+  const responseBody = await response.text()
+  if (!response.ok) {
+    throw new Error(
+      `GitHub user-attachment upload failed with ${response.status}: ${truncate(responseBody, 2_000)}`,
+    )
+  }
+  const uploaded = JSON.parse(responseBody) as { url?: unknown }
+  if (
+    typeof uploaded.url !== 'string' ||
+    !/^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(uploaded.url)
+  ) {
+    throw new Error('GitHub user-attachment upload returned an invalid attachment URL')
+  }
+  return uploaded.url
 }
 
 async function createOrUpdatePullRequest(
@@ -3132,6 +3632,49 @@ async function createOrUpdatePullRequest(
   return pullRequest
 }
 
+export function summarizeFailedCheckLogs(raw: string) {
+  const ansiEscapePattern = new RegExp(
+    `${String.fromCodePoint(27)}\\[[0-?]*[ -/]*[@-~]`,
+    'g',
+  )
+  const normalized = raw
+    .replace(ansiEscapePattern, '')
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+  const signal = normalized.filter((line) =>
+    /\b(?:fail(?:ed|ure)?|error|assertion|expected|received|timeout|timed out|test files?|tests?)\b|[×✕]/i
+      .test(line),
+  )
+  const tail = normalized.slice(-160)
+  const selected = [...new Set([...signal.slice(-120), ...tail])]
+  return truncate(selected.join('\n'), 30_000)
+}
+
+async function rerunFailedWorkflow(
+  config: AdminIssueControllerConfig,
+  runId: number,
+) {
+  const result = await runCommand(
+    'gh',
+    ['run', 'rerun', String(runId), '--failed', '--repo', config.repository],
+    {
+      allowFailure: true,
+      cwd: config.repositoryPath,
+      maxOutputBytes: 100_000,
+      timeoutMs: 120_000,
+    },
+  )
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `Failed-check rerun could not be requested for workflow run ${runId}: ${truncate(
+        `${result.stdout}\n${result.stderr}`,
+        5_000,
+      )}`,
+    )
+  }
+}
+
 async function waitForRequiredChecks(
   config: AdminIssueControllerConfig,
   record: AdminIssueRecord,
@@ -3165,6 +3708,16 @@ async function waitForRequiredChecks(
         let logs = `${failed.name}: ${failed.conclusion ?? failed.status}`
         const runId = failed.details_url?.match(/\/actions\/runs\/(\d+)/)?.[1]
         if (runId) {
+          const workflowRun = await ghApi<WorkflowRun>(
+            config,
+            'GET',
+            `repos/${config.repository}/actions/runs/${runId}`,
+          )
+          if (workflowRun.status !== 'completed') {
+            await sleep(config.deploymentPollSeconds * 1000)
+            if (!(await refreshInputs())) return { interrupted: true as const }
+            continue
+          }
           const result = await runCommand(
             'gh',
             ['run', 'view', runId, '--repo', config.repository, '--log-failed'],
@@ -3175,10 +3728,25 @@ async function waitForRequiredChecks(
               timeoutMs: 120_000,
             },
           )
-          logs = truncate(`${logs}\n\n${result.stdout}\n${result.stderr}`, 30_000)
+          logs = summarizeFailedCheckLogs(
+            `${logs}\n\n${result.stdout}\n${result.stderr}`,
+          )
         }
-        return { logs, success: false as const }
+        const failureFingerprint = createHash('sha256')
+          .update(`${candidate.headSha}\0${failed.name}\0${failed.id}\0${logs}`)
+          .digest('hex')
+        const rerunKey = createHash('sha256')
+          .update(`${candidate.headSha}\0${failed.name}`)
+          .digest('hex')
+        return {
+          failureFingerprint,
+          logs,
+          rerunKey,
+          runId: runId ? Number(runId) : undefined,
+          success: false as const,
+        }
       }
+
       if (
         required.every(
           (check) =>
@@ -3881,6 +4449,25 @@ async function cleanupWorktree(
   record.worktreePath = undefined
 }
 
+function cleanupInputAttachmentCopies(
+  config: Pick<AdminIssueControllerConfig, 'stateDirectory'>,
+  record: AdminIssueRecord,
+) {
+  const attachmentRoot = resolve(config.stateDirectory, 'input-attachments')
+  for (const input of record.inputs) {
+    for (const attachment of input.attachments ?? []) {
+      const localPath = resolve(attachment.localPath)
+      if (!localPath.startsWith(`${attachmentRoot}/`)) {
+        throw new AdminIssueProvenanceError(
+          `Refusing to remove input attachment outside the state directory: ${localPath}`,
+        )
+      }
+      rmSync(localPath, { force: true })
+    }
+  }
+  record.receipts.inputAttachmentCopiesRemovedAt ??= now()
+}
+
 async function finalizeIssue(
   config: AdminIssueControllerConfig,
   client: HassAdminTodoClient,
@@ -3965,31 +4552,148 @@ async function finalizeIssue(
   record.receipts.issueClosedAt = now()
   writeState(config, state)
 
-  let items = await client.getItems(config.todoEntityId)
-  let completed = items.find((item) => item.uid === record.uid)
-  let receipt = await client.getState(config.completionReceiptEntityId)
-  if (!adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) {
-    assertFinalizationAuthorized(record)
-    await verifyMergedPullRequest(config, record)
-    await client.completeItem(config.completionScript, record.uid)
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      await sleep(750)
-      items = await client.getItems(config.todoEntityId)
-      completed = items.find((item) => item.uid === record.uid)
-      receipt = await client.getState(config.completionReceiptEntityId)
-      if (adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) break
+  if (adminTodoCompletionRequired(record)) {
+    let items = await client.getItems(config.todoEntityId)
+    let completed = items.find((item) => item.uid === record.uid)
+    let receipt = await client.getState(config.completionReceiptEntityId)
+    if (!adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) {
+      assertFinalizationAuthorized(record)
+      await verifyMergedPullRequest(config, record)
+      await client.completeItem(config.completionScript, record.uid)
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await sleep(750)
+        items = await client.getItems(config.todoEntityId)
+        completed = items.find((item) => item.uid === record.uid)
+        receipt = await client.getState(config.completionReceiptEntityId)
+        if (adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) break
+      }
     }
+    if (!adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) {
+      throw new Error(`Admin To-Do item ${record.uid} did not become completed`)
+    }
+    record.receipts.todoCompletedAt = now()
+    writeState(config, state)
   }
-  if (!adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) {
-    throw new Error(`Admin To-Do item ${record.uid} did not become completed`)
-  }
-  record.receipts.todoCompletedAt = now()
-  writeState(config, state)
   assertFinalizationAuthorized(record)
   await verifyMergedPullRequest(config, record)
   await cleanupWorktree(config, record, true)
+  cleanupInputAttachmentCopies(config, record)
   record.phase = 'completed'
   writeState(config, state)
+}
+
+async function synchronizeIssueTitle(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+  title: string,
+) {
+  const normalized = issueTitle(title)
+  if (record.title === normalized) return
+  await ghApi(config, 'PATCH', `repos/${config.repository}/issues/${record.issueNumber}`, {
+    title: normalized,
+  })
+  record.title = normalized
+  record.updatedAt = now()
+}
+
+async function finalizeResolvedWithoutPullRequest(
+  config: AdminIssueControllerConfig,
+  client: HassAdminTodoClient,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+) {
+  const outcome = record.lastOutcome
+  if (outcome?.decision !== 'resolved_without_pr') {
+    throw new Error('resolving record is missing a resolved_without_pr outcome')
+  }
+  await ensureWorktree(config, state, record)
+  if (!record.worktreePath || record.provenance.kind !== 'active') {
+    throw new Error('No-PR resolution is missing its isolated worktree')
+  }
+  const files = await changedFiles(record.worktreePath)
+  const snapshot = await readWorktreeSnapshot(record.worktreePath)
+  assertResolvedWithoutPullRequestSnapshot(record, snapshot, files)
+  record.provenance.revision = record.processedRevision
+  await synchronizeIssueTitle(config, record, outcome.issueTitle)
+  await postIssueCommentOnce(
+    config,
+    record.issueNumber,
+    record.uid,
+    `resolved-without-pr-r${record.processedRevision}`,
+    formatResolvedWithoutPrComment(record.uid, record.processedRevision, outcome),
+  )
+  if (!record.receipts.issueClosedAt) {
+    await ghApi(config, 'PATCH', `repos/${config.repository}/issues/${record.issueNumber}`, {
+      state: 'closed',
+      state_reason: 'completed',
+    })
+    record.receipts.issueClosedAt = now()
+    writeState(config, state)
+  }
+
+  if (adminTodoCompletionRequired(record) && !record.receipts.todoCompletedAt) {
+    let items = await client.getItems(config.todoEntityId)
+    let completed = items.find((item) => item.uid === record.uid)
+    let receipt = await client.getState(config.completionReceiptEntityId)
+    if (!adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) {
+      await client.completeItem(config.completionScript, record.uid)
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await sleep(750)
+        items = await client.getItems(config.todoEntityId)
+        completed = items.find((item) => item.uid === record.uid)
+        receipt = await client.getState(config.completionReceiptEntityId)
+        if (adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) break
+      }
+    }
+    if (!adminCompletionBoundarySatisfied(completed?.status, receipt.state, record.uid)) {
+      throw new Error(`Admin To-Do item ${record.uid} did not become completed`)
+    }
+    record.receipts.todoCompletedAt = now()
+    writeState(config, state)
+  }
+
+  await cleanupWorktree(config, record, true)
+  cleanupInputAttachmentCopies(config, record)
+  record.phase = 'completed'
+  record.receipts.resolvedWithoutPrAt = now()
+  writeState(config, state)
+}
+
+export function assertResolvedWithoutPullRequestSnapshot(
+  record: AdminIssueRecord,
+  snapshot: AdminIssueWorktreeSnapshot,
+  files: readonly string[],
+) {
+  if (record.provenance.kind !== 'active') {
+    throw new AdminIssueProvenanceError(
+      'No-PR resolution is missing active worktree provenance',
+    )
+  }
+  if (
+    record.pr ||
+    record.deployment ||
+    record.provenance.candidate ||
+    record.provenance.merge ||
+    record.provenance.deployment
+  ) {
+    throw new AdminIssueProvenanceError(
+      'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state',
+    )
+  }
+  if (files.length > 0) {
+    throw new AdminIssueProvenanceError(
+      `No-PR resolution left repository changes: ${files.join(', ')}`,
+    )
+  }
+  if (
+    snapshot.headSha !== record.provenance.preparedBaseSha ||
+    snapshot.status !== '' ||
+    snapshot.gitOperations.length > 0
+  ) {
+    throw new AdminIssueProvenanceError(
+      'No-PR resolution did not leave the isolated worktree at its prepared base',
+    )
+  }
 }
 
 async function handleWorkerOutcome(
@@ -4023,11 +4727,28 @@ async function handleWorkerOutcome(
     writeState(config, state)
     return false
   }
+  if (outcome.decision === 'resolved_without_pr') {
+    outcome.iosFollowUp = { reason: '', required: false }
+    record.lastOutcome = outcome
+    record.phase = 'resolving'
+    writeState(config, state)
+    return false
+  }
 
   record.phase = 'ready-for-pr'
   writeState(config, state)
   try {
     const candidate = await prepareCommittedCandidate(config, state, record, outcome)
+    outcome.iosFollowUp = authorizedIosFollowUp(
+      record.inputs
+        .filter((input) => input.source !== 'ci-failure')
+        .map((input) => input.body)
+        .join('\n\n'),
+      candidate.diff.files,
+      outcome.iosFollowUp,
+    )
+    record.lastOutcome = outcome
+    writeState(config, state)
     const originalDiffManifestSha256 = candidate.diff.manifestSha256
     if (
       !candidate.validation ||
@@ -4086,6 +4807,7 @@ async function handleWorkerOutcome(
 
   if (!(await refreshInputs())) return false
   try {
+    await synchronizeIssueTitle(config, record, outcome.pr.title)
     await pushCandidate(config, state, record)
     await publishCandidateVisualEvidence(config, state, record)
     await createOrUpdatePullRequest(config, record, outcome)
@@ -4182,6 +4904,7 @@ async function processRecord(
 ) {
   const refreshInputs = async (expectedPhase: AdminIssueRecord['phase']) => {
     await reconcileTodos(config, client, state)
+    await reconcileGitHubAutomationIssues(config, state)
     await reconcileGitHubInputs(config, state)
     return (
       record.phase === expectedPhase &&
@@ -4257,6 +4980,19 @@ async function processRecord(
         return
       }
 
+      if (record.phase === 'resolving') {
+        try {
+          await finalizeResolvedWithoutPullRequest(config, client, state, record)
+        } catch (error) {
+          if (error instanceof AdminIssueProvenanceError) {
+            await blockRecord(config, state, record, error.message)
+            return
+          }
+          throw error
+        }
+        return
+      }
+
       if (record.phase === 'pull-request') {
         if (!record.pr) throw new Error('pull-request record is missing PR metadata')
         try {
@@ -4300,6 +5036,25 @@ async function processRecord(
             return
           }
           if (!checks.success) {
+            if (
+              checks.runId &&
+              record.receipts.ciRerunKey !== checks.rerunKey
+            ) {
+              await rerunFailedWorkflow(config, checks.runId)
+              record.receipts.ciRerunKey = checks.rerunKey
+              record.receipts.ciRerunRequestedAt = now()
+              writeState(config, state)
+              return
+            }
+            if (record.receipts.ciWorkerFailureFingerprint === checks.failureFingerprint) {
+              await blockRecord(
+                config,
+                state,
+                record,
+                `The same protected-check failure remained after the worker returned without changing the candidate.\n\n${checks.logs}`,
+              )
+              return
+            }
             if (record.repairAttempts >= config.maxRepairAttempts) {
               await blockRecord(
                 config,
@@ -4310,6 +5065,7 @@ async function processRecord(
               return
             }
             record.repairAttempts += 1
+            record.receipts.ciWorkerFailureFingerprint = checks.failureFingerprint
             appendIssueInput(record, {
               body: `Protected pull-request checks failed. Diagnose and repair the branch.\n\n${checks.logs}`,
               createdAt: now(),
@@ -4409,19 +5165,21 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
   await cleanupStaleWorkerContainers()
   const state = loadAdminIssueControllerState(config, true)
   await reconcileTodos(config, client, state)
+  await reconcileGitHubAutomationIssues(config, state)
   await reconcileGitHubInputs(config, state)
   const recovering = Object.values(state.issues).find(
     (record) => record.phase === 'blocked' && hasRecoverableTransition(record),
   )
   const inFlight = Object.values(state.issues).find((record) =>
-    ['pull-request', 'deploying', 'ready-for-pr'].includes(record.phase),
+    ['pull-request', 'deploying', 'ready-for-pr', 'resolving'].includes(record.phase),
   )
   if (!recovering && !inFlight && await recoverBlockedDeployments(config, client, state)) {
     return
   }
   const ready = Object.values(state.issues)
     .filter((record) => record.inputRevision > record.processedRevision)
-    .filter((record) => !['completed', 'paused', 'pull-request', 'deploying'].includes(record.phase))
+    .filter((record) =>
+      !['completed', 'paused', 'pull-request', 'deploying', 'resolving'].includes(record.phase))
     .sort((left, right) => left.inputs[0].createdAt.localeCompare(right.inputs[0].createdAt))
   const selected = recovering ?? inFlight ?? ready[0]
   if (selected) await processRecord(config, client, state, selected)

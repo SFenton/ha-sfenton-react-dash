@@ -5,6 +5,11 @@ import { isAbsolute } from "node:path";
 import { joinSession } from "@github/copilot-sdk/extension";
 
 const MAX_OUTPUT_BYTES = 512 * 1024;
+const ALLOWED_MUTABLE_WORKSPACE_PATHS = new Set([
+  ".github/workflows/deploy-dashboard.yml",
+  "scripts/deploy-dashboard-ci.test.ts",
+  "scripts/deploy-dashboard-ci.ts",
+]);
 const READ_ONLY_WORKSPACE_PATHS = [
   ".git",
   ".github",
@@ -118,6 +123,32 @@ async function runIsolated(command, timeoutSeconds) {
       // Missing paths remain covered by the controller's post-run validation.
     }
   }
+  const mutableWorkspacePaths = (process.env.ADMIN_ISSUE_MUTABLE_PATHS ?? "")
+    .split(",")
+    .map((path) => path.trim())
+    .filter(Boolean);
+  if (mutableWorkspacePaths.some((path) => !ALLOWED_MUTABLE_WORKSPACE_PATHS.has(path))) {
+    return {
+      textResultForLlm: "The mutable workspace path policy is invalid.",
+      resultType: "failure",
+    };
+  }
+  const mutableMounts = [];
+  for (const relativePath of mutableWorkspacePaths) {
+    const source = `${workspace}/${relativePath}`;
+    try {
+      await access(source);
+      mutableMounts.push(
+        "--mount",
+        `type=bind,src=${source},dst=/workspace/${relativePath}`,
+      );
+    } catch {
+      return {
+        textResultForLlm: `Authorized mutable path is missing: ${relativePath}`,
+        resultType: "failure",
+      };
+    }
+  }
   const args = [
     "run",
     "--rm",
@@ -148,6 +179,7 @@ async function runIsolated(command, timeoutSeconds) {
     `type=bind,src=${workspace},dst=/workspace`,
     ...maskedMounts,
     ...readOnlyMounts,
+    ...mutableMounts,
     "--mount",
     `type=bind,src=${gitCommonDirectory},dst=${gitCommonDirectory},readonly`,
     "--tmpfs",

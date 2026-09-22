@@ -1386,6 +1386,18 @@
       "words": 7
     },
     {
+      "characters": 8,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "141daf6d6ebd2754",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Add Task",
+      "words": 2
+    },
+    {
       "characters": 14,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/wakeLight.json",
@@ -1410,6 +1422,18 @@
       "placeholders": [],
       "value": "Add to My Week",
       "words": 4
+    },
+    {
+      "characters": 53,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "7095f77f3ae834b9",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Add up to four PNG, JPEG, or WebP images, 10 MB each.",
+      "words": 12
     },
     {
       "characters": 14,
@@ -1456,6 +1480,18 @@
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
       "id": "b7ea3167751e4532",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Adding…",
+      "words": 1
+    },
+    {
+      "characters": 7,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "384f375fd653095d",
       "lines": [],
       "occurrences": 1,
       "origin": "catalog",
@@ -2786,6 +2822,18 @@
       "words": 1
     },
     {
+      "characters": 36,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "d74f573b78393176",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Each image must be 10 MB or smaller.",
+      "words": 8
+    },
+    {
       "characters": 4,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/weather.json",
@@ -4047,6 +4095,18 @@
       "placeholders": [],
       "value": "If the living room switch loses power and comes back with the relay off, run this to temporarily couple the top paddle, unlock the relay, turn power back on, relock it, and return the paddle to decoupled mode.",
       "words": 38
+    },
+    {
+      "characters": 6,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "9a5d4026ac0fd3c6",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Images",
+      "words": 1
     },
     {
       "characters": 30,
@@ -6116,6 +6176,30 @@
       "words": 1
     },
     {
+      "characters": 32,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "26530b4e238a6753",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Select no more than four images.",
+      "words": 6
+    },
+    {
+      "characters": 33,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "8b8d5872d9c82aaf",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Select PNG, JPEG, or WebP images.",
+      "words": 6
+    },
+    {
       "characters": 73,
       "context": "catalog-copy",
       "file": "src/i18n/locales/en/modals/recipe.json",
@@ -7067,6 +7151,18 @@
       "placeholders": [],
       "value": "Target Room Dwell",
       "words": 3
+    },
+    {
+      "characters": 4,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "ebcfacd760620cff",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Task",
+      "words": 1
     },
     {
       "characters": 9,
@@ -8093,6 +8189,18 @@
       "placeholders": [],
       "value": "Unable to add this recipe to My Week.",
       "words": 8
+    },
+    {
+      "characters": 35,
+      "context": "catalog-copy",
+      "file": "src/i18n/locales/en/pages/settings.json",
+      "id": "82b2a35f14d872b8",
+      "lines": [],
+      "occurrences": 1,
+      "origin": "catalog",
+      "placeholders": [],
+      "value": "Unable to add this task. Try again.",
+      "words": 7
     },
     {
       "characters": 39,
@@ -18280,20 +18388,6 @@
       "words": 8
     },
     {
-      "characters": 4,
-      "context": "body-copy",
-      "file": "src/components/hass/CreateTodoItemSheet.tsx",
-      "id": "dcdc9746ea2b7c14",
-      "lines": [
-        79
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Task",
-      "words": 1
-    },
-    {
       "characters": 9,
       "context": "body-copy",
       "file": "src/components/hass/DonetickTaskFormPage.tsx",
@@ -28445,20 +28539,6 @@
       "origin": "legacy",
       "placeholders": [],
       "value": "Add Item",
-      "words": 2
-    },
-    {
-      "characters": 8,
-      "context": "modal-title",
-      "file": "src/components/hass/CreateTodoItemSheet.tsx",
-      "id": "db28b3fc955f4887",
-      "lines": [
-        73
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Add Task",
       "words": 2
     },
     {
@@ -41114,11 +41194,11 @@
     }
   ],
   "summary": {
-    "catalogRecords": 945,
+    "catalogRecords": 954,
     "documentRecords": 1,
-    "legacyOccurrences": 2459,
-    "legacyRecords": 2030,
-    "totalRecords": 2976
+    "legacyOccurrences": 2457,
+    "legacyRecords": 2028,
+    "totalRecords": 2983
   },
   "version": 1
 }
