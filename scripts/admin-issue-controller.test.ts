@@ -38,8 +38,10 @@ import {
   createCommittedDiffReceipt,
   findExactMergeCommit,
   githubRepositoryFromRemote,
+  hasRecoverableTransition,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
+  prepareCommittedCandidate,
   prepareCopilotHome,
   pullRequestBodyWithVisualEvidence,
   readWorktreeSnapshot,
@@ -1321,6 +1323,140 @@ describe('admin issue controller security configuration', () => {
         priorHeadSha,
       ),
     ).toThrow('does not match authorized candidate')
+  })
+
+  it('recovers a journaled nonterminal transition without a new issue revision', () => {
+    const issue = record()
+    issue.phase = 'blocked'
+    issue.provenance = {
+      epoch: 'epoch-recovery',
+      generation: issue.generation,
+      kind: 'active',
+      preparedBaseSha: 'a'.repeat(40),
+      resyncAttempts: 1,
+      revision: issue.inputRevision,
+      transition: {
+        attempt: 1,
+        epoch: 'epoch-recovery',
+        fromBaseSha: 'a'.repeat(40),
+        fromHeadSha: 'b'.repeat(40),
+        fromTreeSha: 'c'.repeat(40),
+        generation: issue.generation,
+        id: 'transition-recovery',
+        revision: issue.inputRevision,
+        stage: 'pushed',
+        startedAt: '2026-09-20T12:05:00.000Z',
+        targetBaseSha: 'd'.repeat(40),
+        toHeadSha: 'e'.repeat(40),
+        toTreeSha: 'f'.repeat(40),
+      },
+    }
+    expect(hasRecoverableTransition(issue)).toBe(true)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.transition) {
+      throw new Error('Expected active transition')
+    }
+    issue.provenance.transition.stage = 'failed'
+    expect(hasRecoverableTransition(issue)).toBe(false)
+  })
+
+  it('reauthorizes an unchanged clean candidate for a newer processed revision', async () => {
+    const root = mkdtempSync(join(homedir(), '.admin-issue-controller-reauthorize-test-'))
+    temporaryDirectories.push(root)
+    const repositoryPath = join(root, 'repository')
+    mkdirSync(repositoryPath)
+    const git = (...args: string[]) =>
+      execFileSync('git', args, { cwd: repositoryPath, encoding: 'utf8' }).trim()
+    git('init', '--initial-branch=master')
+    git('config', 'user.name', 'Admin Issue Controller Test')
+    git('config', 'user.email', 'controller-test@example.invalid')
+    mkdirSync(join(repositoryPath, 'src'))
+    writeFileSync(join(repositoryPath, 'src/fixture.ts'), 'export const value = 1\n')
+    git('add', '--all')
+    git('commit', '-m', 'Base')
+    const baseSha = git('rev-parse', 'HEAD')
+    const branch = 'copilot/admin-todo-321-g1-fix'
+    git('switch', '-c', branch)
+    writeFileSync(join(repositoryPath, 'src/fixture.ts'), 'export const value = 2\n')
+    git('commit', '-am', 'Fix')
+    const headSha = git('rev-parse', 'HEAD')
+
+    const issue = record()
+    issue.branch = branch
+    issue.worktreePath = repositoryPath
+    issue.provenance = {
+      epoch: 'epoch-reauthorize',
+      generation: issue.generation,
+      kind: 'active',
+      preparedBaseSha: baseSha,
+      resyncAttempts: 0,
+      revision: 1,
+    }
+    const originalDiff = await createCommittedDiffReceipt(issue, baseSha, headSha)
+    issue.provenance.candidate = {
+      checks: {
+        epoch: issue.provenance.epoch,
+        generation: issue.generation,
+        headSha,
+        observedAt: '2026-09-20T12:04:00.000Z',
+        requiredSetSha256: '3'.repeat(64),
+        revision: 1,
+        runs: [],
+      },
+      diff: originalDiff,
+      headSha,
+      targetBaseSha: baseSha,
+      treeSha: originalDiff.treeSha,
+      validation: validationReceipt(issue, originalDiff),
+      visualEvidence: [
+        {
+          alt: 'Previous image',
+          caption: 'Mock evidence: previous candidate.',
+          diffManifestSha256: originalDiff.manifestSha256,
+          mediaType: 'image/png',
+          path: 'artifacts/admin-issue-321/fixed.png',
+          sha256: '5'.repeat(64),
+          sizeBytes: 123,
+          url: 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111',
+        },
+      ],
+    }
+    appendIssueInput(issue, {
+      body: 'Retry the same validated candidate.',
+      createdAt: '2026-09-20T12:05:00.000Z',
+      externalId: 'comment:retry',
+      source: 'issue-comment',
+    })
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-20T12:06:00.000Z')
+    const state = controllerState(issue)
+    const candidate = await prepareCommittedCandidate(
+      {
+        repositoryPath,
+        stateDirectory: join(root, 'state'),
+      } as Parameters<typeof prepareCommittedCandidate>[0],
+      state,
+      issue,
+      {
+        changeSummary: ['Preserved the existing candidate.'],
+        decision: 'ready_for_pr',
+        iosFollowUp: { reason: '', required: false },
+        pr: { body: 'Preserved candidate.', title: 'Preserve candidate' },
+        questions: [],
+        review: { approved: true, findings: [] },
+        schemaVersion: 1,
+        summary: 'Preserved candidate.',
+        tests: [{ command: 'test validation', result: 'passed' }],
+        visualEvidence: [],
+      },
+    )
+
+    expect(candidate.headSha).toBe(headSha)
+    expect(candidate.diff.revision).toBe(2)
+    expect(candidate.diff.manifestSha256).toBe(originalDiff.manifestSha256)
+    expect(candidate.validation).toBeUndefined()
+    expect(candidate.checks).toBeUndefined()
+    expect(candidate.visualEvidence).toBeUndefined()
+    if (issue.provenance.kind !== 'active') throw new Error('Expected active provenance')
+    expect(issue.provenance.revision).toBe(2)
   })
 
   it('treats committed-candidate worktree drift as a provenance failure', () => {

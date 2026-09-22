@@ -2136,7 +2136,7 @@ async function fetchMaster(
   ).stdout.trim()
 }
 
-async function prepareCommittedCandidate(
+export async function prepareCommittedCandidate(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
   record: AdminIssueRecord,
@@ -2175,13 +2175,25 @@ async function prepareCommittedCandidate(
   }
   const files = await changedFiles(record.worktreePath)
   if (files.length === 0) {
-    if (
-      previousCandidate &&
-      provenance.revision === record.processedRevision &&
-      snapshot.treeSha === previousCandidate.treeSha &&
-      snapshot.status === ''
-    ) {
-      return previousCandidate
+    if (previousCandidate && snapshot.treeSha === previousCandidate.treeSha && snapshot.status === '') {
+      if (provenance.revision === record.processedRevision) return previousCandidate
+      const diff = await createCommittedDiffReceipt(
+        record,
+        previousCandidate.targetBaseSha,
+        previousCandidate.headSha,
+      )
+      provenance.revision = record.processedRevision
+      provenance.candidate = {
+        diff,
+        ...(previousCandidate.expectedRemoteHeadSha
+          ? { expectedRemoteHeadSha: previousCandidate.expectedRemoteHeadSha }
+          : {}),
+        headSha: previousCandidate.headSha,
+        targetBaseSha: previousCandidate.targetBaseSha,
+        treeSha: previousCandidate.treeSha,
+      }
+      writeState(config, state)
+      return provenance.candidate
     }
     throw new Error('Worker reported ready_for_pr but made no repository changes')
   }
@@ -3753,6 +3765,15 @@ async function queueVisualEvidenceRefreshAfterBaseSync(
   }
 }
 
+export function hasRecoverableTransition(record: AdminIssueRecord) {
+  return (
+    record.provenance.kind === 'active' &&
+    Boolean(record.provenance.transition) &&
+    !record.provenance.quarantine &&
+    !['aborted', 'failed', 'quarantined'].includes(record.provenance.transition?.stage ?? '')
+  )
+}
+
 async function processRecord(
   config: AdminIssueControllerConfig,
   client: HassAdminTodoClient,
@@ -3788,6 +3809,10 @@ async function processRecord(
           `Candidate provenance is quarantined: ${record.provenance.quarantine.reason}`,
         )
         return
+      }
+      if (record.phase === 'blocked' && hasRecoverableTransition(record)) {
+        record.phase = 'pull-request'
+        writeState(config, state)
       }
       if (record.provenance.kind === 'active' && record.provenance.transition) {
         try {
@@ -3993,10 +4018,13 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
     .filter((record) => record.inputRevision > record.processedRevision)
     .filter((record) => !['completed', 'paused', 'pull-request', 'deploying'].includes(record.phase))
     .sort((left, right) => left.inputs[0].createdAt.localeCompare(right.inputs[0].createdAt))
+  const recovering = Object.values(state.issues).find(
+    (record) => record.phase === 'blocked' && hasRecoverableTransition(record),
+  )
   const inFlight = Object.values(state.issues).find((record) =>
     ['pull-request', 'deploying', 'ready-for-pr'].includes(record.phase),
   )
-  const selected = inFlight ?? ready[0]
+  const selected = recovering ?? inFlight ?? ready[0]
   if (selected) await processRecord(config, client, state, selected)
 }
 
