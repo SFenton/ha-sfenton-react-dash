@@ -25,7 +25,7 @@ import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
 import { useReducedMotion } from '../../hooks/useReducedMotion'
 import { useSmoothDisplayedModalTab } from '../../hooks/useSmoothDisplayedModalTab'
 import { useOptimisticState, type OptimisticCommitOptions } from '../../hooks/useOptimisticState'
-import { APP_LOCALE, COMMON_COPY_NAMESPACE, CORE_COPY_KEYS, CORE_COPY_NAMESPACE, VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, useCopy } from '../../i18n'
+import { APP_LOCALE, COMMON_COPY_NAMESPACE, CORE_COPY_KEYS, CORE_COPY_NAMESPACE, VACUUM_COPY_KEYS, VACUUM_COPY_NAMESPACE, formatNumber, useCopy } from '../../i18n'
 import { asEntityName, titleCaseState } from './entityState'
 import { mapGridRectDimensionsCm, mapGridRectToServiceData, type MapGridRect } from './ValetudoMapGeometry'
 import {
@@ -2557,8 +2557,8 @@ export function VacuumModal({
   const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailPageKey)
   const title = areaEditorSession.areaEditorOpen
     ? `${vacuum.title} Cleaning Area`
-    : showOutcomes
-      ? copy(VACUUM_COPY_KEYS.outcomes.detailTitle, { room: vacuum.title })
+    : renderedOutcomeContract
+      ? copy(VACUUM_COPY_KEYS.outcomes.detailTitle, { room: vacuum.title }).concat(' (', formatNumber(renderedOutcomeContract.rooms.length), ')')
       : titleOverride ?? `${vacuum.title} Robot Vacuum`
   const closeAreaEditor = useCallback(() => {
     leaveDetailPage()

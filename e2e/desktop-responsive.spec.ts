@@ -494,7 +494,7 @@ test('cleaning report detail remains usable in a fine-pointer desktop context', 
     await summary.click()
 
     await expect(dialog.getByRole('heading', {
-      name: 'Main Floor · Automatic Cleaning Report',
+      name: 'Main Floor · Automatic Cleaning Report (9)',
     })).toBeVisible()
     await expect(dialog.locator('[data-vacuum-outcome-detail="true"]')).toBeFocused()
     await expect(dialog.locator('[data-group] > button')).toHaveCount(0)

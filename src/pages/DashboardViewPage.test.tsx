@@ -8598,7 +8598,7 @@ describe('DashboardViewPage', () => {
     expect(screen.getByRole('dialog')).toBe(dialog)
     expect(dialog).toHaveAttribute('data-size', 'workspace')
     expect(dialog).toHaveAttribute('data-scroll-mode', 'body')
-    expect(within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report (9)' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('tablist', { name: 'Main Floor modal sections' })).not.toBeInTheDocument()
     const detail = dialog.querySelector<HTMLElement>('[data-vacuum-outcome-detail="true"]')!
     expect(within(detail).getByRole('group', {
@@ -8650,7 +8650,7 @@ describe('DashboardViewPage', () => {
 
     render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
 
-    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report (1)' })).toBeInTheDocument()
     expect(document.querySelector('[data-action-kind="state"][data-icon="mdi:help-circle-outline"]')).toHaveTextContent(
       /Sep 17, 2026\s*1 Room Unverified • 1 Room Needs Attention/,
     )
@@ -8667,7 +8667,7 @@ describe('DashboardViewPage', () => {
 
     render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
 
-    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report (9)' })).toBeInTheDocument()
     expect(document.querySelector('[data-action-kind="state"][data-icon="mdi:alert-circle"]')).toHaveTextContent(
       /Aug 19, 2026\s*4 Rooms Completed • 4 Rooms Need Attention • 1 Error/,
     )
@@ -8691,7 +8691,7 @@ describe('DashboardViewPage', () => {
     view.rerender(<DashboardViewPage activePath="vacuums" onNavigate={() => undefined} path="vacuums" />)
 
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
-    expect(within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report (9)' })).toBeInTheDocument()
     expect(within(dialog).getByRole('group', {
       name: "Dining Room Failed The mop dock's clean-water tank was empty; refill it.",
     })).toBeInTheDocument()
@@ -8719,7 +8719,7 @@ describe('DashboardViewPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Main Floor Docked/i }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('button', { name: /Open Main Floor Automatic Cleaning Report/ }))
-    const detailTitle = within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report' })
+    const detailTitle = within(dialog).getByRole('heading', { name: 'Main Floor · Automatic Cleaning Report (9)' })
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
 
