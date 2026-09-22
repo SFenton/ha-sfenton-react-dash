@@ -24,6 +24,7 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  AdminIssueDeploymentRunError,
   AdminIssueProvenanceError,
   assertDeploymentRunSucceeded,
   assertExactCandidateSnapshot,
@@ -35,9 +36,12 @@ import {
   buildWorkerPrompt,
   classifyPullRequestHead,
   collectVisualEvidenceReceipts,
+  commitIsAncestor,
   createCommittedDiffReceipt,
+  deploymentRecoveryDue,
   findExactMergeCommit,
   githubRepositoryFromRemote,
+  hasRecoverableDeployment,
   hasRecoverableTransition,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
@@ -45,6 +49,7 @@ import {
   prepareCopilotHome,
   pullRequestBodyWithVisualEvidence,
   readWorktreeSnapshot,
+  restoreReadyOutcomeFromWorkerLog,
   selectWorkerHassMcpConfig,
   shouldVerifyExistingPullRequestVisualEvidence,
   synchronizeCandidateBase,
@@ -463,6 +468,29 @@ describe('admin issue controller domain', () => {
     )
   })
 
+  it('authorizes a separately verified descendant deployment binding', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.deployment) {
+      throw new Error('Expected deployment')
+    }
+    issue.provenance.deployment = {
+      ...issue.provenance.deployment,
+      coverage: 'descendant',
+      coverageVerifiedAt: '2026-09-20T12:06:00.000Z',
+      deployedSha: 'f'.repeat(40),
+      sourceSha: 'e'.repeat(40),
+      workflowHeadSha: 'e'.repeat(40),
+    }
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
+    expect(() => assertFinalizationAuthorized(issue)).not.toThrow()
+
+    issue.provenance.deployment.sourceSha = 'a'.repeat(40)
+    expect(() => assertFinalizationAuthorized(issue)).toThrow(
+      'Descendant deployment source does not match workflow head',
+    )
+  })
+
   it('accepts only non-controller comments from the pinned repository owner', () => {
     const trusted = {
       author_association: 'OWNER',
@@ -721,18 +749,121 @@ describe('admin issue controller domain', () => {
   })
 
   it('treats a completed failed deployment as a terminal blocked record', () => {
-    expect(() =>
+    let failure: unknown
+    try {
       assertDeploymentRunSucceeded({
         conclusion: 'failure',
         html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/123',
-      }),
-    ).toThrow(AdminIssueProvenanceError)
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(AdminIssueDeploymentRunError)
+    expect(failure).toBeInstanceOf(AdminIssueProvenanceError)
     expect(() =>
       assertDeploymentRunSucceeded({
         conclusion: 'success',
         html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/123',
       }),
     ).not.toThrow()
+  })
+
+  it('recognizes throttled recovery for a deployment-blocked merged issue', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active') throw new Error('Expected active provenance')
+    issue.provenance.deployment = undefined
+    issue.phase = 'blocked'
+    issue.lastOutcome = {
+      decision: 'blocked',
+      iosFollowUp: { reason: '', required: false },
+      questions: [],
+      reason: 'Deployment run https://github.com/example/actions/runs/123 concluded failure',
+      schemaVersion: 1,
+      summary: 'Deployment failed.',
+      visualEvidence: [],
+    }
+    expect(hasRecoverableDeployment(issue)).toBe(true)
+    expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(true)
+    issue.receipts.deploymentRecoveryCheckedAt = '2026-09-20T12:08:00.000Z'
+    expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(false)
+    expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:14:00.000Z'))).toBe(true)
+  })
+
+  it('restores the exact ready outcome from the retained successful worker log', () => {
+    const stateDirectory = mkdtempSync(join(homedir(), '.admin-issue-controller-recovery-test-'))
+    temporaryDirectories.push(stateDirectory)
+    mkdirSync(join(stateDirectory, 'worker-logs'), { recursive: true })
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active') throw new Error('Expected active provenance')
+    issue.provenance.deployment = undefined
+    issue.phase = 'blocked'
+    issue.workerRuns = 1
+    issue.lastOutcome = {
+      decision: 'blocked',
+      iosFollowUp: { reason: '', required: false },
+      questions: [],
+      reason: 'Deployment run https://github.com/example/actions/runs/123 concluded failure',
+      schemaVersion: 1,
+      summary: 'Deployment failed.',
+      visualEvidence: [],
+    }
+    const visualEvidence = issue.provenance.candidate?.visualEvidence?.map((evidence) => ({
+      alt: evidence.alt,
+      caption: evidence.caption,
+      path: evidence.path,
+    })) ?? []
+    const readyOutcome = {
+      changeSummary: ['Fixed the issue.'],
+      decision: 'ready_for_pr',
+      iosFollowUp: { reason: '', required: false },
+      pr: { body: 'Body', title: 'Title' },
+      questions: [],
+      review: { approved: true, findings: [] },
+      schemaVersion: 1,
+      summary: 'Fixed.',
+      tests: [{ command: 'npm test', result: 'passed' }],
+      visualEvidence,
+    }
+    writeFileSync(
+      join(stateDirectory, 'worker-logs', 'issue-321-run-1.jsonl'),
+      `${JSON.stringify({
+        data: { content: JSON.stringify(readyOutcome) },
+        type: 'assistant.message',
+      })}\n`,
+    )
+    expect(
+      restoreReadyOutcomeFromWorkerLog({ stateDirectory }, issue).decision,
+    ).toBe('ready_for_pr')
+    expect(issue.lastOutcome?.decision).toBe('ready_for_pr')
+  })
+
+  it('verifies deployment ancestry with git rather than SHA ordering', async () => {
+    const repository = mkdtempSync(join(homedir(), '.admin-issue-controller-ancestry-test-'))
+    temporaryDirectories.push(repository)
+    execFileSync('git', ['init', '--quiet'], { cwd: repository })
+    execFileSync('git', ['config', 'user.name', 'Controller Test'], { cwd: repository })
+    execFileSync('git', ['config', 'user.email', 'controller@example.invalid'], {
+      cwd: repository,
+    })
+    writeFileSync(join(repository, 'one.txt'), 'one\n')
+    execFileSync('git', ['add', 'one.txt'], { cwd: repository })
+    execFileSync('git', ['commit', '--quiet', '-m', 'one'], { cwd: repository })
+    const first = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repository,
+      encoding: 'utf8',
+    }).trim()
+    writeFileSync(join(repository, 'two.txt'), 'two\n')
+    execFileSync('git', ['add', 'two.txt'], { cwd: repository })
+    execFileSync('git', ['commit', '--quiet', '-m', 'two'], { cwd: repository })
+    const second = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repository,
+      encoding: 'utf8',
+    }).trim()
+
+    await expect(commitIsAncestor(repository, first, second)).resolves.toBe(true)
+    await expect(commitIsAncestor(repository, second, first)).resolves.toBe(false)
   })
 })
 
@@ -1745,6 +1876,9 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('verifyIssueVisualEvidenceComment(')
     expect(controller).toContain('issues/comments/${existing.id}')
     expect(controller).toContain('assertDeploymentRunSucceeded(run)')
+    expect(controller).toContain('recoverBlockedDeployments(config, client, state)')
+    expect(controller).toContain('loadBoundDeploymentReceipt(config, record)')
+    expect(controller).toContain('restoreReadyOutcomeFromWorkerLog(config, record)')
     expect(controller).toContain('waitForPullRequestHead(')
     expect(controller).toContain(
       'shouldVerifyExistingPullRequestVisualEvidence(previousCandidate)',
