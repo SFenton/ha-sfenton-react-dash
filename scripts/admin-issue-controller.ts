@@ -2053,6 +2053,7 @@ async function getPullRequest(
   config: AdminIssueControllerConfig,
   record: AdminIssueRecord,
   expectedCandidate?: AdminIssueCandidate,
+  requireVisualEvidence = true,
 ) {
   if (!record.pr) throw new AdminIssueProvenanceError('Pull request is missing')
   const pullRequest = await ghApi<GitHubPullRequest>(
@@ -2069,7 +2070,9 @@ async function getPullRequest(
   ) {
     throw new AdminIssueProvenanceError('Live pull request identity does not match controller state')
   }
-  assertPullRequestContainsVisualEvidence(record, pullRequest, expectedCandidate)
+  if (requireVisualEvidence) {
+    assertPullRequestContainsVisualEvidence(record, pullRequest, expectedCandidate)
+  }
   return pullRequest
 }
 
@@ -2136,6 +2139,15 @@ async function fetchMaster(
   ).stdout.trim()
 }
 
+export function shouldVerifyExistingPullRequestVisualEvidence(
+  candidate: AdminIssueCandidate,
+) {
+  return (
+    !candidateRequiresVisualEvidence(candidate.diff.files) ||
+    (candidate.visualEvidence?.length ?? 0) > 0
+  )
+}
+
 export async function prepareCommittedCandidate(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
@@ -2171,7 +2183,12 @@ export async function prepareCommittedCandidate(
     )
   }
   if (record.pr && previousCandidate) {
-    await getPullRequest(config, record, previousCandidate)
+    await getPullRequest(
+      config,
+      record,
+      previousCandidate,
+      shouldVerifyExistingPullRequestVisualEvidence(previousCandidate),
+    )
   }
   const files = await changedFiles(record.worktreePath)
   if (files.length === 0) {
