@@ -1144,6 +1144,14 @@ export function assertCandidateVisualEvidence(
   requirePublished = false,
 ) {
   const { candidate, provenance } = assertCandidateAuthorized(record)
+  const evidence = assertVisualEvidenceForCandidate(candidate, requirePublished)
+  return { candidate, evidence, provenance }
+}
+
+export function assertVisualEvidenceForCandidate(
+  candidate: AdminIssueCandidate,
+  requirePublished = false,
+) {
   const evidence = candidate.visualEvidence ?? []
   if (candidateRequiresVisualEvidence(candidate.diff.files)) {
     assert(
@@ -1165,7 +1173,7 @@ export function assertCandidateVisualEvidence(
       )
     }
   }
-  return { candidate, evidence, provenance }
+  return evidence
 }
 
 function visualEvidenceMarkdownText(value: string) {

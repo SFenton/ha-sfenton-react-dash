@@ -877,6 +877,41 @@ describe('admin issue controller security configuration', () => {
     )
   })
 
+  it('verifies the prior PR candidate while a newer issue revision is being prepared', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate?.visualEvidence) {
+      throw new Error('Expected authorized visual evidence')
+    }
+    const previousCandidate = issue.provenance.candidate
+    const body = pullRequestBodyWithVisualEvidence(
+      'Implements the previous candidate.',
+      previousCandidate.visualEvidence,
+    )
+
+    appendIssueInput(issue, {
+      body: 'Move the Upcoming heading into the scrollable body.',
+      createdAt: '2026-09-20T12:06:00.000Z',
+      externalId: 'comment:2',
+      source: 'issue-comment',
+    })
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-20T12:07:00.000Z')
+
+    expect(() => assertPullRequestContainsVisualEvidence(issue, { body })).toThrow(
+      'Provenance revision does not match issue',
+    )
+    expect(() =>
+      assertPullRequestContainsVisualEvidence(issue, { body }, previousCandidate),
+    ).not.toThrow()
+    expect(() =>
+      assertPullRequestContainsVisualEvidence(
+        issue,
+        { body: body.replace('![Fixed dashboard spacing]', '[Fixed dashboard spacing]') },
+        previousCandidate,
+      ),
+    ).toThrow('missing proposed fixed-behavior image')
+  })
+
   it('recognizes only GitHub repository remotes', () => {
     expect(githubRepositoryFromRemote('https://github.com/SFenton/ha-sfenton-react-dash.git')).toBe(
       'SFenton/ha-sfenton-react-dash',
@@ -1493,6 +1528,7 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('verifyMergedPullRequest(')
     expect(controller).toContain('verifyIssueVisualEvidenceComment(')
     expect(controller).toContain('issues/comments/${existing.id}')
+    expect(controller).toContain('getPullRequest(config, record, previousCandidate)')
     expect(controller).toContain('assertFinalizationAuthorized(record)')
     expect(controller).not.toContain("'--force-with-lease'")
     expect(controller).not.toContain("'--amend'")
