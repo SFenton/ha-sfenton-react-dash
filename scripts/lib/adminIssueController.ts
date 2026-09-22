@@ -155,6 +155,8 @@ export interface AdminIssueMergeReceipt {
 }
 
 export interface AdminIssueDeploymentBinding {
+  coverage?: 'descendant'
+  coverageVerifiedAt?: string
   deployedSha: string
   disposition: string
   epoch: string
@@ -681,13 +683,29 @@ function assertProvenance(value: unknown, field: string) {
     positiveInteger(deployment.workflowRunId, `${field}.deployment.workflowRunId`)
     positiveInteger(deployment.workflowRunAttempt, `${field}.deployment.workflowRunAttempt`)
     nonEmptyString(deployment.disposition, `${field}.deployment.disposition`)
+    assert(provenance.merge, `${field}.deployment has no verified merge`)
     assert(
-      provenance.merge &&
-      deployment.mergeSha === provenance.merge.mergeSha &&
-      deployment.workflowHeadSha === provenance.merge.mergeSha &&
-      deployment.sourceSha === provenance.merge.mergeSha,
+      deployment.mergeSha === provenance.merge.mergeSha,
       `${field}.deployment does not match the verified merge`,
     )
+    if (deployment.coverage === 'descendant') {
+      isoTimestamp(
+        deployment.coverageVerifiedAt,
+        `${field}.deployment.coverageVerifiedAt`,
+      )
+      assert(
+        deployment.workflowHeadSha === deployment.sourceSha,
+        `${field}.deployment descendant source does not match its workflow head`,
+      )
+    } else {
+      assert(
+        deployment.coverage === undefined &&
+        deployment.coverageVerifiedAt === undefined &&
+        deployment.workflowHeadSha === provenance.merge.mergeSha &&
+        deployment.sourceSha === provenance.merge.mergeSha,
+        `${field}.deployment does not exactly match the verified merge`,
+      )
+    }
   }
   if (provenance.quarantine) {
     nonEmptyString(provenance.quarantine.reason, `${field}.quarantine.reason`)
@@ -869,8 +887,19 @@ export function assertFinalizationAuthorized(record: AdminIssueRecord) {
   assert(deployment.generation === provenance.generation, 'Deployment generation does not match provenance')
   assert(deployment.revision === provenance.revision, 'Deployment revision does not match provenance')
   assert(deployment.mergeSha === merge.mergeSha, 'Deployment merge does not match verified merge')
-  assert(deployment.workflowHeadSha === merge.mergeSha, 'Deployment workflow head does not match merge')
-  assert(deployment.sourceSha === merge.mergeSha, 'Deployment source does not match merge')
+  if (deployment.coverage === 'descendant') {
+    assert(
+      deployment.workflowHeadSha === deployment.sourceSha,
+      'Descendant deployment source does not match workflow head',
+    )
+    assert(
+      deployment.coverageVerifiedAt,
+      'Descendant deployment is missing its ancestry verification time',
+    )
+  } else {
+    assert(deployment.workflowHeadSha === merge.mergeSha, 'Deployment workflow head does not match merge')
+    assert(deployment.sourceSha === merge.mergeSha, 'Deployment source does not match merge')
+  }
   return { candidate, deployment, merge, provenance }
 }
 
