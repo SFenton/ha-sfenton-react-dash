@@ -218,6 +218,16 @@ export class AdminIssueProvenanceError extends Error {}
 
 class AdminIssueWorktreeIntegrityError extends AdminIssueProvenanceError {}
 
+export function assertDeploymentRunSucceeded(
+  run: Pick<WorkflowRun, 'conclusion' | 'html_url'>,
+) {
+  if (run.conclusion !== 'success') {
+    throw new AdminIssueProvenanceError(
+      `Deployment run ${run.html_url} concluded ${run.conclusion ?? 'without a conclusion'}`,
+    )
+  }
+}
+
 function isMaskedWorkspaceFile(path: string) {
   return !path.includes('/') && (
     path.startsWith('.env') ||
@@ -3282,9 +3292,7 @@ async function waitForDeploymentReceipt(
       if (!(await refreshInputs())) return undefined
       continue
     }
-    if (run.conclusion !== 'success') {
-      throw new Error(`Deployment run ${run.html_url} concluded ${run.conclusion}`)
-    }
+    assertDeploymentRunSucceeded(run)
 
     const artifactDirectory = mkdtempSync(join(tmpdir(), 'admin-issue-deployment-'))
     try {

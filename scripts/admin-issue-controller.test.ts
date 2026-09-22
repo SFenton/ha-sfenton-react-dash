@@ -25,6 +25,7 @@ import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   AdminIssueProvenanceError,
+  assertDeploymentRunSucceeded,
   assertExactCandidateSnapshot,
   assertIssueCommentBodyContainsVisualEvidence,
   assertWorkerHostConfigurationSafe,
@@ -713,6 +714,21 @@ describe('admin issue controller domain', () => {
     expect(
       deploymentReceiptIsAccepted(receipt, sha, { id: 124, runAttempt: 2 }),
     ).toBe(false)
+  })
+
+  it('treats a completed failed deployment as a terminal blocked record', () => {
+    expect(() =>
+      assertDeploymentRunSucceeded({
+        conclusion: 'failure',
+        html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/123',
+      }),
+    ).toThrow(AdminIssueProvenanceError)
+    expect(() =>
+      assertDeploymentRunSucceeded({
+        conclusion: 'success',
+        html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/123',
+      }),
+    ).not.toThrow()
   })
 })
 
@@ -1529,6 +1545,7 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('verifyIssueVisualEvidenceComment(')
     expect(controller).toContain('issues/comments/${existing.id}')
     expect(controller).toContain('getPullRequest(config, record, previousCandidate)')
+    expect(controller).toContain('assertDeploymentRunSucceeded(run)')
     expect(controller).toContain('assertFinalizationAuthorized(record)')
     expect(controller).not.toContain("'--force-with-lease'")
     expect(controller).not.toContain("'--amend'")
