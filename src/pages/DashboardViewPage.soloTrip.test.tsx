@@ -186,7 +186,7 @@ describe('DashboardViewPage Solo Trip', () => {
     expect(onNavigate).toHaveBeenNthCalledWith(2, 'solo-trip')
   })
 
-  it('keeps the toggle visible but disabled until a traveler is selected', () => {
+  it('keeps the toggle disabled when the traveler selection is cleared', () => {
     renderSoloTripPage()
 
     expect(screen.getByText('Enable or disable Solo Trip mode for the house.')).toBeInTheDocument()
@@ -199,7 +199,22 @@ describe('DashboardViewPage Solo Trip', () => {
     selectTraveler('Stephen')
 
     expect(screen.getByRole('button', { name: 'You', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Steph', exact: true })).toHaveAttribute('aria-pressed', 'false')
     expect(soloTripToggle()).toBeEnabled()
+
+    selectTraveler('Steph')
+
+    expect(screen.getByRole('button', { name: 'You', exact: true })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Steph', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    expect(soloTripToggle()).toBeEnabled()
+
+    selectTraveler('Steph')
+
+    expect(screen.getByRole('button', { name: 'You', exact: true })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Steph', exact: true })).toHaveAttribute('aria-pressed', 'false')
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    expect(soloTripToggle()).toBeDisabled()
+    expect(screen.getByText('Select the user that will be away from home first.')).toBeInTheDocument()
     expect(householdAwayCalls()).toEqual([])
   })
 

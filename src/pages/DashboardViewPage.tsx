@@ -2416,7 +2416,7 @@ function SoloTripPage() {
   const selectTraveler = (traveler: HouseholdResident) => {
     if (selectionLocked) return
     controller.clearError()
-    setSelectedTraveler(traveler)
+    setSelectedTraveler((current) => current === traveler ? null : traveler)
   }
 
   const toggleSoloTrip = async () => {
