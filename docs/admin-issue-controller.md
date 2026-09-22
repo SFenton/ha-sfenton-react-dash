@@ -141,6 +141,22 @@ fast-forward push, invalidates old checks, and reruns committed-diff
 authorization plus trusted validation. Rebase, amend, reset, force push, and
 force-with-lease are not recovery mechanisms.
 
+After a synchronized branch push, GitHub's pull-request API may briefly report
+the exact prior head even though the remote ref already has the new commit. The
+controller tolerates only that one expected stale head for a bounded
+propagation window; any other SHA, repository, base, branch, or URL still fails
+closed.
+
+If the controller was stopped or upgraded during a journaled nonterminal base
+transition, it resumes that transition before dispatching new work. A
+controller-generated retry revision may reauthorize the exact same clean head,
+but it rebuilds the diff receipt for the new revision and discards prior
+validation, checks, and image receipts so they must be established again.
+During that evidence-refresh handoff, the existing PR must still match the
+exact synchronized repository, branch, base, URL, and head. Its old image block
+is not treated as evidence for the new candidate; advancement remains blocked
+until fresh receipts are validated, uploaded, and embedded in both surfaces.
+
 An interrupted `gh pr merge` response is reconciled before any stale-base
 decision. The controller waits for GitHub's PR metadata and, if necessary,
 recognizes an exact two-parent `[base, candidate]` merge already visible in
