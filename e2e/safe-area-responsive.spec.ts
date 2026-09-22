@@ -295,29 +295,43 @@ test.describe('safe-area responsive acceptance', () => {
     for (const geometry of [
       profile('island-phone-landscape-left'),
       profile('island-phone-landscape-right'),
+      profile('rectangular-phone-landscape'),
     ]) {
       await page.setViewportSize(geometry.viewport)
       await setSafeAreaInsets(page, geometry.insets)
       await setRoute(page, 'overview')
       await expect(page.locator('[data-app-shell="true"]')).toHaveAttribute('data-navigation-layout', 'drawer-only')
       await expect(page.locator('[data-adaptive-navigation="bottom"]')).toBeHidden()
-      const geometryFacts = await page.evaluate((insets) => {
-        const scroller = document.querySelector<HTMLElement>('[data-page-scroller="true"]')
-        const content = scroller?.querySelector<HTMLElement>('[data-page-content="true"]')
+      const geometryFacts = await page.locator('[data-page-scroller="true"]:visible').last().evaluate((scroller, insets) => {
+        const content = scroller.querySelector<HTMLElement>('[data-page-content="true"]')
         const dock = document.querySelector<HTMLElement>('[data-floating-action-dock="true"]')
-        if (!scroller || !content || !dock) throw new Error('Drawer-only geometry is incomplete')
+        if (!content || !dock) throw new Error('Drawer-only geometry is incomplete')
         scroller.scrollTop = scroller.scrollHeight
         const contentBounds = content.getBoundingClientRect()
         const dockBounds = dock.getBoundingClientRect()
         return {
           contentToDockGap: dockBounds.top - contentBounds.bottom,
+          dockBottomOffset: innerHeight - dockBounds.bottom,
+          dockHeight: dockBounds.height,
           dockLeft: dockBounds.left,
           dockRight: dockBounds.right,
           safeLeft: insets.left,
           safeRight: innerWidth - insets.right,
+          terminalScrollDelta: Math.abs(scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop),
         }
       }, geometry.insets)
+      const expectedDockBottomOffset = Math.max(12, geometry.insets.bottom)
+      expect(geometryFacts.terminalScrollDelta, `${geometry.name} terminal scroll`).toBeLessThanOrEqual(1)
       expect(geometryFacts.contentToDockGap, `${geometry.name} content-to-dock overlap`).toBeGreaterThanOrEqual(-1)
+      expect(Math.abs(geometryFacts.dockHeight - 56), `${geometry.name} dock height`).toBeLessThanOrEqual(1)
+      expect(
+        Math.abs(geometryFacts.dockBottomOffset - expectedDockBottomOffset),
+        `${geometry.name} dock position`,
+      ).toBeLessThanOrEqual(1)
+      expect(
+        Math.abs(geometryFacts.contentToDockGap - geometryFacts.dockBottomOffset),
+        `${geometry.name} balanced terminal gaps`,
+      ).toBeLessThanOrEqual(1)
       expect(geometryFacts.dockLeft, `${geometry.name} dock left containment`).toBeGreaterThanOrEqual(geometryFacts.safeLeft - 1)
       expect(geometryFacts.dockRight, `${geometry.name} dock right containment`).toBeLessThanOrEqual(geometryFacts.safeRight + 1)
     }
