@@ -111,6 +111,10 @@ The following rules are fail closed:
   attributed to the worker;
 - the live PR must remain in this repository, target `master`, use the recorded
   controller branch, and expose the exact candidate head;
+- when owner feedback produces a replacement candidate for an existing PR, the
+  controller first verifies that PR against the prior candidate and its
+  published images, then replaces the authorization with the new committed
+  revision;
 - dashboard runtime candidates cannot advance without valid issue-scoped image
   files. The controller rejects traversal, symlinks, mismatched extensions or
   magic bytes, duplicate content, files above 10 MiB, and captions that omit

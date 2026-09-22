@@ -28,6 +28,7 @@ import {
   assertCandidateAuthorized,
   assertCandidateVisualEvidence,
   assertFinalizationAuthorized,
+  assertVisualEvidenceForCandidate,
   baselineAdminIssueState,
   beginAdminIssueGeneration,
   branchNameForIssue,
@@ -2030,7 +2031,7 @@ export function assertPullRequestBinding(
 async function getPullRequest(
   config: AdminIssueControllerConfig,
   record: AdminIssueRecord,
-  expectedHeadSha?: string,
+  expectedCandidate?: AdminIssueCandidate,
 ) {
   if (!record.pr) throw new AdminIssueProvenanceError('Pull request is missing')
   const pullRequest = await ghApi<GitHubPullRequest>(
@@ -2039,15 +2040,15 @@ async function getPullRequest(
     `repos/${config.repository}/pulls/${record.pr.number}`,
   )
   if (!record.branch) throw new AdminIssueProvenanceError('Worker branch is missing')
-  const candidateHeadSha = expectedHeadSha ?? assertCandidateAuthorized(record).candidate.headSha
-  assertPullRequestBinding(config.repository, record.branch, pullRequest, candidateHeadSha)
+  const candidate = expectedCandidate ?? assertCandidateAuthorized(record).candidate
+  assertPullRequestBinding(config.repository, record.branch, pullRequest, candidate.headSha)
   if (
     pullRequest.number !== record.pr.number ||
     pullRequest.html_url.toLowerCase() !== record.pr.url.toLowerCase()
   ) {
     throw new AdminIssueProvenanceError('Live pull request identity does not match controller state')
   }
-  assertPullRequestContainsVisualEvidence(record, pullRequest)
+  assertPullRequestContainsVisualEvidence(record, pullRequest, expectedCandidate)
   return pullRequest
 }
 
@@ -2117,7 +2118,7 @@ async function prepareCommittedCandidate(
     )
   }
   if (record.pr && previousCandidate) {
-    await getPullRequest(config, record, previousCandidate.headSha)
+    await getPullRequest(config, record, previousCandidate)
   }
   const files = await changedFiles(record.worktreePath)
   if (files.length === 0) {
@@ -2779,8 +2780,11 @@ export function pullRequestBodyWithVisualEvidence(
 export function assertPullRequestContainsVisualEvidence(
   record: AdminIssueRecord,
   pullRequest: Pick<GitHubPullRequest, 'body'>,
+  expectedCandidate?: AdminIssueCandidate,
 ) {
-  const { evidence } = assertCandidateVisualEvidence(record, true)
+  const evidence = expectedCandidate
+    ? assertVisualEvidenceForCandidate(expectedCandidate, true)
+    : assertCandidateVisualEvidence(record, true).evidence
   const body = pullRequest.body ?? ''
   const start = body.indexOf('<!-- admin-issue-visual-evidence:start -->')
   const end = body.indexOf('<!-- admin-issue-visual-evidence:end -->', start + 1)
