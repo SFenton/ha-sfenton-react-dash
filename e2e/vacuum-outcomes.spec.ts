@@ -668,6 +668,7 @@ test.describe('fine-pointer outcome details', () => {
       }
       await dialog.getByRole('button', { name: 'Back to Vacuum Controls' }).click()
       await expectVacuumLoadingCentered(dialog)
+      await expect(dialog.locator('[data-layout-preparation-phase]')).toHaveAttribute('data-layout-preparation-phase', 'content', { timeout: 15_000 })
       await expect(summary).toBeFocused()
       await expect(dialog).toHaveAttribute('data-outcome-flow-node', 'original')
       expect(await vacuumActionCalls(page)).toEqual([])

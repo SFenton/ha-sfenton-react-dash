@@ -1893,7 +1893,7 @@ function VacuumModalTabContent({
   onAreaSelectionChange,
   onDrawModeChange,
   onEditArea,
-  onFinishAreaEditing,
+  onFinishAreaEditing, onLayoutPreparationPhaseChange,
   onOpenOutcomes,
   onResetAreaView,
   outcomePresentation,
@@ -1915,7 +1915,7 @@ function VacuumModalTabContent({
   onAreaSelectionChange: (selection: MapGridRect | null) => void
   onDrawModeChange: (drawMode: boolean) => void
   onEditArea?: () => void
-  onFinishAreaEditing: () => void
+  onFinishAreaEditing: () => void; onLayoutPreparationPhaseChange?: (phase: VacuumLayoutPreparationPhase) => void
   onOpenOutcomes?: () => void
   onResetAreaView: () => void
   outcomePresentation: VacuumWhileAwayPresentation
@@ -2171,12 +2171,12 @@ function VacuumModalTabContent({
     ? 'exiting'
     : mapStatusTransitionState
   const visibleLayoutPreparationPhase = areaEditorOpen ? 'content' : layoutPreparationPhase
+  useEffect(() => onLayoutPreparationPhaseChange?.(visibleLayoutPreparationPhase), [onLayoutPreparationPhaseChange, visibleLayoutPreparationPhase])
   const layoutLoadingVisible = !areaEditorOpen && visibleLayoutPreparationPhase !== 'content'
   const layoutLoadingPhase = visibleLayoutPreparationPhase === 'exiting' ? 'exiting' : 'loading'
   const controlsPanelStatusVisible = reportedStatusInRightPane
     || compactMapPresentation
     || (cleaningReportInRightPane && outcomePresentation.kind !== 'empty')
-
   return (
     <div
       className={[styles.modalBody, areaEditorOpen ? styles.areaEditorModalBody : ''].filter(Boolean).join(' ')}
@@ -2538,6 +2538,7 @@ export function VacuumModal({
   const [activeTab, setActiveTab] = useState<VacuumModalTab>('controls')
   const areaEditorSession = useVacuumAreaEditorSession(runtimeMode)
   const [outcomeDetailContract, setOutcomeDetailContract] = useState<VacuumOutcomeContract | null>(null)
+  const [controlsLayoutReady, setControlsLayoutReady] = useState(true)
   const [areaSelection, setAreaSelection] = useState<MapGridRect | null>(null)
   const [editorMeta, setEditorMeta] = useState<ValetudoMapEditorMeta>({
     displayScope: VALETUDO_MAP_SCOPE_FULL,
@@ -2551,29 +2552,28 @@ export function VacuumModal({
   })
   const [resetAreaViewRevision, setResetAreaViewRevision] = useState(0)
   const previousOpenRef = useRef(open)
-  const renderedOutcomeContract = outcomeDetailContract
-  const showOutcomes = renderedOutcomeContract !== null
+  const showOutcomes = outcomeDetailContract !== null
   const detailPageKey = areaEditorSession.areaEditorOpen ? 'vacuum-area-editor' : showOutcomes ? 'vacuum-outcomes' : activeTab
-  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailPageKey)
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(detailPageKey, undefined, { restoreFocusReady: controlsLayoutReady })
   const title = areaEditorSession.areaEditorOpen
     ? `${vacuum.title} Cleaning Area`
-    : renderedOutcomeContract
-      ? copy(VACUUM_COPY_KEYS.outcomes.detailTitle, { room: vacuum.title }).concat(' (', formatNumber(renderedOutcomeContract.rooms.length), ')')
+    : outcomeDetailContract
+      ? copy(VACUUM_COPY_KEYS.outcomes.detailTitle, { room: vacuum.title }).concat(' (', formatNumber(outcomeDetailContract.rooms.length), ')')
       : titleOverride ?? `${vacuum.title} Robot Vacuum`
+  const handleLayoutPreparationPhaseChange = useCallback(
+    (phase: VacuumLayoutPreparationPhase) => setControlsLayoutReady(phase === 'content'),
+    [],
+  )
+
   const closeAreaEditor = useCallback(() => {
     leaveDetailPage()
     areaEditorSession.closeAreaEditor()
   }, [areaEditorSession, leaveDetailPage])
   const closeOutcomes = useCallback(() => {
     leaveDetailPage()
+    setControlsLayoutReady(false)
     setOutcomeDetailContract(null)
-    window.requestAnimationFrame(() => {
-      bodyElementRef.current
-        ?.closest('[role="dialog"]')
-        ?.querySelector<HTMLElement>('[data-modal-detail-trigger="vacuum-outcomes"] button')
-        ?.focus({ preventScroll: true })
-    })
-  }, [bodyElementRef, leaveDetailPage, setOutcomeDetailContract])
+  }, [leaveDetailPage, setOutcomeDetailContract])
   const openAreaEditor = useCallback(() => {
     enterDetailPage('vacuum-area-editor')
     setOutcomeDetailContract(null)
@@ -2635,7 +2635,7 @@ export function VacuumModal({
       title={title}
     >
       {showOutcomes ? (
-        <VacuumOutcomeDetail contract={renderedOutcomeContract} vacuum={vacuum} />
+        <VacuumOutcomeDetail contract={outcomeDetailContract} vacuum={vacuum} />
       ) : (
         <VacuumModalTabContent
           activeTab={effectiveActiveTab}
@@ -2650,6 +2650,7 @@ export function VacuumModal({
           onDrawModeChange={(drawMode) => areaEditorSession.openAreaEditor(drawMode)}
           onEditArea={openAreaEditor}
           onFinishAreaEditing={closeAreaEditor}
+          onLayoutPreparationPhaseChange={handleLayoutPreparationPhaseChange}
           onOpenOutcomes={openOutcomes}
           onResetAreaView={() => setResetAreaViewRevision((revision) => revision + 1)}
           outcomePresentation={outcomePresentation}
@@ -2664,7 +2665,6 @@ export function VacuumModal({
     </ModalSheet>
   )
 }
-
 function LiveVacuumCard({ vacuum }: Pick<VacuumCardProps, 'vacuum'>) {
   const [open, setOpen] = useState(false)
 
