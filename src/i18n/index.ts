@@ -30,7 +30,16 @@ export const PAGE_SETTINGS_COPY_NAMESPACE = 'pageSettings' as const
 export const PAGE_SETTINGS_COPY_KEYS = {
   items: {
     todo: {
+      addFailed: 'items.todo.addFailed',
+      addTask: 'items.todo.addTask',
+      adding: 'items.todo.adding',
       githubSyncDisclosure: 'items.todo.githubSyncDisclosure',
+      imageTooLarge: 'items.todo.imageTooLarge',
+      imagesDescription: 'items.todo.imagesDescription',
+      imagesLabel: 'items.todo.imagesLabel',
+      taskLabel: 'items.todo.taskLabel',
+      tooManyImages: 'items.todo.tooManyImages',
+      unsupportedImage: 'items.todo.unsupportedImage',
     },
     vacation: {
       subtitle: 'items.vacation.subtitle',

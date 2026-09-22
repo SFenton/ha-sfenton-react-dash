@@ -51,6 +51,39 @@ describe('HassAdminTodoClient', () => {
     })
   })
 
+  it('downloads Admin To-Do attachments through the authenticated endpoint', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(new Uint8Array([137, 80, 78, 71]), { status: 200 }),
+    )
+    const client = new HassAdminTodoClient({ token: 'secret', url: 'http://ha.local:8123' }, fetchMock)
+
+    await expect(client.getAdminTodoAttachment('attachment 1')).resolves.toEqual(
+      new Uint8Array([137, 80, 78, 71]),
+    )
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://ha.local:8123/api/sfenton_admin_todo/attachments/attachment%201',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer secret' },
+      }),
+    )
+  })
+
+  it('accepts missing attachments during idempotent cleanup', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response('', { status: 404 }),
+    )
+    const client = new HassAdminTodoClient({ token: 'secret', url: 'http://ha.local:8123' }, fetchMock)
+
+    await expect(client.deleteAdminTodoAttachment('attachment-1')).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://ha.local:8123/api/sfenton_admin_todo/attachments/attachment-1',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer secret' },
+        method: 'DELETE',
+      }),
+    )
+  })
+
   it('requires both completed todo state and the matching completion receipt', () => {
     expect(adminCompletionBoundarySatisfied('needs_action', 'task-1', 'task-1')).toBe(false)
     expect(adminCompletionBoundarySatisfied('completed', 'another-task', 'task-1')).toBe(false)

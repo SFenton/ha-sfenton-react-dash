@@ -28,6 +28,7 @@ import {
   AdminIssueProvenanceError,
   assertDeploymentRunSucceeded,
   assertExactCandidateSnapshot,
+  assertResolvedWithoutPullRequestSnapshot,
   assertIssueCommentBodyContainsVisualEvidence,
   assertWorkerHostConfigurationSafe,
   assertWorkerChangesSafe,
@@ -51,14 +52,18 @@ import {
   readWorktreeSnapshot,
   restoreReadyOutcomeFromWorkerLog,
   selectWorkerHassMcpConfig,
+  selectWorkerSessionCandidate,
   shouldVerifyExistingPullRequestVisualEvidence,
+  summarizeFailedCheckLogs,
   synchronizeCandidateBase,
   waitForMergedPullRequest,
 } from './admin-issue-controller'
 import {
   CONTROLLER_COMMENT_MARKER,
+  adminTodoCompletionRequired,
   adminIssueMarker,
   appendIssueInput,
+  authorizedIosFollowUp,
   assertAdminIssueControllerState,
   assertCandidateAuthorized,
   assertCandidateVisualEvidence,
@@ -73,13 +78,18 @@ import {
   formatCompletionComment,
   formatPullRequestComment,
   formatQuestionsComment,
+  formatResolvedWithoutPrComment,
+  formatSubmittedImageMarkdown,
   formatVisualEvidenceMarkdown,
   isTrustedIssueComment,
+  githubAutomationIssueMarker,
+  githubAutomationIssueUid,
   issueBody,
   issueTitle,
   markIssueInputsProcessed,
   migrateAdminIssueControllerState,
   neutralizeGitHubClosingReferences,
+  parseAdminTodoAttachments,
   parseWorkerOutcome,
   pendingIssueInputs,
   REQUIRED_DEPLOYMENT_VERIFIED_PATHS,
@@ -283,6 +293,68 @@ describe('admin issue controller domain', () => {
       ),
     ).toBe(
       'Tracks #321 and Tracks https://github.com/SFenton/ha-sfenton-react-dash/issues/99.',
+    )
+    expect(githubAutomationIssueUid(167)).toBe('github-issue-167')
+    expect(
+      githubAutomationIssueMarker('<!-- layout-failure-commit-abc123 -->'),
+    ).toBe('layout-failure-commit-')
+    expect(
+      githubAutomationIssueMarker('<!-- dashboard-deployment-failure-run-10-2 -->'),
+    ).toBe('dashboard-deployment-failure-run-')
+    expect(githubAutomationIssueMarker('ordinary issue')).toBeUndefined()
+  })
+
+  it('parses bounded Admin To-Do image manifests without exposing the marker as issue text', () => {
+    const parsed = parseAdminTodoAttachments(
+      [
+        'Reported on the vacuum page.',
+        '<!-- admin-todo-attachments:{"version":1,"attachments":[{"id":"11111111-1111-4111-8111-111111111111","mediaType":"image/png","name":"vacuum.png","sha256":"' + 'a'.repeat(64) + '","sizeBytes":123}]} -->',
+      ].join('\n\n'),
+    )
+    expect(parsed.description).toBe('Reported on the vacuum page.')
+    expect(parsed.attachments).toEqual([
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        mediaType: 'image/png',
+        name: 'vacuum.png',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 123,
+      },
+    ])
+    expect(() =>
+      parseAdminTodoAttachments(
+        '<!-- admin-todo-attachments:{"version":1,"attachments":[]} -->',
+      ),
+    ).toThrow('one to four images')
+  })
+
+  it('validates persisted input attachment receipts', () => {
+    const issue = record()
+    issue.inputs[0].attachments = [
+      {
+        githubUrl: 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111',
+        id: '11111111-1111-4111-8111-111111111111',
+        localPath: '/tmp/admin-issue-controller/11111111-1111-4111-8111-111111111111.png',
+        mediaType: 'image/png',
+        name: 'vacuum.png',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 123,
+      },
+    ]
+    const state = baselineAdminIssueState([], '2026-09-20T12:00:00.000Z')
+    state.issues[issue.uid] = issue
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
+    issue.inputs[0].attachments[0].githubUrl = 'https://example.com/untrusted.png'
+    expect(() => assertAdminIssueControllerState(state)).toThrow(
+      'githubUrl is invalid',
+    )
+    expect(
+      formatSubmittedImageMarkdown(
+        'Vacuum ](https://example.com) <script>\nmap',
+        'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111',
+      ),
+    ).toBe(
+      '![Vacuum \\](https://example.com) script map](https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111)',
     )
   })
 
@@ -548,6 +620,26 @@ describe('admin issue controller domain', () => {
     )
     expect(blocked.decision).toBe('blocked')
 
+    const resolved = parseWorkerOutcome(
+      JSON.stringify({
+        decision: 'resolved_without_pr',
+        iosFollowUp: { reason: 'An iPhone was involved.', required: true },
+        issueTitle: 'Keep clean-water tasks guarded in Home Assistant',
+        questions: [],
+        resolution: 'The guarded automation remains enabled and verified.',
+        resolutionType: 'home_assistant',
+        schemaVersion: 1,
+        summary: 'Home Assistant owns the complete fix.',
+        verification: ['The automation trace reached the guarded branch.'],
+        visualEvidence: [],
+      }),
+    )
+    expect(resolved).toMatchObject({
+      decision: 'resolved_without_pr',
+      issueTitle: 'Keep clean-water tasks guarded in Home Assistant',
+      resolutionType: 'home_assistant',
+    })
+
     const ready = parseWorkerOutcome(
       JSON.stringify({
         changeSummary: ['Aligned terminal spacing with the dock-to-navigation gap.'],
@@ -559,6 +651,7 @@ describe('admin issue controller domain', () => {
         schemaVersion: 1,
         summary: 'The spacing is now consistent.',
         tests: [{ command: 'npx playwright test e2e/feedback-regressions.spec.ts', result: 'passed' }],
+        visualChange: { reason: 'The spacing correction is visible.', required: true },
         visualEvidence: [
           {
             alt: 'Phone page with matching bottom gaps',
@@ -571,6 +664,7 @@ describe('admin issue controller domain', () => {
     expect(ready).toMatchObject({
       changeSummary: ['Aligned terminal spacing with the dock-to-navigation gap.'],
       decision: 'ready_for_pr',
+      visualChange: { required: true },
       visualEvidence: [
         {
           path: 'artifacts/admin-issue-321/fixed-phone.png',
@@ -669,6 +763,25 @@ describe('admin issue controller domain', () => {
       '## Automation blocked',
     )
 
+    const resolvedOutcome = parseWorkerOutcome(
+      JSON.stringify({
+        decision: 'resolved_without_pr',
+        iosFollowUp: { reason: '', required: false },
+        issueTitle: 'Keep clean-water tasks guarded in Home Assistant',
+        questions: [],
+        resolution: 'The Home Assistant automation was corrected and verified.',
+        resolutionType: 'home_assistant',
+        schemaVersion: 1,
+        summary: 'No repository change is needed.',
+        verification: ['The live trace completed without creating an incorrect task.'],
+        visualEvidence: [],
+      }),
+    )
+    if (resolvedOutcome.decision !== 'resolved_without_pr') throw new Error('Expected no-PR resolution')
+    expect(
+      formatResolvedWithoutPrComment(issue.uid, issue.inputRevision, resolvedOutcome),
+    ).toContain('## Resolved without a pull request')
+
     const readyOutcome = parseWorkerOutcome(
       JSON.stringify({
         changeSummary: ['Changed spacing.'],
@@ -711,6 +824,46 @@ describe('admin issue controller domain', () => {
         issue,
       }),
     ).toContain('## Fixed and deployed')
+  })
+
+  it('allows no-PR completion only from an unchanged isolated base', () => {
+    const issue = record()
+    const baseSha = 'a'.repeat(40)
+    issue.provenance = {
+      epoch: 'epoch-1',
+      generation: issue.generation,
+      kind: 'active',
+      preparedBaseSha: baseSha,
+      resyncAttempts: 0,
+      revision: issue.processedRevision,
+    }
+    const cleanSnapshot = {
+      branch: 'copilot/admin-todo-321-g1-fix',
+      gitOperations: [],
+      headSha: baseSha,
+      status: '',
+      treeSha: 'b'.repeat(40),
+    }
+    expect(() =>
+      assertResolvedWithoutPullRequestSnapshot(issue, cleanSnapshot, [])
+    ).not.toThrow()
+    expect(() =>
+      assertResolvedWithoutPullRequestSnapshot(issue, cleanSnapshot, ['src/App.tsx'])
+    ).toThrow('left repository changes')
+    issue.pr = {
+      number: 400,
+      url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
+    }
+    expect(() =>
+      assertResolvedWithoutPullRequestSnapshot(issue, cleanSnapshot, [])
+    ).toThrow('cannot retain candidate')
+  })
+
+  it('skips Home Assistant completion for workflow-filed issues', () => {
+    const issue = record()
+    expect(adminTodoCompletionRequired(issue)).toBe(true)
+    issue.origin = 'github-automation'
+    expect(adminTodoCompletionRequired(issue)).toBe(false)
   })
 
   it('requires the complete deployment receipt boundary', () => {
@@ -873,6 +1026,79 @@ describe('admin issue controller security configuration', () => {
     expect(candidateRequiresVisualEvidence(['public/icon.svg'])).toBe(true)
     expect(candidateRequiresVisualEvidence(['index.html'])).toBe(true)
     expect(candidateRequiresVisualEvidence(['src/App.test.tsx', 'e2e/app.spec.ts', 'docs/app.md'])).toBe(false)
+    expect(
+      candidateRequiresVisualEvidence(
+        ['src/components/hass/FocusController.tsx'],
+        { reason: 'Focus restoration has no distinct visible state.', required: false },
+      ),
+    ).toBe(false)
+    expect(
+      candidateRequiresVisualEvidence(
+        ['src/components/core/Page.module.css'],
+        { reason: 'The worker incorrectly classified the change as invisible.', required: false },
+      ),
+    ).toBe(true)
+  })
+
+  it('authorizes iOS follow-up only for explicit browser-specific issue evidence', () => {
+    const requested = {
+      reason: 'Physical Safari keyboard behavior cannot be certified on Linux WebKit.',
+      required: true,
+    }
+    expect(
+      authorizedIosFollowUp(
+        'The bottom action is obscured by the software keyboard on iPhone.',
+        ['src/components/core/ModalSheet.tsx'],
+        requested,
+      ),
+    ).toEqual(requested)
+    expect(
+      authorizedIosFollowUp(
+        'The vacuum totals do not match and focus should return to the report.',
+        ['src/components/hass/VacuumCard.tsx'],
+        requested,
+      ),
+    ).toEqual({ reason: '', required: false })
+    expect(
+      authorizedIosFollowUp(
+        'My iPhone never registered me as arriving home.',
+        ['src/components/hass/VacuumCard.tsx'],
+        requested,
+      ),
+    ).toEqual({ reason: '', required: false })
+  })
+
+  it('selects the substantive stable session when an empty duplicate name exists', () => {
+    expect(
+      selectWorkerSessionCandidate(
+        [
+          {
+            id: '50eac06b-59ef-4236-8db6-1aef35d91c52',
+            name: 'admin-issue-190-task',
+            summaryCount: 0,
+            updatedAt: '2026-09-22T14:24:07.801Z',
+          },
+          {
+            id: 'e0642349-ed35-4b5a-b89e-0c5213b72a92',
+            name: 'admin-issue-190-task',
+            summaryCount: 1,
+            updatedAt: '2026-09-22T14:03:39.202Z',
+          },
+        ],
+        'admin-issue-190-task',
+      )?.id,
+    ).toBe('e0642349-ed35-4b5a-b89e-0c5213b72a92')
+  })
+
+  it('summarizes the useful failing assertion instead of leading setup logs', () => {
+    const setup = Array.from({ length: 250 }, (_, index) => `setup line ${index}`).join('\n')
+    const summary = summarizeFailedCheckLogs(
+      `${setup}\n\u001B[31mFAIL\u001B[0m DailyReportModal.test.tsx\nAssertionError: expected empty to be visible\nTest Files 1 failed`,
+    )
+    expect(summary).toContain('AssertionError: expected empty to be visible')
+    expect(summary).toContain('Test Files 1 failed')
+    expect(summary).not.toContain('\u001B')
+    expect(summary).not.toContain('setup line 0')
   })
 
   it('validates bounded issue-scoped visual evidence from real image bytes', () => {
@@ -1687,6 +1913,20 @@ describe('admin issue controller security configuration', () => {
     expect(() => assertWorkerChangesSafe('/tmp', ['home-assistant/packages/example.yaml'])).toThrow(
       'outside the auto-deployed dashboard',
     )
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        ['.github/workflows/deploy-dashboard.yml', 'scripts/deploy-dashboard-ci.test.ts'],
+        { automationKind: 'deployment' },
+      ),
+    ).not.toThrow()
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        ['scripts/admin-issue-controller.ts'],
+        { automationKind: 'deployment' },
+      ),
+    ).toThrow('protected path')
   })
 
   it('rejects executable Copilot configuration outside the dedicated extension', () => {
@@ -1840,6 +2080,8 @@ describe('admin issue controller security configuration', () => {
     expect(extension).toContain('".github"')
     expect(extension).toContain('"node_modules"')
     expect(extension).toContain('"scripts/lib/hassAdminTodo.ts"')
+    expect(extension).toContain('process.env.ADMIN_ISSUE_MUTABLE_PATHS')
+    expect(extension).toContain('ALLOWED_MUTABLE_WORKSPACE_PATHS')
     expect(extension).toContain('src=/dev/null,dst=/workspace/${relativePath},readonly')
     expect(extension).toContain('/workspace/.cache:rw,nosuid,nodev')
     expect(extension).toContain('readonly')
@@ -1864,6 +2106,7 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain("'custom-tool(admin_issue_workspace)'")
     expect(controller).toContain('config.hassMcpServerName')
     expect(controller).toContain("'GH_TOKEN'")
+    expect(controller).toContain('`--session-id=${session.id}`')
     expect(controller).toContain('disableAllHooks: true')
     expect(controller).toContain("'installed-plugins'")
     expect(controller).toContain("const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']")
@@ -1905,8 +2148,12 @@ describe('admin issue controller security configuration', () => {
     expect(prompt).toContain('Gather available Home Assistant evidence yourself')
     expect(prompt).toContain('artifacts/admin-issue-321/')
     expect(prompt).toContain('"visualEvidence"')
+    expect(prompt).toContain('"resolved_without_pr"')
+    expect(prompt).toContain('"visualChange"')
     expect(prompt).toContain('both the pull request and the GitHub issue update')
     expect(prompt).toContain('Images supplement tests')
+    expect(prompt).toContain('Manual iOS follow-up is exceptional')
+    expect(prompt).toContain('An iPhone involved only as a Home Assistant presence device')
     expect(prompt).not.toContain('Do not use host filesystem, shell, GitHub, Home Assistant')
   })
 })

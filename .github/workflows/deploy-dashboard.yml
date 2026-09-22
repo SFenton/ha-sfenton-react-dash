@@ -103,3 +103,90 @@ jobs:
           path: .ha-deploy-artifact/deployment-receipt.json
           if-no-files-found: warn
           retention-days: 30
+
+  report-deployment-failure:
+    name: Report deployment failure
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/master' &&
+      (needs.build.result == 'failure' || needs.deploy.result == 'failure')
+    needs: [build, deploy]
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download deployment receipt
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p deployment-failure
+          gh run download "${GITHUB_RUN_ID}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name "dashboard-deployment-receipt-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
+            --dir deployment-failure
+      - name: Create deduplicated repair issue
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          marker="<!-- dashboard-deployment-failure-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT} -->"
+          existing="$(gh api -X GET search/issues \
+            -f q="repo:${GITHUB_REPOSITORY} is:issue is:open in:body \"${marker}\"" \
+            --jq '.items[0].number // empty')"
+          if [[ -n "${existing}" ]]; then
+            exit 0
+          fi
+          node <<'NODE'
+          const fs = require('node:fs')
+          const receiptPath = 'deployment-failure/deployment-receipt.json'
+          let receipt = {}
+          if (fs.existsSync(receiptPath)) {
+            try {
+              receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
+            } catch (error) {
+              receipt = {
+                error: `Deployment receipt could not be parsed: ${String(error).slice(0, 1000)}`,
+                status: 'invalid-receipt',
+              }
+            }
+          }
+          const marker = `<!-- dashboard-deployment-failure-run-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT} -->`
+          const selected = {
+            buildResult: process.env.BUILD_RESULT,
+            deployResult: process.env.DEPLOY_RESULT,
+            deployedSha: receipt.deployedSha ?? null,
+            disposition: receipt.disposition ?? null,
+            error: String(receipt.error ?? 'Deployment failed without a receipt error.').slice(0, 4000),
+            leaseReleased: receipt.leaseReleased ?? null,
+            mutationState: receipt.mutationState ?? null,
+            rollback: receipt.rollback ?? null,
+            sourceSha: receipt.sourceSha ?? process.env.GITHUB_SHA,
+            status: receipt.status ?? 'failed',
+          }
+          fs.writeFileSync('deployment-failure/issue-body.md', [
+            marker,
+            '',
+            '## Automated dashboard deployment failure',
+            '',
+            `The protected dashboard deployment workflow failed for \`${process.env.GITHUB_SHA}\`.`,
+            '',
+            `**Workflow:** ${process.env.RUN_URL}`,
+            '',
+            '```json',
+            JSON.stringify(selected, null, 2),
+            '```',
+            '',
+            'Investigate the failure, repair repository-owned deployment behavior when appropriate, and retain the no-mutation and rollback safety boundaries.',
+          ].join('\n'))
+          NODE
+          gh issue create \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "Dashboard deployment workflow failed for ${GITHUB_SHA:0:12}" \
+            --body-file deployment-failure/issue-body.md

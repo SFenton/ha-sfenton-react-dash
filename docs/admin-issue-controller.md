@@ -1,9 +1,10 @@
 # Admin issue controller
 
 The Admin issue controller mirrors new Home Assistant Admin To-Do items into
-GitHub issues and runs one serialized, resumable Copilot lifecycle for each
-issue. The controller is intentionally separate from the dashboard deployment
-runner: deployment remains owned by the protected `master` workflow.
+GitHub issues and also adopts trusted workflow-filed layout and deployment
+issues. It runs one serialized, resumable Copilot lifecycle for each issue.
+The controller is intentionally separate from the dashboard deployment runner:
+deployment remains owned by the protected `master` workflow.
 
 ## Authority boundary
 
@@ -33,6 +34,11 @@ Each repository command runs in Docker with no network, a read-only root filesys
 Git metadata. The extension accepts only an immutable Docker image ID.
 The controller rejects changes outside the auto-deployed dashboard surfaces:
 `src/`, `public/`, `e2e/`, and the root `index.html`.
+Trusted deployment-failure issues have a separate narrow exception for
+`.github/workflows/deploy-dashboard.yml`,
+`scripts/deploy-dashboard-ci.ts`, and its directly owned test. Exact nested
+mounts make only those paths writable; controller implementation, other
+workflows, packages, credentials, and Home Assistant files remain protected.
 Repository env and package-credential files are masked with `/dev/null`, and
 build caches use per-command tmpfs mounts, so model commands cannot read local
 tokens or persist a cache that influences trusted validation.
@@ -54,44 +60,69 @@ mutable user extensions or unrelated personal skills.
 ## Lifecycle
 
 1. Poll `todo.groceries` and ignore the UIDs captured by the one-time baseline.
-2. Create one GitHub issue carrying a stable Admin To-Do UID marker.
+   Also discover open GitHub Actions issues carrying the exact trusted layout
+   or deployment-failure marker.
+2. Create one GitHub issue carrying a stable Admin To-Do UID marker. A task
+   filed with images uses the authenticated `sfenton_admin_todo` endpoint,
+   which validates and temporarily stores up to four PNG, JPEG, or WebP files.
+   The host validates their hashes and bytes, uploads them to GitHub, embeds
+   them in the initial issue body, and copies them into the worker's ignored
+   issue artifact directory. The controller deletes the HA source copy after
+   durable journal persistence; a daily HA cleanup removes abandoned files
+   after 14 days.
 3. Apply later Admin To-Do edits to the issue and queue them as a new input
    revision.
 4. Accept follow-up comments only when the numeric user ID, login, and
    `OWNER` association all match the pinned repository owner.
-5. Create or resume the stable named Copilot session with `gpt-5.6-sol`,
+5. Create or resume the stable UUID-bound Copilot session with `gpt-5.6-sol`,
    `max` effort, `/tandem-research`, the isolated repository tool, and the
-   operator's configured `hass` MCP server.
+   operator's configured `hass` MCP server. Legacy named sessions are resolved
+   once and persisted by UUID; an empty duplicate name cannot stall the queue.
 6. Gather available repository and live Home Assistant evidence, then post a
    structured question only when a consequential decision still remains.
-7. Otherwise create a local candidate commit, authorize its complete committed
-   diff, and validate that exact clean commit in the isolated runner.
-8. For a candidate that changes production dashboard runtime files, validate
-   one to four issue-scoped PNG, JPEG, or WebP images of the proposed fixed
-   behavior, bind their hashes to the committed-diff manifest, upload them to
-   GitHub, and render them inline in both the pull-request body and the
-   controller's GitHub issue update. Test-only,
-   documentation-only, Home Assistant-only, and controller-only outcomes are
-   exempt.
-9. Merge current `origin/master` into a stale candidate only through a
+7. If verified Home Assistant work fully resolves the issue, or no repository
+   change is appropriate, require a clean untouched worktree, post the
+   resolution and verification, close the GitHub issue, and complete the Admin
+   To-Do when one exists. GitHub-only issues skip Home Assistant completion.
+8. Otherwise create a local candidate commit, authorize its complete committed
+   diff, and validate that exact clean commit in the isolated runner. Rename
+   the GitHub issue to the accepted PR title while preserving the complete
+   original report in the issue body.
+9. Require one to four issue-scoped proposed-behavior images only when the
+   worker classifies a meaningful visible React result or the candidate changes
+   CSS or visual assets. Logic-only focus/accessibility, Home Assistant,
+   test-only, documentation-only, controller-only, and other non-demonstrable
+   changes may use an empty evidence set with a specific reason. When required,
+   bind image hashes to the committed-diff manifest, upload them to GitHub, and
+   render them inline in both review surfaces.
+10. Merge current `origin/master` into a stale candidate only through a
    controller-journaled, conflict-free normal merge. Every new candidate is
    revalidated before a normal push.
-10. Require the live pull request repository, base, branch, head SHA, and every
+11. Require the live pull request repository, base, branch, head SHA, and every
    persisted visual-evidence URL to match the candidate. Bind protected checks
    from the pinned GitHub App to that exact SHA and merge with
    `--match-head-commit`.
-11. Require a successful v2 deployment artifact with accepted disposition,
+12. Require a successful v2 deployment artifact with accepted disposition,
    verified paths, panel registration, and a released deployment lease. The
    normal path binds the exact merge SHA. If that exact run failed before
    deployment, a later successful `master` deployment may recover the issue
    only after the controller verifies the newer receipt and proves with Git
    ancestry that its deployed SHA contains the issue merge.
-12. Post the completion evidence, close the issue, complete the Home Assistant
+13. Post the completion evidence, close the issue, complete the Home Assistant
     item, verify its completion receipt, and remove the issue worktree.
 
-A completed deployment workflow with a non-success conclusion blocks that
-issue once and releases the serialized queue. It is not retried indefinitely;
-the GitHub issue and Home Assistant task remain open for operator recovery. At
+A protected-check failure first receives one host-owned rerun of the failed
+jobs for that candidate SHA. The controller summarizes failing assertions and
+tail output rather than leading setup logs. If the rerun still fails, the
+stable worker receives that exact evidence once. Returning the same unchanged
+candidate into the same failure blocks instead of consuming repeated repair
+turns.
+
+A completed deployment workflow with a non-success conclusion blocks the
+original issue once and releases the serialized queue. The workflow files one
+deduplicated trusted deployment-failure issue containing the sanitized receipt;
+that issue enters the same tandem-research pipeline with the narrow deployment
+repair scope. At
 a bounded polling cadence, the controller checks the latest completed
 `master` deployment. A failed or in-progress run leaves the record blocked. A
 successful run can recover it only when the receipt satisfies the full v2
@@ -103,8 +134,10 @@ failed exact run again.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
-stable Copilot session. A worker-classified iOS/WebKit fix remains open after
-deployment with a manual-device follow-up comment.
+stable Copilot session. Manual iOS follow-up remains open after deployment only
+when the canonical issue names platform-specific browser behavior, the
+candidate changes a browser-facing surface, and the follow-up reason identifies
+the behavior that local evidence cannot certify.
 
 ## Candidate provenance
 
@@ -130,9 +163,10 @@ The following rules are fail closed:
   controller first verifies that PR against the prior candidate and its
   published images, then replaces the authorization with the new committed
   revision;
-- dashboard runtime candidates cannot advance without valid issue-scoped image
-  files. The controller rejects traversal, symlinks, mismatched extensions or
-  magic bytes, duplicate content, files above 10 MiB, and captions that omit
+- candidates classified as visibly changing React, plus every CSS or visual
+  asset candidate, cannot advance without valid issue-scoped image files. The
+  controller rejects traversal, symlinks, mismatched extensions or magic
+  bytes, duplicate content, files above 10 MiB, and captions that omit
   mock/live provenance;
 - uploaded attachment URLs must use GitHub's user-attachment host and every URL
   must remain embedded under `## Proposed fixed behavior` in both the live PR
@@ -273,6 +307,13 @@ remain in the ignored worktree artifact directory until normal issue cleanup.
 Controller issue comments are upserted by their stable receipt marker, so a
 retry or corrected candidate replaces stale text or images instead of leaving
 the bug with an outdated evidence comment.
+
+Install `home-assistant/custom_components/sfenton_admin_todo` and
+`home-assistant/packages/sfenton_admin_todo.yaml` before enabling dashboard
+image filing. This is a Home Assistant Python integration change and requires
+the normal separately authorized restart-aware release. Until it is installed,
+text-only Admin To-Do filing continues to use `todo.add_item`; selecting images
+fails visibly and does not silently create a task without them.
 
 ## Operation and recovery
 

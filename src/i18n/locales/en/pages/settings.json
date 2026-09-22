@@ -21,9 +21,18 @@
       "title": "Mach-E"
     },
     "todo": {
+      "addFailed": "Unable to add this task. Try again.",
+      "addTask": "Add Task",
+      "adding": "Adding…",
       "githubSyncDisclosure": "This issue is synchronized from the dashboard Admin To-Do list. The repository is public.",
+      "imageTooLarge": "Each image must be 10 MB or smaller.",
+      "imagesDescription": "Add up to four PNG, JPEG, or WebP images, 10 MB each.",
+      "imagesLabel": "Images",
       "subtitle": "An admin panel for to-do tasks.",
-      "title": "To-Do"
+      "taskLabel": "Task",
+      "title": "To-Do",
+      "tooManyImages": "Select no more than four images.",
+      "unsupportedImage": "Select PNG, JPEG, or WebP images."
     },
     "vacation": {
       "subtitle": "Set away dates and prepare the house for vacation.",

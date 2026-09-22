@@ -66,6 +66,34 @@ export class HassAdminTodoClient {
     await this.callService('todo', 'update_item', { description, entity_id: entityId, item })
   }
 
+  async getAdminTodoAttachment(attachmentId: string) {
+    const response = await this.fetchImpl(
+      `${this.config.url}/api/sfenton_admin_todo/attachments/${encodeURIComponent(attachmentId)}`,
+      { headers: { Authorization: `Bearer ${this.config.token}` } },
+    )
+    if (!response.ok) {
+      throw new Error(
+        `Home Assistant Admin To-Do attachment ${attachmentId} failed with HTTP ${response.status}`,
+      )
+    }
+    return new Uint8Array(await response.arrayBuffer())
+  }
+
+  async deleteAdminTodoAttachment(attachmentId: string) {
+    const response = await this.fetchImpl(
+      `${this.config.url}/api/sfenton_admin_todo/attachments/${encodeURIComponent(attachmentId)}`,
+      {
+        headers: { Authorization: `Bearer ${this.config.token}` },
+        method: 'DELETE',
+      },
+    )
+    if (!response.ok && response.status !== 404) {
+      throw new Error(
+        `Home Assistant Admin To-Do attachment cleanup ${attachmentId} failed with HTTP ${response.status}`,
+      )
+    }
+  }
+
   private async callService(domain: string, service: string, data: Record<string, unknown>, returnResponse = false) {
     const suffix = returnResponse ? '?return_response' : ''
     const response = await this.fetchImpl(`${this.config.url}/api/services/${domain}/${service}${suffix}`, {

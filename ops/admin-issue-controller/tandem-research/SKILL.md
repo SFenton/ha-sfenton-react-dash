@@ -39,12 +39,27 @@ Do not use Claude models in tandem or as fallback researchers.
 ## Autonomous issue evidence
 
 When the host controller invokes this skill for an Admin To-Do issue, its
-prompt defines the final handoff contract. A `ready_for_pr` result that changes
-production dashboard runtime files must include one to four deterministic
-PNG, JPEG, or WebP images under the issue-specific ignored artifact directory.
-The images must show the proposed fixed behavior, and each caption must say
-whether it is mock or live evidence. Test-only, documentation-only, Home
-Assistant-only, and controller-only outcomes are exempt. Visual evidence
-supplements tests and never substitutes for required manual iOS verification.
-The host publishes the same rendered images in both the pull request and the
-GitHub issue update so the bug itself remains a complete review surface.
+prompt defines the final handoff contract. Inspect submitted report images from
+the issue-specific artifact paths when they are relevant.
+
+Return `resolved_without_pr` when verified Home Assistant work fully resolves
+the issue or when investigation proves that no repository change is
+appropriate. Keep the worktree clean, describe the resolution and verification,
+and never fabricate a dashboard change to satisfy the lifecycle.
+
+For `ready_for_pr`, explicitly classify whether the result has a meaningful
+visible React state. CSS and visual-asset changes always require one to four
+deterministic PNG, JPEG, or WebP images under the issue-specific ignored
+artifact directory. Logic-only focus, accessibility, Home Assistant, test,
+documentation, controller, and other non-demonstrable changes may opt out with
+a specific reason. Required images must show the proposed fixed behavior, and
+each caption must say whether it is mock or live evidence. The host publishes
+the same rendered images in both the pull request and the GitHub issue update.
+
+Manual iOS follow-up is allowed only when the canonical issue explicitly names
+iOS, iPhone, iPad, Safari, WebKit, safe-area, orientation, touch, or
+software-keyboard behavior, the candidate changes a browser-facing surface,
+and the reason identifies the platform-specific behavior that local evidence
+cannot certify. An iPhone used only as a Home Assistant presence device,
+generic responsive layout, wrapping, focus restoration, and Linux WebKit
+limitations do not independently create an iOS gate.

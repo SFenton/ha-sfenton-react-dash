@@ -1,8 +1,13 @@
 import { createHash } from 'node:crypto'
 
 export const ADMIN_ISSUE_MARKER_PREFIX = 'admin-todo-uid:'
+export const ADMIN_TODO_ATTACHMENTS_PREFIX = 'admin-todo-attachments:'
 export const CONTROLLER_COMMENT_MARKER = '<!-- admin-issue-controller -->'
 export const ADMIN_ISSUE_STATE_VERSION = 2 as const
+export const GITHUB_AUTOMATION_ISSUE_MARKERS = [
+  'layout-failure-commit-',
+  'dashboard-deployment-failure-run-',
+] as const
 export const REQUIRED_DEPLOYMENT_VERIFIED_PATHS = [
   'deployment.json',
   'index.html',
@@ -18,6 +23,7 @@ export type AdminIssuePhase =
   | 'ready-for-pr'
   | 'pull-request'
   | 'deploying'
+  | 'resolving'
   | 'completed'
   | 'paused'
   | 'blocked'
@@ -26,9 +32,21 @@ export type AdminIssueInputSource =
   | 'todo-created'
   | 'todo-updated'
   | 'issue-comment'
+  | 'github-issue'
   | 'ci-failure'
 
+export interface AdminIssueInputAttachment {
+  githubUrl?: string
+  id: string
+  localPath: string
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp'
+  name: string
+  sha256: string
+  sizeBytes: number
+}
+
 export interface AdminIssueInput {
+  attachments?: AdminIssueInputAttachment[]
   body: string
   createdAt: string
   externalId: string
@@ -91,6 +109,7 @@ export interface AdminIssueCandidate {
   targetBaseSha: string
   treeSha: string
   validation?: AdminIssueValidationReceipt
+  visualChange?: AdminIssueVisualChange
   visualEvidence?: AdminIssueVisualEvidenceReceipt[]
 }
 
@@ -208,6 +227,7 @@ export interface AdminIssueDeployment {
 }
 
 export interface AdminIssueRecord {
+  automationKind?: 'deployment' | 'layout'
   branch?: string
   commentCursor: number
   createdAt: string
@@ -220,11 +240,13 @@ export interface AdminIssueRecord {
   issueUrl: string
   lastOutcome?: AdminIssueWorkerOutcome
   phase: AdminIssuePhase
+  origin?: 'github-automation'
   pr?: AdminIssuePullRequest
   processedRevision: number
   provenance: AdminIssueProvenance
   repairAttempts: number
   receipts: Record<string, string>
+  sessionId?: string
   sessionName: string
   taskFingerprint: string
   title: string
@@ -250,6 +272,11 @@ export interface AdminIssueQuestion {
 }
 
 export interface AdminIssueIosFollowUp {
+  reason: string
+  required: boolean
+}
+
+export interface AdminIssueVisualChange {
   reason: string
   required: boolean
 }
@@ -288,6 +315,18 @@ export type AdminIssueWorkerOutcome =
     visualEvidence: []
   }
   | {
+    decision: 'resolved_without_pr'
+    iosFollowUp: AdminIssueIosFollowUp
+    issueTitle: string
+    questions: []
+    resolution: string
+    resolutionType: 'home_assistant' | 'no_repository_change'
+    schemaVersion: 1
+    summary: string
+    verification: string[]
+    visualEvidence: []
+  }
+  | {
     changeSummary: string[]
     decision: 'ready_for_pr'
     iosFollowUp: AdminIssueIosFollowUp
@@ -297,6 +336,7 @@ export type AdminIssueWorkerOutcome =
     schemaVersion: 1
     summary: string
     tests: Array<{ command: string; result: string }>
+    visualChange: AdminIssueVisualChange
     visualEvidence: AdminIssueVisualEvidenceDraft[]
   }
   | {
@@ -371,6 +411,16 @@ function iosFollowUp(value: unknown): AdminIssueIosFollowUp {
   }
 }
 
+function visualChange(value: unknown): AdminIssueVisualChange {
+  assert(object(value), 'visualChange must be an object')
+  assert(typeof value.required === 'boolean', 'visualChange.required must be a boolean')
+  assert(typeof value.reason === 'string' && value.reason.trim(), 'visualChange.reason is required')
+  return {
+    required: value.required,
+    reason: value.reason.trim(),
+  }
+}
+
 const SHA_PATTERN = /^[a-f0-9]{40}$/
 const HASH_PATTERN = /^[a-f0-9]{64}$/
 const ADMIN_ISSUE_PHASES = new Set<AdminIssuePhase>([
@@ -381,6 +431,7 @@ const ADMIN_ISSUE_PHASES = new Set<AdminIssuePhase>([
   'ready-for-pr',
   'pull-request',
   'deploying',
+  'resolving',
   'completed',
   'paused',
   'blocked',
@@ -514,6 +565,26 @@ function assertVisualEvidenceReceipt(value: unknown, field: string) {
   }
 }
 
+function assertInputAttachment(value: unknown, field: string) {
+  assert(object(value), `${field} must be an object`)
+  nonEmptyString(value.id, `${field}.id`)
+  nonEmptyString(value.name, `${field}.name`)
+  nonEmptyString(value.localPath, `${field}.localPath`)
+  sha256(value.sha256, `${field}.sha256`)
+  positiveInteger(value.sizeBytes, `${field}.sizeBytes`)
+  assert(
+    ['image/jpeg', 'image/png', 'image/webp'].includes(String(value.mediaType)),
+    `${field}.mediaType is invalid`,
+  )
+  if (value.githubUrl !== undefined) {
+    assert(
+      typeof value.githubUrl === 'string' &&
+      /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(value.githubUrl),
+      `${field}.githubUrl is invalid`,
+    )
+  }
+}
+
 function assertProvenance(value: unknown, field: string) {
   assert(object(value), `${field} must be an object`)
   if (value.kind === 'none') return
@@ -571,6 +642,9 @@ function assertProvenance(value: unknown, field: string) {
         provenance.candidate.checks.headSha === provenance.candidate.headSha,
         `${field}.candidate.checks do not match a validated candidate`,
       )
+    }
+    if (provenance.candidate.visualChange) {
+      visualChange(provenance.candidate.visualChange)
     }
     if (provenance.candidate.visualEvidence) {
       assert(
@@ -742,6 +816,20 @@ export function assertAdminIssueControllerState(
       `state.issues.${uid}.phase is invalid`,
     )
     assert(Array.isArray(rawRecord.inputs), `state.issues.${uid}.inputs must be an array`)
+    for (const [inputIndex, input] of rawRecord.inputs.entries()) {
+      assert(object(input), `state.issues.${uid}.inputs[${inputIndex}] must be an object`)
+      if (input.attachments !== undefined) {
+        assert(
+          Array.isArray(input.attachments) && input.attachments.length <= 8,
+          `state.issues.${uid}.inputs[${inputIndex}].attachments is invalid`,
+        )
+        input.attachments.forEach((attachment, attachmentIndex) =>
+          assertInputAttachment(
+            attachment,
+            `state.issues.${uid}.inputs[${inputIndex}].attachments[${attachmentIndex}]`,
+          ))
+      }
+    }
     assert(object(rawRecord.receipts), `state.issues.${uid}.receipts must be an object`)
     assert(
       Object.values(rawRecord.receipts).every((receipt) => typeof receipt === 'string'),
@@ -754,6 +842,28 @@ export function assertAdminIssueControllerState(
       assert(
         rawRecord.pr.headSha === undefined && rawRecord.pr.mergeSha === undefined,
         `state.issues.${uid}.pr cannot contain legacy authorization SHAs`,
+      )
+    }
+    if (rawRecord.origin !== undefined) {
+      assert(
+        rawRecord.origin === 'github-automation',
+        `state.issues.${uid}.origin is invalid`,
+      )
+    }
+    if (rawRecord.automationKind !== undefined) {
+      assert(
+        rawRecord.origin === 'github-automation' &&
+        ['deployment', 'layout'].includes(String(rawRecord.automationKind)),
+        `state.issues.${uid}.automationKind is invalid`,
+      )
+    }
+    if (rawRecord.sessionId !== undefined) {
+      assert(
+        typeof rawRecord.sessionId === 'string' &&
+        /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
+          rawRecord.sessionId,
+        ),
+        `state.issues.${uid}.sessionId is invalid`,
       )
     }
     assertProvenance(rawRecord.provenance, `state.issues.${uid}.provenance`)
@@ -907,6 +1017,17 @@ export function adminIssueMarker(uid: string) {
   return `<!-- ${ADMIN_ISSUE_MARKER_PREFIX}${uid} -->`
 }
 
+export function githubAutomationIssueUid(issueNumber: number) {
+  return `github-issue-${issueNumber}`
+}
+
+export function githubAutomationIssueMarker(body: string | null | undefined) {
+  if (!body) return undefined
+  return GITHUB_AUTOMATION_ISSUE_MARKERS.find((prefix) =>
+    body.includes(`<!-- ${prefix}`),
+  )
+}
+
 export function controllerReceiptMarker(uid: string, receipt: string) {
   return `<!-- admin-issue-controller:${uid}:${receipt} -->`
 }
@@ -930,20 +1051,96 @@ export function neutralizeGitHubClosingReferences(body: string) {
 }
 
 export function issueBody(input: {
+  attachments?: Array<{ alt: string; url: string }>
   description: string
   summary: string
   uid: string
 }) {
   const description = input.description.trim()
+  const attachments = input.attachments?.length
+    ? `\n\n## Submitted images\n\n${input.attachments
+      .map((attachment) => formatSubmittedImageMarkdown(attachment.alt, attachment.url))
+      .join('\n\n')}`
+    : ''
   return `${adminIssueMarker(input.uid)}
 
 ## Admin To-Do
 
 ${input.summary.trim()}
-${description ? `\n\n${description}` : ''}
+${description ? `\n\n${description}` : ''}${attachments}
 
 _This issue is synchronized from the dashboard Admin To-Do list._
 `
+}
+
+export function formatSubmittedImageMarkdown(alt: string, url: string) {
+  assert(
+    /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(url),
+    'Submitted image URL is invalid',
+  )
+  const safeAlt = visualEvidenceMarkdownText(alt).replace(/[\\[\]]/g, '\\$&')
+  return `![${safeAlt}](${url})`
+}
+
+export interface AdminTodoAttachmentManifestItem {
+  id: string
+  mediaType: 'image/jpeg' | 'image/png' | 'image/webp'
+  name: string
+  sha256: string
+  sizeBytes: number
+}
+
+export function parseAdminTodoAttachments(description = '') {
+  const pattern = new RegExp(`<!--\\s*${ADMIN_TODO_ATTACHMENTS_PREFIX}([\\s\\S]*?)\\s*-->`, 'i')
+  const match = description.match(pattern)
+  if (!match) return { attachments: [] as AdminTodoAttachmentManifestItem[], description: description.trim() }
+  let value: unknown
+  try {
+    value = JSON.parse(match[1])
+  } catch (error) {
+    throw new Error('Admin To-Do attachment manifest is invalid JSON', { cause: error })
+  }
+  assert(object(value) && value.version === 1, 'Admin To-Do attachment manifest version is invalid')
+  assert(
+    Array.isArray(value.attachments) && value.attachments.length > 0 && value.attachments.length <= 4,
+    'Admin To-Do attachment manifest must contain one to four images',
+  )
+  const ids = new Set<string>()
+  const attachments = value.attachments.map((entry, index) => {
+    assert(object(entry), `Admin To-Do attachment ${index + 1} must be an object`)
+    const id = nonEmptyString(entry.id, `Admin To-Do attachment ${index + 1}.id`)
+    const name = nonEmptyString(entry.name, `Admin To-Do attachment ${index + 1}.name`).trim()
+    const mediaType = nonEmptyString(
+      entry.mediaType,
+      `Admin To-Do attachment ${index + 1}.mediaType`,
+    )
+    assert(
+      ['image/jpeg', 'image/png', 'image/webp'].includes(mediaType),
+      `Admin To-Do attachment ${index + 1}.mediaType is invalid`,
+    )
+    assert(
+      /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i
+        .test(id) &&
+      !ids.has(id),
+      `Admin To-Do attachment ${index + 1}.id is invalid`,
+    )
+    assert(name.length <= 240, `Admin To-Do attachment ${index + 1}.name is too long`)
+    ids.add(id)
+    return {
+      id,
+      mediaType: mediaType as AdminTodoAttachmentManifestItem['mediaType'],
+      name,
+      sha256: sha256(entry.sha256, `Admin To-Do attachment ${index + 1}.sha256`),
+      sizeBytes: positiveInteger(
+        entry.sizeBytes,
+        `Admin To-Do attachment ${index + 1}.sizeBytes`,
+      ),
+    }
+  })
+  return {
+    attachments,
+    description: description.replace(pattern, '').trim(),
+  }
 }
 
 export function sessionNameForIssue(issueNumber: number, uid: string) {
@@ -975,6 +1172,10 @@ export function appendIssueInput(
 
 export function pendingIssueInputs(record: AdminIssueRecord) {
   return record.inputs.filter((input) => input.revision > record.processedRevision)
+}
+
+export function adminTodoCompletionRequired(record: AdminIssueRecord) {
+  return record.origin !== 'github-automation'
 }
 
 export function baselineAdminIssueState(
@@ -1114,6 +1315,44 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
     }
   }
 
+  if (value.decision === 'resolved_without_pr') {
+    const visualEvidence = visualEvidenceDrafts(value.visualEvidence)
+    assert(visualEvidence.length === 0, 'resolved_without_pr visualEvidence must be empty')
+    assert(
+      Array.isArray(value.questions) && value.questions.length === 0,
+      'resolved_without_pr questions must be empty',
+    )
+    assert(
+      value.resolutionType === 'home_assistant' ||
+      value.resolutionType === 'no_repository_change',
+      'resolved_without_pr resolutionType is invalid',
+    )
+    assert(
+      typeof value.issueTitle === 'string' && value.issueTitle.trim(),
+      'resolved_without_pr issueTitle is required',
+    )
+    assert(
+      typeof value.resolution === 'string' && value.resolution.trim(),
+      'resolved_without_pr resolution is required',
+    )
+    const verification = stringArray(value.verification, 'verification')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+    assert(verification.length > 0, 'resolved_without_pr verification is required')
+    return {
+      schemaVersion: 1,
+      decision: 'resolved_without_pr',
+      summary: value.summary.trim(),
+      questions: [],
+      issueTitle: neutralizeGitHubClosingReferences(value.issueTitle.trim()).slice(0, 240),
+      resolution: neutralizeGitHubClosingReferences(value.resolution.trim()),
+      resolutionType: value.resolutionType,
+      verification,
+      iosFollowUp: ios,
+      visualEvidence: [],
+    }
+  }
+
   assert(value.decision === 'ready_for_pr', 'Worker decision is unsupported')
   assert(Array.isArray(value.questions) && value.questions.length === 0, 'ready_for_pr questions must be empty')
   const changeSummary = stringArray(value.changeSummary, 'changeSummary')
@@ -1134,6 +1373,15 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
   assert(typeof value.pr.title === 'string' && value.pr.title.trim(), 'pr.title is required')
   assert(typeof value.pr.body === 'string' && value.pr.body.trim(), 'pr.body is required')
   const visualEvidence = visualEvidenceDrafts(value.visualEvidence)
+  const candidateVisualChange = value.visualChange === undefined
+    ? {
+      reason: 'Legacy worker outcome inferred from the supplied visual evidence.',
+      required: visualEvidence.length > 0,
+    }
+    : visualChange(value.visualChange)
+  if (candidateVisualChange.required) {
+    assert(visualEvidence.length > 0, 'visualChange requires visualEvidence')
+  }
   return {
     schemaVersion: 1,
     decision: 'ready_for_pr',
@@ -1150,6 +1398,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
       title: neutralizeGitHubClosingReferences(value.pr.title.trim()).slice(0, 240),
       body: neutralizeGitHubClosingReferences(value.pr.body.trim()),
     },
+    visualChange: candidateVisualChange,
     visualEvidence,
   }
 }
@@ -1160,7 +1409,17 @@ function isTestOnlyPath(path: string) {
     /\.(?:spec|test)\.[cm]?[jt]sx?$/.test(path)
 }
 
-export function candidateRequiresVisualEvidence(files: readonly string[]) {
+function isInherentlyVisualPath(path: string) {
+  return /\.(?:css|jpe?g|png|svg|webp|gif|avif|woff2?|ttf|otf)$/i.test(path)
+}
+
+export function candidateRequiresVisualEvidence(
+  files: readonly string[],
+  classification?: AdminIssueVisualChange,
+) {
+  if (classification) {
+    return classification.required || files.some(isInherentlyVisualPath)
+  }
   return files.some((path) =>
     path === 'index.html' ||
     path.startsWith('public/') ||
@@ -1182,7 +1441,7 @@ export function assertVisualEvidenceForCandidate(
   requirePublished = false,
 ) {
   const evidence = candidate.visualEvidence ?? []
-  if (candidateRequiresVisualEvidence(candidate.diff.files)) {
+  if (candidateRequiresVisualEvidence(candidate.diff.files, candidate.visualChange)) {
     assert(
       evidence.length > 0,
       'Candidate changes dashboard runtime files but has no proposed fixed-behavior images',
@@ -1269,6 +1528,58 @@ ${controllerReceiptMarker(uid, `blocked-r${revision}`)}
 ${outcome.summary}
 
 ${outcome.reason}${ios}`
+}
+
+export function formatResolvedWithoutPrComment(
+  uid: string,
+  revision: number,
+  outcome: Extract<AdminIssueWorkerOutcome, { decision: 'resolved_without_pr' }>,
+) {
+  const verification = outcome.verification.map((entry) => `- ${entry}`).join('\n')
+  const resolutionType = outcome.resolutionType === 'home_assistant'
+    ? 'Home Assistant'
+    : 'No repository change'
+  return `${CONTROLLER_COMMENT_MARKER}
+${controllerReceiptMarker(uid, `resolved-without-pr-r${revision}`)}
+
+## Resolved without a pull request
+
+${outcome.summary}
+
+**Resolution type:** ${resolutionType}
+
+${outcome.resolution}
+
+**Verification**
+${verification}`
+}
+
+export function authorizedIosFollowUp(
+  canonicalIssueText: string,
+  candidateFiles: readonly string[],
+  followUp: AdminIssueIosFollowUp,
+) {
+  if (!followUp.required) return followUp
+  const explicitPlatformIssue =
+    /\b(?:ios|safari|webkit|safe[- ]area|software keyboard|onscreen keyboard|on-screen keyboard)\b/i
+      .test(canonicalIssueText)
+  const deviceSpecificInterfaceIssue = (
+    /\b(?:iphone|ipad)\b[\s\S]{0,160}\b(?:browser|screen|view|viewport|keyboard|orientation|touch|tap|scroll|focus|layout|modal|sheet|navigation|button)\b/i
+      .test(canonicalIssueText) ||
+    /\b(?:browser|screen|view|viewport|keyboard|orientation|touch|tap|scroll|focus|layout|modal|sheet|navigation|button)\b[\s\S]{0,160}\b(?:iphone|ipad)\b/i
+      .test(canonicalIssueText)
+  )
+  const issueCallsOutIos = explicitPlatformIssue || deviceSpecificInterfaceIssue
+  const reasonNamesPlatformBehavior = /\b(?:ios|safari|webkit|safe[- ]area|software keyboard|onscreen keyboard|on-screen keyboard|viewport|orientation|touch)\b/i
+    .test(followUp.reason)
+  const browserCandidate = candidateFiles.some((path) =>
+    path === 'index.html' ||
+    path.startsWith('public/') ||
+    path.startsWith('src/') ||
+    path.startsWith('e2e/'),
+  )
+  if (issueCallsOutIos && reasonNamesPlatformBehavior && browserCandidate) return followUp
+  return { reason: '', required: false }
 }
 
 export function formatPullRequestComment(

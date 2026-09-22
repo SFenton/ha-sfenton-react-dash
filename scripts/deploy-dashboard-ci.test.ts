@@ -1,3 +1,5 @@
+// @covers .github/workflows/deploy-dashboard.yml
+
 import { execFile } from 'node:child_process'
 import {
   mkdir,
@@ -681,5 +683,23 @@ describe('dashboard CI deployment', () => {
         undefined,
       ),
     ).toThrow('deploy a forward v2 record first')
+  })
+
+  it('files a trusted deduplicated repair issue when protected deployment fails', async () => {
+    const workflow = await readFile('.github/workflows/deploy-dashboard.yml', 'utf8')
+    expect(workflow).toContain('report-deployment-failure:')
+    expect(workflow).toContain("needs.build.result == 'failure'")
+    expect(workflow).toContain("needs.deploy.result == 'failure'")
+    expect(workflow).toContain('needs: [build, deploy]')
+    expect(workflow).toContain(
+      'dashboard-deployment-failure-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}',
+    )
+    expect(workflow).toContain(
+      'dashboard-deployment-receipt-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}',
+    )
+    expect(workflow).toContain('actions: read')
+    expect(workflow).toContain('issues: write')
+    expect(workflow).toContain('mkdir -p deployment-failure')
+    expect(workflow).toContain('Deployment receipt could not be parsed')
   })
 })

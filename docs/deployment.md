@@ -4,6 +4,14 @@ Every push to protected `master` starts `.github/workflows/deploy-dashboard.yml`
 The post-merge layout workflow is independent regression monitoring: dashboard
 deployment neither depends on nor waits for its jobs or artifacts.
 
+If the protected build or deployment job fails, the workflow downloads its
+sanitized receipt when available and files one deduplicated GitHub issue carrying the
+exact `dashboard-deployment-failure-run-<run>-<attempt>` marker. The Admin issue
+controller adopts that issue, runs tandem research, and may change only the
+deployment workflow, `scripts/deploy-dashboard-ci.ts`, and its directly owned
+test in addition to ordinary dashboard paths. The failed deployment itself
+still performs no success-shaped mutation or automatic Home Assistant restart.
+
 Admin To-Do issue automation is operated by a separate controller and does not
 change deployment ownership. See
 [Admin issue controller](./admin-issue-controller.md) for its installation,
