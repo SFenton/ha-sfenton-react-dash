@@ -196,18 +196,26 @@ describe('Daily summary modal', () => {
     expect(within(nav).getByRole('tab', { name: 'Expired Food' }).querySelector('[data-count]')).toBeNull()
   })
 
-  it('keeps a section header for the active tab outside the modal scroller', async () => {
+  it('keeps Upcoming inside the modal scroller while other section headers stay outside', async () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const bodyHeader = dialog.querySelector('[data-modal-sheet-body-header="true"]')
-    expect(bodyHeader).not.toBeNull()
-    expect(bodyHeader?.contains(dialog.querySelector('[data-modal-sheet-body="true"]'))).toBe(false)
-    expect(within(bodyHeader as HTMLElement).getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeInTheDocument()
+    const body = dialog.querySelector('[data-modal-sheet-body="true"]') as HTMLElement
+    const overdueHeader = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(overdueHeader.contains(body)).toBe(false)
+    expect(within(overdueHeader).getByRole('heading', { level: 2, name: 'Overdue Chores' })).toBeInTheDocument()
 
     const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
+    const upcomingHeading = await within(body).findByRole('heading', { level: 2, name: 'Upcoming Chores' })
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
+    expect(within(dialog).getAllByRole('heading', { level: 2, name: 'Upcoming Chores' })).toHaveLength(1)
+    expect(upcomingHeading.parentElement?.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
+
     fireEvent.click(within(nav).getByRole('tab', { name: /^Expired Food/ }))
-    expect(within(bodyHeader as HTMLElement).getByRole('heading', { level: 2, name: 'Expired Food' })).toBeInTheDocument()
+    const expiredHeader = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
+    expect(expiredHeader.contains(body)).toBe(false)
+    expect(within(expiredHeader).getByRole('heading', { level: 2, name: 'Expired Food' })).toBeInTheDocument()
   })
 
   it('switches between the overdue, upcoming, and expired food tabs', async () => {
@@ -219,6 +227,8 @@ describe('Daily summary modal', () => {
 
     fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
     expect(await within(dialog).findByText('Water the plants')).toBeInTheDocument()
+    const upcomingHeading = within(dialog).getByRole('heading', { level: 2, name: 'Upcoming Chores' })
+    expect(upcomingHeading.parentElement?.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
     const noDueDateSection = within(dialog).getByRole('region', { name: 'No Due Date' })
     const noDueDateHeading = within(noDueDateSection).getByRole('heading', { level: 2, name: 'No Due Date' })
     expect(noDueDateHeading.parentElement?.querySelector('[aria-hidden="true"]')).toBeInTheDocument()
@@ -242,6 +252,8 @@ describe('Daily summary modal', () => {
     expect(within(noDueDateSection).getByText('Replace air filter')).toBeInTheDocument()
     expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
     await waitFor(() => expect(dialog.querySelector('[data-daily-report-todo-section="upcoming"]')).toHaveAttribute('hidden'))
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
   })
 
   it('omits the no-due-date section when only upcoming chores remain', async () => {
@@ -253,6 +265,9 @@ describe('Daily summary modal', () => {
     fireEvent.click(within(nav).getByRole('tab', { name: /^Upcoming Chores/ }))
 
     expect(await within(dialog).findByText('Water the plants')).toBeInTheDocument()
+    const upcomingHeading = within(dialog).getByRole('heading', { level: 2, name: 'Upcoming Chores' })
+    expect(dialog.querySelector('[data-modal-sheet-body="true"]')?.contains(upcomingHeading)).toBe(true)
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
     await waitFor(() => expect(within(dialog).queryByRole('region', { name: 'No Due Date' })).not.toBeInTheDocument())
     expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
   })
@@ -465,12 +480,19 @@ describe('Daily summary modal', () => {
       expect(dialog.querySelector(`[data-daily-report-todo-section="${resolvedEntityId === UPCOMING_ENTITY_ID ? 'upcoming' : 'no-due-date'}"]`)).toHaveAttribute('hidden')
     })
     expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
+    if (delayedEntityId === UPCOMING_ENTITY_ID) {
+      expect(within(dialog).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    } else {
+      expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    }
 
     await act(async () => {
       resolveDelayed?.({ items: [] })
       await delayedResponse
     })
     expect(await within(dialog).findByRole('heading', { name: 'No Chores Upcoming' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'No Due Date' })).not.toBeInTheDocument()
   })
 
   it('keeps a failed no-due-date reload visible instead of restoring the combined empty state', async () => {
@@ -498,6 +520,8 @@ describe('Daily summary modal', () => {
 
     expect(await within(dialog).findByText('Unable to refresh chores')).toBeInTheDocument()
     expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { level: 2, name: 'No Due Date' })).toBeInTheDocument()
     expect(dialog.querySelector('[data-daily-report-todo-section="no-due-date"]')).not.toHaveAttribute('hidden')
   })
 
@@ -519,6 +543,8 @@ describe('Daily summary modal', () => {
       serviceData: { item: '333--None', status: 'completed' },
     })
     expect(await within(dialog).findByRole('heading', { name: 'No Chores Upcoming' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'No Due Date' })).not.toBeInTheDocument()
   })
 
   // Titles stay identical across vacation and non-vacation; only the supporting line changes.
@@ -701,11 +727,13 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
-    expect(within(header).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    const body = dialog.querySelector('[data-modal-sheet-body="true"]') as HTMLElement
+    expect(await within(body).findByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
   })
 
   it('falls through to upcoming when only no-due-date chores remain', async () => {
+    mockTodoItemsByEntity[UPCOMING_ENTITY_ID] = []
     mockEntities[OVERDUE_ENTITY_ID].state = '0'
     mockEntities[UPCOMING_ENTITY_ID].state = '0'
     mockEntities[NO_DUE_DATE_ENTITY_ID].state = '4'
@@ -714,8 +742,11 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
-    expect(within(header).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    const nav = within(dialog).getByRole('tablist', { name: 'Daily report sections' })
+    expect(within(nav).getByRole('tab', { name: /^Upcoming Chores/ })).toHaveAttribute('aria-selected', 'true')
+    expect(await within(dialog).findByRole('heading', { level: 2, name: 'No Due Date' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
   })
 
   it('honours an explicit tab request from a link', async () => {
@@ -724,8 +755,9 @@ describe('Daily summary modal', () => {
     renderHome()
 
     const dialog = await screen.findByRole('dialog')
-    const header = dialog.querySelector('[data-modal-sheet-body-header="true"]') as HTMLElement
-    expect(within(header).getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    const body = dialog.querySelector('[data-modal-sheet-body="true"]') as HTMLElement
+    expect(await within(body).findByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-body-header="true"]')).not.toBeInTheDocument()
   })
 
   it('consumes the tab request so a later manual open keeps the chosen tab', async () => {

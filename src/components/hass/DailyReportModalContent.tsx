@@ -135,6 +135,7 @@ function DailyReportUpcomingTab({ emptyDescription, emptyTitle, noDueDateEntityI
   return (
     <section aria-label={title} className={styles.tabSection} data-empty={empty ? 'true' : undefined}>
       <div data-daily-report-todo-section="upcoming" hidden={upcomingItemCount === 0 && !upcomingError}>
+        <SectionHeader className={styles.summarySectionHeader} title={title} />
         <TodoListPanel entityId={upcomingEntityId} hideCompleted layout="responsive-grid" onEditTask={onEditTask} onErrorChange={setUpcomingError} onVisibleItemsChange={setUpcomingItemCount} reloadVersion={reloadVersion} rowVariant="summary" title={title} />
       </div>
       <section aria-label={noDueDateTitle} data-daily-report-todo-section="no-due-date" hidden={noDueDateItemCount === 0 && !noDueDateError}>

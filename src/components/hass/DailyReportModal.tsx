@@ -81,7 +81,7 @@ function DailyReportModalView({ activeTab, context, editingTask, inventoryDetail
   return (
     <ModalSheet
       backLabel={editingInventoryPage ? 'Back to expired food' : 'Back to daily summary'}
-      bodyHeader={!detailPage && context.user ? <SectionHeader className={styles.summarySectionHeader} title={dailyReportTabLabel(activeTab)} /> : undefined}
+      bodyHeader={!detailPage && context.user && activeTab !== 'upcoming' ? <SectionHeader className={styles.summarySectionHeader} title={dailyReportTabLabel(activeTab)} /> : undefined}
       centeredGeometry={DAILY_REPORT_CENTERED_GEOMETRY}
       contentStyle={DAILY_REPORT_MODAL_STYLE}
       footer={editingTaskPage

@@ -5431,6 +5431,11 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await nav.getByRole('tab', { name: /^Upcoming Chores/ }).click()
   const upcomingRegion = dialog.getByRole('region', { name: 'Upcoming Chores', exact: true })
   await expect(upcomingRegion).toBeVisible()
+  await expect(bodyHeader).toHaveCount(0)
+  const body = dialog.locator('[data-modal-sheet-body="true"]')
+  const upcomingHeading = body.getByRole('heading', { level: 2, name: 'Upcoming Chores', exact: true })
+  await expect(upcomingHeading).toBeVisible()
+  await expect(dialog.getByRole('heading', { level: 2, name: 'Upcoming Chores', exact: true })).toHaveCount(1)
   const upcomingList = upcomingRegion.getByRole('article', { name: 'Upcoming Chores todo list', exact: true })
   await expect(upcomingList.getByRole('button', { name: 'Edit Mock task one', exact: true })).toBeVisible()
   const noDueDateRegion = upcomingRegion.getByRole('region', { name: 'No Due Date', exact: true })
@@ -5438,8 +5443,6 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   const noDueDateList = noDueDateRegion.getByRole('article', { name: 'No Due Date todo list', exact: true })
   await expect(noDueDateList.getByRole('button', { name: 'Edit Mock task one', exact: true })).toBeVisible()
   await expect(dialog.getByRole('region', { name: 'Overdue Chores' })).toHaveCount(0)
-
-  await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Upcoming Chores' })).toBeVisible()
 
   await nav.getByRole('tab', { name: /^Expired Food/ }).click()
   await expect(bodyHeader.getByRole('heading', { level: 2, name: 'Expired Food' })).toBeVisible()
@@ -5460,6 +5463,47 @@ test('daily summary deep link opens the tabbed modal for the requested user', as
   await inventoryPage.getByRole('button', { name: 'Back to expired food' }).click()
   await expect(dialog).toBeVisible()
   await expect(dialog.getByLabel('Expired Food inventory list')).toBeVisible()
+})
+
+test('daily summary upcoming header scrolls with chore content in short landscape', async ({ page }) => {
+  await page.setViewportSize({ width: 667, height: 375 })
+  await page.goto('/index.html?path=overview&user=stephen')
+  await page.evaluate(() => {
+    const mock = window.__mockHass
+    if (!mock) throw new Error('Mock Home Assistant API is unavailable')
+    const due = new Date().toISOString()
+    const upcoming = Array.from({ length: 10 }, (_, index) => ({
+      due,
+      status: 'needs_action',
+      summary: `Upcoming chore ${index + 1}`,
+      uid: `18${String(index).padStart(2, '0')}--summary-scroll`,
+    }))
+    mock.setTodoItems('todo.stephen_s_due_today_with_unassigned', upcoming)
+    mock.setEntityState('todo.stephen_s_due_today_with_unassigned', String(upcoming.length))
+    mock.setTodoItems('todo.stephen_s_no_due_date_with_unassigned', [
+      { status: 'needs_action', summary: 'Undated chore', uid: '1899--None' },
+    ])
+    mock.setEntityState('todo.stephen_s_no_due_date_with_unassigned', '1')
+    window.location.hash = '#daily-report'
+  })
+
+  const dialog = page.getByRole('dialog', { name: "Your Summary", exact: true })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('tab', { name: /^Upcoming Chores/ }).click()
+  const body = dialog.locator('[data-modal-sheet-body="true"]')
+  const heading = body.getByRole('heading', { level: 2, name: 'Upcoming Chores', exact: true })
+  await expect(heading).toBeVisible()
+  await expect(dialog.locator('[data-modal-sheet-body-header="true"]')).toHaveCount(0)
+  await expect(dialog.getByRole('heading', { level: 2, name: 'Upcoming Chores', exact: true })).toHaveCount(1)
+  await expect(dialog.getByRole('article', { name: 'Upcoming Chores todo list', exact: true }).locator('li')).toHaveCount(10)
+
+  const overflow = await body.evaluate((element) => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight }))
+  expect(overflow.scrollHeight).toBeGreaterThan(overflow.clientHeight + 100)
+  const beforeTop = await heading.evaluate((element) => element.getBoundingClientRect().top)
+  await body.evaluate((element) => { element.scrollTop = 120 })
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(60)
+  const afterTop = await heading.evaluate((element) => element.getBoundingClientRect().top)
+  expect(beforeTop - afterTop).toBeGreaterThan(60)
 })
 
 test('daily summary deep link titles the modal for the other household user', async ({ page }) => {
