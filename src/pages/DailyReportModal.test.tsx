@@ -519,10 +519,12 @@ describe('Daily summary modal', () => {
     act(() => setMockEntityState(NO_DUE_DATE_ENTITY_ID, '1'))
 
     expect(await within(dialog).findByText('Unable to refresh chores')).toBeInTheDocument()
-    expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
-    expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
-    expect(within(dialog).getByRole('heading', { level: 2, name: 'No Due Date' })).toBeInTheDocument()
-    expect(dialog.querySelector('[data-daily-report-todo-section="no-due-date"]')).not.toHaveAttribute('hidden')
+    await waitFor(() => {
+      expect(within(dialog).queryByRole('heading', { name: 'No Chores Upcoming' })).not.toBeInTheDocument()
+      expect(within(dialog).queryByRole('heading', { level: 2, name: 'Upcoming Chores' })).not.toBeInTheDocument()
+      expect(within(dialog).getByRole('heading', { level: 2, name: 'No Due Date' })).toBeInTheDocument()
+      expect(dialog.querySelector('[data-daily-report-todo-section="no-due-date"]')).not.toHaveAttribute('hidden')
+    })
   })
 
   it('shows the combined empty state after completing the last no-due-date chore', async () => {

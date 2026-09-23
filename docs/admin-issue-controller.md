@@ -39,6 +39,14 @@ Trusted deployment-failure issues have a separate narrow exception for
 `scripts/deploy-dashboard-ci.ts`, and its directly owned test. Exact nested
 mounts make only those paths writable; controller implementation, other
 workflows, packages, credentials, and Home Assistant files remain protected.
+Trusted layout-failure issues have a separate narrow exception for
+`scripts/layout/` and the generated `docs/ux/layouts.md` contract. Those paths
+are read-only for ordinary issue workers and writable only when the issue was
+adopted from the exact GitHub Actions layout-failure marker. The host rechecks
+the same scope before committing the candidate. After merge, these issues bind
+completion to the exact merge SHA's successful protected `Playwright` push
+workflow, which includes the `Automated layout` job; they do not wait for or
+claim a dashboard deployment.
 Repository env and package-credential files are masked with `/dev/null`, and
 build caches use per-command tmpfs mounts, so model commands cannot read local
 tokens or persist a cache that influences trusted validation.
@@ -102,13 +110,19 @@ mutable user extensions or unrelated personal skills.
    persisted visual-evidence URL to match the candidate. Bind protected checks
    from the pinned GitHub App to that exact SHA and merge with
    `--match-head-commit`.
-12. Require a successful v2 deployment artifact with accepted disposition,
-   verified paths, panel registration, and a released deployment lease. The
-   normal path binds the exact merge SHA. If that exact run failed before
-   deployment, a later successful `master` deployment may recover the issue
-   only after the controller verifies the newer receipt and proves with Git
-   ancestry that its deployed SHA contains the issue merge.
-13. Post the completion evidence, close the issue, complete the Home Assistant
+12. When the exact reviewed candidate changed the protected deployment
+    workflow, fetch and prove the merge commit on current `origin/master`,
+    atomically rotate only the local JIT controller's trusted workflow digest,
+    restart that controller, and verify it is active. A failed rotation restores
+    the prior private config and blocks rather than leaving an unexplained queued
+    deployment.
+13. Require a successful v2 deployment artifact with accepted disposition,
+    verified paths, panel registration, and a released deployment lease. The
+    normal path binds the exact merge SHA. If that exact run failed before
+    deployment, a later successful `master` deployment may recover the issue
+    only after the controller verifies the newer receipt and proves with Git
+    ancestry that its deployed SHA contains the issue merge.
+14. Post the completion evidence, close the issue, complete the Home Assistant
     item, verify its completion receipt, and remove the issue worktree.
 
 A protected-check failure first receives one host-owned rerun of the failed
@@ -120,9 +134,13 @@ turns.
 
 A completed deployment workflow with a non-success conclusion blocks the
 original issue once and releases the serialized queue. The workflow files one
-deduplicated trusted deployment-failure issue containing the sanitized receipt;
-that issue enters the same tandem-research pipeline with the narrow deployment
-repair scope. At
+trusted deployment-failure issue containing the sanitized receipt. Subsequent
+safe no-mutation receipts with the same error, deployed baseline, disposition,
+and rollback result are appended to that open canonical issue instead of
+launching duplicate tandem sessions. Materially different failures and receipts
+whose mutation safety is uncertain still receive their own issue. A newly filed
+issue enters the same tandem-research pipeline with the narrow deployment repair
+scope. At
 a bounded polling cadence, the controller checks the latest completed
 `master` deployment. A failed or in-progress run leaves the record blocked. A
 successful run can recover it only when the receipt satisfies the full v2
@@ -130,14 +148,47 @@ contract, the workflow and deployed SHAs remain on current `master`, the
 deployed SHA descends from the verified issue merge, and the retained worker
 outcome still matches the authorized visual evidence. This also lets an iOS
 follow-up reuse the verified descendant deployment without consulting the
-failed exact run again.
+failed exact run again. Recovery asks GitHub for the latest successful
+protected deployment, so newer fail-closed runs cannot hide an earlier
+descendant deployment that already contains the issue's verified merge.
+If a verification-only worker correctly reports that no additional repository
+change is needed after an existing issue PR merged, the controller uses a
+dedicated existing-release terminal path instead of rewriting old candidate
+receipts or demanding a fabricated second pull request. It requires an
+unchanged retained worktree, the latest worker's no-change outcome, the
+controller-owned merged PR identity, the final PR head's protected checks, the
+merge on current `master`, the original issue and PR visual evidence when the
+candidate was visual, and a successful descendant deployment receipt. It then
+posts an **Existing release verified** receipt, closes the issue, verifies the
+applicable Admin To-Do completion boundary, and removes the retained worktree.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
 stable Copilot session. Manual iOS follow-up remains open after deployment only
 when the canonical issue names platform-specific browser behavior, the
 candidate changes a browser-facing surface, and the follow-up reason identifies
-the behavior that local evidence cannot certify.
+the behavior that local evidence cannot certify. Persisted follow-up gates are
+rechecked against that policy before finalization, so a legacy overbroad gate
+cannot keep an otherwise verified issue and Admin To-Do item open. Canonical
+text comes from the current issue report and substantive owner follow-ups;
+controller receipts, repair-policy handoffs, CI diagnostics, and proposed
+behavior evidence cannot create an iOS requirement merely by mentioning a
+platform or viewport.
+
+If the local receipt predates a remotely created stable session, the first
+named launch may report that the UUID already resolves remotely. The controller
+records that proof and immediately retries the same UUID without `--name`,
+preserving the conversation instead of creating a duplicate.
+
+On Linux, every bounded host command runs in its own process group. Timeout and
+output-limit enforcement kill the launcher and its local descendants together,
+so a Copilot core or Docker client cannot retain the controller's output pipe
+after the launcher exits. The next controller cycle also removes any labeled
+worker container left behind by a forcibly disconnected Docker client.
+Workflow-authenticated layout workers use changed tests and focused
+provenance-bound mixed-context runs for local acceptance. They must not turn a
+full historical or full-known-mock replay into a pre-PR gate; the protected
+post-merge `Automated layout` job owns exact full-corpus evidence.
 
 ## Candidate provenance
 
@@ -274,6 +325,10 @@ keep the configuration mode `0600`. Keep `hassMcpConfigPath` pointed at the
 operator's private MCP configuration and `hassMcpServerName` matched to the
 trusted Home Assistant server entry. The controller fails closed if the file
 is not private, the server is missing, or the transport is malformed.
+Keep `runnerControllerConfigPath` pointed at the private deployment-runner
+config and `runnerControllerService` set to its exact user service. Those
+settings let a merged, protected deployment repair rotate the workflow digest
+without granting the worker access to the host config or systemd.
 
 Before starting the service, baseline every pre-existing Admin To-Do item.
 This is a mandatory fail-closed migration step:

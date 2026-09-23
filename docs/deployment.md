@@ -5,12 +5,18 @@ The post-merge layout workflow is independent regression monitoring: dashboard
 deployment neither depends on nor waits for its jobs or artifacts.
 
 If the protected build or deployment job fails, the workflow downloads its
-sanitized receipt when available and files one deduplicated GitHub issue carrying the
-exact `dashboard-deployment-failure-run-<run>-<attempt>` marker. The Admin issue
-controller adopts that issue, runs tandem research, and may change only the
-deployment workflow, `scripts/deploy-dashboard-ci.ts`, and its directly owned
-test in addition to ordinary dashboard paths. The failed deployment itself
-still performs no success-shaped mutation or automatic Home Assistant restart.
+sanitized receipt when available. Every report carries the exact
+`dashboard-deployment-failure-run-<run>-<attempt>` marker. A receipt that proves
+no mutation, lease release, and no required rollback also carries a stable
+failure-signature marker that excludes the run and source SHA. If an open issue
+already has that exact signature, the workflow appends the new run to the
+canonical issue instead of filing another investigation. Different errors,
+deployed baselines, or uncertain mutation/rollback states always file a new
+issue. The Admin issue controller adopts a newly filed issue, runs tandem
+research, and may change only the deployment workflow,
+`scripts/deploy-dashboard-ci.ts`, and its directly owned test in addition to
+ordinary dashboard paths. The failed deployment itself still performs no
+success-shaped mutation or automatic Home Assistant restart.
 
 Admin To-Do issue automation is operated by a separate controller and does not
 change deployment ownership. See
@@ -117,6 +123,16 @@ workflow file, and the exact local Docker image ID. Start with `"mode":
 "smoke-only"`. The service runs as the operator's lingering user and uses that
 user's authenticated `gh` and Docker clients; its GitHub credential must never
 be copied into a workflow secret or runner container.
+
+The workflow digest is a deliberate trust boundary. After protected checks
+pass and a merge commit is proven on `origin/master`, any release that changed
+`.github/workflows/deploy-dashboard.yml` must atomically replace only
+`workflowSha256` with the exact merged blob digest, preserve mode `0600`,
+restart `ha-dashboard-runner-controller.service`, and verify it is active
+before waiting for the deployment job. Never authorize a candidate or pull
+request head before merge. The Admin issue controller performs this rotation
+for deployment-repair pull requests it merges; other release coordinators own
+the same post-merge step for their releases.
 
 The smoke dispatch must prove:
 

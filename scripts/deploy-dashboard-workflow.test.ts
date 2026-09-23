@@ -5,6 +5,7 @@
 // @covers ops/ha-deploy-runner/squid.conf
 // @covers ops/ha-deploy-runner/controller.json.example
 // @covers ops/ha-deploy-runner/ha-dashboard-runner-controller.service
+// @covers .github/skills/release-dashboard/SKILL.md
 // @covers .dockerignore
 // @covers docs/deployment.md
 import { readFileSync } from 'node:fs'
@@ -34,9 +35,10 @@ describe('dashboard deployment workflow', () => {
     const buildStart = workflow.indexOf('  build:')
     const smokeStart = workflow.indexOf('  controller-smoke:')
     const deployStart = workflow.indexOf('  deploy:')
+    const reportStart = workflow.indexOf('  report-deployment-failure:')
     const build = workflow.slice(buildStart, smokeStart)
     const smoke = workflow.slice(smokeStart, deployStart)
-    const deploy = workflow.slice(deployStart)
+    const deploy = workflow.slice(deployStart, reportStart)
 
     expect(build).toContain('runs-on: ubuntu-latest')
     expect(build).toContain("VITE_HA_TOKEN: ''")
@@ -107,5 +109,9 @@ describe('dashboard deployment workflow', () => {
     expect(deployment).toContain('/sfenton-react-dash/home')
     expect(deployment).toContain('/sfenton-react-panel')
     expect(deployment).toContain('smoke-only')
+    expect(deployment).toContain('workflow digest is a deliberate trust boundary')
+    expect(read('.github/skills/release-dashboard/SKILL.md')).toContain(
+      'Never rotate trust to an unmerged candidate or PR head',
+    )
   })
 })
