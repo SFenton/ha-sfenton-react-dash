@@ -119,6 +119,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
       - name: Download deployment receipt
         continue-on-error: true
         env:
@@ -129,63 +132,56 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --name "dashboard-deployment-receipt-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
             --dir deployment-failure
-      - name: Create deduplicated repair issue
+      - name: Create or update deduplicated repair issue
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          marker="<!-- dashboard-deployment-failure-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT} -->"
-          existing="$(gh api -X GET search/issues \
-            -f q="repo:${GITHUB_REPOSITORY} is:issue is:open in:body \"${marker}\"" \
-            --jq '.items[0].number // empty')"
-          if [[ -n "${existing}" ]]; then
+          node scripts/deployment-failure-report.mjs
+          run_marker="$(cat deployment-failure/run-marker.txt)"
+          signature_marker="$(cat deployment-failure/signature-marker.txt)"
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/issues?state=open&sort=created&direction=asc&per_page=100" \
+            | jq -s 'add // [] | map(select(.pull_request == null))' \
+            > deployment-failure/open-issues.json
+          existing_run="$(jq -r --arg marker "${run_marker}" \
+            'map(select((.body // "") | contains($marker)))[0].number // empty' \
+            deployment-failure/open-issues.json)"
+          if [[ -n "${existing_run}" ]]; then
             exit 0
           fi
-          node <<'NODE'
-          const fs = require('node:fs')
-          const receiptPath = 'deployment-failure/deployment-receipt.json'
-          let receipt = {}
-          if (fs.existsSync(receiptPath)) {
-            try {
-              receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
-            } catch (error) {
-              receipt = {
-                error: `Deployment receipt could not be parsed: ${String(error).slice(0, 1000)}`,
-                status: 'invalid-receipt',
-              }
-            }
-          }
-          const marker = `<!-- dashboard-deployment-failure-run-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT} -->`
-          const selected = {
-            buildResult: process.env.BUILD_RESULT,
-            deployResult: process.env.DEPLOY_RESULT,
-            deployedSha: receipt.deployedSha ?? null,
-            disposition: receipt.disposition ?? null,
-            error: String(receipt.error ?? 'Deployment failed without a receipt error.').slice(0, 4000),
-            leaseReleased: receipt.leaseReleased ?? null,
-            mutationState: receipt.mutationState ?? null,
-            rollback: receipt.rollback ?? null,
-            sourceSha: receipt.sourceSha ?? process.env.GITHUB_SHA,
-            status: receipt.status ?? 'failed',
-          }
-          fs.writeFileSync('deployment-failure/issue-body.md', [
-            marker,
-            '',
-            '## Automated dashboard deployment failure',
-            '',
-            `The protected dashboard deployment workflow failed for \`${process.env.GITHUB_SHA}\`.`,
-            '',
-            `**Workflow:** ${process.env.RUN_URL}`,
-            '',
-            '```json',
-            JSON.stringify(selected, null, 2),
-            '```',
-            '',
-            'Investigate the failure, repair repository-owned deployment behavior when appropriate, and retain the no-mutation and rollback safety boundaries.',
-          ].join('\n'))
-          NODE
+          if [[ -n "${signature_marker}" ]]; then
+            existing_signature="$(jq -r --arg marker "${signature_marker}" \
+              'map(select((.body // "") | contains($marker)))[0].number // empty' \
+              deployment-failure/open-issues.json)"
+            if [[ -n "${existing_signature}" ]]; then
+              comment_marker="<!-- dashboard-deployment-failure-duplicate-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT} -->"
+              existing_comment="$(gh api --paginate \
+                "repos/${GITHUB_REPOSITORY}/issues/${existing_signature}/comments?per_page=100" \
+                | jq -s --arg marker "${comment_marker}" \
+                  '[.[][] | select((.body // "") | contains($marker))] | length')"
+              if [[ "${existing_comment}" == "0" ]]; then
+                cat > deployment-failure/matched-comment.md <<EOF
+          ${comment_marker}
+
+          An additional protected deployment reached this exact no-mutation failure boundary.
+
+          - Source: \`${GITHUB_SHA}\`
+          - Workflow: ${RUN_URL}
+          - Build result: \`${BUILD_RESULT}\`
+          - Deploy result: \`${DEPLOY_RESULT}\`
+
+          The canonical issue remains open; no duplicate investigation issue was created.
+          EOF
+                gh issue comment "${existing_signature}" \
+                  --repo "${GITHUB_REPOSITORY}" \
+                  --body-file deployment-failure/matched-comment.md
+              fi
+              exit 0
+            fi
+          fi
           gh issue create \
             --repo "${GITHUB_REPOSITORY}" \
             --title "Dashboard deployment workflow failed for ${GITHUB_SHA:0:12}" \

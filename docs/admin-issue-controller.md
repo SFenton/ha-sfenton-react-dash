@@ -134,9 +134,13 @@ turns.
 
 A completed deployment workflow with a non-success conclusion blocks the
 original issue once and releases the serialized queue. The workflow files one
-deduplicated trusted deployment-failure issue containing the sanitized receipt;
-that issue enters the same tandem-research pipeline with the narrow deployment
-repair scope. At
+trusted deployment-failure issue containing the sanitized receipt. Subsequent
+safe no-mutation receipts with the same error, deployed baseline, disposition,
+and rollback result are appended to that open canonical issue instead of
+launching duplicate tandem sessions. Materially different failures and receipts
+whose mutation safety is uncertain still receive their own issue. A newly filed
+issue enters the same tandem-research pipeline with the narrow deployment repair
+scope. At
 a bounded polling cadence, the controller checks the latest completed
 `master` deployment. A failed or in-progress run leaves the record blocked. A
 successful run can recover it only when the receipt satisfies the full v2
