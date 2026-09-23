@@ -687,19 +687,28 @@ describe('dashboard CI deployment', () => {
 
   it('files a trusted deduplicated repair issue when protected deployment fails', async () => {
     const workflow = await readFile('.github/workflows/deploy-dashboard.yml', 'utf8')
+    const reporter = await readFile('scripts/deployment-failure-report.mjs', 'utf8')
     expect(workflow).toContain('report-deployment-failure:')
     expect(workflow).toContain("needs.build.result == 'failure'")
     expect(workflow).toContain("needs.deploy.result == 'failure'")
     expect(workflow).toContain('needs: [build, deploy]')
+    expect(workflow).toContain('node scripts/deployment-failure-report.mjs')
+    expect(workflow).toContain('deployment-failure/run-marker.txt')
+    expect(workflow).toContain('deployment-failure/signature-marker.txt')
+    expect(workflow).toContain('deployment-failure/open-issues.json')
+    expect(workflow).toContain('existing_signature')
     expect(workflow).toContain(
-      'dashboard-deployment-failure-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}',
+      'dashboard-deployment-failure-duplicate-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}',
     )
+    expect(workflow).toContain('no duplicate investigation issue was created')
     expect(workflow).toContain(
       'dashboard-deployment-receipt-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}',
     )
     expect(workflow).toContain('actions: read')
     expect(workflow).toContain('issues: write')
     expect(workflow).toContain('mkdir -p deployment-failure')
-    expect(workflow).toContain('Deployment receipt could not be parsed')
+    expect(reporter).toContain('Deployment receipt could not be parsed')
+    expect(reporter).toContain('dashboard-deployment-failure-run-')
+    expect(reporter).toContain('dashboard-deployment-failure-signature-')
   })
 })
