@@ -145,6 +145,12 @@ when the canonical issue names platform-specific browser behavior, the
 candidate changes a browser-facing surface, and the follow-up reason identifies
 the behavior that local evidence cannot certify.
 
+On Linux, every bounded host command runs in its own process group. Timeout and
+output-limit enforcement kill the launcher and its local descendants together,
+so a Copilot core or Docker client cannot retain the controller's output pipe
+after the launcher exits. The next controller cycle also removes any labeled
+worker container left behind by a forcibly disconnected Docker client.
+
 ## Candidate provenance
 
 Controller state version 2 uses one provenance record as the sole lifecycle

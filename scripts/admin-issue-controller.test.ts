@@ -51,6 +51,7 @@ import {
   pullRequestBodyWithVisualEvidence,
   readWorktreeSnapshot,
   restoreReadyOutcomeFromWorkerLog,
+  runCommand,
   selectWorkerHassMcpConfig,
   selectWorkerSessionCandidate,
   shouldVerifyExistingPullRequestVisualEvidence,
@@ -192,6 +193,66 @@ describe('deployment runner trust rotation', () => {
       ),
     ).toThrow('version')
   })
+})
+
+describe('controller command lifecycle', () => {
+  it.skipIf(process.platform === 'win32')(
+    'kills the complete subprocess group when a command times out',
+    async () => {
+      const root = mkdtempSync(join(homedir(), '.admin-issue-controller-process-test-'))
+      temporaryDirectories.push(root)
+      const pidPath = join(root, 'grandchild.pid')
+      const script = [
+        "const { spawn } = require('node:child_process')",
+        "const { writeFileSync } = require('node:fs')",
+        "const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })",
+        'writeFileSync(process.argv[1], String(child.pid))',
+        'setInterval(() => {}, 1000)',
+      ].join(';')
+      let grandchildPid: number | undefined
+      const command = runCommand(process.execPath, ['-e', script, pidPath], {
+        timeoutMs: 1_000,
+      }).then(
+        (result) => ({ result }),
+        (error: unknown) => ({ error }),
+      )
+      const processIsAlive = (pid: number) => {
+        try {
+          process.kill(pid, 0)
+          return true
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false
+          throw error
+        }
+      }
+
+      try {
+        await expect.poll(() => {
+          try {
+            grandchildPid = Number(readFileSync(pidPath, 'utf8'))
+            return Number.isInteger(grandchildPid) && grandchildPid > 0
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+            throw error
+          }
+        }).toBe(true)
+        await expect.poll(
+          () => processIsAlive(grandchildPid as number),
+          { timeout: 3_000 },
+        ).toBe(false)
+        expect(await command).toMatchObject({
+          error: expect.objectContaining({
+            message: `${process.execPath} timed out after 1000 ms`,
+          }),
+        })
+      } finally {
+        if (grandchildPid && processIsAlive(grandchildPid)) {
+          process.kill(grandchildPid, 'SIGKILL')
+        }
+        await command
+      }
+    },
+  )
 })
 
 function authorizeRecord(issue: AdminIssueRecord) {

@@ -692,7 +692,23 @@ async function assertRunnerControllerActive(config: AdminIssueControllerConfig) 
   }
 }
 
-async function runCommand(
+function killCommandProcessTree(
+  child: ReturnType<typeof spawn>,
+  signal: NodeJS.Signals,
+) {
+  if (!child.pid) return
+  if (process.platform !== 'win32') {
+    try {
+      process.kill(-child.pid, signal)
+      return
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ESRCH') return
+    }
+  }
+  child.kill(signal)
+}
+
+export async function runCommand(
   file: string,
   args: string[],
   options: CommandOptions = {},
@@ -701,6 +717,7 @@ async function runCommand(
   return await new Promise((resolveCommand, rejectCommand) => {
     const child = spawn(file, args, {
       cwd: options.cwd,
+      detached: process.platform !== 'win32',
       env: options.env,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
@@ -713,7 +730,7 @@ async function runCommand(
     const capture = (target: Buffer[], chunk: Buffer) => {
       outputBytes += chunk.length
       if (outputBytes > maxOutputBytes) {
-        child.kill('SIGKILL')
+        killCommandProcessTree(child, 'SIGKILL')
         rejectCommand(new Error(`${file} exceeded the ${maxOutputBytes}-byte output limit`))
         return
       }
@@ -751,7 +768,7 @@ async function runCommand(
     if (options.timeoutMs) {
       timeout = setTimeout(() => {
         timedOut = true
-        child.kill('SIGKILL')
+        killCommandProcessTree(child, 'SIGKILL')
       }, options.timeoutMs)
     }
 
