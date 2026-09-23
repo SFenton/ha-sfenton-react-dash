@@ -106,6 +106,8 @@ export interface AdminIssueCandidate {
   diff: AdminIssueDiffReceipt
   expectedRemoteHeadSha?: string
   headSha: string
+  publishedHeadSha?: string
+  pushAttempted?: boolean
   targetBaseSha: string
   treeSha: string
   validation?: AdminIssueValidationReceipt
@@ -625,6 +627,20 @@ function assertProvenance(value: unknown, field: string) {
       sha(
         provenance.candidate.expectedRemoteHeadSha,
         `${field}.candidate.expectedRemoteHeadSha`,
+      )
+    }
+    if (provenance.candidate.pushAttempted !== undefined) {
+      assert(
+        typeof provenance.candidate.pushAttempted === 'boolean',
+        `${field}.candidate.pushAttempted is invalid`,
+      )
+    }
+    if (provenance.candidate.publishedHeadSha !== undefined) {
+      sha(provenance.candidate.publishedHeadSha, `${field}.candidate.publishedHeadSha`)
+      assert(
+        provenance.candidate.publishedHeadSha === provenance.candidate.headSha &&
+        provenance.candidate.pushAttempted === true,
+        `${field}.candidate.publishedHeadSha does not confirm an attempted candidate push`,
       )
     }
     assertDiffReceipt(provenance.candidate.diff, `${field}.candidate.diff`, provenance)
