@@ -35,9 +35,10 @@ describe('dashboard deployment workflow', () => {
     const buildStart = workflow.indexOf('  build:')
     const smokeStart = workflow.indexOf('  controller-smoke:')
     const deployStart = workflow.indexOf('  deploy:')
+    const reportStart = workflow.indexOf('  report-deployment-failure:')
     const build = workflow.slice(buildStart, smokeStart)
     const smoke = workflow.slice(smokeStart, deployStart)
-    const deploy = workflow.slice(deployStart)
+    const deploy = workflow.slice(deployStart, reportStart)
 
     expect(build).toContain('runs-on: ubuntu-latest')
     expect(build).toContain("VITE_HA_TOKEN: ''")
