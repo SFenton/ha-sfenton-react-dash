@@ -147,13 +147,25 @@ follow-up reuse the verified descendant deployment without consulting the
 failed exact run again. Recovery asks GitHub for the latest successful
 protected deployment, so newer fail-closed runs cannot hide an earlier
 descendant deployment that already contains the issue's verified merge.
+If a verification-only worker correctly reports that no additional repository
+change is needed after an existing issue PR merged, the controller uses a
+dedicated existing-release terminal path instead of rewriting old candidate
+receipts or demanding a fabricated second pull request. It requires an
+unchanged retained worktree, the latest worker's no-change outcome, the
+controller-owned merged PR identity, the final PR head's protected checks, the
+merge on current `master`, the original issue and PR visual evidence when the
+candidate was visual, and a successful descendant deployment receipt. It then
+posts an **Existing release verified** receipt, closes the issue, verifies the
+applicable Admin To-Do completion boundary, and removes the retained worktree.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
 stable Copilot session. Manual iOS follow-up remains open after deployment only
 when the canonical issue names platform-specific browser behavior, the
 candidate changes a browser-facing surface, and the follow-up reason identifies
-the behavior that local evidence cannot certify.
+the behavior that local evidence cannot certify. Persisted follow-up gates are
+rechecked against that policy before finalization, so a legacy overbroad gate
+cannot keep an otherwise verified issue and Admin To-Do item open.
 
 If the local receipt predates a remotely created stable session, the first
 named launch may report that the UUID already resolves remotely. The controller
