@@ -290,7 +290,7 @@ function createMockMainFloorMap(): ValetudoMap {
       { type: 'charger_location', points: [(bounds.minX + inset + 4) * 5, (bounds.minY + inset + 4) * 5] },
       { type: 'robot_position', points: [Math.round((bounds.minX + bounds.maxX) * 2.5), Math.round((bounds.minY + bounds.maxY) * 2.5)], metaData: { angle: 90 } },
     ],
-    layers: [
+    layers: [{ type: 'floor', dimensions: { x: { min: bounds.minX, max: bounds.maxX }, y: { min: 0, max: 6554 } }, pixels: [] },
       ...rooms.map((room) => ({
         type: 'segment',
         dimensions: { x: { min: room.minX, max: room.maxX }, y: { min: room.minY, max: room.maxY } },
@@ -301,11 +301,6 @@ function createMockMainFloorMap(): ValetudoMap {
         type: 'wall',
         dimensions: { x: { min: bounds.minX, max: bounds.maxX }, y: { min: bounds.minY, max: bounds.maxY } },
         compressedPixels: mockOutlineRows(bounds.minX, bounds.maxX, bounds.minY, bounds.maxY),
-      },
-      {
-        type: 'floor',
-        dimensions: { x: { min: bounds.minX, max: bounds.maxX }, y: { min: 0, max: 6554 } },
-        pixels: [],
       },
     ],
     metaData: { nonce: 'mock-main-floor-rooms', version: 2 },
