@@ -165,7 +165,11 @@ when the canonical issue names platform-specific browser behavior, the
 candidate changes a browser-facing surface, and the follow-up reason identifies
 the behavior that local evidence cannot certify. Persisted follow-up gates are
 rechecked against that policy before finalization, so a legacy overbroad gate
-cannot keep an otherwise verified issue and Admin To-Do item open.
+cannot keep an otherwise verified issue and Admin To-Do item open. Canonical
+text comes from the current issue report and substantive owner follow-ups;
+controller receipts, repair-policy handoffs, CI diagnostics, and proposed
+behavior evidence cannot create an iOS requirement merely by mentioning a
+platform or viewport.
 
 If the local receipt predates a remotely created stable session, the first
 named launch may report that the UUID already resolves remotely. The controller

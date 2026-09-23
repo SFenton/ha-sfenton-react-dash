@@ -35,6 +35,7 @@ import {
   baselineAdminIssueState,
   beginAdminIssueGeneration,
   branchNameForIssue,
+  canonicalIssueTextForIos,
   candidateRequiresVisualEvidence,
   controllerReceiptMarker,
   deploymentReceiptIsAccepted,
@@ -1411,6 +1412,24 @@ async function getIssue(config: AdminIssueControllerConfig, issueNumber: number)
     config,
     'GET',
     `repos/${config.repository}/issues/${issueNumber}`,
+  )
+}
+
+async function canonicalIssueTextFromGitHub(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+) {
+  const issue = await getIssue(config, record.issueNumber)
+  return canonicalIssueTextForIos(record, issue.body ?? '')
+}
+
+async function reauthorizePersistedIosFollowUpFromGitHub(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+) {
+  return reauthorizePersistedIosFollowUp(
+    record,
+    await canonicalIssueTextFromGitHub(config, record),
   )
 }
 
@@ -4825,10 +4844,7 @@ async function verifyExistingRelease(
     )
   }
   outcome.iosFollowUp = authorizedIosFollowUp(
-    record.inputs
-      .filter((input) => input.source !== 'ci-failure')
-      .map((input) => input.body)
-      .join('\n\n'),
+    await canonicalIssueTextFromGitHub(config, record),
     record.provenance.candidate.diff.files,
     outcome.iosFollowUp,
   )
@@ -5341,7 +5357,9 @@ async function finalizeIssue(
   assertFinalizationAuthorized(record)
   await verifyMergedPullRequest(config, record)
   const outcome = record.lastOutcome
-  if (reauthorizePersistedIosFollowUp(record)) writeState(config, state)
+  if (await reauthorizePersistedIosFollowUpFromGitHub(config, record)) {
+    writeState(config, state)
+  }
   if (record.inputRevision > record.processedRevision) {
     await postIssueCommentOnce(
       config,
@@ -5457,7 +5475,9 @@ async function finalizeLayoutIssue(
   assertLayoutFinalizationAuthorized(record)
   await verifyMergedPullRequest(config, record)
   const outcome = record.lastOutcome
-  if (reauthorizePersistedIosFollowUp(record)) writeState(config, state)
+  if (await reauthorizePersistedIosFollowUpFromGitHub(config, record)) {
+    writeState(config, state)
+  }
   if (record.inputRevision > record.processedRevision) {
     await postIssueCommentOnce(
       config,
@@ -5684,10 +5704,7 @@ async function handleWorkerOutcome(
   try {
     const candidate = await prepareCommittedCandidate(config, state, record, outcome)
     outcome.iosFollowUp = authorizedIosFollowUp(
-      record.inputs
-        .filter((input) => input.source !== 'ci-failure')
-        .map((input) => input.body)
-        .join('\n\n'),
+      await canonicalIssueTextFromGitHub(config, record),
       candidate.diff.files,
       outcome.iosFollowUp,
     )
@@ -6127,12 +6144,18 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
   await reconcileTodos(config, client, state)
   await reconcileGitHubAutomationIssues(config, state)
   await reconcileGitHubInputs(config, state)
-  const reauthorizedIos = Object.values(state.issues).find((record) => (
-    record.phase === 'awaiting-user' &&
-    Boolean(record.receipts.awaitingIosVerificationAt) &&
-    !record.receipts.iosVerifiedAt &&
-    reauthorizePersistedIosFollowUp(record)
-  ))
+  let reauthorizedIos: AdminIssueRecord | undefined
+  for (const record of Object.values(state.issues)) {
+    if (
+      record.phase === 'awaiting-user' &&
+      record.receipts.awaitingIosVerificationAt &&
+      !record.receipts.iosVerifiedAt &&
+      await reauthorizePersistedIosFollowUpFromGitHub(config, record)
+    ) {
+      reauthorizedIos = record
+      break
+    }
+  }
   if (reauthorizedIos) {
     reauthorizedIos.phase = 'deploying'
     writeState(config, state)

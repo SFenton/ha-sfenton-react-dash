@@ -1660,7 +1660,42 @@ export function authorizedIosFollowUp(
   return { reason: '', required: false }
 }
 
-export function reauthorizePersistedIosFollowUp(record: AdminIssueRecord) {
+function operationalIssueComment(body: string) {
+  const trimmed = body.trim()
+  return (
+    trimmed.includes('<!-- admin-issue-controller') ||
+    /^##\s+Autonomous repair policy update\b/i.test(trimmed) ||
+    /^##\s+Proposed fixed behavior\b/i.test(trimmed) ||
+    (
+      /\bcontroller\b/i.test(trimmed) &&
+      /\bresume this same session\b/i.test(trimmed)
+    )
+  )
+}
+
+export function canonicalIssueTextForIos(
+  record: AdminIssueRecord,
+  issueBody = '',
+) {
+  const inputBodies = record.inputs
+    .filter((input) => input.source !== 'ci-failure')
+    .filter((input) =>
+      input.source !== 'issue-comment' ||
+      !operationalIssueComment(input.body))
+    .map((input) => input.body.trim())
+    .filter(Boolean)
+  return [
+    issueBody.trim(),
+    record.title.trim(),
+    record.description.trim(),
+    ...inputBodies,
+  ].filter(Boolean).join('\n\n')
+}
+
+export function reauthorizePersistedIosFollowUp(
+  record: AdminIssueRecord,
+  canonicalIssueText = canonicalIssueTextForIos(record),
+) {
   const outcome = record.lastOutcome
   const candidate = record.provenance.kind === 'active'
     ? record.provenance.candidate
@@ -1668,10 +1703,7 @@ export function reauthorizePersistedIosFollowUp(record: AdminIssueRecord) {
   if (!outcome?.iosFollowUp.required || !candidate) return false
 
   const authorized = authorizedIosFollowUp(
-    record.inputs
-      .filter((input) => input.source !== 'ci-failure')
-      .map((input) => input.body)
-      .join('\n\n'),
+    canonicalIssueText,
     candidate.diff.files,
     outcome.iosFollowUp,
   )
