@@ -145,6 +145,11 @@ when the canonical issue names platform-specific browser behavior, the
 candidate changes a browser-facing surface, and the follow-up reason identifies
 the behavior that local evidence cannot certify.
 
+If the local receipt predates a remotely created stable session, the first
+named launch may report that the UUID already resolves remotely. The controller
+records that proof and immediately retries the same UUID without `--name`,
+preserving the conversation instead of creating a duplicate.
+
 On Linux, every bounded host command runs in its own process group. Timeout and
 output-limit enforcement kill the launcher and its local descendants together,
 so a Copilot core or Docker client cannot retain the controller's output pipe
