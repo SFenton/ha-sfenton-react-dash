@@ -6,7 +6,7 @@ import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import type { BuildIdentity, CollectedTest, ExecutionLedger, LayoutPlan, ManualLedger, RunIdentity } from '../../e2e/layout/types'
-import { SURFACE_CONTRACTS } from '../../e2e/layout/contracts'
+import { CONTEXTS, SURFACE_CONTRACTS } from '../../e2e/layout/contracts'
 import { assertCurrentPlan, checkContracts } from './plan'
 import { assertExactSelection, selectTests, testList, verifyEvidence } from './verify'
 import { artifactPath, assertOptions, fingerprintDirectory, git, hash, isEntry, option, readJson, snapshot, stableHash, writeJson } from './shared'
@@ -31,11 +31,15 @@ export function safeEnvironment(root: string, directory: string): NodeJS.Process
   }
 }
 
-async function command(root: string, args: string[], env: NodeJS.ProcessEnv, log: string) {
+async function command(root: string, args: string[], env: NodeJS.ProcessEnv, log: string, mirror = false) {
   const output = createWriteStream(log)
   const child = spawn(process.execPath, args, { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] })
   child.stdout!.pipe(output, { end: false })
   child.stderr!.pipe(output, { end: false })
+  if (mirror) {
+    child.stdout!.pipe(process.stdout, { end: false })
+    child.stderr!.pipe(process.stderr, { end: false })
+  }
   const code = await new Promise<number>((resolveCode, reject) => {
     child.once('error', reject)
     child.once('close', (status, signal) => signal ? reject(new Error(`Command interrupted by ${signal}`)) : resolveCode(status ?? 1))
@@ -151,6 +155,64 @@ export function executionWorkerCount(contexts: LayoutPlan['contexts']) {
   return contexts.includes('touch-webkit') ? 1 : 2
 }
 
+export interface ExecutionBatch {
+  id: 'non-webkit' | 'webkit'
+  tests: CollectedTest[]
+  workers: number
+}
+
+export function executionBatches(selection: CollectedTest[], workerLimit = layoutWorkerCount()): ExecutionBatch[] {
+  const webkitProject = CONTEXTS['touch-webkit'].project
+  const nonWebkit = selection.filter((test) => test.project !== webkitProject)
+  const webkit = selection.filter((test) => test.project === webkitProject)
+  const batches: ExecutionBatch[] = []
+  if (nonWebkit.length) batches.push({
+    id: 'non-webkit',
+    tests: nonWebkit,
+    workers: Math.min(workerLimit, executionWorkerCount(['touch-chromium', 'fine-chromium'])),
+  })
+  if (webkit.length) batches.push({
+    id: 'webkit',
+    tests: webkit,
+    workers: executionWorkerCount(['touch-webkit']),
+  })
+
+  assertExactSelection(selection, batches.flatMap((batch) => batch.tests))
+  return batches
+}
+
+export function mergeExecutionLedgers(
+  run: Pick<RunIdentity, 'runId' | 'planId' | 'source'>,
+  selection: CollectedTest[],
+  results: Array<{ batch: ExecutionBatch; ledger: ExecutionLedger }>,
+): ExecutionLedger {
+  if (!results.length) throw new Error('No execution batch evidence to merge')
+  assertExactSelection(selection, results.flatMap(({ ledger }) => ledger.selected))
+
+  for (const { batch, ledger } of results) {
+    assertExactSelection(batch.tests, ledger.selected)
+    if (ledger.version !== 1 || ledger.runId !== run.runId || ledger.planId !== run.planId
+      || ledger.sourceDigest !== run.source.digest) throw new Error(`Execution batch identity mismatch: ${batch.id}`)
+    const selectedIds = new Set(batch.tests.map((test) => test.id))
+    if (ledger.attempts.some((attempt) => !selectedIds.has(attempt.testId))) {
+      throw new Error(`Execution batch contains an unselected attempt: ${batch.id}`)
+    }
+  }
+
+  const failedStatus = results.map(({ ledger }) => ledger.status).find((status) => status !== 'passed')
+  return {
+    version: 1,
+    runId: run.runId,
+    planId: run.planId,
+    sourceDigest: run.source.digest,
+    selected: selection,
+    attempts: results.flatMap(({ ledger }) => ledger.attempts),
+    errors: results.flatMap(({ batch, ledger }) => ledger.errors.map((error) => `${batch.id}: ${error}`)),
+    status: failedStatus ?? 'passed',
+    complete: results.every(({ ledger }) => ledger.complete),
+  }
+}
+
 async function build(root: string, sourceRoot: string, directory: string, name: string, env: NodeJS.ProcessEnv) {
   const dist = resolve(directory, `${name}-dist`)
   const options = { mode: 'test', configLoader: 'native', cacheDir: resolve(directory, `${name}-cache`), build: { outDir: dist, emptyOutDir: true } }
@@ -241,14 +303,43 @@ export async function runPlan(root: string, input: string, review = false) {
     writeJson(resolve(directory, 'run.json'), run)
     writeJson(resolve(directory, 'selection.json'), selection)
     writeFileSync(resolve(directory, 'selected-tests.txt'), testList(selection))
-    let executionError: unknown
-    const workers = Math.min(layoutWorkerCount(), executionWorkerCount(plan.contexts))
-    try {
-      await command(root, [playwrightCli, 'test', '--test-list', resolve(directory, 'selected-tests.txt'), '--forbid-only',
-        `--workers=${workers}`, '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', resolve(directory, 'playwright')],
-      childEnv, resolve(directory, 'execution.log'))
-    } catch (error) { executionError = error }
-    const ledger = readJson<ExecutionLedger>(resolve(directory, 'execution.json'))
+    const batches = executionBatches(selection)
+    writeJson(resolve(directory, 'execution-batches.json'), batches.map((batch) => ({
+      id: batch.id,
+      tests: batch.tests.length,
+      workers: batch.workers,
+      testList: `selected-tests-${batch.id}.txt`,
+      ledger: `execution-${batch.id}.json`,
+      log: `execution-${batch.id}.log`,
+      output: `playwright/${batch.id}`,
+    })))
+    const results: Array<{ batch: ExecutionBatch; ledger: ExecutionLedger }> = []
+    const executionErrors: string[] = []
+    for (const batch of batches) {
+      const selectedTests = resolve(directory, `selected-tests-${batch.id}.txt`)
+      const executionLog = resolve(directory, `execution-${batch.id}.log`)
+      const currentLedger = resolve(directory, 'execution.json')
+      writeFileSync(selectedTests, testList(batch.tests))
+      rmSync(currentLedger, { force: true })
+      console.log(`Running ${batch.id} layout evidence: ${batch.tests.length} test${batch.tests.length === 1 ? '' : 's'} with ${batch.workers} worker${batch.workers === 1 ? '' : 's'}.`)
+      try {
+        await command(root, [playwrightCli, 'test', '--test-list', selectedTests, '--forbid-only',
+          `--workers=${batch.workers}`, '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', resolve(directory, 'playwright', batch.id)],
+        childEnv, executionLog, true)
+      } catch (error) { executionErrors.push(`${batch.id}: ${String(error)}`) }
+      if (!existsSync(currentLedger)) throw new Error(`Execution batch produced no ledger: ${batch.id}; inspect ${executionLog}`)
+      const ledger = readJson<ExecutionLedger>(currentLedger)
+      assertExactSelection(batch.tests, ledger.selected)
+      writeJson(resolve(directory, `execution-${batch.id}.json`), ledger)
+      results.push({ batch, ledger })
+      console.log(`Recorded ${batch.id} layout evidence: ${ledger.attempts.length} attempts, status ${ledger.status}.`)
+    }
+    const ledger = mergeExecutionLedgers(run, selection, results)
+    writeJson(resolve(directory, 'execution.json'), ledger)
+    writeFileSync(resolve(directory, 'execution.log'), batches.map((batch) => {
+      const log = resolve(directory, `execution-${batch.id}.log`)
+      return `===== ${batch.id} (${batch.tests.length} tests, ${batch.workers} worker${batch.workers === 1 ? '' : 's'}) =====\n${readFileSync(log, 'utf8')}`
+    }).join('\n'))
     assertExactSelection(selection, ledger.selected)
     const { accepted: automatedPassed, ...automated } = verifyEvidence(
       plan, run, selection, ledger, null, (file) => readFileSync(artifactPath(root, file, true)), false,
@@ -260,7 +351,7 @@ export async function runPlan(root: string, input: string, review = false) {
     writeJson(resolve(directory, 'manual.json'), manual)
     await verifyServedBuild(run.candidate)
     if (snapshot(root, plan.source.base).digest !== plan.source.digest) throw new Error('Source changed during execution; evidence is historical, not current')
-    if (executionError) throw executionError
+    if (executionErrors.length) throw new Error(`Execution batches failed:\n${executionErrors.join('\n')}`)
     if (!automatedPassed) throw new Error(`Runtime evidence assessment failed; inspect ${directory}/automated-assessment.json before manual review`)
     console.log(`Selected ${selection.length} tests; recorded ${ledger.attempts.length} attempts (${ledger.attempts.filter((attempt) => attempt.status === 'passed').length} passed, ${ledger.attempts.filter((attempt) => attempt.status === 'skipped').length} skipped). ${manualReviewMessage(worklist.length, directory)}`)
   } finally {

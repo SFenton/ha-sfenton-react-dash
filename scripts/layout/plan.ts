@@ -148,6 +148,9 @@ evidence, not release gates.
    to justify a catalog serialization-only exception; none is inferred automatically.
 4. Run \`npm run layout:run -- --plan artifacts/layout/<run-id>/plan.json\`.
    This owns fresh mock builds and strict loopback previews; it does not authorize HA.
+   Non-WebKit evidence keeps the bounded two-worker policy while WPE WebKit runs
+   separately with one worker. Both batches retain exact selection, logs and ledgers,
+   then merge into one fail-closed evidence record while progress remains visible.
 5. Inspect the generated \`manual-worklist.json\` AND perform its listed browser
    interactions. View the unnormalized images with an image-capable tool. Record
    observations in \`manual.json\`; capture alone is not inspection.

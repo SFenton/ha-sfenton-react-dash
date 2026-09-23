@@ -3,8 +3,18 @@
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { hash, stableHash } from './shared'
-import { executionWorkerCount, isBaselineBuildInput, layoutWorkerCount, manualReviewMessage, stopOwnedProcess, verifyServedBuild } from './run'
+import {
+  executionBatches,
+  executionWorkerCount,
+  isBaselineBuildInput,
+  layoutWorkerCount,
+  manualReviewMessage,
+  mergeExecutionLedgers,
+  stopOwnedProcess,
+  verifyServedBuild,
+} from './run'
 import type { ChildProcess } from 'node:child_process'
+import type { CollectedTest, ExecutionLedger, RunIdentity } from '../../e2e/layout/types'
 
 describe('owned build verification', () => {
   it('uses two layout workers by default and accepts an explicit positive override', () => {
@@ -28,9 +38,80 @@ describe('owned build verification', () => {
     await stopOwnedProcess({ exitCode: null, signalCode: 'SIGTERM', kill } as unknown as ChildProcess)
     expect(kill).not.toHaveBeenCalled()
   })
-  it('serializes evidence runs that require the WPE WebKit context', () => {
+  it('keeps WPE WebKit serial without serializing non-WebKit evidence', () => {
     expect(executionWorkerCount(['touch-chromium', 'fine-chromium', 'touch-webkit'])).toBe(1)
     expect(executionWorkerCount(['touch-chromium', 'fine-chromium'])).toBe(2)
+    const selection: CollectedTest[] = [
+      { id: 'mobile', project: 'mobile', file: 'mobile.spec.ts', titlePath: ['mobile'] },
+      { id: 'desktop', project: 'desktop', file: 'desktop.spec.ts', titlePath: ['desktop'] },
+      { id: 'webkit', project: 'webkit', file: 'webkit.spec.ts', titlePath: ['webkit'] },
+    ]
+    expect(executionBatches(selection, 4).map((batch) => ({
+      id: batch.id,
+      tests: batch.tests.map((test) => test.id),
+      workers: batch.workers,
+    }))).toEqual([
+      { id: 'non-webkit', tests: ['mobile', 'desktop'], workers: 2 },
+      { id: 'webkit', tests: ['webkit'], workers: 1 },
+    ])
+    expect(executionBatches(selection.slice(0, 2), 1)).toMatchObject([
+      { id: 'non-webkit', workers: 1 },
+    ])
+    expect(executionBatches(selection.slice(2), 4)).toMatchObject([
+      { id: 'webkit', workers: 1 },
+    ])
+    expect(() => executionBatches([])).toThrow(/No required tests selected/)
+  })
+  it('merges disjoint batch ledgers without weakening identity or failure evidence', () => {
+    const source = { base: 'base', head: 'head', files: {}, digest: 'source' }
+    const run = { runId: 'run', planId: 'plan', source } as Pick<RunIdentity, 'runId' | 'planId' | 'source'>
+    const selection: CollectedTest[] = [
+      { id: 'mobile', project: 'mobile', file: 'mobile.spec.ts', titlePath: ['mobile'] },
+      { id: 'webkit', project: 'webkit', file: 'webkit.spec.ts', titlePath: ['webkit'] },
+    ]
+    const batches = executionBatches(selection)
+    const ledger = (test: CollectedTest): ExecutionLedger => ({
+      version: 1,
+      runId: run.runId,
+      planId: run.planId,
+      sourceDigest: source.digest,
+      selected: [test],
+      attempts: [{
+        testId: test.id,
+        expectedStatus: 'passed',
+        status: 'passed',
+        retry: 0,
+        workerIndex: 0,
+        annotations: [],
+        checkpoints: [],
+      }],
+      errors: [],
+      status: 'passed',
+      complete: true,
+    })
+    const results = batches.map((batch) => ({ batch, ledger: ledger(batch.tests[0]) }))
+    const merged = mergeExecutionLedgers(run, selection, results)
+    expect(merged.selected).toEqual(selection)
+    expect(merged.attempts.map((attempt) => attempt.testId)).toEqual(['mobile', 'webkit'])
+    expect(merged).toMatchObject({ complete: true, errors: [], status: 'passed' })
+    expect(() => mergeExecutionLedgers(run, selection, results.slice(0, 1))).toThrow(/missing/)
+    expect(() => mergeExecutionLedgers(run, selection, [results[0], ...results])).toThrow(/Duplicate/)
+
+    results[1].ledger.complete = false
+    expect(mergeExecutionLedgers(run, selection, results)).toMatchObject({ complete: false, status: 'passed' })
+    results[1].ledger.complete = true
+    results[1].ledger.attempts[0].testId = 'mobile'
+    expect(() => mergeExecutionLedgers(run, selection, results)).toThrow(/unselected attempt/)
+    results[1].ledger.attempts[0].testId = 'webkit'
+    results[1].ledger.status = 'failed'
+    results[1].ledger.errors = ['browser closed']
+    expect(mergeExecutionLedgers(run, selection, results)).toMatchObject({
+      complete: true,
+      errors: ['webkit: browser closed'],
+      status: 'failed',
+    })
+    results[1].ledger.runId = 'foreign-run'
+    expect(() => mergeExecutionLedgers(run, selection, results)).toThrow(/identity mismatch/)
   })
   it('does not request manual review when the plan has no review worklist', () => {
     expect(manualReviewMessage(0, '/tmp/layout')).toBe(
