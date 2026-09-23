@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto'
+import {
+  MAX_GITHUB_MEDIA_REFERENCES,
+  stableGitHubMediaUrl,
+  type MediaPlacement,
+  type NativeMediaType,
+} from './adminIssueMedia'
 
 export const ADMIN_ISSUE_MARKER_PREFIX = 'admin-todo-uid:'
 export const ADMIN_TODO_ATTACHMENTS_PREFIX = 'admin-todo-attachments:'
 export const CONTROLLER_COMMENT_MARKER = '<!-- admin-issue-controller -->'
-export const ADMIN_ISSUE_STATE_VERSION = 2 as const
+export const ADMIN_ISSUE_STATE_VERSION = 3 as const
 export const GITHUB_AUTOMATION_ISSUE_MARKERS = [
   'layout-failure-commit-',
   'dashboard-deployment-failure-run-',
@@ -32,6 +38,7 @@ export type AdminIssueInputSource =
   | 'todo-created'
   | 'todo-updated'
   | 'issue-comment'
+  | 'issue-body'
   | 'github-issue'
   | 'ci-failure'
 
@@ -39,20 +46,38 @@ export interface AdminIssueInputAttachment {
   githubUrl?: string
   id: string
   localPath: string
-  mediaType: 'image/jpeg' | 'image/png' | 'image/webp'
+  mediaType: NativeMediaType
   name: string
   sha256: string
   sizeBytes: number
 }
 
+export interface AdminIssueMediaFinding {
+  attachmentId?: string
+  githubUrl?: string
+  id: string
+  label: string
+  mediaType?: string
+  occurrence: number
+  placement: MediaPlacement
+  reason?: string
+  sha256?: string
+  sizeBytes?: number
+  status: 'attached' | 'unsupported'
+}
+
 export interface AdminIssueInput {
   attachments?: AdminIssueInputAttachment[]
   body: string
+  bodySha256?: string
   createdAt: string
   externalId: string
+  mediaFindings?: AdminIssueMediaFinding[]
   processedAt?: string
   revision: number
   source: AdminIssueInputSource
+  sourceKey?: string
+  sourceUpdatedAt?: string
 }
 
 export interface AdminIssuePullRequest {
@@ -252,6 +277,7 @@ export interface AdminIssueRecord {
   generation: number
   inputRevision: number
   inputs: AdminIssueInput[]
+  issueBodySha256?: string
   issueNumber: number
   issueUrl: string
   lastOutcome?: AdminIssueWorkerOutcome
@@ -278,7 +304,7 @@ export interface AdminIssueControllerState {
   ignoredUids: string[]
   issues: Record<string, AdminIssueRecord>
   updatedAt: string
-  version: 2
+  version: typeof ADMIN_ISSUE_STATE_VERSION
 }
 
 export interface AdminIssueQuestion {
@@ -370,6 +396,7 @@ export interface GitHubIssueComment {
   body?: string | null
   created_at?: string
   id: number
+  updated_at?: string
   user?: {
     id?: number
     login?: string
@@ -583,21 +610,74 @@ function assertVisualEvidenceReceipt(value: unknown, field: string) {
 
 function assertInputAttachment(value: unknown, field: string) {
   assert(object(value), `${field} must be an object`)
-  nonEmptyString(value.id, `${field}.id`)
+  assert(
+    typeof value.id === 'string' &&
+    /^[A-Za-z0-9_-]{1,100}$/.test(value.id),
+    `${field}.id is invalid`,
+  )
   nonEmptyString(value.name, `${field}.name`)
   nonEmptyString(value.localPath, `${field}.localPath`)
   sha256(value.sha256, `${field}.sha256`)
   positiveInteger(value.sizeBytes, `${field}.sizeBytes`)
   assert(
-    ['image/jpeg', 'image/png', 'image/webp'].includes(String(value.mediaType)),
+    ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+      .includes(String(value.mediaType)),
     `${field}.mediaType is invalid`,
   )
   if (value.githubUrl !== undefined) {
     assert(
       typeof value.githubUrl === 'string' &&
-      /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(value.githubUrl),
+      stableGitHubMediaUrl(value.githubUrl, 'SFenton/ha-sfenton-react-dash') === value.githubUrl,
       `${field}.githubUrl is invalid`,
     )
+  }
+}
+
+function assertMediaFinding(
+  value: unknown,
+  field: string,
+  attachments: AdminIssueInputAttachment[],
+) {
+  assert(object(value), `${field} must be an object`)
+  assert(
+    typeof value.id === 'string' && /^[a-f0-9]{32}$/.test(value.id),
+    `${field}.id is invalid`,
+  )
+  nonEmptyString(value.label, `${field}.label`)
+  assert(String(value.label).length <= 180, `${field}.label is too long`)
+  nonNegativeInteger(value.occurrence, `${field}.occurrence`)
+  assert(
+    ['image', 'video', 'audio', 'link'].includes(String(value.placement)),
+    `${field}.placement is invalid`,
+  )
+  assert(['attached', 'unsupported'].includes(String(value.status)), `${field}.status is invalid`)
+  if (value.githubUrl !== undefined) {
+    assert(
+      typeof value.githubUrl === 'string' &&
+      stableGitHubMediaUrl(value.githubUrl, 'SFenton/ha-sfenton-react-dash') === value.githubUrl,
+      `${field}.githubUrl is invalid`,
+    )
+  }
+  if (value.mediaType !== undefined) nonEmptyString(value.mediaType, `${field}.mediaType`)
+  if (value.sha256 !== undefined) sha256(value.sha256, `${field}.sha256`)
+  if (value.sizeBytes !== undefined) positiveInteger(value.sizeBytes, `${field}.sizeBytes`)
+  if (value.status === 'attached') {
+    assert(typeof value.githubUrl === 'string', `${field}.githubUrl is required for attached media`)
+    nonEmptyString(value.attachmentId, `${field}.attachmentId`)
+    const attachment = attachments.find((item) => item.id === value.attachmentId)
+    assert(
+      attachment &&
+      attachment.githubUrl === value.githubUrl &&
+      attachment.mediaType === value.mediaType &&
+      attachment.sha256 === value.sha256 &&
+      attachment.sizeBytes === value.sizeBytes,
+      `${field} does not match a verified input attachment`,
+    )
+    assert(value.reason === undefined, `${field}.reason must be absent for attached media`)
+  } else {
+    nonEmptyString(value.reason, `${field}.reason`)
+    assert(String(value.reason).length <= 240, `${field}.reason is too long`)
+    assert(value.attachmentId === undefined, `${field}.attachmentId must be absent`)
   }
 }
 
@@ -843,11 +923,9 @@ function assertProvenance(value: unknown, field: string) {
   }
 }
 
-export function assertAdminIssueControllerState(
-  value: unknown,
-): asserts value is AdminIssueControllerState {
+function validateAdminIssueControllerState(value: unknown, version: 2 | 3) {
   assert(object(value), 'Controller state must be an object')
-  assert(value.version === ADMIN_ISSUE_STATE_VERSION, `Unsupported controller state version ${value.version}`)
+  assert(value.version === version, `Unsupported controller state version ${value.version}`)
   isoTimestamp(value.baselineCompletedAt, 'state.baselineCompletedAt')
   isoTimestamp(value.updatedAt, 'state.updatedAt')
   stringArray(value.ignoredUids, 'state.ignoredUids')
@@ -871,6 +949,9 @@ export function assertAdminIssueControllerState(
       `state.issues.${uid}.phase is invalid`,
     )
     assert(Array.isArray(rawRecord.inputs), `state.issues.${uid}.inputs must be an array`)
+    if (rawRecord.issueBodySha256 !== undefined) {
+      sha256(rawRecord.issueBodySha256, `state.issues.${uid}.issueBodySha256`)
+    }
     for (const [inputIndex, input] of rawRecord.inputs.entries()) {
       assert(object(input), `state.issues.${uid}.inputs[${inputIndex}] must be an object`)
       if (input.attachments !== undefined) {
@@ -883,6 +964,51 @@ export function assertAdminIssueControllerState(
             attachment,
             `state.issues.${uid}.inputs[${inputIndex}].attachments[${attachmentIndex}]`,
           ))
+      }
+      const attachments = Array.isArray(input.attachments)
+        ? input.attachments as AdminIssueInputAttachment[]
+        : []
+      if (input.bodySha256 !== undefined) sha256(
+        input.bodySha256,
+        `state.issues.${uid}.inputs[${inputIndex}].bodySha256`,
+      )
+      if (input.sourceUpdatedAt !== undefined) isoTimestamp(
+        input.sourceUpdatedAt,
+        `state.issues.${uid}.inputs[${inputIndex}].sourceUpdatedAt`,
+      )
+      if (input.sourceKey !== undefined) {
+        assert(
+          typeof input.sourceKey === 'string' &&
+          /^(?:issue|comment):\d+$/.test(input.sourceKey),
+          `state.issues.${uid}.inputs[${inputIndex}].sourceKey is invalid`,
+        )
+      }
+      if (input.mediaFindings !== undefined) {
+        assert(version === 3, `state.issues.${uid}.inputs[${inputIndex}].mediaFindings requires v3`)
+        assert(
+          Array.isArray(input.mediaFindings) &&
+          input.mediaFindings.length <= MAX_GITHUB_MEDIA_REFERENCES,
+          `state.issues.${uid}.inputs[${inputIndex}].mediaFindings is invalid`,
+        )
+        sha256(input.bodySha256, `state.issues.${uid}.inputs[${inputIndex}].bodySha256`)
+        isoTimestamp(input.sourceUpdatedAt, `state.issues.${uid}.inputs[${inputIndex}].sourceUpdatedAt`)
+        nonEmptyString(input.sourceKey, `state.issues.${uid}.inputs[${inputIndex}].sourceKey`)
+        const findingIds = new Set<string>()
+        const occurrences = new Set<number>()
+        input.mediaFindings.forEach((finding, findingIndex) =>
+          {
+            assertMediaFinding(
+              finding,
+              `state.issues.${uid}.inputs[${inputIndex}].mediaFindings[${findingIndex}]`,
+              attachments,
+            )
+            assert(
+              !findingIds.has(finding.id) && !occurrences.has(finding.occurrence),
+              `state.issues.${uid}.inputs[${inputIndex}].mediaFindings has duplicate references`,
+            )
+            findingIds.add(finding.id)
+            occurrences.add(finding.occurrence)
+          })
       }
     }
     assert(object(rawRecord.receipts), `state.issues.${uid}.receipts must be an object`)
@@ -931,11 +1057,25 @@ export function assertAdminIssueControllerState(
   }
 }
 
+export function assertAdminIssueControllerState(
+  value: unknown,
+): asserts value is AdminIssueControllerState {
+  validateAdminIssueControllerState(value, ADMIN_ISSUE_STATE_VERSION)
+}
+
 export function migrateAdminIssueControllerState(
   value: unknown,
   migratedAt: string,
 ): AdminIssueControllerState {
   assert(object(value), 'Controller state must be an object')
+  if (value.version === 2) {
+    validateAdminIssueControllerState(value, 2)
+    const migrated = JSON.parse(JSON.stringify(value)) as AdminIssueControllerState
+    migrated.version = ADMIN_ISSUE_STATE_VERSION
+    migrated.updatedAt = migratedAt
+    assertAdminIssueControllerState(migrated)
+    return migrated
+  }
   assert(value.version === 1, `Cannot migrate controller state version ${value.version}`)
   isoTimestamp(value.baselineCompletedAt, 'state.baselineCompletedAt')
   isoTimestamp(value.updatedAt, 'state.updatedAt')

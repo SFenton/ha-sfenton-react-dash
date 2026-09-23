@@ -8,8 +8,10 @@
 // @covers .gitignore
 
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -29,6 +31,7 @@ import {
   assertDeploymentRunSucceeded,
   assertDeploymentCoversMergeSha,
   assertExactCandidateSnapshot,
+  assertPausedCandidateUnchanged,
   assertExistingReleasePullRequestEvidence,
   assertExistingReleaseVerificationSnapshot,
   assertSuccessfulLayoutWorkflowRun,
@@ -52,14 +55,21 @@ import {
   hasRecoverableDeployment,
   hasRecoverableExistingRelease,
   hasRecoverableTransition,
+  issueBodyMediaPlan,
   latestSuccessfulDeploymentRunPath,
   layoutWorkflowRunsPath,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
+  materializeWorkerInputAttachments,
+  mediaInputRequired,
+  mediaSourceExternalId,
   prepareCommittedCandidate,
   prepareCopilotHome,
+  prepareGitHubMediaInput,
+  prepareReopenedMedia,
   pullRequestBodyWithVisualEvidence,
   pushCandidate,
+  queueReopenedMediaInputs,
   readWorktreeSnapshot,
   restoreReadyOutcomeFromWorkerLog,
   runCommand,
@@ -69,7 +79,10 @@ import {
   shouldVerifyExistingPullRequestVisualEvidence,
   summarizeFailedCheckLogs,
   synchronizeCandidateBase,
+  unreviewableIssueMedia,
   waitForMergedPullRequest,
+  workerInputAttachments,
+  workerMediaAttachmentArgs,
   updateWorkflowDigestConfig,
   workerMutableInfrastructurePaths,
   workflowDigestRotationRequired,
@@ -120,6 +133,7 @@ import {
   type AdminIssueDiffReceipt,
   type AdminIssueValidationReceipt,
 } from './lib/adminIssueController'
+import { discoverEmbeddedGitHubMedia } from './lib/adminIssueMedia'
 
 const temporaryDirectories: string[] = []
 
@@ -380,7 +394,7 @@ function controllerState(issue: AdminIssueRecord): AdminIssueControllerState {
     ignoredUids: [],
     issues: { [issue.uid]: issue },
     updatedAt: issue.updatedAt,
-    version: 2,
+    version: 3,
   }
 }
 
@@ -565,6 +579,403 @@ describe('admin issue controller domain', () => {
     )
   })
 
+  it('binds GitHub media findings to verified attachments without trusting unrecorded files', () => {
+    const issue = record()
+    const attachment = {
+      githubUrl: 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111',
+      id: '11111111-1111-4111-8111-111111111111',
+      localPath: '/tmp/admin-issue-controller/11111111-1111-4111-8111-111111111111.png',
+      mediaType: 'image/png' as const,
+      name: 'Image',
+      sha256: 'a'.repeat(64),
+      sizeBytes: 123,
+    }
+    issue.inputs[0].source = 'issue-comment'
+    issue.inputs[0].attachments = [attachment]
+    issue.inputs[0].bodySha256 = 'b'.repeat(64)
+    issue.inputs[0].sourceKey = 'comment:123'
+    issue.inputs[0].sourceUpdatedAt = '2026-09-20T12:00:00.000Z'
+    issue.inputs[0].mediaFindings = [{
+      attachmentId: attachment.id,
+      githubUrl: attachment.githubUrl,
+      id: 'c'.repeat(32),
+      label: 'Image',
+      mediaType: attachment.mediaType,
+      occurrence: 0,
+      placement: 'image',
+      sha256: attachment.sha256,
+      sizeBytes: attachment.sizeBytes,
+      status: 'attached',
+    }]
+    const state = controllerState(issue)
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
+    issue.inputs[0].mediaFindings[0].attachmentId = 'another-file'
+    expect(() => assertAdminIssueControllerState(state)).toThrow(
+      'does not match a verified input attachment',
+    )
+    issue.inputs[0].mediaFindings[0].attachmentId = attachment.id
+    issue.inputs[0].mediaFindings.push({
+      ...issue.inputs[0].mediaFindings[0],
+      id: 'd'.repeat(32),
+    })
+    expect(() => assertAdminIssueControllerState(state)).toThrow('duplicate references')
+    issue.inputs[0].mediaFindings.pop()
+    delete issue.inputs[0].mediaFindings[0].githubUrl
+    expect(() => assertAdminIssueControllerState(state)).toThrow(
+      'githubUrl is required for attached media',
+    )
+    issue.inputs[0].mediaFindings[0].githubUrl = attachment.githubUrl
+    issue.inputs[0].attachments[0].id = '../../.env'
+    expect(() => assertAdminIssueControllerState(state)).toThrow('.id is invalid')
+  })
+
+  it('replays the exact HTML screenshot into a new unprocessed, verified native attachment', async () => {
+    const root = mkdtempSync(join(homedir(), '.admin-issue-media-replay-test-'))
+    temporaryDirectories.push(root)
+    const repository = 'SFenton/ha-sfenton-react-dash'
+    const githubUrl = 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111'
+    const body = `<img width="3651" height="1822" alt="Image" src="${githubUrl}" />\n\nCaptured on a fullscreen 4k desktop.`
+    const pngBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlO89sAAAAASUVORK5CYII=',
+      'base64',
+    )
+    const config = { repository, repositoryPath: root, stateDirectory: join(root, 'state') }
+    const issue = record()
+    issue.issueNumber = 225
+    issue.issueUrl = 'https://github.com/SFenton/ha-sfenton-react-dash/issues/225'
+    const sourceKey = 'comment:5802431887'
+    const commentAt = '2026-09-23T20:31:01.000Z'
+    appendIssueInput(issue, {
+      body,
+      createdAt: commentAt,
+      externalId: sourceKey,
+      source: 'issue-comment',
+    })
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-23T20:55:26.000Z')
+    issue.commentCursor = 5802431887
+    issue.phase = 'paused'
+    issue.pr = { number: 228, url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/228' }
+    issue.receipts.manuallyClosedAt = '2026-09-23T21:13:30.000Z'
+    const references = discoverEmbeddedGitHubMedia(body, repository)
+    expect(mediaInputRequired(issue, sourceKey, body, references)).toBe(true)
+
+    const fetcher: typeof fetch = async (_url, init) => {
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer test-token')
+      return new Response(new Uint8Array(pngBytes), {
+        headers: { 'content-type': 'image/png' },
+        status: 200,
+      })
+    }
+    const media = await prepareGitHubMediaInput(
+      config,
+      issue,
+      sourceKey,
+      commentAt,
+      body,
+      { fetcher, token: 'test-token' },
+    )
+    expect(media.mediaFindings).toMatchObject([
+      { githubUrl, placement: 'image', status: 'attached', mediaType: 'image/png' },
+    ])
+    expect(media.attachments).toHaveLength(1)
+    expect(statSync(media.attachments?.[0].localPath ?? '').mode & 0o777).toBe(0o600)
+
+    const comments = [
+      {
+        author_association: 'OWNER',
+        body,
+        created_at: commentAt,
+        id: 5802431887,
+        updated_at: commentAt,
+        user: { id: 42, login: 'SFenton' },
+      },
+      {
+        author_association: 'COLLABORATOR',
+        body: `<img src="${githubUrl}">`,
+        created_at: commentAt,
+        id: 5802431888,
+        user: { id: 43, login: 'visitor' },
+      },
+      {
+        author_association: 'OWNER',
+        body: `<!-- admin-issue-controller -->\n<img src="${githubUrl}">`,
+        created_at: commentAt,
+        id: 5802431889,
+        user: { id: 42, login: 'SFenton' },
+      },
+    ]
+    const reopenedIssue = {
+      author_association: 'OWNER',
+      body: null,
+      created_at: commentAt,
+      html_url: issue.issueUrl,
+      number: 225,
+      state: 'open' as const,
+      title: issue.title,
+      updated_at: '2026-09-23T21:20:00.000Z',
+      user: { id: 42, login: 'SFenton' },
+    }
+    const prepared = await prepareReopenedMedia(
+      { ...config, ownerId: 42, ownerLogin: 'SFenton' } as Parameters<typeof prepareReopenedMedia>[0],
+      issue,
+      reopenedIssue,
+      comments,
+      { fetcher, token: 'test-token' },
+    )
+    expect(prepared.map((source) => source.key)).toEqual([sourceKey])
+    beginAdminIssueGeneration(issue, '2026-09-23T21:20:00.000Z')
+    queueReopenedMediaInputs(issue, reopenedIssue, comments, prepared)
+    expect(issue.phase).toBe('queued')
+    expect(issue.generation).toBe(2)
+    expect(issue.pr).toBeUndefined()
+    expect(issue.receipts.manuallyClosedAt).toBeUndefined()
+    expect(issue.commentCursor).toBe(5802431889)
+    expect(pendingIssueInputs(issue).map((input) => input.revision)).toEqual([3, 4])
+    expect(pendingIssueInputs(issue)[1].attachments?.[0].sha256).toMatch(/^[a-f0-9]{64}$/)
+    expect(mediaInputRequired(issue, sourceKey, body, references)).toBe(false)
+    expect(mediaInputRequired(issue, sourceKey, `${body}\nUpdated`, references)).toBe(true)
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
+
+    issue.worktreePath = join(root, 'worktree')
+    mkdirSync(issue.worktreePath)
+    materializeWorkerInputAttachments(config, issue)
+    const nativeArgs = workerMediaAttachmentArgs(issue)
+    expect(nativeArgs).toEqual([
+      '--attachment',
+      resolve(issue.worktreePath, `artifacts/admin-issue-${issue.issueNumber}/reported/input-4-${media.attachments?.[0].id}.png`),
+    ])
+    expect(statSync(nativeArgs[1]).mode & 0o777).toBe(0o400)
+    expect(readFileSync(nativeArgs[1])).toEqual(pngBytes)
+    expect(buildWorkerPrompt(issue)).toContain('Submitted media (also attached directly')
+    expect(workerInputAttachments(issue)).toHaveLength(1)
+
+    const outside = join(root, 'outside.png')
+    writeFileSync(outside, pngBytes)
+    const tampered = structuredClone(issue)
+    const replay = tampered.inputs.at(-1)
+    if (!replay?.attachments?.[0]) throw new Error('Expected replay attachment')
+    replay.attachments[0].localPath = outside
+    expect(() => materializeWorkerInputAttachments(config, tampered)).toThrow(
+      'escaped the private attachment directory',
+    )
+
+    const outsideDirectory = join(root, 'outside-directory')
+    mkdirSync(outsideDirectory)
+    const symlinked = structuredClone(issue)
+    symlinked.worktreePath = join(root, 'symlinked-worktree')
+    mkdirSync(symlinked.worktreePath)
+    symlinkSync(outsideDirectory, join(symlinked.worktreePath, 'artifacts'))
+    expect(() => materializeWorkerInputAttachments(config, symlinked)).toThrow(
+      'not a real directory',
+    )
+    expect(existsSync(join(outsideDirectory, 'admin-issue-225'))).toBe(false)
+  })
+
+  it('notices newly embedded issue-body media and a later removal without replaying known images', () => {
+    const issue = record()
+    const repository = 'SFenton/ha-sfenton-react-dash'
+    const url = 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111'
+    const withImage = `Full issue report\n\n![Image](${url})`
+    const first = issueBodyMediaPlan(issue, issue.issueNumber, withImage, repository)
+    expect(first.needsInput).toBe(true)
+    expect(first.newReferences).toHaveLength(1)
+    issue.inputs[0].attachments = [{
+      githubUrl: url,
+      id: '11111111-1111-4111-8111-111111111111',
+      localPath: '/tmp/controller/input-attachments/image.png',
+      mediaType: 'image/png',
+      name: 'Image',
+      sha256: 'a'.repeat(64),
+      sizeBytes: 123,
+    }]
+    const known = issueBodyMediaPlan(issue, issue.issueNumber, withImage, repository)
+    expect(known.needsInput).toBe(false)
+    issue.issueBodySha256 = known.bodySha256
+    expect(issueBodyMediaPlan(issue, issue.issueNumber, withImage, repository).needsInput).toBe(false)
+    issue.inputs.push({
+      body: withImage,
+      createdAt: '2026-09-23T21:00:00.000Z',
+      externalId: 'issue-body:321:first',
+      mediaFindings: [{
+        id: 'b'.repeat(32),
+        label: 'Image',
+        occurrence: 0,
+        placement: 'image',
+        reason: 'Initial input predates media handling',
+        status: 'unsupported',
+      }],
+      revision: 2,
+      source: 'issue-body',
+      sourceKey: 'issue:321',
+    })
+    const removed = issueBodyMediaPlan(issue, issue.issueNumber, 'Image removed', repository)
+    expect(removed.needsInput).toBe(true)
+    expect(removed.newReferences).toEqual([])
+    issue.inputs.push({
+      body: 'Image removed',
+      createdAt: '2026-09-23T21:02:00.000Z',
+      externalId: mediaSourceExternalId('issue', 321, '2026-09-23T21:02:00.000Z', 'Image removed'),
+      mediaFindings: [],
+      revision: 3,
+      source: 'issue-body',
+      sourceKey: 'issue:321',
+    })
+    issue.issueBodySha256 = removed.bodySha256
+    const restored = issueBodyMediaPlan(issue, issue.issueNumber, withImage, repository)
+    expect(restored.needsInput).toBe(true)
+    expect(restored.newReferences).toHaveLength(1)
+    expect(mediaSourceExternalId('issue', 321, '2026-09-23T21:00:00.000Z', withImage))
+      .not.toBe(mediaSourceExternalId('issue', 321, '2026-09-23T21:04:00.000Z', withImage))
+  })
+
+  it('treats a later owner-comment edit or reversion as a new idempotent input', () => {
+    const issue = record()
+    const sourceKey = 'comment:123'
+    const first = 'Original owner note'
+    const second = 'Corrected owner note'
+    const at = '2026-09-23T21:00:00.000Z'
+    const firstId = mediaSourceExternalId('comment', 123, at, first)
+    appendIssueInput(issue, {
+      body: first,
+      bodySha256: createHash('sha256').update(first).digest('hex'),
+      createdAt: at,
+      externalId: firstId,
+      mediaFindings: [],
+      source: 'issue-comment',
+      sourceKey,
+      sourceUpdatedAt: at,
+    })
+    expect(mediaInputRequired(issue, sourceKey, first, [])).toBe(false)
+    expect(mediaInputRequired(issue, sourceKey, second, [])).toBe(true)
+    const secondAt = '2026-09-23T21:02:00.000Z'
+    const secondId = mediaSourceExternalId('comment', 123, secondAt, second)
+    expect(secondId).not.toBe(firstId)
+    appendIssueInput(issue, {
+      body: second,
+      bodySha256: createHash('sha256').update(second).digest('hex'),
+      createdAt: secondAt,
+      externalId: secondId,
+      mediaFindings: [],
+      source: 'issue-comment',
+      sourceKey,
+      sourceUpdatedAt: secondAt,
+    })
+    expect(mediaInputRequired(issue, sourceKey, first, [])).toBe(true)
+    expect(mediaSourceExternalId('comment', 123, '2026-09-23T21:04:00.000Z', first))
+      .not.toBe(firstId)
+  })
+
+  it('reports unsupported embedded media instead of silently authorizing a result', async () => {
+    const issue = record()
+    const body = '<img src="http://127.0.0.1:8123/api/camera">'
+    const config = {
+      repository: 'SFenton/ha-sfenton-react-dash',
+      repositoryPath: '/tmp',
+      stateDirectory: '/tmp',
+    }
+    const media = await prepareGitHubMediaInput(
+      config,
+      issue,
+      'comment:99',
+      '2026-09-23T21:00:00.000Z',
+      body,
+    )
+    expect(media.attachments).toBeUndefined()
+    expect(media.mediaFindings).toMatchObject([
+      { placement: 'image', status: 'unsupported' },
+    ])
+    appendIssueInput(issue, {
+      ...media,
+      body,
+      createdAt: '2026-09-23T21:00:00.000Z',
+      externalId: 'comment:99:v3:test',
+      source: 'issue-comment',
+    })
+    expect(unreviewableIssueMedia(issue)).toHaveLength(1)
+    expect(buildWorkerPrompt(issue)).toContain('Media the controller could not make available')
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
+  })
+
+  it('teaches the dedicated worker to inspect attached media rather than names or links', () => {
+    const skill = readFileSync(resolve('ops/admin-issue-controller/tandem-research/SKILL.md'), 'utf8')
+    expect(skill).toContain('native image attachments')
+    expect(skill).toContain('Inspect the attached pixels, not merely a path')
+    expect(skill).toContain('unsupported media')
+  })
+
+  it('preserves duplicate media contexts but downloads a GitHub asset once per input', async () => {
+    const root = mkdtempSync(join(homedir(), '.admin-issue-media-dedup-test-'))
+    temporaryDirectories.push(root)
+    const issue = record()
+    const githubUrl = 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111'
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlO89sAAAAASUVORK5CYII=',
+      'base64',
+    )
+    let downloads = 0
+    const fetcher: typeof fetch = async () => {
+      downloads += 1
+      return new Response(new Uint8Array(png), {
+        headers: { 'content-type': 'image/png' },
+      })
+    }
+    const config = {
+      repository: 'SFenton/ha-sfenton-react-dash',
+      repositoryPath: root,
+      stateDirectory: join(root, 'state'),
+    }
+    const body = `![First](${githubUrl})\n\n<img alt="Second" src="${githubUrl}">`
+    const media = await prepareGitHubMediaInput(config, issue, 'comment:100',
+      '2026-09-23T20:31:01.000Z', body, { fetcher, token: 'test-token' })
+    expect(downloads).toBe(1)
+    expect(media.attachments).toHaveLength(1)
+    expect(media.mediaFindings).toHaveLength(2)
+    expect(media.mediaFindings.map((finding) => finding.label)).toEqual(['First', 'Second'])
+    expect(media.mediaFindings.map((finding) => finding.attachmentId))
+      .toEqual([media.attachments?.[0].id, media.attachments?.[0].id])
+    appendIssueInput(issue, {
+      ...media,
+      body,
+      createdAt: '2026-09-23T20:31:01.000Z',
+      externalId: 'comment:100:v3:dedup',
+      source: 'issue-comment',
+    })
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
+
+    const excessive = Array.from({ length: 9 }, (_, index) =>
+      `![Image](https://github.com/user-attachments/assets/${String(index).padStart(8, '0')}-1111-1111-1111-111111111111)`)
+      .join('\n\n')
+    await expect(prepareGitHubMediaInput(config, issue, 'comment:101',
+      '2026-09-23T20:32:00.000Z', excessive, { fetcher, token: 'test-token' }))
+      .rejects.toThrow('more than eight')
+  })
+
+  it('preserves a paused published candidate if its worktree or remote changed before replay', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.phase = 'paused'
+    issue.branch = 'copilot/admin-todo-321-g1-map'
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate) {
+      throw new Error('Expected paused active candidate')
+    }
+    const candidate = issue.provenance.candidate
+    candidate.pushAttempted = true
+    candidate.publishedHeadSha = candidate.headSha
+    const snapshot = {
+      branch: issue.branch,
+      gitOperations: [],
+      headSha: candidate.headSha,
+      status: '',
+      treeSha: candidate.treeSha,
+    }
+    expect(() => assertPausedCandidateUnchanged(issue, snapshot, candidate.headSha)).not.toThrow()
+    expect(() => assertPausedCandidateUnchanged(issue, snapshot, undefined)).toThrow(
+      'remote branch changed',
+    )
+    expect(() => assertPausedCandidateUnchanged(issue, { ...snapshot, status: 'dirty' }, candidate.headSha))
+      .toThrow('worktree changed')
+  })
+
   it('deduplicates inputs and advances revisions monotonically', () => {
     const issue = record()
     expect(
@@ -605,7 +1016,7 @@ describe('admin issue controller domain', () => {
       ignoredUids: ['existing-1', 'existing-2'],
       issues: {},
       updatedAt: '2026-09-20T12:00:00.000Z',
-      version: 2,
+      version: 3,
     })
 
     const issue = record()
@@ -678,7 +1089,7 @@ describe('admin issue controller domain', () => {
     }
     const migratedAt = '2026-09-21T12:00:00.000Z'
     const migrated = migrateAdminIssueControllerState(legacyState, migratedAt)
-    expect(migrated.version).toBe(2)
+    expect(migrated.version).toBe(3)
     expect(migrated.issues[active.uid].pr).toEqual({
       number: 400,
       url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
@@ -719,14 +1130,56 @@ describe('admin issue controller domain', () => {
     } as Parameters<typeof loadAdminIssueControllerState>[0]
     expect(() => loadAdminIssueControllerState(config)).toThrow('requires a locked run')
     const migrated = loadAdminIssueControllerState(config, true)
-    expect(migrated.version).toBe(2)
+    expect(migrated.version).toBe(3)
     expect(migrated.issues[pristine.uid].provenance).toEqual({ kind: 'none' })
     const backups = readdirSync(stateDirectory).filter((entry) =>
       entry.startsWith('state.v1-backup-'),
     )
     expect(backups).toHaveLength(1)
     expect(statSync(join(stateDirectory, backups[0])).mode & 0o777).toBe(0o600)
-    expect(JSON.parse(readFileSync(join(stateDirectory, 'state.json'), 'utf8')).version).toBe(2)
+    expect(JSON.parse(readFileSync(join(stateDirectory, 'state.json'), 'utf8')).version).toBe(3)
+  })
+
+  it('backs up v2 and retains a paused published PR and exact provenance on migration', () => {
+    const stateDirectory = mkdtempSync(join(homedir(), '.admin-issue-controller-v2-media-test-'))
+    temporaryDirectories.push(stateDirectory)
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate) {
+      throw new Error('Expected active candidate')
+    }
+    issue.phase = 'paused'
+    issue.pr = {
+      number: 228,
+      url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/228',
+    }
+    issue.receipts.manuallyClosedAt = '2026-09-23T21:13:30.000Z'
+    issue.provenance.candidate.pushAttempted = true
+    issue.provenance.candidate.publishedHeadSha = issue.provenance.candidate.headSha
+    issue.provenance.candidate.checks = undefined
+    issue.provenance.merge = undefined
+    issue.provenance.deployment = undefined
+    const legacyV2 = { ...controllerState(issue), version: 2 }
+    writeFileSync(join(stateDirectory, 'state.json'), JSON.stringify(legacyV2), { mode: 0o600 })
+    const config = {
+      stateDirectory,
+    } as Parameters<typeof loadAdminIssueControllerState>[0]
+    expect(() => loadAdminIssueControllerState(config)).toThrow('requires a locked run')
+    const migrated = loadAdminIssueControllerState(config, true)
+    expect(migrated.version).toBe(3)
+    expect(migrated.activeUid).toBe(issue.uid)
+    expect(migrated.issues[issue.uid]).toEqual(issue)
+    expect(migrated.issues[issue.uid].phase).toBe('paused')
+    const backups = readdirSync(stateDirectory).filter((entry) =>
+      entry.startsWith('state.v2-backup-'),
+    )
+    expect(backups).toHaveLength(1)
+    expect(statSync(join(stateDirectory, backups[0])).mode & 0o777).toBe(0o600)
+    expect(JSON.parse(readFileSync(join(stateDirectory, backups[0]), 'utf8')).version).toBe(2)
+    expect(JSON.parse(readFileSync(join(stateDirectory, 'state.json'), 'utf8')).version).toBe(3)
+    expect(() => loadAdminIssueControllerState(config, true)).not.toThrow()
+    expect(readdirSync(stateDirectory).filter((entry) =>
+      entry.startsWith('state.v2-backup-'))).toHaveLength(1)
   })
 
   it('binds candidate, checks, merge, and deployment to one exact identity', () => {
