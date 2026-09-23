@@ -59,6 +59,7 @@ import {
   prepareCommittedCandidate,
   prepareCopilotHome,
   pullRequestBodyWithVisualEvidence,
+  pushCandidate,
   readWorktreeSnapshot,
   restoreReadyOutcomeFromWorkerLog,
   runCommand,
@@ -399,6 +400,82 @@ function validationReceipt(
     revision: issue.processedRevision,
     treeSha: diff.treeSha,
   }
+}
+
+function readyCandidateOutcome(): Parameters<typeof prepareCommittedCandidate>[3] {
+  return {
+    changeSummary: ['Updated the dashboard fixture.'],
+    decision: 'ready_for_pr',
+    iosFollowUp: { reason: '', required: false },
+    pr: { body: 'Fix the dashboard fixture.', title: 'Fix fixture' },
+    questions: [],
+    review: { approved: true, findings: [] },
+    schemaVersion: 1,
+    summary: 'Updated the dashboard fixture.',
+    tests: [{ command: 'test validation', result: 'passed' }],
+    visualChange: { reason: 'Fixture-only test; no visible dashboard result.', required: false },
+    visualEvidence: [],
+  }
+}
+
+async function publicationFixture() {
+  const root = mkdtempSync(join(homedir(), '.admin-issue-controller-publication-test-'))
+  temporaryDirectories.push(root)
+  const remotePath = join(root, 'origin.git')
+  const repositoryPath = join(root, 'repository')
+  execFileSync('git', ['init', '--bare', '--initial-branch=master', remotePath])
+  mkdirSync(repositoryPath)
+  const git = (...args: string[]) =>
+    execFileSync('git', args, { cwd: repositoryPath, encoding: 'utf8' }).trim()
+  git('init', '--initial-branch=master')
+  git('config', 'user.name', 'Admin Issue Controller Test')
+  git('config', 'user.email', 'controller-test@example.invalid')
+  git('remote', 'add', 'origin', remotePath)
+  mkdirSync(join(repositoryPath, 'src'))
+  writeFileSync(join(repositoryPath, 'src/fixture.ts'), 'export const value = 1\n')
+  git('add', '--all')
+  git('commit', '-m', 'Base')
+  git('push', '--set-upstream', 'origin', 'master')
+  const baseSha = git('rev-parse', 'HEAD')
+  const branch = 'copilot/admin-todo-321-g1-publication'
+  git('switch', '-c', branch)
+  writeFileSync(join(repositoryPath, 'src/fixture.ts'), 'export const value = 2\n')
+
+  const issue = record()
+  issue.branch = branch
+  issue.worktreePath = repositoryPath
+  issue.processedRevision = 1
+  issue.provenance = {
+    epoch: 'epoch-publication',
+    generation: issue.generation,
+    kind: 'active',
+    preparedBaseSha: baseSha,
+    resyncAttempts: 0,
+    revision: 0,
+  }
+  const state = controllerState(issue)
+  const config = {
+    repositoryPath,
+    stateDirectory: join(root, 'state'),
+  } as Parameters<typeof prepareCommittedCandidate>[0]
+  const first = await prepareCommittedCandidate(config, state, issue, readyCandidateOutcome())
+  return { baseSha, branch, config, first, git, issue, repositoryPath, root, state }
+}
+
+async function replaceCandidate(
+  fixture: Awaited<ReturnType<typeof publicationFixture>>,
+  value: number,
+) {
+  const { config, issue, repositoryPath, state } = fixture
+  appendIssueInput(issue, {
+    body: 'Repair the previous candidate.',
+    createdAt: '2026-09-20T12:05:00.000Z',
+    externalId: `repair:${issue.inputRevision + 1}`,
+    source: 'ci-failure',
+  })
+  markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-20T12:06:00.000Z')
+  writeFileSync(join(repositoryPath, 'src/fixture.ts'), `export const value = ${value}\n`)
+  return prepareCommittedCandidate(config, state, issue, readyCandidateOutcome())
 }
 
 describe('admin issue controller domain', () => {
@@ -2031,6 +2108,8 @@ describe('admin issue controller security configuration', () => {
     expect(synchronized.targetBaseSha).toBe(advancedBaseSha)
     expect(synchronized.diff.files).toEqual(['src/task.ts'])
     expect(synchronized.validation?.headSha).toBe(synchronized.headSha)
+    expect(synchronized.publishedHeadSha).toBe(synchronized.headSha)
+    expect(synchronized.pushAttempted).toBe(true)
     expect(issue.provenance.resyncAttempts).toBe(1)
     expect(issue.provenance.transition).toBeUndefined()
     expect(git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s+/)[0]).toBe(
@@ -2333,6 +2412,8 @@ describe('admin issue controller security configuration', () => {
       targetBaseSha: baseSha,
       treeSha: originalDiff.treeSha,
       validation: validationReceipt(issue, originalDiff),
+      publishedHeadSha: headSha,
+      pushAttempted: true,
       visualEvidence: [
         {
           alt: 'Previous image',
@@ -2381,8 +2462,166 @@ describe('admin issue controller security configuration', () => {
     expect(candidate.validation).toBeUndefined()
     expect(candidate.checks).toBeUndefined()
     expect(candidate.visualEvidence).toBeUndefined()
+    expect(candidate.publishedHeadSha).toBe(headSha)
+    expect(candidate.pushAttempted).toBe(true)
     if (issue.provenance.kind !== 'active') throw new Error('Expected active provenance')
     expect(issue.provenance.revision).toBe(2)
+  })
+
+  it('publishes a repaired candidate when the prior validation failed before any push', async () => {
+    const fixture = await publicationFixture()
+    const { branch, config, first, git, issue, root, state } = fixture
+    expect(first.validation).toBeUndefined()
+    expect(first.pushAttempted).toBe(false)
+    expect(git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`)).toBe('')
+
+    const repair = await replaceCandidate(fixture, 3)
+    expect(repair.expectedRemoteHeadSha).toBeUndefined()
+    expect(repair.pushAttempted).toBe(false)
+    repair.validation = validationReceipt(issue, repair.diff)
+    await pushCandidate(config, state, issue)
+
+    expect(git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s+/)[0]).toBe(
+      repair.headSha,
+    )
+    expect(repair.publishedHeadSha).toBe(repair.headSha)
+    expect(repair.pushAttempted).toBe(true)
+    expect(JSON.parse(readFileSync(join(root, 'state', 'state.json'), 'utf8'))).toMatchObject({
+      issues: {
+        [issue.uid]: {
+          provenance: { candidate: { publishedHeadSha: repair.headSha, pushAttempted: true } },
+        },
+      },
+    })
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
+  })
+
+  it('inherits only the verified published head and rejects deletion before another push', async () => {
+    const fixture = await publicationFixture()
+    const { branch, config, first, git, issue, state } = fixture
+    first.validation = validationReceipt(issue, first.diff)
+    await pushCandidate(config, state, issue)
+    expect(first.publishedHeadSha).toBe(first.headSha)
+
+    const replacement = await replaceCandidate(fixture, 3)
+    expect(replacement.expectedRemoteHeadSha).toBe(first.headSha)
+    replacement.validation = validationReceipt(issue, replacement.diff)
+    await pushCandidate(config, state, issue)
+    expect(replacement.publishedHeadSha).toBe(replacement.headSha)
+
+    const third = await replaceCandidate(fixture, 4)
+    expect(third.expectedRemoteHeadSha).toBe(replacement.headSha)
+    third.validation = validationReceipt(issue, third.diff)
+    git('push', 'origin', '--delete', branch)
+    await expect(pushCandidate(config, state, issue)).rejects.toThrow(
+      `Remote branch ${branch} is absent, expected ${replacement.headSha}`,
+    )
+    expect(git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`)).toBe('')
+  })
+
+  it('rejects an unexpected existing remote branch and a divergent published branch', async () => {
+    const unexpected = await publicationFixture()
+    unexpected.first.validation = validationReceipt(unexpected.issue, unexpected.first.diff)
+    unexpected.git('push', 'origin', `${unexpected.baseSha}:refs/heads/${unexpected.branch}`)
+    await expect(
+      pushCandidate(unexpected.config, unexpected.state, unexpected.issue),
+    ).rejects.toThrow(`expected absent`)
+
+    const divergent = await publicationFixture()
+    const { branch, config, first, git, issue, repositoryPath, state } = divergent
+    first.validation = validationReceipt(issue, first.diff)
+    await pushCandidate(config, state, issue)
+    git('switch', '-c', 'external-update')
+    writeFileSync(join(repositoryPath, 'src/external.ts'), 'export const external = true\n')
+    git('add', '--all')
+    git('commit', '-m', 'External update')
+    git('push', 'origin', `HEAD:refs/heads/${branch}`)
+    const externalHead = git('rev-parse', 'HEAD')
+    git('switch', branch)
+    const replacement = await replaceCandidate(divergent, 3)
+    replacement.validation = validationReceipt(issue, replacement.diff)
+    await expect(pushCandidate(config, state, issue)).rejects.toThrow(
+      `Remote branch ${branch} is ${externalHead}, expected ${first.headSha}`,
+    )
+    expect(git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s+/)[0]).toBe(
+      externalHead,
+    )
+  })
+
+  it('fails closed on ambiguous legacy publication and propagates remote read errors', async () => {
+    const legacy = await publicationFixture()
+    legacy.first.validation = validationReceipt(legacy.issue, legacy.first.diff)
+    delete legacy.first.pushAttempted
+    await expect(replaceCandidate(legacy, 3)).rejects.toThrow('Publication of previous candidate')
+    expect(legacy.git('rev-parse', 'HEAD')).toBe(legacy.first.headSha)
+
+    const failedRead = await publicationFixture()
+    failedRead.first.validation = validationReceipt(failedRead.issue, failedRead.first.diff)
+    failedRead.git('remote', 'set-url', 'origin', join(failedRead.root, 'missing.git'))
+    await expect(
+      pushCandidate(failedRead.config, failedRead.state, failedRead.issue),
+    ).rejects.toThrow('git ls-remote --heads origin')
+    expect(failedRead.first.pushAttempted).toBe(false)
+    if (failedRead.issue.provenance.kind !== 'active') throw new Error('Expected active provenance')
+    expect(failedRead.issue.provenance.quarantine).toBeUndefined()
+  })
+
+  it('confirms an interrupted push only when the remote has the exact candidate head', async () => {
+    const confirmed = await publicationFixture()
+    confirmed.first.validation = validationReceipt(confirmed.issue, confirmed.first.diff)
+    confirmed.first.pushAttempted = true
+    confirmed.git('push', '--set-upstream', 'origin', confirmed.branch)
+    await pushCandidate(confirmed.config, confirmed.state, confirmed.issue)
+    expect(confirmed.first.publishedHeadSha).toBe(confirmed.first.headSha)
+
+    const ambiguous = await publicationFixture()
+    ambiguous.first.validation = validationReceipt(ambiguous.issue, ambiguous.first.diff)
+    ambiguous.first.pushAttempted = true
+    await expect(
+      pushCandidate(ambiguous.config, ambiguous.state, ambiguous.issue),
+    ).rejects.toThrow('Publication of candidate')
+    expect(ambiguous.git('ls-remote', '--heads', 'origin', `refs/heads/${ambiguous.branch}`)).toBe('')
+  })
+
+  it('quarantines a deleted published branch before base synchronization', async () => {
+    const fixture = await publicationFixture()
+    const { branch, config, first, git, issue, repositoryPath, state } = fixture
+    first.validation = validationReceipt(issue, first.diff)
+    await pushCandidate(config, state, issue)
+    git('switch', 'master')
+    writeFileSync(join(repositoryPath, 'src/base-new.ts'), 'export const next = true\n')
+    git('add', '--all')
+    git('commit', '-m', 'Advance master')
+    git('push', 'origin', 'master')
+    const advancedBaseSha = git('rev-parse', 'HEAD')
+    git('switch', branch)
+    git('push', 'origin', '--delete', branch)
+
+    await expect(
+      synchronizeCandidateBase(config, state, issue, advancedBaseSha),
+    ).rejects.toThrow(`Published branch ${branch} is absent, expected ${first.headSha}`)
+    expect(git('rev-parse', 'HEAD')).toBe(first.headSha)
+  })
+
+  it('rejects inconsistent published-head receipts in the journal', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate) {
+      throw new Error('Expected authorized candidate')
+    }
+    const candidate = issue.provenance.candidate
+    candidate.publishedHeadSha = 'd'.repeat(40)
+    candidate.pushAttempted = true
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).toThrow(
+      'publishedHeadSha does not confirm',
+    )
+    candidate.publishedHeadSha = candidate.headSha
+    candidate.pushAttempted = false
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).toThrow(
+      'publishedHeadSha does not confirm',
+    )
+    candidate.pushAttempted = true
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
   })
 
   it('treats committed-candidate worktree drift as a provenance failure', () => {
