@@ -141,7 +141,9 @@ contract, the workflow and deployed SHAs remain on current `master`, the
 deployed SHA descends from the verified issue merge, and the retained worker
 outcome still matches the authorized visual evidence. This also lets an iOS
 follow-up reuse the verified descendant deployment without consulting the
-failed exact run again.
+failed exact run again. Recovery asks GitHub for the latest successful
+protected deployment, so newer fail-closed runs cannot hide an earlier
+descendant deployment that already contains the issue's verified merge.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
