@@ -147,6 +147,10 @@ follow-up reuse the verified descendant deployment without consulting the
 failed exact run again. Recovery asks GitHub for the latest successful
 protected deployment, so newer fail-closed runs cannot hide an earlier
 descendant deployment that already contains the issue's verified merge.
+If a verification-only worker correctly reports that no additional repository
+change is needed after an existing issue PR merged, the controller restores the
+authorized ready outcome and finalizes against that same verified deployment
+instead of demanding a fabricated second pull request.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the

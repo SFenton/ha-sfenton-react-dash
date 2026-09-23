@@ -4492,7 +4492,10 @@ export function hasRecoverableDeployment(record: AdminIssueRecord) {
   }
   const reason = record.receipts.controllerBlockedReason ??
     (record.lastOutcome?.decision === 'blocked' ? record.lastOutcome.reason : '')
-  return /^Deployment run \S+ concluded (?!success\b)/.test(reason)
+  return (
+    /^Deployment run \S+ concluded (?!success\b)/.test(reason) ||
+    reason === 'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state'
+  )
 }
 
 export function deploymentRecoveryDue(

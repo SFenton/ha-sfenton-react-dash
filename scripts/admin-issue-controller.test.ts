@@ -1121,6 +1121,10 @@ describe('admin issue controller domain', () => {
     issue.receipts.deploymentRecoveryCheckedAt = '2026-09-20T12:08:00.000Z'
     expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(false)
     expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:14:00.000Z'))).toBe(true)
+
+    issue.receipts.controllerBlockedReason =
+      'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state'
+    expect(hasRecoverableDeployment(issue)).toBe(true)
   })
 
   it('recovers against the latest successful deployment instead of a newer failure', () => {
