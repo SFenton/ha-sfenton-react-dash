@@ -28,6 +28,7 @@ import {
   AdminIssueProvenanceError,
   assertDeploymentRunSucceeded,
   assertExactCandidateSnapshot,
+  assertSuccessfulLayoutWorkflowRun,
   assertResolvedWithoutPullRequestSnapshot,
   assertIssueCommentBodyContainsVisualEvidence,
   assertWorkerHostConfigurationSafe,
@@ -45,6 +46,8 @@ import {
   githubRepositoryFromRemote,
   hasRecoverableDeployment,
   hasRecoverableTransition,
+  latestSuccessfulDeploymentRunPath,
+  layoutWorkflowRunsPath,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
   prepareCommittedCandidate,
@@ -74,6 +77,7 @@ import {
   assertCandidateAuthorized,
   assertCandidateVisualEvidence,
   assertFinalizationAuthorized,
+  assertLayoutFinalizationAuthorized,
   baselineAdminIssueState,
   beginAdminIssueGeneration,
   branchNameForIssue,
@@ -82,6 +86,7 @@ import {
   deploymentReceiptIsAccepted,
   formatBlockedComment,
   formatCompletionComment,
+  formatLayoutCompletionComment,
   formatPullRequestComment,
   formatQuestionsComment,
   formatResolvedWithoutPrComment,
@@ -536,6 +541,7 @@ describe('admin issue controller domain', () => {
     issue.receipts.awaitingIosVerificationAt = '2026-09-20T12:01:00.000Z'
     issue.receipts.checksPassedAt = '2026-09-20T12:01:00.000Z'
     issue.receipts.deployedAt = '2026-09-20T12:01:00.000Z'
+    issue.receipts.layoutValidatedAt = '2026-09-20T12:01:00.000Z'
     const sessionName = issue.sessionName
 
     beginAdminIssueGeneration(issue, '2026-09-20T12:02:00.000Z')
@@ -554,6 +560,7 @@ describe('admin issue controller domain', () => {
     expect(issue.receipts.awaitingIosVerificationAt).toBeUndefined()
     expect(issue.receipts.checksPassedAt).toBeUndefined()
     expect(issue.receipts.deployedAt).toBeUndefined()
+    expect(issue.receipts.layoutValidatedAt).toBeUndefined()
   })
 
   it('migrates version-1 state without granting legacy provenance', () => {
@@ -677,6 +684,39 @@ describe('admin issue controller domain', () => {
     issue.provenance.deployment.sourceSha = 'a'.repeat(40)
     expect(() => assertFinalizationAuthorized(issue)).toThrow(
       'Descendant deployment source does not match workflow head',
+    )
+  })
+
+  it('authorizes exact post-merge layout validation without a dashboard deployment', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.automationKind = 'layout'
+    issue.origin = 'github-automation'
+    if (issue.provenance.kind !== 'active' || !issue.provenance.merge) {
+      throw new Error('Expected merge provenance')
+    }
+    delete issue.provenance.deployment
+    issue.provenance.layoutValidation = {
+      conclusion: 'success',
+      epoch: issue.provenance.epoch,
+      generation: issue.generation,
+      mergeSha: issue.provenance.merge.mergeSha,
+      observedAt: '2026-09-20T12:06:00.000Z',
+      revision: issue.processedRevision,
+      workflowHeadSha: issue.provenance.merge.mergeSha,
+      workflowRunAttempt: 1,
+      workflowRunId: 24,
+      workflowUrl: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+    }
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
+    expect(() => assertLayoutFinalizationAuthorized(issue)).not.toThrow()
+    expect(() => assertFinalizationAuthorized(issue)).toThrow(
+      'Issue does not have a verified deployment',
+    )
+
+    issue.provenance.layoutValidation.workflowHeadSha = 'f'.repeat(40)
+    expect(() => assertLayoutFinalizationAuthorized(issue)).toThrow(
+      'Layout validation workflow head does not match merge',
     )
   })
 
@@ -941,6 +981,28 @@ describe('admin issue controller domain', () => {
         issue,
       }),
     ).toContain('## Fixed and deployed')
+    issue.automationKind = 'layout'
+    issue.origin = 'github-automation'
+    if (issue.provenance.kind !== 'active' || !issue.provenance.merge) {
+      throw new Error('Expected merge provenance')
+    }
+    delete issue.provenance.deployment
+    issue.provenance.layoutValidation = {
+      conclusion: 'success',
+      epoch: issue.provenance.epoch,
+      generation: issue.generation,
+      mergeSha: issue.provenance.merge.mergeSha,
+      observedAt: '2026-09-20T12:06:00.000Z',
+      revision: issue.processedRevision,
+      workflowHeadSha: issue.provenance.merge.mergeSha,
+      workflowRunAttempt: 1,
+      workflowRunId: 24,
+      workflowUrl: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+    }
+    expect(formatLayoutCompletionComment(issue)).toContain('## Fixed and validated')
+    expect(formatLayoutCompletionComment(issue)).toContain(
+      '**Post-merge layout validation:** https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+    )
   })
 
   it('allows no-PR completion only from an unchanged isolated base', () => {
@@ -1058,6 +1120,41 @@ describe('admin issue controller domain', () => {
     issue.receipts.deploymentRecoveryCheckedAt = '2026-09-20T12:08:00.000Z'
     expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(false)
     expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:14:00.000Z'))).toBe(true)
+  })
+
+  it('recovers against the latest successful deployment instead of a newer failure', () => {
+    expect(
+      latestSuccessfulDeploymentRunPath(
+        'SFenton/ha-sfenton-react-dash',
+        'deploy-dashboard.yml',
+      ),
+    ).toBe(
+      'repos/SFenton/ha-sfenton-react-dash/actions/workflows/deploy-dashboard.yml/runs?branch=master&event=push&status=success&per_page=1',
+    )
+  })
+
+  it('binds layout validation to the exact protected master workflow run', () => {
+    const mergeSha = 'd'.repeat(40)
+    expect(
+      layoutWorkflowRunsPath('SFenton/ha-sfenton-react-dash', mergeSha),
+    ).toBe(
+      `repos/SFenton/ha-sfenton-react-dash/actions/workflows/playwright.yml/runs?head_sha=${mergeSha}&event=push&per_page=20`,
+    )
+    const run = {
+      conclusion: 'success',
+      event: 'push',
+      head_branch: 'master',
+      head_sha: mergeSha,
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+      status: 'completed',
+    }
+    expect(() => assertSuccessfulLayoutWorkflowRun(run, mergeSha)).not.toThrow()
+    expect(() =>
+      assertSuccessfulLayoutWorkflowRun({ ...run, conclusion: 'failure' }, mergeSha),
+    ).toThrow('concluded failure')
+    expect(() =>
+      assertSuccessfulLayoutWorkflowRun({ ...run, head_sha: 'f'.repeat(40) }, mergeSha),
+    ).toThrow('does not bind exact merge')
   })
 
   it('restores the exact ready outcome from the retained successful worker log', () => {
@@ -2358,6 +2455,10 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('assertWorkerChangesSafe(record.worktreePath, files, record)')
     expect(controller).toContain('recoverBlockedDeployments(config, client, state)')
     expect(controller).toContain('loadBoundDeploymentReceipt(config, record)')
+    expect(controller).toContain("record.automationKind === 'layout'")
+    expect(controller).toContain('waitForLayoutWorkflow(')
+    expect(controller).toContain('bindVerifiedLayoutWorkflow(record, run)')
+    expect(controller).toContain('finalizeLayoutIssue(config, state, record, run)')
     expect(controller).toContain('restoreReadyOutcomeFromWorkerLog(config, record)')
     expect(controller).toContain('waitForPullRequestHead(')
     expect(controller).toContain(
@@ -2399,6 +2500,8 @@ describe('admin issue controller security configuration', () => {
     expect(layoutPrompt).toContain('trusted layout-failure issue')
     expect(layoutPrompt).toContain('docs/ux/layouts.md')
     expect(layoutPrompt).toContain('scripts/layout')
+    expect(layoutPrompt).toContain('focused provenance-bound mixed-context runs')
+    expect(layoutPrompt).toContain('protected post-merge Automated layout job')
     expect(layoutPrompt).not.toContain('.github/workflows/deploy-dashboard.yml')
   })
 })

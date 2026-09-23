@@ -43,7 +43,10 @@ Trusted layout-failure issues have a separate narrow exception for
 `scripts/layout/` and the generated `docs/ux/layouts.md` contract. Those paths
 are read-only for ordinary issue workers and writable only when the issue was
 adopted from the exact GitHub Actions layout-failure marker. The host rechecks
-the same scope before committing the candidate.
+the same scope before committing the candidate. After merge, these issues bind
+completion to the exact merge SHA's successful protected `Playwright` push
+workflow, which includes the `Automated layout` job; they do not wait for or
+claim a dashboard deployment.
 Repository env and package-credential files are masked with `/dev/null`, and
 build caches use per-command tmpfs mounts, so model commands cannot read local
 tokens or persist a cache that influences trusted validation.
@@ -141,7 +144,9 @@ contract, the workflow and deployed SHAs remain on current `master`, the
 deployed SHA descends from the verified issue merge, and the retained worker
 outcome still matches the authorized visual evidence. This also lets an iOS
 follow-up reuse the verified descendant deployment without consulting the
-failed exact run again.
+failed exact run again. Recovery asks GitHub for the latest successful
+protected deployment, so newer fail-closed runs cannot hide an earlier
+descendant deployment that already contains the issue's verified merge.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
@@ -160,6 +165,10 @@ output-limit enforcement kill the launcher and its local descendants together,
 so a Copilot core or Docker client cannot retain the controller's output pipe
 after the launcher exits. The next controller cycle also removes any labeled
 worker container left behind by a forcibly disconnected Docker client.
+Workflow-authenticated layout workers use changed tests and focused
+provenance-bound mixed-context runs for local acceptance. They must not turn a
+full historical or full-known-mock replay into a pre-PR gate; the protected
+post-merge `Automated layout` job owns exact full-corpus evidence.
 
 ## Candidate provenance
 

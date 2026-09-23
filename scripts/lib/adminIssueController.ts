@@ -189,6 +189,19 @@ export interface AdminIssueDeploymentBinding {
   workflowRunId: number
 }
 
+export interface AdminIssueLayoutValidationBinding {
+  conclusion: 'success'
+  epoch: string
+  generation: number
+  mergeSha: string
+  observedAt: string
+  revision: number
+  workflowHeadSha: string
+  workflowRunAttempt: number
+  workflowRunId: number
+  workflowUrl: string
+}
+
 export type AdminIssueProvenance =
   | { kind: 'none' }
   | {
@@ -205,6 +218,7 @@ export type AdminIssueProvenance =
     epoch: string
     generation: number
     kind: 'active'
+    layoutValidation?: AdminIssueLayoutValidationBinding
     merge?: AdminIssueMergeReceipt
     preparedBaseSha: string
     quarantine?: {
@@ -781,6 +795,31 @@ function assertProvenance(value: unknown, field: string) {
       )
     }
   }
+  if (provenance.layoutValidation) {
+    const validation = provenance.layoutValidation
+    assert(!provenance.deployment, `${field}.layoutValidation cannot coexist with deployment`)
+    assertReceiptContext(
+      validation as unknown as Record<string, unknown>,
+      `${field}.layoutValidation`,
+      provenance,
+    )
+    assert(validation.conclusion === 'success', `${field}.layoutValidation.conclusion is invalid`)
+    sha(validation.mergeSha, `${field}.layoutValidation.mergeSha`)
+    sha(validation.workflowHeadSha, `${field}.layoutValidation.workflowHeadSha`)
+    isoTimestamp(validation.observedAt, `${field}.layoutValidation.observedAt`)
+    positiveInteger(validation.workflowRunId, `${field}.layoutValidation.workflowRunId`)
+    positiveInteger(
+      validation.workflowRunAttempt,
+      `${field}.layoutValidation.workflowRunAttempt`,
+    )
+    nonEmptyString(validation.workflowUrl, `${field}.layoutValidation.workflowUrl`)
+    assert(provenance.merge, `${field}.layoutValidation has no verified merge`)
+    assert(
+      validation.mergeSha === provenance.merge.mergeSha &&
+      validation.workflowHeadSha === provenance.merge.mergeSha,
+      `${field}.layoutValidation does not match the verified merge`,
+    )
+  }
   if (provenance.quarantine) {
     nonEmptyString(provenance.quarantine.reason, `${field}.quarantine.reason`)
     isoTimestamp(provenance.quarantine.detectedAt, `${field}.quarantine.detectedAt`)
@@ -979,7 +1018,7 @@ export function assertCandidateAuthorized(record: AdminIssueRecord, requireCheck
   return { candidate, provenance }
 }
 
-export function assertFinalizationAuthorized(record: AdminIssueRecord) {
+export function assertMergedCandidateAuthorized(record: AdminIssueRecord) {
   const { candidate, provenance } = assertCandidateAuthorized(record, true)
   assertCandidateVisualEvidence(record, true)
   assert(record.pr, 'Issue does not have a pull request')
@@ -991,6 +1030,11 @@ export function assertFinalizationAuthorized(record: AdminIssueRecord) {
   assert(merge.prNumber === record.pr.number, 'Merge pull request does not match issue')
   assert(merge.candidateHeadSha === candidate.headSha, 'Merge candidate does not match provenance')
   assert(merge.baseSha === candidate.targetBaseSha, 'Merge base does not match candidate')
+  return { candidate, merge, provenance }
+}
+
+export function assertFinalizationAuthorized(record: AdminIssueRecord) {
+  const { candidate, merge, provenance } = assertMergedCandidateAuthorized(record)
   const deployment = provenance.deployment
   assert(deployment, 'Issue does not have a verified deployment')
   assert(deployment.epoch === provenance.epoch, 'Deployment epoch does not match provenance')
@@ -1011,6 +1055,39 @@ export function assertFinalizationAuthorized(record: AdminIssueRecord) {
     assert(deployment.sourceSha === merge.mergeSha, 'Deployment source does not match merge')
   }
   return { candidate, deployment, merge, provenance }
+}
+
+export function assertLayoutFinalizationAuthorized(record: AdminIssueRecord) {
+  const { candidate, merge, provenance } = assertMergedCandidateAuthorized(record)
+  assert(record.automationKind === 'layout', 'Issue is not a trusted layout incident')
+  assert(!provenance.deployment, 'Layout validation cannot coexist with deployment')
+  const layoutValidation = provenance.layoutValidation
+  assert(layoutValidation, 'Issue does not have verified post-merge layout validation')
+  assert(
+    layoutValidation.epoch === provenance.epoch,
+    'Layout validation epoch does not match provenance',
+  )
+  assert(
+    layoutValidation.generation === provenance.generation,
+    'Layout validation generation does not match provenance',
+  )
+  assert(
+    layoutValidation.revision === provenance.revision,
+    'Layout validation revision does not match provenance',
+  )
+  assert(
+    layoutValidation.mergeSha === merge.mergeSha,
+    'Layout validation merge does not match verified merge',
+  )
+  assert(
+    layoutValidation.workflowHeadSha === merge.mergeSha,
+    'Layout validation workflow head does not match merge',
+  )
+  assert(
+    layoutValidation.conclusion === 'success',
+    'Layout validation did not conclude successfully',
+  )
+  return { candidate, layoutValidation, merge, provenance }
 }
 
 export function adminIssueMarker(uid: string) {
@@ -1209,6 +1286,7 @@ export function beginAdminIssueGeneration(record: AdminIssueRecord, updatedAt: s
     'deployedAt',
     'deploymentRunUrl',
     'iosVerifiedAt',
+    'layoutValidatedAt',
     'mergedAt',
     'prOpenedAt',
     'validatedAt',
@@ -1646,6 +1724,37 @@ ${tests}
 **Merged commit:** \`${merge.mergeSha}\`
 **Deployment:** ${input.deployment.url}
 **Production result:** ${input.deployment.disposition} at \`${input.deployment.deployedSha}\`${evidence}${ios}`
+}
+
+export function formatLayoutCompletionComment(issue: AdminIssueRecord) {
+  const outcome = issue.lastOutcome
+  assert(outcome?.decision === 'ready_for_pr', 'Completion requires a ready_for_pr outcome')
+  const { layoutValidation, merge } = assertLayoutFinalizationAuthorized(issue)
+  const changes = outcome.changeSummary.map((entry) => `- ${entry}`).join('\n')
+  const tests = outcome.tests.map((entry) => `- \`${entry.command}\` — ${entry.result}`).join('\n')
+  const evidenceCount = outcome.visualEvidence?.length ?? 0
+  const evidence = evidenceCount > 0
+    ? `\n**Proposed fixed behavior:** ${evidenceCount} GitHub-hosted image${evidenceCount === 1 ? '' : 's'} in the pull request`
+    : ''
+  const ios = outcome.iosFollowUp.required
+    ? `\n\n> **Manual iOS follow-up:** ${outcome.iosFollowUp.reason}`
+    : ''
+  return `${CONTROLLER_COMMENT_MARKER}
+${controllerReceiptMarker(issue.uid, 'completed')}
+
+## Fixed and validated
+
+${outcome.summary}
+
+**What changed**
+${changes}
+
+**Validation**
+${tests}
+
+**Pull request:** ${issue.pr?.url}
+**Merged commit:** \`${merge.mergeSha}\`
+**Post-merge layout validation:** ${layoutValidation.workflowUrl}${evidence}${ios}`
 }
 
 export function deploymentReceiptIsAccepted(
