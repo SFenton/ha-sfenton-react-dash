@@ -1,7 +1,9 @@
 // @covers src/panel/sfentonReactAppCard.ts
 // @covers e2e/layout/foldBridgeFixture.ts
+// @covers e2e/layout/app.ts
 import { expect, test, type Page } from './layout/fixture'
 import { FOLD_TEST_CARD_TAG } from '../src/constants/rtcPilot'
+import { openHost } from './layout/app'
 import { serveFoldBridge } from './layout/foldBridgeFixture'
 import {
   REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY,
@@ -279,6 +281,17 @@ test('Fold-only card resource preserves the iframe without replacing the product
   expect(instanceIds.size).toBe(1)
   await page.waitForTimeout(5_100)
   await expectDisposed(page)
+})
+
+test('Fold layout host opens its own card and keeps the app frame on resize', async ({ page }) => {
+  const frame = await openHost(page, 'pilot')
+  const initialOrigin = await frame.evaluate(() => performance.timeOrigin)
+
+  await expect(page.locator('[data-layout-host="pilot"]')).toHaveCount(1)
+  expect(await page.evaluate((tag) => Boolean(customElements.get(tag)), FOLD_TEST_CARD_TAG)).toBe(true)
+  await page.setViewportSize({ width: 852, height: 393 })
+  await expect.poll(() => frame.evaluate(() => innerWidth)).toBe(852)
+  expect(await frame.evaluate(() => performance.timeOrigin)).toBe(initialOrigin)
 })
 
 test('custom panel preserves one lifecycle across outer-frame replacements', async ({ page }) => {
