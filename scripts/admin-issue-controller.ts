@@ -93,6 +93,8 @@ export interface AdminIssueControllerConfig {
   repositoryPath: string
   requiredChecks: string[]
   requiredWorkflow: string
+  runnerControllerConfigPath: string
+  runnerControllerService: string
   stateDirectory: string
   todoEntityId: string
   tandemSkillPath: string
@@ -308,6 +310,14 @@ function parseNonEmptyString(value: unknown, field: string) {
   return value.trim()
 }
 
+function parseSystemdUserService(value: unknown, field: string) {
+  const service = parseNonEmptyString(value, field)
+  if (!/^[A-Za-z0-9_.@-]+\.service$/.test(service)) {
+    throw new Error(`${field} must be a systemd service unit name`)
+  }
+  return service
+}
+
 function parseStringArray(value: unknown, field: string) {
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string' || !entry.trim())) {
     throw new Error(`${field} must be an array of non-empty strings`)
@@ -317,6 +327,35 @@ function parseStringArray(value: unknown, field: string) {
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function workflowDigestRotationRequired(files: string[], workflowPath: string) {
+  return files.includes(workflowPath)
+}
+
+export function updateWorkflowDigestConfig(
+  value: unknown,
+  workflowSha256: string,
+) {
+  if (!/^[a-f0-9]{64}$/.test(workflowSha256)) {
+    throw new Error('workflowSha256 must be a lowercase SHA-256 digest')
+  }
+  if (!object(value)) {
+    throw new Error('Runner controller config must be a JSON object')
+  }
+  if (value.version !== 1) {
+    throw new Error('Runner controller config version must be 1')
+  }
+  if (
+    typeof value.workflowSha256 !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(value.workflowSha256)
+  ) {
+    throw new Error('Runner controller config workflowSha256 is invalid')
+  }
+  return {
+    ...value,
+    workflowSha256,
+  }
 }
 
 export function selectWorkerHassMcpConfig(value: unknown, serverName: string) {
@@ -369,6 +408,16 @@ function pathsOverlap(left: string, right: string) {
   const outside = (value: string) =>
     value === '..' || value.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
   return !outside(leftToRight) || !outside(rightToLeft)
+}
+
+function assertPrivateRegularFile(path: string, field: string) {
+  const file = lstatSync(path)
+  if (!file.isFile()) {
+    throw new Error(`${field} must reference a regular file`)
+  }
+  if (process.platform !== 'win32' && (file.mode & 0o077) !== 0) {
+    throw new Error(`${field} must not be readable by group or other users`)
+  }
 }
 
 export function loadAdminIssueControllerConfig(configPath: string): AdminIssueControllerConfig {
@@ -427,6 +476,21 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
     raw.hassMcpServerName ?? 'hass',
     'hassMcpServerName',
   )
+  const runnerControllerConfigPath = resolveInside(
+    homedir(),
+    parseNonEmptyString(
+      raw.runnerControllerConfigPath ??
+        '~/.config/ha-dashboard-runner/controller.json',
+      'runnerControllerConfigPath',
+    ),
+    'runnerControllerConfigPath',
+  )
+  if (existsSync(runnerControllerConfigPath)) {
+    assertPrivateRegularFile(
+      runnerControllerConfigPath,
+      'runnerControllerConfigPath',
+    )
+  }
   if (
     !/^[A-Za-z0-9_.-]+$/.test(hassMcpServerName) ||
     ['__proto__', 'constructor', 'prototype'].includes(hassMcpServerName)
@@ -464,7 +528,18 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
   if (pathsOverlap(repositoryPath, hassMcpConfigPath)) {
     throw new Error('hassMcpConfigPath must not overlap repositoryPath')
   }
+  if (pathsOverlap(repositoryPath, runnerControllerConfigPath)) {
+    throw new Error('runnerControllerConfigPath must not overlap repositoryPath')
+  }
+  if (pathsOverlap(hassMcpConfigPath, runnerControllerConfigPath)) {
+    throw new Error('runnerControllerConfigPath must not overlap hassMcpConfigPath')
+  }
   for (let index = 0; index < mutablePaths.length; index += 1) {
+    if (pathsOverlap(mutablePaths[index][1], runnerControllerConfigPath)) {
+      throw new Error(
+        `runnerControllerConfigPath must not overlap ${mutablePaths[index][0]}`,
+      )
+    }
     for (let other = index + 1; other < mutablePaths.length; other += 1) {
       if (pathsOverlap(mutablePaths[index][1], mutablePaths[other][1])) {
         throw new Error(`${mutablePaths[index][0]} must not overlap ${mutablePaths[other][0]}`)
@@ -505,6 +580,12 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
       raw.requiredWorkflow ?? 'deploy-dashboard.yml',
       'requiredWorkflow',
     ),
+    runnerControllerConfigPath,
+    runnerControllerService: parseSystemdUserService(
+      raw.runnerControllerService ??
+        'ha-dashboard-runner-controller.service',
+      'runnerControllerService',
+    ),
     stateDirectory,
     tandemSkillPath,
     todoEntityId: parseNonEmptyString(raw.todoEntityId, 'todoEntityId'),
@@ -513,6 +594,101 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
     workerHome,
     workerTimeoutMinutes: parsePositiveInteger(raw.workerTimeoutMinutes ?? 90, 'workerTimeoutMinutes'),
     worktreeRoot,
+  }
+}
+
+async function rotateRunnerWorkflowDigest(
+  config: AdminIssueControllerConfig,
+  mergeSha: string,
+  files: string[],
+) {
+  const workflowPath = `.github/workflows/${config.requiredWorkflow}`
+  if (!workflowDigestRotationRequired(files, workflowPath)) return
+  if (!existsSync(config.runnerControllerConfigPath)) {
+    throw new AdminIssueProvenanceError(
+      `Runner controller config is missing at ${config.runnerControllerConfigPath}`,
+    )
+  }
+  assertPrivateRegularFile(
+    config.runnerControllerConfigPath,
+    'runnerControllerConfigPath',
+  )
+  await runCommand('git', ['fetch', '--quiet', 'origin', 'master'], {
+    cwd: config.repositoryPath,
+    timeoutMs: 120_000,
+  })
+  const onMaster = await runCommand(
+    'git',
+    ['merge-base', '--is-ancestor', mergeSha, 'origin/master'],
+    {
+      allowFailure: true,
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    },
+  )
+  if (onMaster.exitCode !== 0) {
+    throw new AdminIssueProvenanceError(
+      `Merged workflow commit ${mergeSha} is not on current origin/master`,
+    )
+  }
+  const source = (
+    await runCommand('git', ['show', `${mergeSha}:${workflowPath}`], {
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    })
+  ).stdout
+  const workflowSha256 = createHash('sha256').update(source).digest('hex')
+  const currentSerialized = readFileSync(
+    config.runnerControllerConfigPath,
+    'utf8',
+  )
+  const current = JSON.parse(currentSerialized) as unknown
+  const updated = updateWorkflowDigestConfig(current, workflowSha256)
+  if (object(current) && current.workflowSha256 === workflowSha256) {
+    await assertRunnerControllerActive(config)
+    return
+  }
+  const temporaryPath = `${config.runnerControllerConfigPath}.${process.pid}.tmp`
+  writeFileSync(temporaryPath, `${JSON.stringify(updated, null, 2)}\n`, {
+    mode: 0o600,
+  })
+  renameSync(temporaryPath, config.runnerControllerConfigPath)
+  chmodSync(config.runnerControllerConfigPath, 0o600)
+  try {
+    await runCommand(
+      'systemctl',
+      ['--user', 'restart', config.runnerControllerService],
+      { timeoutMs: 30_000 },
+    )
+    await assertRunnerControllerActive(config)
+  } catch (error) {
+    const restorePath = `${config.runnerControllerConfigPath}.${process.pid}.restore`
+    writeFileSync(restorePath, currentSerialized, { mode: 0o600 })
+    renameSync(restorePath, config.runnerControllerConfigPath)
+    chmodSync(config.runnerControllerConfigPath, 0o600)
+    await runCommand(
+      'systemctl',
+      ['--user', 'restart', config.runnerControllerService],
+      { allowFailure: true, timeoutMs: 30_000 },
+    )
+    throw new AdminIssueProvenanceError(
+      `Runner controller trust rotation failed and the prior config was restored: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+}
+
+async function assertRunnerControllerActive(config: AdminIssueControllerConfig) {
+  const active = await runCommand(
+    'systemctl',
+    ['--user', 'is-active', config.runnerControllerService],
+    { allowFailure: true, timeoutMs: 30_000 },
+  )
+  if (active.exitCode !== 0 || active.stdout.trim() !== 'active') {
+    throw new AdminIssueProvenanceError(
+      `Runner controller ${config.runnerControllerService} is not active`,
+    )
   }
 }
 
@@ -3970,6 +4146,11 @@ async function mergePullRequest(
   }
   record.phase = 'deploying'
   record.receipts.mergedAt = merged.merged_at
+  await rotateRunnerWorkflowDigest(
+    config,
+    merged.merge_commit_sha,
+    candidate.diff.files,
+  )
   return { mergeSha: merged.merge_commit_sha }
 }
 

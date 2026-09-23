@@ -118,6 +118,16 @@ workflow file, and the exact local Docker image ID. Start with `"mode":
 user's authenticated `gh` and Docker clients; its GitHub credential must never
 be copied into a workflow secret or runner container.
 
+The workflow digest is a deliberate trust boundary. After protected checks
+pass and a merge commit is proven on `origin/master`, any release that changed
+`.github/workflows/deploy-dashboard.yml` must atomically replace only
+`workflowSha256` with the exact merged blob digest, preserve mode `0600`,
+restart `ha-dashboard-runner-controller.service`, and verify it is active
+before waiting for the deployment job. Never authorize a candidate or pull
+request head before merge. The Admin issue controller performs this rotation
+for deployment-repair pull requests it merges; other release coordinators own
+the same post-merge step for their releases.
+
 The smoke dispatch must prove:
 
 - the job receives only its unique label;

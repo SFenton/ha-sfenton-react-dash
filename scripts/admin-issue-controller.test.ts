@@ -57,6 +57,8 @@ import {
   summarizeFailedCheckLogs,
   synchronizeCandidateBase,
   waitForMergedPullRequest,
+  updateWorkflowDigestConfig,
+  workflowDigestRotationRequired,
 } from './admin-issue-controller'
 import {
   CONTROLLER_COMMENT_MARKER,
@@ -140,6 +142,57 @@ function record(): AdminIssueRecord {
     workerRuns: 0,
   }
 }
+
+describe('deployment runner trust rotation', () => {
+  it('rotates only when the protected deployment workflow changed', () => {
+    expect(
+      workflowDigestRotationRequired(
+        ['.github/workflows/deploy-dashboard.yml'],
+        '.github/workflows/deploy-dashboard.yml',
+      ),
+    ).toBe(true)
+    expect(
+      workflowDigestRotationRequired(
+        ['scripts/deploy-dashboard-ci.ts'],
+        '.github/workflows/deploy-dashboard.yml',
+      ),
+    ).toBe(false)
+  })
+
+  it('preserves the runner config while replacing only the trusted digest', () => {
+    expect(
+      updateWorkflowDigestConfig(
+        {
+          mode: 'production',
+          runnerImageId: `sha256:${'a'.repeat(64)}`,
+          version: 1,
+          workflowSha256: 'b'.repeat(64),
+        },
+        'c'.repeat(64),
+      ),
+    ).toEqual({
+      mode: 'production',
+      runnerImageId: `sha256:${'a'.repeat(64)}`,
+      version: 1,
+      workflowSha256: 'c'.repeat(64),
+    })
+  })
+
+  it('rejects malformed runner config and digests', () => {
+    expect(() =>
+      updateWorkflowDigestConfig(
+        { version: 1, workflowSha256: 'b'.repeat(64) },
+        'not-a-digest',
+      ),
+    ).toThrow('workflowSha256')
+    expect(() =>
+      updateWorkflowDigestConfig(
+        { version: 2, workflowSha256: 'b'.repeat(64) },
+        'c'.repeat(64),
+      ),
+    ).toThrow('version')
+  })
+})
 
 function authorizeRecord(issue: AdminIssueRecord) {
   const baseSha = 'a'.repeat(40)
@@ -1965,6 +2018,7 @@ describe('admin issue controller security configuration', () => {
     const workerExtensionPath = join(root, 'worker-extension.mjs')
     const tandemSkillPath = join(root, 'tandem-research', 'SKILL.md')
     const hassMcpConfigPath = join(root, 'mcp-config.json')
+    const runnerControllerConfigPath = join(root, 'runner-controller.json')
     mkdirSync(repositoryPath, { recursive: true })
     mkdirSync(resolve(tandemSkillPath, '..'), { recursive: true })
     writeFileSync(workerExtensionPath, 'export {};\n')
@@ -1977,6 +2031,11 @@ describe('admin issue controller security configuration', () => {
           playwright: { command: '/usr/bin/false' },
         },
       }),
+      { mode: 0o600 },
+    )
+    writeFileSync(
+      runnerControllerConfigPath,
+      JSON.stringify({ version: 1, workflowSha256: 'b'.repeat(64) }),
       { mode: 0o600 },
     )
     const configPath = join(root, 'controller.json')
@@ -1998,6 +2057,8 @@ describe('admin issue controller security configuration', () => {
       requiredCheckAppId: 15368,
       requiredChecks: ['Playwright gate'],
       requiredWorkflow: 'deploy-dashboard.yml',
+      runnerControllerConfigPath,
+      runnerControllerService: 'ha-dashboard-runner-controller.service',
       stateDirectory: join(root, 'state'),
       tandemSkillPath,
       todoEntityId: 'todo.groceries',
@@ -2014,6 +2075,8 @@ describe('admin issue controller security configuration', () => {
       requiredCheckAppId: 15368,
       hassMcpConfigPath,
       hassMcpServerName: 'hass',
+      runnerControllerConfigPath,
+      runnerControllerService: 'ha-dashboard-runner-controller.service',
       workerImageId: base.workerImageId,
     })
     expect(
@@ -2046,6 +2109,21 @@ describe('admin issue controller security configuration', () => {
 
     writeFileSync(configPath, JSON.stringify({ ...base, workerImageId: 'node:latest' }))
     expect(() => loadAdminIssueControllerConfig(configPath)).toThrow('immutable sha256 image ID')
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({ ...base, runnerControllerService: '--system' }),
+    )
+    expect(() => loadAdminIssueControllerConfig(configPath)).toThrow(
+      'systemd service unit name',
+    )
+
+    chmodSync(runnerControllerConfigPath, 0o644)
+    writeFileSync(configPath, JSON.stringify(base))
+    expect(() => loadAdminIssueControllerConfig(configPath)).toThrow(
+      'runnerControllerConfigPath must not be readable',
+    )
+    chmodSync(runnerControllerConfigPath, 0o600)
 
     chmodSync(hassMcpConfigPath, 0o644)
     writeFileSync(configPath, JSON.stringify(base))

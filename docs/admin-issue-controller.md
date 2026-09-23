@@ -102,13 +102,19 @@ mutable user extensions or unrelated personal skills.
    persisted visual-evidence URL to match the candidate. Bind protected checks
    from the pinned GitHub App to that exact SHA and merge with
    `--match-head-commit`.
-12. Require a successful v2 deployment artifact with accepted disposition,
-   verified paths, panel registration, and a released deployment lease. The
-   normal path binds the exact merge SHA. If that exact run failed before
-   deployment, a later successful `master` deployment may recover the issue
-   only after the controller verifies the newer receipt and proves with Git
-   ancestry that its deployed SHA contains the issue merge.
-13. Post the completion evidence, close the issue, complete the Home Assistant
+12. When the exact reviewed candidate changed the protected deployment
+    workflow, fetch and prove the merge commit on current `origin/master`,
+    atomically rotate only the local JIT controller's trusted workflow digest,
+    restart that controller, and verify it is active. A failed rotation restores
+    the prior private config and blocks rather than leaving an unexplained queued
+    deployment.
+13. Require a successful v2 deployment artifact with accepted disposition,
+    verified paths, panel registration, and a released deployment lease. The
+    normal path binds the exact merge SHA. If that exact run failed before
+    deployment, a later successful `master` deployment may recover the issue
+    only after the controller verifies the newer receipt and proves with Git
+    ancestry that its deployed SHA contains the issue merge.
+14. Post the completion evidence, close the issue, complete the Home Assistant
     item, verify its completion receipt, and remove the issue worktree.
 
 A protected-check failure first receives one host-owned rerun of the failed
@@ -274,6 +280,10 @@ keep the configuration mode `0600`. Keep `hassMcpConfigPath` pointed at the
 operator's private MCP configuration and `hassMcpServerName` matched to the
 trusted Home Assistant server entry. The controller fails closed if the file
 is not private, the server is missing, or the transport is malformed.
+Keep `runnerControllerConfigPath` pointed at the private deployment-runner
+config and `runnerControllerService` set to its exact user service. Those
+settings let a merged, protected deployment repair rotate the workflow digest
+without granting the worker access to the host config or systemd.
 
 Before starting the service, baseline every pre-existing Admin To-Do item.
 This is a mandatory fail-closed migration step:
