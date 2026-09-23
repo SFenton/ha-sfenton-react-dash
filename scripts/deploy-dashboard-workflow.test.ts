@@ -5,6 +5,7 @@
 // @covers ops/ha-deploy-runner/squid.conf
 // @covers ops/ha-deploy-runner/controller.json.example
 // @covers ops/ha-deploy-runner/ha-dashboard-runner-controller.service
+// @covers .github/skills/release-dashboard/SKILL.md
 // @covers .dockerignore
 // @covers docs/deployment.md
 import { readFileSync } from 'node:fs'
@@ -107,5 +108,9 @@ describe('dashboard deployment workflow', () => {
     expect(deployment).toContain('/sfenton-react-dash/home')
     expect(deployment).toContain('/sfenton-react-panel')
     expect(deployment).toContain('smoke-only')
+    expect(deployment).toContain('workflow digest is a deliberate trust boundary')
+    expect(read('.github/skills/release-dashboard/SKILL.md')).toContain(
+      'Never rotate trust to an unmerged candidate or PR head',
+    )
   })
 })
