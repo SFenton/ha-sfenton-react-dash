@@ -2920,6 +2920,60 @@ async function remoteBranchHead(
   return lines[0]?.split(/\s+/)[0]
 }
 
+function recordPublishedHead(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+  candidate: AdminIssueCandidate,
+  remoteHead: string | undefined,
+) {
+  if (remoteHead !== candidate.headSha) {
+    throw new AdminIssueProvenanceError('Published branch head does not match the candidate')
+  }
+  if (candidate.publishedHeadSha === remoteHead && candidate.pushAttempted) return
+  candidate.pushAttempted = true
+  candidate.publishedHeadSha = remoteHead
+  writeState(config, state)
+}
+
+function candidateNeedsPush(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+  candidate: AdminIssueCandidate,
+  remoteHead: string | undefined,
+) {
+  if (remoteHead === candidate.headSha) {
+    recordPublishedHead(config, state, record, candidate, remoteHead)
+    return false
+  }
+  if (candidate.publishedHeadSha) {
+    quarantineRecord(
+      config,
+      state,
+      record,
+      `Published branch ${record.branch} is ${remoteHead ?? 'absent'}, expected ${candidate.headSha}`,
+    )
+  }
+  if (candidate.pushAttempted !== false) {
+    quarantineRecord(
+      config,
+      state,
+      record,
+      `Publication of candidate ${candidate.headSha} is unverified; remote branch is ${remoteHead ?? 'absent'}`,
+    )
+  }
+  if (remoteHead !== candidate.expectedRemoteHeadSha) {
+    quarantineRecord(
+      config,
+      state,
+      record,
+      `Remote branch ${record.branch} is ${remoteHead ?? 'absent'}, expected ${candidate.expectedRemoteHeadSha ?? 'absent'}`,
+    )
+  }
+  return true
+}
+
 async function waitForPullRequestHead(
   config: AdminIssueControllerConfig,
   record: AdminIssueRecord,
@@ -3010,12 +3064,13 @@ export async function prepareCommittedCandidate(
     )
   }
   if (record.pr && previousCandidate) {
-    await getPullRequest(
+    const pullRequest = await getPullRequest(
       config,
       record,
       previousCandidate,
       shouldVerifyExistingPullRequestVisualEvidence(previousCandidate),
     )
+    recordPublishedHead(config, state, record, previousCandidate, pullRequest.head.sha)
   }
   const files = await changedFiles(record.worktreePath)
   if (files.length === 0) {
@@ -3037,6 +3092,12 @@ export async function prepareCommittedCandidate(
           ? { expectedRemoteHeadSha: previousCandidate.expectedRemoteHeadSha }
           : {}),
         headSha: previousCandidate.headSha,
+        ...(previousCandidate.publishedHeadSha
+          ? { publishedHeadSha: previousCandidate.publishedHeadSha }
+          : {}),
+        ...(previousCandidate.pushAttempted === undefined
+          ? {}
+          : { pushAttempted: previousCandidate.pushAttempted }),
         targetBaseSha: previousCandidate.targetBaseSha,
         treeSha: previousCandidate.treeSha,
         visualChange: outcome.visualChange,
@@ -3047,7 +3108,20 @@ export async function prepareCommittedCandidate(
     throw new Error('Worker reported ready_for_pr but made no repository changes')
   }
   assertWorkerChangesSafe(record.worktreePath, files, record)
-  const expectedRemoteHeadSha = previousCandidate?.headSha
+  if (
+    previousCandidate?.validation &&
+    !previousCandidate.publishedHeadSha &&
+    previousCandidate.pushAttempted !== false
+  ) {
+    quarantineRecord(
+      config,
+      state,
+      record,
+      `Publication of previous candidate ${previousCandidate.headSha} is unverified`,
+    )
+  }
+  const expectedRemoteHeadSha =
+    previousCandidate?.publishedHeadSha ?? previousCandidate?.expectedRemoteHeadSha
   const targetBaseSha = previousCandidate?.targetBaseSha ?? provenance.preparedBaseSha
   const committed = await commitWorkerChanges(record, outcome)
   const commitLine = (
@@ -3088,6 +3162,7 @@ export async function prepareCommittedCandidate(
     diff,
     ...(expectedRemoteHeadSha ? { expectedRemoteHeadSha } : {}),
     headSha: committed.headSha,
+    pushAttempted: false,
     targetBaseSha,
     treeSha: committed.treeSha,
     visualChange: outcome.visualChange,
@@ -3117,7 +3192,7 @@ async function validateAndPersistCandidate(
   return candidate
 }
 
-async function pushCandidate(
+export async function pushCandidate(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
   record: AdminIssueRecord,
@@ -3133,15 +3208,9 @@ async function pushCandidate(
     candidate.treeSha,
   )
   const remoteBefore = await remoteBranchHead(config, record)
-  if (remoteBefore === candidate.headSha) return
-  if (remoteBefore !== candidate.expectedRemoteHeadSha) {
-    quarantineRecord(
-      config,
-      state,
-      record,
-      `Remote branch ${record.branch} is ${remoteBefore ?? 'absent'}, expected ${candidate.expectedRemoteHeadSha ?? 'absent'}`,
-    )
-  }
+  if (!candidateNeedsPush(config, state, record, candidate, remoteBefore)) return
+  candidate.pushAttempted = true
+  writeState(config, state)
   const push = await runCommand(
     'git',
     [
@@ -3176,6 +3245,7 @@ async function pushCandidate(
       `Remote branch ${record.branch} did not confirm candidate ${candidate.headSha}`,
     )
   }
+  recordPublishedHead(config, state, record, candidate, remoteAfter)
 }
 
 async function handleBaseSyncConflict(
@@ -3347,19 +3417,7 @@ export async function synchronizeCandidateBase(
       candidate.treeSha,
     )
     const remoteHead = await remoteBranchHead(config, record)
-    const allowedRemoteHeads = new Set(
-      [candidate.headSha, candidate.expectedRemoteHeadSha].filter(
-        (value): value is string => Boolean(value),
-      ),
-    )
-    if (remoteHead && !allowedRemoteHeads.has(remoteHead)) {
-      quarantineRecord(
-        config,
-        state,
-        record,
-        `Remote branch ${record.branch} changed unexpectedly to ${remoteHead}`,
-      )
-    }
+    candidateNeedsPush(config, state, record, candidate, remoteHead)
     if (record.pr) {
       const pullRequest = await ghApi<GitHubPullRequest>(
         config,
@@ -3638,6 +3696,8 @@ export async function synchronizeCandidateBase(
         ? { expectedRemoteHeadSha: transition.expectedRemoteHeadSha }
         : {}),
       headSha: transition.toHeadSha,
+      publishedHeadSha: transition.toHeadSha,
+      pushAttempted: true,
       targetBaseSha: transition.targetBaseSha,
       treeSha: transition.toTreeSha,
       validation: transition.provisionalValidation,

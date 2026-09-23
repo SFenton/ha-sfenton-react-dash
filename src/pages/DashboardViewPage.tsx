@@ -3411,7 +3411,7 @@ const FREE_SLEEP_TARGET_MIN = -10
 const FREE_SLEEP_TARGET_MAX = 10
 const FREE_SLEEP_TARGET_STEP = 1
 const FREE_SLEEP_TARGET_REVERT_MS = 30000
-const SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS = 3000
+const SLEEPYPOD_CONFIRMATION_HOLD_MS = 3000
 const THERMOSTAT_DIAL_TAP_TOLERANCE_PX = 8
 const FREE_SLEEP_ALARM_SYNC_DEBOUNCE_MS = 450
 const FREE_SLEEP_NUMBER_SYNC_DEBOUNCE_MS = 300
@@ -4009,9 +4009,9 @@ function useEightSleepBedModalState(
   const activeSchedulePhase = sleepypodSchedulePhase(schedulePhaseState)
   const schedulePhaseIsAvailable = Boolean(side && schedulePhaseEntity && sleepypodSchedulePhaseAvailable(schedulePhaseState))
   const [displayHotFlashActive, commitHotFlashActive] = useOptimisticState(liveHotFlashActive, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
-  const targetConfirmationHoldMs = useSleepypodAdapter ? SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS : 0
+  const targetConfirmationHoldMs = useSleepypodAdapter ? SLEEPYPOD_CONFIRMATION_HOLD_MS : 0
   const [displayedTargetValueRaw, commitTargetTemperature, cancelTargetTemperature] = useOptimisticState(liveTargetTemperature, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
-  const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, { clearOn: 'confirmation', revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
+  const [displaySideOn, commitDisplaySideOn] = useOptimisticState(liveSideOn, { clearOn: 'confirmation', confirmationHoldMs: useSleepypodAdapter ? SLEEPYPOD_CONFIRMATION_HOLD_MS : 0, revertMs: EIGHT_SLEEP_POWER_REVERT_MS })
   const previousSchedulePhaseStateRef = useRef(schedulePhaseState)
   const hotFlashHolding = displayHotFlashActive && isOccupancyActive(hotFlashTimerEntity)
   const hotFlashCountdown = hotFlashHolding ? eightSleepHotFlashCountdown(hotFlashTimerEntity, hotFlashRestoreAtEntity, hotFlashNow) : null
@@ -4327,7 +4327,7 @@ function EightSleepThermostatHero({
   const [targetDragging, setTargetDragging] = useState(false)
   const { activeSchedulePhase, cancelTargetTemperature, commitDisplaySideOn, commitTargetTemperature, controlMode, controlsSideOn, currentTemperature, displayedTargetValue: sourceTargetValue, liveTargetValue, schedulePhaseAvailable, sendSoloTripCommand, sideAvailable, soloTripScope, targetMax, targetMin, targetScale, targetStep } = modalState
   const soloTripInteractive = !soloTripScope.engaged || soloTripScope.controlsWholeBed
-  const targetConfirmationHoldMs = controlMode === 'climate' && targetScale === 'level' ? SLEEPYPOD_TARGET_CONFIRMATION_HOLD_MS : 0
+  const targetConfirmationHoldMs = controlMode === 'climate' && targetScale === 'level' ? SLEEPYPOD_CONFIRMATION_HOLD_MS : 0
   const [optimisticTargetValue, commitHeroTargetValue, cancelHeroTargetValue] = useOptimisticState(sourceTargetValue, { clearOn: 'confirmation', confirmationHoldMs: targetConfirmationHoldMs, revertMs: FREE_SLEEP_TARGET_REVERT_MS })
   const displayedTargetValue = modalState.hotFlashActive ? sourceTargetValue : dragValue ?? optimisticTargetValue
   const scopedSleepypodTarget = controlMode === 'climate' && targetScale === 'level'

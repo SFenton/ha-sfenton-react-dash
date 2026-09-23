@@ -1765,6 +1765,131 @@ describe('DashboardViewPage', () => {
     }
   })
 
+  it('keeps both SleepyPod controls Off through the broker rebound', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '2'
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    const bedCard = screen.getByRole('button', { name: /Your Side Heating • \+2/i })
+
+    fireEvent.click(bedCard)
+    const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
+
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'script',
+        service: 'sleepypod_hot_flash_broker',
+        serviceData: { action: 'power_off', side: 'left' },
+      })
+      expect(bedCard).toHaveAccessibleName(/Your Side Off/i)
+      expect(within(dialog).getByRole('region', { name: "Stephen's Bed thermostat Off" })).toBeInTheDocument()
+
+      act(() => {
+        mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'off'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      expect(bedCard).toHaveAccessibleName(/Your Side Off/i)
+      expect(within(dialog).getByRole('region', { name: "Stephen's Bed thermostat Off" })).toBeInTheDocument()
+
+      act(() => {
+        mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'heat'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      expect(bedCard).toHaveAccessibleName(/Your Side Off/i)
+      expect(within(dialog).getByRole('region', { name: "Stephen's Bed thermostat Off" })).toBeInTheDocument()
+
+      act(() => vi.advanceTimersByTime(2000))
+      act(() => {
+        mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'off'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      act(() => vi.advanceTimersByTime(1000))
+      expect(bedCard).toHaveAccessibleName(/Your Side Off/i)
+      expect(within(dialog).getByRole('region', { name: "Stephen's Bed thermostat Off" })).toBeInTheDocument()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+      confirm.mockRestore()
+    }
+  })
+
+  it('shows persistent renewed SleepyPod Heating when the Off hold expires', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '2'
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    const bedCard = screen.getByRole('button', { name: /Your Side Heating • \+2/i })
+
+    fireEvent.click(bedCard)
+    const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
+      act(() => {
+        mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'off'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      act(() => {
+        mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'heat'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+
+      act(() => vi.advanceTimersByTime(2999))
+      expect(bedCard).toHaveAccessibleName(/Your Side Off/i)
+      expect(within(dialog).getByRole('region', { name: "Stephen's Bed thermostat Off" })).toBeInTheDocument()
+
+      act(() => vi.advanceTimersByTime(1))
+      expect(bedCard).toHaveAccessibleName(/Your Side Heating • \+2/i)
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+2/i })).toBeInTheDocument()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+      confirm.mockRestore()
+    }
+  })
+
+  it('lets a local SleepyPod Turn On supersede the active Off hold', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    setupStephenSleepypodLevelControl('bedtime')
+    mockEntities['number.master_bedroom_sleepypod_eight_pod_left_target_level'].state = '2'
+    const view = render(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+    const bedCard = screen.getByRole('button', { name: /Your Side Heating • \+2/i })
+
+    fireEvent.click(bedCard)
+    const dialog = await screen.findByRole('dialog', { name: "Stephen's Bed" })
+    vi.useFakeTimers()
+    try {
+      fireEvent.click(within(dialog).getByRole('button', { name: "Turn off Stephen's Bed" }))
+      act(() => {
+        mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'off'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+
+      fireEvent.click(within(dialog).getByRole('button', { name: "Turn on Stephen's Bed" }))
+      expect(mockCallServiceCalls).toContainEqual({
+        domain: 'script',
+        service: 'sleepypod_hot_flash_broker',
+        serviceData: { action: 'power_heat', side: 'left' },
+      })
+      expect(bedCard).toHaveAccessibleName(/Your Side Heating • \+2/i)
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+2/i })).toBeInTheDocument()
+
+      act(() => {
+        mockEntities['climate.sleepypod_eight_pod_left_side'].state = 'heat'
+        view.rerender(<DashboardViewPage activePath="master-bedroom" onNavigate={() => undefined} path="master-bedroom" />)
+      })
+      act(() => vi.advanceTimersByTime(3000))
+      expect(bedCard).toHaveAccessibleName(/Your Side Heating • \+2/i)
+      expect(within(dialog).getByRole('region', { name: /Stephen's Bed thermostat Heating \+2/i })).toBeInTheDocument()
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+      confirm.mockRestore()
+    }
+  })
+
   it.each([
     ['off', 'off'],
     ['on', 'off'],

@@ -200,6 +200,15 @@ Each visual receipt records the relative artifact path, media type, byte size,
 SHA-256, committed-diff manifest, and GitHub attachment URL. Timestamp receipts
 remain useful for audit but cannot authorize a merge or completion.
 
+The expected remote head of a replacement candidate comes from the last
+verified published head, not merely the previous local commit. New candidates
+record that no push was attempted; the controller journals push intent before
+the network call and records the published head only after confirming the exact
+remote SHA. Retries preserve the confirmed publication and reject deleted or
+divergent published branches. A pre-upgrade candidate with validation but no
+publication evidence fails closed rather than assuming its branch was never
+published; an owner comment can start a fresh generation.
+
 The following rules are fail closed:
 
 - ancestry never substitutes for exact candidate SHA equality;
@@ -385,6 +394,11 @@ State is an atomic, strictly validated version-2 `0600` JSON journal under
 its `worker-logs` child directory. Stable issue, comment, branch, session, PR,
 merge, deployment, Home Assistant receipt, and worktree receipts make retries
 idempotent.
+
+An owner comment on a quarantined issue starts a fresh generation. Archive any
+unpublished local commits needed for diagnosis first: the controller removes the
+old worktree and branch as part of that transition. Do not clear quarantine by
+editing the journal or bypassing the remote-head guard.
 
 Do not delete or edit the journal while the service runs. If intervention is
 required, stop the service first and retain the journal and worker logs for

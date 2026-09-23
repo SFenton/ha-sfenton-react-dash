@@ -52,6 +52,12 @@ describe('HlsCamera', () => {
       'camera.upper_deck_camera_2',
       'camera.lower_deck_camera',
     ])
+    expect(CAMERA_ITEMS.map((camera) => camera.rtcStreamId)).toEqual([
+      'front_door',
+      'garage_camera',
+      'upper_deck',
+      'lower_deck',
+    ])
   })
 
   it('starts an HA HLS session for the configured entity and exposes decoded status', () => {
