@@ -16,6 +16,12 @@ import { isWakeScenario, openWakeRoomState, wakeRoomFacts, wakeStateFacts } from
 // @covers src/pages/DashboardViewPage.tsx
 // @covers src/pages/DashboardViewPage.module.css
 
+test('RTC pilot adapter and wrapper have declared layout owners', () => {
+  expect(SURFACE_CONTRACTS.camera.owners).toContain('src/components/hass/RtcPilotCamera')
+  expect(SURFACE_CONTRACTS.camera.owners).toContain('src/constants/rtcPilot')
+  expect(SURFACE_CONTRACTS.host.states).toEqual(['legacy', 'pilot', 'panel'])
+})
+
 async function recipeGroceryFacts(dialog: Locator, state: string) {
   const exhaustedCopy = 'All missing ingredients have already been added to groceries.'
   const command = state === 'exhausted'

@@ -1,12 +1,14 @@
 export const LEGACY_REACT_DASHBOARD_HOST = 'sfenton-react-dash'
 export const PANEL_REACT_DASHBOARD_HOST = 'sfenton-react-panel'
 export const IOS_TEST_REACT_DASHBOARD_HOST = 'sfenton-react-ios-test'
+export const FOLD_TEST_REACT_DASHBOARD_HOST = 'sfenton-react-fold-test'
 export const SOURCE_DASHBOARD_HOST = 'at-a-glance'
 
 export const DASHBOARD_ROUTE_HOSTS = [
   LEGACY_REACT_DASHBOARD_HOST,
   PANEL_REACT_DASHBOARD_HOST,
   IOS_TEST_REACT_DASHBOARD_HOST,
+  FOLD_TEST_REACT_DASHBOARD_HOST,
   SOURCE_DASHBOARD_HOST,
 ] as const
 

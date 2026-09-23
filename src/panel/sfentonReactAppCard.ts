@@ -1,9 +1,14 @@
 export const SFENTON_REACT_APP_CARD_TAG = 'sfenton-react-app-card'
+export const SFENTON_REACT_FOLD_CARD_TAG = 'sfenton-react-fold-app-card'
+const ACTIVE_REACT_APP_CARD_TAG = import.meta.env.MODE === 'fold-bridge'
+  ? SFENTON_REACT_FOLD_CARD_TAG
+  : SFENTON_REACT_APP_CARD_TAG
 export const DEFAULT_REACT_DASHBOARD_CARD_URL = '/local/ha-sfenton-react-dash/index.html'
 const REACT_DASHBOARD_DISPOSE_PROPERTY = '__sfentonReactDashboardDispose'
 const REACT_DASHBOARD_FRAME_PROPERTY = '__sfentonReactDashboardCardFrame'
 const REACT_DASHBOARD_REATTACH_GRACE_MS = 5_000
 const LEGACY_REACT_DASHBOARD_PATH = '/sfenton-react-dash/home'
+const RTC_PILOT_DASHBOARD_PATH = '/sfenton-react-fold-test/home'
 const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
 
 type DisposableDashboardWindow = Window & {
@@ -166,7 +171,7 @@ function releasePersistentFrame(card: SfentonReactAppCard) {
 
   frame.owner = undefined
   const currentPath = card.ownerDocument.location.pathname.replace(/\/+$/, '')
-  if (currentPath !== LEGACY_REACT_DASHBOARD_PATH) {
+  if (currentPath !== LEGACY_REACT_DASHBOARD_PATH && currentPath !== RTC_PILOT_DASHBOARD_PATH) {
     disposePersistentFrame(ownerWindow, frame, 'legacy-card-disconnected')
     return
   }
@@ -218,7 +223,7 @@ export class SfentonReactAppCard extends HTMLElement {
     const configuredTitle = this.config.title
     return typeof configuredTitle === 'string' && configuredTitle.trim()
       ? configuredTitle
-      : this.ownerDocument.title.trim() || SFENTON_REACT_APP_CARD_TAG
+      : this.ownerDocument.title.trim() || ACTIVE_REACT_APP_CARD_TAG
   }
 
   private render() {
@@ -264,15 +269,15 @@ export class SfentonReactAppCard extends HTMLElement {
   }
 }
 
-if (!customElements.get(SFENTON_REACT_APP_CARD_TAG)) {
-  customElements.define(SFENTON_REACT_APP_CARD_TAG, SfentonReactAppCard)
+if (!customElements.get(ACTIVE_REACT_APP_CARD_TAG)) {
+  customElements.define(ACTIVE_REACT_APP_CARD_TAG, SfentonReactAppCard)
 }
 
 const customCardWindow = window as CustomCardWindow
 customCardWindow.customCards ??= []
-if (!customCardWindow.customCards.some((card) => card.type === SFENTON_REACT_APP_CARD_TAG)) {
+if (!customCardWindow.customCards.some((card) => card.type === ACTIVE_REACT_APP_CARD_TAG)) {
   customCardWindow.customCards.push({
-    type: SFENTON_REACT_APP_CARD_TAG,
-    name: document.title.trim() || SFENTON_REACT_APP_CARD_TAG,
+    type: ACTIVE_REACT_APP_CARD_TAG,
+    name: document.title.trim() || ACTIVE_REACT_APP_CARD_TAG,
   })
 }

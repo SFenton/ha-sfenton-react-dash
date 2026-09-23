@@ -1,0 +1,4 @@
+.card[data-dashboard-variant='tile'],
+.card[data-dashboard-fill='true'] {
+  height: 100%;
+}

@@ -1,9 +1,12 @@
+import { FOLD_TEST_REACT_DASHBOARD_HOST } from '../constants/dashboardHosts'
 import { REACT_DASHBOARD_DISPOSE_PROPERTY } from '../lifecycle/reactDashboardLifecycle'
 import {
   DEFAULT_REACT_DASHBOARD_CARD_URL,
   SFENTON_REACT_APP_CARD_TAG,
+  SFENTON_REACT_FOLD_CARD_TAG,
   SfentonReactAppCard,
 } from './sfentonReactAppCard'
+import { FOLD_TEST_CARD_TAG } from '../constants/rtcPilot'
 
 function setIframeDisposer(iframe: HTMLIFrameElement | null | undefined, dispose: () => boolean) {
   Object.defineProperty(iframe, 'contentWindow', {
@@ -19,6 +22,11 @@ function persistentIframe() {
 }
 
 describe('Sfenton React app card', () => {
+  it('reserves a distinct custom element tag for the Fold-only bridge build', () => {
+    expect(SFENTON_REACT_FOLD_CARD_TAG).toBe(FOLD_TEST_CARD_TAG)
+    expect(SFENTON_REACT_APP_CARD_TAG).not.toBe(SFENTON_REACT_FOLD_CARD_TAG)
+  })
+
   afterEach(() => {
     vi.clearAllTimers()
     vi.useRealTimers()
@@ -93,9 +101,12 @@ describe('Sfenton React app card', () => {
     )
   })
 
-  it('keeps the same app frame across an immediate Lovelace replacement', () => {
+  it.each([
+    '/sfenton-react-dash/home',
+    `/${FOLD_TEST_REACT_DASHBOARD_HOST}/home`,
+  ])('keeps the same app frame across an immediate Lovelace replacement on %s', (path) => {
     vi.useFakeTimers()
-    window.history.replaceState({}, '', '/sfenton-react-dash/home')
+    window.history.replaceState({}, '', path)
     const firstCard = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
     firstCard.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
     document.body.append(firstCard)
@@ -111,6 +122,43 @@ describe('Sfenton React app card', () => {
 
     expect(persistentIframe()).toBe(iframe)
     expect(dispose).not.toHaveBeenCalled()
+  })
+
+  it('disposes the pilot iframe when its app source changes after replacement', () => {
+    vi.useFakeTimers()
+    window.history.replaceState({}, '', '/sfenton-react-fold-test/home')
+    const firstCard = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    firstCard.setConfig({ url: '/local/ha-sfenton-react-dash-fold-test/index.html?v=first' })
+    document.body.append(firstCard)
+    const iframe = persistentIframe()
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    firstCard.remove()
+    const replacement = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    replacement.setConfig({ url: '/local/ha-sfenton-react-dash-fold-test/index.html?v=second' })
+    document.body.append(replacement)
+
+    expect(persistentIframe()).toBe(iframe)
+    expect(dispose).toHaveBeenCalledWith('legacy-card-source-change')
+    expect(iframe).toHaveAttribute('src', '/local/ha-sfenton-react-dash-fold-test/index.html?v=second')
+  })
+
+  it('disposes the pilot iframe on route departure rather than retaining it', () => {
+    vi.useFakeTimers()
+    window.history.replaceState({}, '', '/sfenton-react-fold-test/home')
+    const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    card.setConfig({ url: '/local/ha-sfenton-react-dash-fold-test/index.html' })
+    document.body.append(card)
+    const iframe = persistentIframe()
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    window.history.replaceState({}, '', '/another-dashboard/home')
+    card.remove()
+
+    expect(dispose).toHaveBeenCalledWith('legacy-card-disconnected')
+    expect(iframe).not.toBeInTheDocument()
   })
 
   it('disposes the current app when Home Assistant removes the card', () => {
