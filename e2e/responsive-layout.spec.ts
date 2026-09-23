@@ -93,10 +93,13 @@ test('Solo Trip keeps return-only fields inline and rejects a past return locall
   await expect(page.getByLabel('Return Time')).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Change' })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Solo Trip Scheduled' })).toHaveCount(0)
+  const awayStatus = page.getByRole('note', { name: 'Stephen Away', exact: true })
+  await expect(awayStatus).toHaveCount(0)
 
   await page.getByLabel('Return Date').fill('2020-01-01')
 
   await expect(page.getByRole('alert')).toContainText('Return date/time must be in the future.')
+  await expect(awayStatus).toHaveCount(0)
   await expect.poll(() => page.evaluate(() =>
     window.__mockHass!.calls.filter((call) => call.domain === 'script' && call.service === 'household_away_command'))).toEqual([])
 

@@ -503,7 +503,7 @@ async function soloTripSettingsFacts(root: Locator, state: string) {
     { backgroundColor: 'rgba(91, 141, 239, 0.6)', filter: 'saturate(0.45)' },
     { backgroundColor: 'rgba(255, 255, 255, 0.1)', filter: 'saturate(0.45)' },
   ])
-  if (state === 'scheduled') await expect(root.getByRole('note', { name: 'Stephen Away' })).toHaveCount(0)
+  if (state === 'scheduled' || state === 'invalid-return') await expect(root.getByRole('note', { name: 'Stephen Away' })).toHaveCount(0)
   else await expect(root.getByRole('note', { name: 'Stephen Away' })).toHaveCount(1)
 
   if (state === 'scheduled') {
