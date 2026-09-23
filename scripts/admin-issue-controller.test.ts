@@ -61,6 +61,7 @@ import {
   synchronizeCandidateBase,
   waitForMergedPullRequest,
   updateWorkflowDigestConfig,
+  workerMutableInfrastructurePaths,
   workflowDigestRotationRequired,
 } from './admin-issue-controller'
 import {
@@ -2068,6 +2069,16 @@ describe('admin issue controller security configuration', () => {
   })
 
   it('allows only auto-deployed dashboard paths from workers', () => {
+    expect(workerMutableInfrastructurePaths()).toEqual([])
+    expect(workerMutableInfrastructurePaths({ automationKind: 'deployment' })).toEqual([
+      '.github/workflows/deploy-dashboard.yml',
+      'scripts/deploy-dashboard-ci.test.ts',
+      'scripts/deploy-dashboard-ci.ts',
+    ])
+    expect(workerMutableInfrastructurePaths({ automationKind: 'layout' })).toEqual([
+      'docs/ux/layouts.md',
+      'scripts/layout',
+    ])
     expect(() => assertWorkerChangesSafe('/tmp', ['src/App.tsx', 'e2e/app.spec.ts'])).not.toThrow()
     expect(() => assertWorkerChangesSafe('/tmp', ['home-assistant/packages/example.yaml'])).toThrow(
       'outside the auto-deployed dashboard',
@@ -2084,6 +2095,42 @@ describe('admin issue controller security configuration', () => {
         '/tmp',
         ['scripts/admin-issue-controller.ts'],
         { automationKind: 'deployment' },
+      ),
+    ).toThrow('protected path')
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        [
+          'docs/ux/layouts.md',
+          'scripts/layout/plan.ts',
+          'scripts/layout/run.test.ts',
+          'scripts/layout/run.ts',
+        ],
+        { automationKind: 'layout' },
+      ),
+    ).not.toThrow()
+    expect(() => assertWorkerChangesSafe('/tmp', ['scripts/layout/run.ts'])).toThrow(
+      'protected path',
+    )
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        ['docs/ux/layouts.md/extra'],
+        { automationKind: 'layout' },
+      ),
+    ).toThrow('protected path')
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        ['scripts/layout/run.ts'],
+        { automationKind: 'deployment' },
+      ),
+    ).toThrow('protected path')
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        ['playwright.config.ts'],
+        { automationKind: 'layout' },
       ),
     ).toThrow('protected path')
   })
@@ -2264,8 +2311,11 @@ describe('admin issue controller security configuration', () => {
     expect(extension).toContain('".github"')
     expect(extension).toContain('"node_modules"')
     expect(extension).toContain('"scripts/lib/hassAdminTodo.ts"')
+    expect(extension).toContain('"docs/ux/layouts.md"')
+    expect(extension).toContain('"scripts/layout"')
     expect(extension).toContain('process.env.ADMIN_ISSUE_MUTABLE_PATHS')
     expect(extension).toContain('ALLOWED_MUTABLE_WORKSPACE_PATHS')
+    expect(extension).toContain('if (mutableWorkspacePaths.includes(relativePath)) continue')
     expect(extension).toContain('src=/dev/null,dst=/workspace/${relativePath},readonly')
     expect(extension).toContain('/workspace/.cache:rw,nosuid,nodev')
     expect(extension).toContain('readonly')
@@ -2305,6 +2355,7 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('verifyIssueVisualEvidenceComment(')
     expect(controller).toContain('issues/comments/${existing.id}')
     expect(controller).toContain('assertDeploymentRunSucceeded(run)')
+    expect(controller).toContain('assertWorkerChangesSafe(record.worktreePath, files, record)')
     expect(controller).toContain('recoverBlockedDeployments(config, client, state)')
     expect(controller).toContain('loadBoundDeploymentReceipt(config, record)')
     expect(controller).toContain('restoreReadyOutcomeFromWorkerLog(config, record)')
@@ -2341,5 +2392,13 @@ describe('admin issue controller security configuration', () => {
     expect(prompt).toContain('Manual iOS follow-up is exceptional')
     expect(prompt).toContain('An iPhone involved only as a Home Assistant presence device')
     expect(prompt).not.toContain('Do not use host filesystem, shell, GitHub, Home Assistant')
+
+    const layoutRecord = record()
+    layoutRecord.automationKind = 'layout'
+    const layoutPrompt = buildWorkerPrompt(layoutRecord)
+    expect(layoutPrompt).toContain('trusted layout-failure issue')
+    expect(layoutPrompt).toContain('docs/ux/layouts.md')
+    expect(layoutPrompt).toContain('scripts/layout')
+    expect(layoutPrompt).not.toContain('.github/workflows/deploy-dashboard.yml')
   })
 })
