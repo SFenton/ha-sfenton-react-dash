@@ -43,7 +43,10 @@ Trusted layout-failure issues have a separate narrow exception for
 `scripts/layout/` and the generated `docs/ux/layouts.md` contract. Those paths
 are read-only for ordinary issue workers and writable only when the issue was
 adopted from the exact GitHub Actions layout-failure marker. The host rechecks
-the same scope before committing the candidate.
+the same scope before committing the candidate. After merge, these issues bind
+completion to the exact merge SHA's successful protected `Playwright` push
+workflow, which includes the `Automated layout` job; they do not wait for or
+claim a dashboard deployment.
 Repository env and package-credential files are masked with `/dev/null`, and
 build caches use per-command tmpfs mounts, so model commands cannot read local
 tokens or persist a cache that influences trusted validation.

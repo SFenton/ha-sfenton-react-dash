@@ -29,6 +29,7 @@ import {
   assertCandidateAuthorized,
   assertCandidateVisualEvidence,
   assertFinalizationAuthorized,
+  assertLayoutFinalizationAuthorized,
   assertVisualEvidenceForCandidate,
   authorizedIosFollowUp,
   baselineAdminIssueState,
@@ -39,6 +40,7 @@ import {
   deploymentReceiptIsAccepted,
   formatBlockedComment,
   formatCompletionComment,
+  formatLayoutCompletionComment,
   formatPullRequestComment,
   formatQuestionsComment,
   formatResolvedWithoutPrComment,
@@ -206,6 +208,8 @@ const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
 const MAX_BASE_RESYNCS_PER_GENERATION = 2
 const DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS = 5 * 60_000
+const LAYOUT_WORKFLOW = 'playwright.yml'
+const LAYOUT_WORKFLOW_TIMEOUT_MINUTES = 390
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
 const DEPLOYMENT_WORKER_MUTABLE_PATHS = [
@@ -1536,7 +1540,7 @@ async function reconcileGitHubInputs(
         controllerCompleted &&
         record.provenance.kind === 'active' &&
         record.provenance.merge &&
-        record.provenance.deployment
+        (record.provenance.deployment || record.provenance.layoutValidation)
       ) {
         record.phase = 'deploying'
         record.receipts.issueClosedAt = issue.updated_at
@@ -4305,6 +4309,112 @@ async function waitForDeploymentReceipt(
   throw new Error(`Deployment did not finish within ${config.deploymentTimeoutMinutes} minutes`)
 }
 
+export function layoutWorkflowRunsPath(repository: string, mergeSha: string) {
+  return `repos/${repository}/actions/workflows/${LAYOUT_WORKFLOW}/runs?head_sha=${mergeSha}&event=push&per_page=20`
+}
+
+export function assertSuccessfulLayoutWorkflowRun(
+  run: Pick<
+    WorkflowRun,
+    'conclusion' | 'event' | 'head_branch' | 'head_sha' | 'html_url' | 'status'
+  >,
+  mergeSha: string,
+) {
+  if (
+    run.event !== 'push' ||
+    run.head_branch !== 'master' ||
+    run.head_sha !== mergeSha
+  ) {
+    throw new AdminIssueProvenanceError(
+      `Post-merge layout workflow does not bind exact merge ${mergeSha}`,
+    )
+  }
+  if (run.status !== 'completed') {
+    throw new AdminIssueProvenanceError(
+      `Post-merge layout workflow ${run.html_url} is not complete`,
+    )
+  }
+  if (run.conclusion !== 'success') {
+    throw new AdminIssueProvenanceError(
+      `Post-merge layout workflow ${run.html_url} concluded ${run.conclusion ?? 'without a conclusion'}`,
+    )
+  }
+}
+
+async function waitForLayoutWorkflow(
+  config: AdminIssueControllerConfig,
+  mergeSha: string,
+  refreshInputs: () => Promise<boolean>,
+) {
+  const deadline = Date.now() + LAYOUT_WORKFLOW_TIMEOUT_MINUTES * 60_000
+  while (Date.now() < deadline) {
+    const response = await ghApi<{ workflow_runs: WorkflowRun[] }>(
+      config,
+      'GET',
+      layoutWorkflowRunsPath(config.repository, mergeSha),
+    )
+    const run = response.workflow_runs.find((candidate) => candidate.head_sha === mergeSha)
+    if (!run || run.status !== 'completed') {
+      await sleep(config.deploymentPollSeconds * 1000)
+      if (!(await refreshInputs())) return undefined
+      continue
+    }
+    assertSuccessfulLayoutWorkflowRun(run, mergeSha)
+    return run
+  }
+  throw new AdminIssueProvenanceError(
+    `Post-merge layout workflow did not finish within ${LAYOUT_WORKFLOW_TIMEOUT_MINUTES} minutes`,
+  )
+}
+
+function bindVerifiedLayoutWorkflow(record: AdminIssueRecord, run: WorkflowRun) {
+  if (record.provenance.kind !== 'active' || !record.provenance.merge) {
+    throw new AdminIssueProvenanceError(
+      'Cannot bind layout validation without verified merge provenance',
+    )
+  }
+  const mergeSha = record.provenance.merge.mergeSha
+  assertSuccessfulLayoutWorkflowRun(run, mergeSha)
+  const observedAt = now()
+  delete record.provenance.deployment
+  record.provenance.layoutValidation = {
+    conclusion: 'success',
+    epoch: record.provenance.epoch,
+    generation: record.generation,
+    mergeSha,
+    observedAt,
+    revision: record.processedRevision,
+    workflowHeadSha: run.head_sha,
+    workflowRunAttempt: run.run_attempt,
+    workflowRunId: run.id,
+    workflowUrl: run.html_url,
+  }
+  record.receipts.layoutValidatedAt = observedAt
+}
+
+async function loadBoundLayoutWorkflow(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+) {
+  const { layoutValidation, merge } = assertLayoutFinalizationAuthorized(record)
+  const run = await ghApi<WorkflowRun>(
+    config,
+    'GET',
+    `repos/${config.repository}/actions/runs/${layoutValidation.workflowRunId}`,
+  )
+  assertSuccessfulLayoutWorkflowRun(run, merge.mergeSha)
+  if (
+    run.id !== layoutValidation.workflowRunId ||
+    run.run_attempt !== layoutValidation.workflowRunAttempt ||
+    run.html_url !== layoutValidation.workflowUrl
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Bound post-merge layout workflow no longer matches its verified receipt',
+    )
+  }
+  return run
+}
+
 export async function commitIsAncestor(
   repositoryPath: string,
   ancestorSha: string,
@@ -4848,6 +4958,91 @@ async function finalizeIssue(
   writeState(config, state)
 }
 
+async function finalizeLayoutIssue(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+  run: WorkflowRun,
+) {
+  if (!record.pr || !record.lastOutcome || record.lastOutcome.decision !== 'ready_for_pr') {
+    throw new Error('Cannot finalize layout issue without a merged ready_for_pr outcome')
+  }
+  if (adminTodoCompletionRequired(record)) {
+    throw new AdminIssueProvenanceError(
+      'A workflow-authenticated layout issue unexpectedly requires Admin To-Do completion',
+    )
+  }
+  assertLayoutFinalizationAuthorized(record)
+  await verifyMergedPullRequest(config, record)
+  const outcome = record.lastOutcome
+  if (record.inputRevision > record.processedRevision) {
+    await postIssueCommentOnce(
+      config,
+      record.issueNumber,
+      record.uid,
+      `follow-up-g${record.generation}`,
+      [
+        '**The current fix passed post-merge layout validation, and a newer update is queued.**',
+        '',
+        `- Pull request: ${record.pr.url}`,
+        `- Layout workflow: ${run.html_url}`,
+        '',
+        'The issue will remain open while the follow-up is handled in a new isolated worktree generation.',
+      ].join('\n'),
+    )
+    await startNewGeneration(config, record)
+    writeState(config, state)
+    return
+  }
+  if (outcome.iosFollowUp.required && !record.receipts.iosVerifiedAt) {
+    await postIssueCommentOnce(
+      config,
+      record.issueNumber,
+      record.uid,
+      `ios-follow-up-${assertLayoutFinalizationAuthorized(record).merge.mergeSha}`,
+      [
+        '**Post-merge layout validation succeeded, but manual iOS verification is still required.**',
+        '',
+        outcome.iosFollowUp.reason,
+        '',
+        `- Pull request: ${record.pr.url}`,
+        `- Layout workflow: ${run.html_url}`,
+        '',
+        'After verifying the fix on the affected iOS device or simulator, reply with exactly `iOS verification passed`. The issue will remain open until then.',
+      ].join('\n'),
+    )
+    record.phase = 'awaiting-user'
+    record.receipts.awaitingIosVerificationAt = now()
+    writeState(config, state)
+    return
+  }
+
+  assertLayoutFinalizationAuthorized(record)
+  await verifyMergedPullRequest(config, record)
+  await postIssueCommentOnce(
+    config,
+    record.issueNumber,
+    record.uid,
+    'completed',
+    formatLayoutCompletionComment(record),
+  )
+  assertLayoutFinalizationAuthorized(record)
+  await verifyMergedPullRequest(config, record)
+  await ghApi(config, 'PATCH', `repos/${config.repository}/issues/${record.issueNumber}`, {
+    state: 'closed',
+    state_reason: 'completed',
+  })
+  record.receipts.issueClosedAt = now()
+  writeState(config, state)
+
+  assertLayoutFinalizationAuthorized(record)
+  await verifyMergedPullRequest(config, record)
+  await cleanupWorktree(config, record, true)
+  cleanupInputAttachmentCopies(config, record)
+  record.phase = 'completed'
+  writeState(config, state)
+}
+
 async function synchronizeIssueTitle(
   config: AdminIssueControllerConfig,
   record: AdminIssueRecord,
@@ -5376,6 +5571,22 @@ async function processRecord(
           }
           await verifyMergedPullRequest(config, record)
           const mergeSha = record.provenance.merge.mergeSha
+          if (record.automationKind === 'layout') {
+            const run = record.provenance.layoutValidation
+              ? await loadBoundLayoutWorkflow(config, record)
+              : await waitForLayoutWorkflow(
+                  config,
+                  mergeSha,
+                  () => refreshInputs('deploying'),
+                )
+            if (!run) return
+            if (!record.provenance.layoutValidation) {
+              bindVerifiedLayoutWorkflow(record, run)
+              writeState(config, state)
+            }
+            await finalizeLayoutIssue(config, state, record, run)
+            return
+          }
           const deployment = record.provenance.deployment
             ? await loadBoundDeploymentReceipt(config, record)
             : await waitForDeploymentReceipt(
