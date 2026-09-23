@@ -88,6 +88,7 @@ import {
   beginAdminIssueGeneration,
   branchNameForIssue,
   candidateRequiresVisualEvidence,
+  canonicalIssueTextForIos,
   controllerReceiptMarker,
   deploymentReceiptIsAccepted,
   formatBlockedComment,
@@ -1536,17 +1537,43 @@ describe('admin issue controller security configuration', () => {
       visualEvidence: [],
     }
 
-    expect(reauthorizePersistedIosFollowUp(issue)).toBe(true)
+    appendIssueInput(issue, {
+      body: [
+        '## Autonomous repair policy update',
+        '',
+        'Resume this session under the hardened controller contract.',
+        'The existing manual iOS follow-up remains.',
+      ].join('\n'),
+      createdAt: '2026-09-20T12:06:30.000Z',
+      externalId: 'comment:policy',
+      source: 'issue-comment',
+    })
+    appendIssueInput(issue, {
+      body: '## Proposed fixed behavior\n\nMock iPhone Safari viewport evidence.',
+      createdAt: '2026-09-20T12:06:45.000Z',
+      externalId: 'comment:evidence',
+      source: 'issue-comment',
+    })
+    const genericReport = canonicalIssueTextForIos(
+      issue,
+      '## Admin To-Do\n\nBalance terminal page spacing around Quick Links.',
+    )
+    expect(genericReport).not.toContain('manual iOS follow-up')
+    expect(genericReport).not.toContain('Mock iPhone Safari viewport evidence')
+    expect(reauthorizePersistedIosFollowUp(issue, genericReport)).toBe(true)
     expect(issue.lastOutcome.iosFollowUp).toEqual({ reason: '', required: false })
     expect(issue.receipts.awaitingIosVerificationAt).toBeUndefined()
 
-    issue.inputs[0].body = 'The software keyboard on iPhone Safari obscures the modal action.'
     issue.lastOutcome.iosFollowUp = {
       reason: 'Physical Safari keyboard behavior cannot be certified on Linux WebKit.',
       required: true,
     }
     issue.receipts.awaitingIosVerificationAt = '2026-09-20T12:07:00.000Z'
-    expect(reauthorizePersistedIosFollowUp(issue)).toBe(false)
+    const iosReport = canonicalIssueTextForIos(
+      issue,
+      'The software keyboard on iPhone Safari obscures the modal action.',
+    )
+    expect(reauthorizePersistedIosFollowUp(issue, iosReport)).toBe(false)
     expect(issue.lastOutcome.iosFollowUp.required).toBe(true)
     expect(issue.receipts.awaitingIosVerificationAt).toBe(
       '2026-09-20T12:07:00.000Z',
@@ -2734,7 +2761,8 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('waitForLayoutWorkflow(')
     expect(controller).toContain('bindVerifiedLayoutWorkflow(record, run)')
     expect(controller).toContain('finalizeLayoutIssue(config, state, record, run)')
-    expect(controller).toContain('reauthorizePersistedIosFollowUp(record)')
+    expect(controller).toContain('reauthorizePersistedIosFollowUpFromGitHub(config, record)')
+    expect(controller).toContain('canonicalIssueTextFromGitHub(config, record)')
     expect(controller).toContain('restoreReadyOutcomeFromWorkerLog(config, record)')
     expect(controller).toContain('waitForPullRequestHead(')
     expect(controller).toContain(
