@@ -45,6 +45,7 @@ import {
   githubRepositoryFromRemote,
   hasRecoverableDeployment,
   hasRecoverableTransition,
+  latestSuccessfulDeploymentRunPath,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
   prepareCommittedCandidate,
@@ -1058,6 +1059,17 @@ describe('admin issue controller domain', () => {
     issue.receipts.deploymentRecoveryCheckedAt = '2026-09-20T12:08:00.000Z'
     expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(false)
     expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:14:00.000Z'))).toBe(true)
+  })
+
+  it('recovers against the latest successful deployment instead of a newer failure', () => {
+    expect(
+      latestSuccessfulDeploymentRunPath(
+        'SFenton/ha-sfenton-react-dash',
+        'deploy-dashboard.yml',
+      ),
+    ).toBe(
+      'repos/SFenton/ha-sfenton-react-dash/actions/workflows/deploy-dashboard.yml/runs?branch=master&event=push&status=success&per_page=1',
+    )
   })
 
   it('restores the exact ready outcome from the retained successful worker log', () => {

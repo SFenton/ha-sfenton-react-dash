@@ -4491,6 +4491,15 @@ async function loadBoundDeploymentReceipt(
   return { receipt, run }
 }
 
+export function latestSuccessfulDeploymentRunPath(
+  repository: string,
+  requiredWorkflow: string,
+) {
+  return `repos/${repository}/actions/workflows/${encodeURIComponent(
+    requiredWorkflow,
+  )}/runs?branch=master&event=push&status=success&per_page=1`
+}
+
 async function recoverBlockedDeployments(
   config: AdminIssueControllerConfig,
   client: HassAdminTodoClient,
@@ -4512,9 +4521,10 @@ async function recoverBlockedDeployments(
   const response = await ghApi<{ workflow_runs: WorkflowRun[] }>(
     config,
     'GET',
-    `repos/${config.repository}/actions/workflows/${encodeURIComponent(
+    latestSuccessfulDeploymentRunPath(
+      config.repository,
       config.requiredWorkflow,
-    )}/runs?branch=master&event=push&per_page=1`,
+    ),
   )
   const run = response.workflow_runs[0]
   const checkedAt = now()
