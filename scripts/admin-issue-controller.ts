@@ -204,6 +204,7 @@ type ActionableTodoItem = HassTodoItem & {
 
 const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
+const LAYOUT_WORKER_TIMEOUT_MINUTES = 240
 const MAX_BASE_RESYNCS_PER_GENERATION = 2
 const DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS = 5 * 60_000
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
@@ -2124,7 +2125,10 @@ async function runCopilotWorker(
     cwd: worktreePath,
     env: environment,
     maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
-    timeoutMs: config.workerTimeoutMinutes * 60_000,
+    timeoutMs: workerTimeoutMinutesForRecord(
+      config.workerTimeoutMinutes,
+      record,
+    ) * 60_000,
   }
   let result = await runCommand(
     'copilot',
@@ -2236,6 +2240,15 @@ export function workerMutableInfrastructurePaths(
   if (record?.automationKind === 'deployment') return [...DEPLOYMENT_WORKER_MUTABLE_PATHS]
   if (record?.automationKind === 'layout') return [...LAYOUT_WORKER_MUTABLE_PATHS]
   return []
+}
+
+export function workerTimeoutMinutesForRecord(
+  configuredTimeoutMinutes: number,
+  record?: Pick<AdminIssueRecord, 'automationKind'>,
+) {
+  return record?.automationKind === 'layout'
+    ? Math.max(configuredTimeoutMinutes, LAYOUT_WORKER_TIMEOUT_MINUTES)
+    : configuredTimeoutMinutes
 }
 
 function workerCanModifyInfrastructurePath(

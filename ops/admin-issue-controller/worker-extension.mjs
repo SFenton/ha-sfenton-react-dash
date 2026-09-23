@@ -5,7 +5,13 @@ import { isAbsolute } from "node:path";
 import { joinSession } from "@github/copilot-sdk/extension";
 
 const MAX_OUTPUT_BYTES = 512 * 1024;
-const MAX_COMMAND_TIMEOUT_SECONDS = 80 * 60;
+const mutableWorkspacePaths = (process.env.ADMIN_ISSUE_MUTABLE_PATHS ?? "")
+  .split(",")
+  .map((path) => path.trim())
+  .filter(Boolean);
+const MAX_COMMAND_TIMEOUT_SECONDS = mutableWorkspacePaths.includes("scripts/layout")
+  ? 210 * 60
+  : 80 * 60;
 const ALLOWED_MUTABLE_WORKSPACE_PATHS = new Set([
   ".github/workflows/deploy-dashboard.yml",
   "docs/ux/layouts.md",
@@ -115,10 +121,6 @@ async function runIsolated(command, timeoutSeconds) {
     "--mount",
     `type=bind,src=/dev/null,dst=/workspace/${relativePath},readonly`,
   ]);
-  const mutableWorkspacePaths = (process.env.ADMIN_ISSUE_MUTABLE_PATHS ?? "")
-    .split(",")
-    .map((path) => path.trim())
-    .filter(Boolean);
   if (mutableWorkspacePaths.some((path) => !ALLOWED_MUTABLE_WORKSPACE_PATHS.has(path))) {
     return {
       textResultForLlm: "The mutable workspace path policy is invalid.",
@@ -273,8 +275,7 @@ await joinSession({
           },
           timeout_seconds: {
             type: "integer",
-            description:
-              "Bounded command timeout. Use the 300-second default normally; request up to 4800 seconds only for an already-selected long validation such as an exact layout replay.",
+            description: `Bounded command timeout. Use the 300-second default normally; request up to ${MAX_COMMAND_TIMEOUT_SECONDS} seconds only for an already-selected long validation.`,
             minimum: 1,
             maximum: MAX_COMMAND_TIMEOUT_SECONDS,
             default: 300,
