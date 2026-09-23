@@ -22,6 +22,12 @@ const LOCAL_DIRECTORY = './dist'
 const PANEL_PACKAGE_PATH = resolve('home-assistant/packages/sfenton_react_panel.yaml')
 const SOLO_TRIP_PACKAGE_PATH = resolve('home-assistant/packages/solo_trip.yaml')
 const CHAT_COMPONENT_FILES = ['__init__.py', 'manifest.json', 'services.yaml', 'retention.py', 'README.md']
+const ADMIN_TODO_PATHS = [
+  'packages/sfenton_admin_todo.yaml',
+  'custom_components/sfenton_admin_todo/__init__.py',
+  'custom_components/sfenton_admin_todo/attachment_store.py',
+  'custom_components/sfenton_admin_todo/manifest.json',
+]
 const SOLO_TRIP_NATIVE_PATHS = [
   'packages/solo_trip.yaml',
   'custom_templates/solo_trip.jinja',
@@ -101,7 +107,12 @@ async function deploy() {
       'packages/sfenton_react_chat.yaml',
       ...CHAT_COMPONENT_FILES.map((file) => `custom_components/sfenton_react_chat/${file}`),
     ]
-    const managedPaths = [...chatPaths, ...HOME_MCP_PROXY_PATHS, ...SOLO_TRIP_NATIVE_PATHS]
+    const managedPaths = [
+      ...chatPaths,
+      ...ADMIN_TODO_PATHS,
+      ...HOME_MCP_PROXY_PATHS,
+      ...SOLO_TRIP_NATIVE_PATHS,
+    ]
     const changedConfig = []
     if (packageChanged) changedConfig.push({ path: remotePackage, content: packageContent, previous: currentPackage })
     if (soloTripPackageChanged) changedConfig.push({ path: `${configRoot}/packages/solo_trip.yaml`, content: soloTripPackageContent, previous: currentSoloTripPackage })
@@ -112,6 +123,7 @@ async function deploy() {
       if (!previous?.equals(content)) changedConfig.push({ path: `${configRoot}/${path}`, content, previous })
     }
     const chatChanged = changedConfig.some((file) => chatPaths.some((path) => file.path.endsWith(`/${path}`)))
+    const adminTodoChanged = changedConfig.some((file) => ADMIN_TODO_PATHS.some((path) => file.path.endsWith(`/${path}`)))
     const homeMcpProxyChanged = changedConfig.some((file) => HOME_MCP_PROXY_PATHS.some((path) => file.path.endsWith(`/${path}`)))
     const soloTripNativeChanged = changedConfig.some((file) => SOLO_TRIP_NATIVE_PATHS.some((path) => file.path.endsWith(`/${path}`)))
 
@@ -119,6 +131,7 @@ async function deploy() {
       await client.mkdir(`${configRoot}/packages`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/custom_templates`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/custom_components/sfenton_react_chat`, undefined, { recursive: true })
+      await client.mkdir(`${configRoot}/custom_components/sfenton_admin_todo`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/custom_components/sfenton_home_mcp_proxy`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/solo_trip`, undefined, { recursive: true })
       for (const file of changedConfig) {
@@ -143,6 +156,7 @@ async function deploy() {
       console.info(chalk.green('\nHome Assistant package/component files were staged and configuration-checked.'))
       if (packageChanged) console.info(chalk.yellow('Restart Home Assistant with approval before deploying the React assets.'))
       if (chatChanged) console.info(chalk.yellow('Restart Home Assistant with approval, then verify the prior daily chat purge automation is absent.'))
+      if (adminTodoChanged) console.info(chalk.yellow('Restart Home Assistant with approval, then verify authenticated Admin To-Do image filing before deploying the React assets.'))
       if (homeMcpProxyChanged) console.info(chalk.yellow('Restart Home Assistant with approval, then verify /api/sfenton_home_mcp before enabling Home MCP in the production build.'))
       if (soloTripNativeChanged) console.info(chalk.yellow('Restart Home Assistant with approval only after the native Solo Trip package, broker retention, live bindings, and exact restore gates are reviewed.'))
       console.info(chalk.yellow('React assets were not uploaded. Rerun deployment after the required restart and proxy verification.'))

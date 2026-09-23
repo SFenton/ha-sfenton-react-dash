@@ -29,6 +29,7 @@ import {
   assertCandidateAuthorized,
   assertCandidateVisualEvidence,
   assertFinalizationAuthorized,
+  assertLayoutFinalizationAuthorized,
   assertVisualEvidenceForCandidate,
   authorizedIosFollowUp,
   baselineAdminIssueState,
@@ -39,6 +40,7 @@ import {
   deploymentReceiptIsAccepted,
   formatBlockedComment,
   formatCompletionComment,
+  formatLayoutCompletionComment,
   formatPullRequestComment,
   formatQuestionsComment,
   formatResolvedWithoutPrComment,
@@ -93,6 +95,8 @@ export interface AdminIssueControllerConfig {
   repositoryPath: string
   requiredChecks: string[]
   requiredWorkflow: string
+  runnerControllerConfigPath: string
+  runnerControllerService: string
   stateDirectory: string
   todoEntityId: string
   tandemSkillPath: string
@@ -204,6 +208,8 @@ const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
 const MAX_BASE_RESYNCS_PER_GENERATION = 2
 const DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS = 5 * 60_000
+const LAYOUT_WORKFLOW = 'playwright.yml'
+const LAYOUT_WORKFLOW_TIMEOUT_MINUTES = 390
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
 const DEPLOYMENT_WORKER_MUTABLE_PATHS = [
@@ -211,7 +217,13 @@ const DEPLOYMENT_WORKER_MUTABLE_PATHS = [
   'scripts/deploy-dashboard-ci.test.ts',
   'scripts/deploy-dashboard-ci.ts',
 ] as const
+const LAYOUT_WORKER_MUTABLE_PATHS = [
+  'docs/ux/layouts.md',
+  'scripts/layout',
+] as const
+const RECURSIVE_WORKER_MUTABLE_PATHS = new Set<string>(['scripts/layout'])
 const PROTECTED_WORKER_PATHS = [
+  'docs/ux/layouts.md',
   '.gitattributes',
   '.git',
   '.gitignore',
@@ -227,6 +239,7 @@ const PROTECTED_WORKER_PATHS = [
   'scripts/design-system/',
   'scripts/e2e-coverage-check.ts',
   'scripts/i18n/',
+  'scripts/layout/',
   'scripts/lib/adminIssueController.ts',
   'scripts/lib/hassAdminTodo.test.ts',
   'scripts/lib/hassAdminTodo.ts',
@@ -308,6 +321,14 @@ function parseNonEmptyString(value: unknown, field: string) {
   return value.trim()
 }
 
+function parseSystemdUserService(value: unknown, field: string) {
+  const service = parseNonEmptyString(value, field)
+  if (!/^[A-Za-z0-9_.@-]+\.service$/.test(service)) {
+    throw new Error(`${field} must be a systemd service unit name`)
+  }
+  return service
+}
+
 function parseStringArray(value: unknown, field: string) {
   if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string' || !entry.trim())) {
     throw new Error(`${field} must be an array of non-empty strings`)
@@ -317,6 +338,35 @@ function parseStringArray(value: unknown, field: string) {
 
 function object(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function workflowDigestRotationRequired(files: string[], workflowPath: string) {
+  return files.includes(workflowPath)
+}
+
+export function updateWorkflowDigestConfig(
+  value: unknown,
+  workflowSha256: string,
+) {
+  if (!/^[a-f0-9]{64}$/.test(workflowSha256)) {
+    throw new Error('workflowSha256 must be a lowercase SHA-256 digest')
+  }
+  if (!object(value)) {
+    throw new Error('Runner controller config must be a JSON object')
+  }
+  if (value.version !== 1) {
+    throw new Error('Runner controller config version must be 1')
+  }
+  if (
+    typeof value.workflowSha256 !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(value.workflowSha256)
+  ) {
+    throw new Error('Runner controller config workflowSha256 is invalid')
+  }
+  return {
+    ...value,
+    workflowSha256,
+  }
 }
 
 export function selectWorkerHassMcpConfig(value: unknown, serverName: string) {
@@ -369,6 +419,16 @@ function pathsOverlap(left: string, right: string) {
   const outside = (value: string) =>
     value === '..' || value.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`)
   return !outside(leftToRight) || !outside(rightToLeft)
+}
+
+function assertPrivateRegularFile(path: string, field: string) {
+  const file = lstatSync(path)
+  if (!file.isFile()) {
+    throw new Error(`${field} must reference a regular file`)
+  }
+  if (process.platform !== 'win32' && (file.mode & 0o077) !== 0) {
+    throw new Error(`${field} must not be readable by group or other users`)
+  }
 }
 
 export function loadAdminIssueControllerConfig(configPath: string): AdminIssueControllerConfig {
@@ -427,6 +487,21 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
     raw.hassMcpServerName ?? 'hass',
     'hassMcpServerName',
   )
+  const runnerControllerConfigPath = resolveInside(
+    homedir(),
+    parseNonEmptyString(
+      raw.runnerControllerConfigPath ??
+        '~/.config/ha-dashboard-runner/controller.json',
+      'runnerControllerConfigPath',
+    ),
+    'runnerControllerConfigPath',
+  )
+  if (existsSync(runnerControllerConfigPath)) {
+    assertPrivateRegularFile(
+      runnerControllerConfigPath,
+      'runnerControllerConfigPath',
+    )
+  }
   if (
     !/^[A-Za-z0-9_.-]+$/.test(hassMcpServerName) ||
     ['__proto__', 'constructor', 'prototype'].includes(hassMcpServerName)
@@ -464,7 +539,18 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
   if (pathsOverlap(repositoryPath, hassMcpConfigPath)) {
     throw new Error('hassMcpConfigPath must not overlap repositoryPath')
   }
+  if (pathsOverlap(repositoryPath, runnerControllerConfigPath)) {
+    throw new Error('runnerControllerConfigPath must not overlap repositoryPath')
+  }
+  if (pathsOverlap(hassMcpConfigPath, runnerControllerConfigPath)) {
+    throw new Error('runnerControllerConfigPath must not overlap hassMcpConfigPath')
+  }
   for (let index = 0; index < mutablePaths.length; index += 1) {
+    if (pathsOverlap(mutablePaths[index][1], runnerControllerConfigPath)) {
+      throw new Error(
+        `runnerControllerConfigPath must not overlap ${mutablePaths[index][0]}`,
+      )
+    }
     for (let other = index + 1; other < mutablePaths.length; other += 1) {
       if (pathsOverlap(mutablePaths[index][1], mutablePaths[other][1])) {
         throw new Error(`${mutablePaths[index][0]} must not overlap ${mutablePaths[other][0]}`)
@@ -505,6 +591,12 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
       raw.requiredWorkflow ?? 'deploy-dashboard.yml',
       'requiredWorkflow',
     ),
+    runnerControllerConfigPath,
+    runnerControllerService: parseSystemdUserService(
+      raw.runnerControllerService ??
+        'ha-dashboard-runner-controller.service',
+      'runnerControllerService',
+    ),
     stateDirectory,
     tandemSkillPath,
     todoEntityId: parseNonEmptyString(raw.todoEntityId, 'todoEntityId'),
@@ -516,7 +608,118 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
   }
 }
 
-async function runCommand(
+async function rotateRunnerWorkflowDigest(
+  config: AdminIssueControllerConfig,
+  mergeSha: string,
+  files: string[],
+) {
+  const workflowPath = `.github/workflows/${config.requiredWorkflow}`
+  if (!workflowDigestRotationRequired(files, workflowPath)) return
+  if (!existsSync(config.runnerControllerConfigPath)) {
+    throw new AdminIssueProvenanceError(
+      `Runner controller config is missing at ${config.runnerControllerConfigPath}`,
+    )
+  }
+  assertPrivateRegularFile(
+    config.runnerControllerConfigPath,
+    'runnerControllerConfigPath',
+  )
+  await runCommand('git', ['fetch', '--quiet', 'origin', 'master'], {
+    cwd: config.repositoryPath,
+    timeoutMs: 120_000,
+  })
+  const onMaster = await runCommand(
+    'git',
+    ['merge-base', '--is-ancestor', mergeSha, 'origin/master'],
+    {
+      allowFailure: true,
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    },
+  )
+  if (onMaster.exitCode !== 0) {
+    throw new AdminIssueProvenanceError(
+      `Merged workflow commit ${mergeSha} is not on current origin/master`,
+    )
+  }
+  const source = (
+    await runCommand('git', ['show', `${mergeSha}:${workflowPath}`], {
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    })
+  ).stdout
+  const workflowSha256 = createHash('sha256').update(source).digest('hex')
+  const currentSerialized = readFileSync(
+    config.runnerControllerConfigPath,
+    'utf8',
+  )
+  const current = JSON.parse(currentSerialized) as unknown
+  const updated = updateWorkflowDigestConfig(current, workflowSha256)
+  if (object(current) && current.workflowSha256 === workflowSha256) {
+    await assertRunnerControllerActive(config)
+    return
+  }
+  const temporaryPath = `${config.runnerControllerConfigPath}.${process.pid}.tmp`
+  writeFileSync(temporaryPath, `${JSON.stringify(updated, null, 2)}\n`, {
+    mode: 0o600,
+  })
+  renameSync(temporaryPath, config.runnerControllerConfigPath)
+  chmodSync(config.runnerControllerConfigPath, 0o600)
+  try {
+    await runCommand(
+      'systemctl',
+      ['--user', 'restart', config.runnerControllerService],
+      { timeoutMs: 30_000 },
+    )
+    await assertRunnerControllerActive(config)
+  } catch (error) {
+    const restorePath = `${config.runnerControllerConfigPath}.${process.pid}.restore`
+    writeFileSync(restorePath, currentSerialized, { mode: 0o600 })
+    renameSync(restorePath, config.runnerControllerConfigPath)
+    chmodSync(config.runnerControllerConfigPath, 0o600)
+    await runCommand(
+      'systemctl',
+      ['--user', 'restart', config.runnerControllerService],
+      { allowFailure: true, timeoutMs: 30_000 },
+    )
+    throw new AdminIssueProvenanceError(
+      `Runner controller trust rotation failed and the prior config was restored: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    )
+  }
+}
+
+async function assertRunnerControllerActive(config: AdminIssueControllerConfig) {
+  const active = await runCommand(
+    'systemctl',
+    ['--user', 'is-active', config.runnerControllerService],
+    { allowFailure: true, timeoutMs: 30_000 },
+  )
+  if (active.exitCode !== 0 || active.stdout.trim() !== 'active') {
+    throw new AdminIssueProvenanceError(
+      `Runner controller ${config.runnerControllerService} is not active`,
+    )
+  }
+}
+
+function killCommandProcessTree(
+  child: ReturnType<typeof spawn>,
+  signal: NodeJS.Signals,
+) {
+  if (!child.pid) return
+  if (process.platform !== 'win32') {
+    try {
+      process.kill(-child.pid, signal)
+      return
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ESRCH') return
+    }
+  }
+  child.kill(signal)
+}
+
+export async function runCommand(
   file: string,
   args: string[],
   options: CommandOptions = {},
@@ -525,6 +728,7 @@ async function runCommand(
   return await new Promise((resolveCommand, rejectCommand) => {
     const child = spawn(file, args, {
       cwd: options.cwd,
+      detached: process.platform !== 'win32',
       env: options.env,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
@@ -537,7 +741,7 @@ async function runCommand(
     const capture = (target: Buffer[], chunk: Buffer) => {
       outputBytes += chunk.length
       if (outputBytes > maxOutputBytes) {
-        child.kill('SIGKILL')
+        killCommandProcessTree(child, 'SIGKILL')
         rejectCommand(new Error(`${file} exceeded the ${maxOutputBytes}-byte output limit`))
         return
       }
@@ -575,7 +779,7 @@ async function runCommand(
     if (options.timeoutMs) {
       timeout = setTimeout(() => {
         timedOut = true
-        child.kill('SIGKILL')
+        killCommandProcessTree(child, 'SIGKILL')
       }, options.timeoutMs)
     }
 
@@ -1336,7 +1540,7 @@ async function reconcileGitHubInputs(
         controllerCompleted &&
         record.provenance.kind === 'active' &&
         record.provenance.merge &&
-        record.provenance.deployment
+        (record.provenance.deployment || record.provenance.layoutValidation)
       ) {
         record.phase = 'deploying'
         record.receipts.issueClosedAt = issue.updated_at
@@ -1559,12 +1763,13 @@ function buildWorkerEnvironment(
   record?: Pick<AdminIssueRecord, 'automationKind'>,
 ) {
   const copilotHome = join(config.workerHome, '.copilot')
+  const mutableInfrastructurePaths = workerMutableInfrastructurePaths(record)
   const environment: NodeJS.ProcessEnv = {
     ADMIN_ISSUE_GIT_COMMON_DIR: gitCommonDirectory,
     ADMIN_ISSUE_WORKER_IMAGE: config.workerImageId,
     ADMIN_ISSUE_WORKSPACE: worktreePath,
-    ...(record?.automationKind === 'deployment'
-      ? { ADMIN_ISSUE_MUTABLE_PATHS: DEPLOYMENT_WORKER_MUTABLE_PATHS.join(',') }
+    ...(mutableInfrastructurePaths.length > 0
+      ? { ADMIN_ISSUE_MUTABLE_PATHS: mutableInfrastructurePaths.join(',') }
       : {}),
     COPILOT_HOME: copilotHome,
     GH_TOKEN: githubToken,
@@ -1591,9 +1796,12 @@ export function buildWorkerPrompt(record: AdminIssueRecord) {
       },
     )
     .join('\n\n')
-  const protectedSurfaceGuidance = record.automationKind === 'deployment'
-    ? `This trusted deployment-failure issue may modify only these infrastructure paths in addition to ordinary dashboard paths: ${DEPLOYMENT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to deployment diagnosis, recovery, or regression coverage.`
-    : 'Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.'
+  const protectedSurfaceGuidance =
+    record.automationKind === 'deployment'
+      ? `This trusted deployment-failure issue may modify only these infrastructure paths in addition to ordinary dashboard paths: ${DEPLOYMENT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to deployment diagnosis, recovery, or regression coverage.`
+      : record.automationKind === 'layout'
+        ? `This trusted layout-failure issue may modify only these layout infrastructure paths in addition to ordinary dashboard paths: ${LAYOUT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to layout planning, execution, evidence, verification, or directly owned regression coverage. Use changed tests and focused provenance-bound mixed-context runs for local acceptance. Do not make a full historical or full-known-mock layout replay a pre-PR gate; the protected post-merge Automated layout job owns exact full-corpus evidence.`
+        : 'Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.'
   return `/tandem-research ${record.title}
 
 You are working on GitHub issue #${record.issueNumber} in ${record.issueUrl}.
@@ -1834,6 +2042,31 @@ function bindWorkerSessionId(
   return { id: record.sessionId, resume: false }
 }
 
+export function buildCopilotWorkerArgs(
+  sessionId: string,
+  sessionName: string,
+  commonArgs: readonly string[],
+  resume: boolean,
+) {
+  return [
+    `--session-id=${sessionId}`,
+    ...(resume ? [] : ['--name', sessionName]),
+    ...commonArgs,
+  ]
+}
+
+export function shouldRetryWorkerSessionWithoutName(
+  namedSessionAttempt: boolean,
+  result: CommandResult,
+) {
+  return (
+    namedSessionAttempt &&
+    result.exitCode !== 0 &&
+    result.stderr.includes("cannot be used with option '--session-id <id>'") &&
+    result.stderr.includes('existing or remote session or task')
+  )
+}
+
 async function runCopilotWorker(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
@@ -1890,21 +2123,28 @@ async function runCopilotWorker(
     '-p',
     buildWorkerPrompt(record),
   ]
-  const result = await runCommand(
+  const commandOptions = {
+    allowFailure: true,
+    cwd: worktreePath,
+    env: environment,
+    maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
+    timeoutMs: config.workerTimeoutMinutes * 60_000,
+  }
+  let result = await runCommand(
     'copilot',
-    [
-      `--session-id=${session.id}`,
-      ...(session.resume ? [] : ['--name', record.sessionName]),
-      ...commonArgs,
-    ],
-    {
-      allowFailure: true,
-      cwd: worktreePath,
-      env: environment,
-      maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
-      timeoutMs: config.workerTimeoutMinutes * 60_000,
-    },
+    buildCopilotWorkerArgs(session.id, record.sessionName, commonArgs, session.resume),
+    commandOptions,
   )
+  if (shouldRetryWorkerSessionWithoutName(!session.resume, result)) {
+    record.receipts.sessionCreatedAt ??= now()
+    record.updatedAt = now()
+    writeState(config, state)
+    result = await runCommand(
+      'copilot',
+      buildCopilotWorkerArgs(session.id, record.sessionName, commonArgs, true),
+      commandOptions,
+    )
+  }
 
   mkdirSync(join(config.stateDirectory, 'worker-logs'), { mode: 0o700, recursive: true })
   const logPath = join(
@@ -1964,6 +2204,7 @@ async function changedFiles(worktreePath: string) {
         '.gitignore',
         '.gitmodules',
         'eslint.config.js',
+        'docs/ux/layouts.md',
         'ops/admin-issue-controller',
         'package-lock.json',
         'package.json',
@@ -1973,6 +2214,7 @@ async function changedFiles(worktreePath: string) {
         'scripts/design-system',
         'scripts/e2e-coverage-check.ts',
         'scripts/i18n',
+        'scripts/layout',
         'scripts/lib/adminIssueController.ts',
         'scripts/lib/hassAdminTodo.test.ts',
         'scripts/lib/hassAdminTodo.ts',
@@ -1992,9 +2234,23 @@ async function changedFiles(worktreePath: string) {
   return [...new Set([...tracked, ...untracked, ...ignoredProtected])].sort()
 }
 
-function workerMutableInfrastructurePaths(record?: Pick<AdminIssueRecord, 'automationKind'>) {
-  return new Set<string>(
-    record?.automationKind === 'deployment' ? DEPLOYMENT_WORKER_MUTABLE_PATHS : [],
+export function workerMutableInfrastructurePaths(
+  record?: Pick<AdminIssueRecord, 'automationKind'>,
+) {
+  if (record?.automationKind === 'deployment') return [...DEPLOYMENT_WORKER_MUTABLE_PATHS]
+  if (record?.automationKind === 'layout') return [...LAYOUT_WORKER_MUTABLE_PATHS]
+  return []
+}
+
+function workerCanModifyInfrastructurePath(
+  normalizedPath: string,
+  record?: Pick<AdminIssueRecord, 'automationKind'>,
+) {
+  return workerMutableInfrastructurePaths(record).some(
+    (allowedPath) =>
+      normalizedPath === allowedPath ||
+      (RECURSIVE_WORKER_MUTABLE_PATHS.has(allowedPath) &&
+        normalizedPath.startsWith(`${allowedPath}/`)),
   )
 }
 
@@ -2002,10 +2258,9 @@ function assertProtectedPathsUntouched(
   files: string[],
   record?: Pick<AdminIssueRecord, 'automationKind'>,
 ) {
-  const mutableInfrastructurePaths = workerMutableInfrastructurePaths(record)
   for (const file of files) {
     const normalized = file.replaceAll('\\', '/')
-    if (mutableInfrastructurePaths.has(normalized)) {
+    if (workerCanModifyInfrastructurePath(normalized, record)) {
       continue
     }
     if (
@@ -2035,10 +2290,10 @@ export function assertWorkerChangesSafe(
     if (
       normalized !== 'index.html' &&
       !ALLOWED_WORKER_PATHS.some((allowedPath) => normalized.startsWith(allowedPath)) &&
-      !mutableInfrastructurePaths.has(normalized)
+      !workerCanModifyInfrastructurePath(normalized, record)
     ) {
       throw new Error(
-        mutableInfrastructurePaths.size > 0
+        mutableInfrastructurePaths.length > 0
           ? `Worker changed a path outside its authorized repair scope: ${file}`
           : `Worker changed a path outside the auto-deployed dashboard: ${file}`,
       )
@@ -2759,7 +3014,7 @@ export async function prepareCommittedCandidate(
     }
     throw new Error('Worker reported ready_for_pr but made no repository changes')
   }
-  assertWorkerChangesSafe(record.worktreePath, files)
+  assertWorkerChangesSafe(record.worktreePath, files, record)
   const expectedRemoteHeadSha = previousCandidate?.headSha
   const targetBaseSha = previousCandidate?.targetBaseSha ?? provenance.preparedBaseSha
   const committed = await commitWorkerChanges(record, outcome)
@@ -3970,6 +4225,11 @@ async function mergePullRequest(
   }
   record.phase = 'deploying'
   record.receipts.mergedAt = merged.merged_at
+  await rotateRunnerWorkflowDigest(
+    config,
+    merged.merge_commit_sha,
+    candidate.diff.files,
+  )
   return { mergeSha: merged.merge_commit_sha }
 }
 
@@ -4047,6 +4307,112 @@ async function waitForDeploymentReceipt(
     return { receipt, run }
   }
   throw new Error(`Deployment did not finish within ${config.deploymentTimeoutMinutes} minutes`)
+}
+
+export function layoutWorkflowRunsPath(repository: string, mergeSha: string) {
+  return `repos/${repository}/actions/workflows/${LAYOUT_WORKFLOW}/runs?head_sha=${mergeSha}&event=push&per_page=20`
+}
+
+export function assertSuccessfulLayoutWorkflowRun(
+  run: Pick<
+    WorkflowRun,
+    'conclusion' | 'event' | 'head_branch' | 'head_sha' | 'html_url' | 'status'
+  >,
+  mergeSha: string,
+) {
+  if (
+    run.event !== 'push' ||
+    run.head_branch !== 'master' ||
+    run.head_sha !== mergeSha
+  ) {
+    throw new AdminIssueProvenanceError(
+      `Post-merge layout workflow does not bind exact merge ${mergeSha}`,
+    )
+  }
+  if (run.status !== 'completed') {
+    throw new AdminIssueProvenanceError(
+      `Post-merge layout workflow ${run.html_url} is not complete`,
+    )
+  }
+  if (run.conclusion !== 'success') {
+    throw new AdminIssueProvenanceError(
+      `Post-merge layout workflow ${run.html_url} concluded ${run.conclusion ?? 'without a conclusion'}`,
+    )
+  }
+}
+
+async function waitForLayoutWorkflow(
+  config: AdminIssueControllerConfig,
+  mergeSha: string,
+  refreshInputs: () => Promise<boolean>,
+) {
+  const deadline = Date.now() + LAYOUT_WORKFLOW_TIMEOUT_MINUTES * 60_000
+  while (Date.now() < deadline) {
+    const response = await ghApi<{ workflow_runs: WorkflowRun[] }>(
+      config,
+      'GET',
+      layoutWorkflowRunsPath(config.repository, mergeSha),
+    )
+    const run = response.workflow_runs.find((candidate) => candidate.head_sha === mergeSha)
+    if (!run || run.status !== 'completed') {
+      await sleep(config.deploymentPollSeconds * 1000)
+      if (!(await refreshInputs())) return undefined
+      continue
+    }
+    assertSuccessfulLayoutWorkflowRun(run, mergeSha)
+    return run
+  }
+  throw new AdminIssueProvenanceError(
+    `Post-merge layout workflow did not finish within ${LAYOUT_WORKFLOW_TIMEOUT_MINUTES} minutes`,
+  )
+}
+
+function bindVerifiedLayoutWorkflow(record: AdminIssueRecord, run: WorkflowRun) {
+  if (record.provenance.kind !== 'active' || !record.provenance.merge) {
+    throw new AdminIssueProvenanceError(
+      'Cannot bind layout validation without verified merge provenance',
+    )
+  }
+  const mergeSha = record.provenance.merge.mergeSha
+  assertSuccessfulLayoutWorkflowRun(run, mergeSha)
+  const observedAt = now()
+  delete record.provenance.deployment
+  record.provenance.layoutValidation = {
+    conclusion: 'success',
+    epoch: record.provenance.epoch,
+    generation: record.generation,
+    mergeSha,
+    observedAt,
+    revision: record.processedRevision,
+    workflowHeadSha: run.head_sha,
+    workflowRunAttempt: run.run_attempt,
+    workflowRunId: run.id,
+    workflowUrl: run.html_url,
+  }
+  record.receipts.layoutValidatedAt = observedAt
+}
+
+async function loadBoundLayoutWorkflow(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+) {
+  const { layoutValidation, merge } = assertLayoutFinalizationAuthorized(record)
+  const run = await ghApi<WorkflowRun>(
+    config,
+    'GET',
+    `repos/${config.repository}/actions/runs/${layoutValidation.workflowRunId}`,
+  )
+  assertSuccessfulLayoutWorkflowRun(run, merge.mergeSha)
+  if (
+    run.id !== layoutValidation.workflowRunId ||
+    run.run_attempt !== layoutValidation.workflowRunAttempt ||
+    run.html_url !== layoutValidation.workflowUrl
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Bound post-merge layout workflow no longer matches its verified receipt',
+    )
+  }
+  return run
 }
 
 export async function commitIsAncestor(
@@ -4235,6 +4601,15 @@ async function loadBoundDeploymentReceipt(
   return { receipt, run }
 }
 
+export function latestSuccessfulDeploymentRunPath(
+  repository: string,
+  requiredWorkflow: string,
+) {
+  return `repos/${repository}/actions/workflows/${encodeURIComponent(
+    requiredWorkflow,
+  )}/runs?branch=master&event=push&status=success&per_page=1`
+}
+
 async function recoverBlockedDeployments(
   config: AdminIssueControllerConfig,
   client: HassAdminTodoClient,
@@ -4256,9 +4631,10 @@ async function recoverBlockedDeployments(
   const response = await ghApi<{ workflow_runs: WorkflowRun[] }>(
     config,
     'GET',
-    `repos/${config.repository}/actions/workflows/${encodeURIComponent(
+    latestSuccessfulDeploymentRunPath(
+      config.repository,
       config.requiredWorkflow,
-    )}/runs?branch=master&event=push&per_page=1`,
+    ),
   )
   const run = response.workflow_runs[0]
   const checkedAt = now()
@@ -4575,6 +4951,91 @@ async function finalizeIssue(
     writeState(config, state)
   }
   assertFinalizationAuthorized(record)
+  await verifyMergedPullRequest(config, record)
+  await cleanupWorktree(config, record, true)
+  cleanupInputAttachmentCopies(config, record)
+  record.phase = 'completed'
+  writeState(config, state)
+}
+
+async function finalizeLayoutIssue(
+  config: AdminIssueControllerConfig,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+  run: WorkflowRun,
+) {
+  if (!record.pr || !record.lastOutcome || record.lastOutcome.decision !== 'ready_for_pr') {
+    throw new Error('Cannot finalize layout issue without a merged ready_for_pr outcome')
+  }
+  if (adminTodoCompletionRequired(record)) {
+    throw new AdminIssueProvenanceError(
+      'A workflow-authenticated layout issue unexpectedly requires Admin To-Do completion',
+    )
+  }
+  assertLayoutFinalizationAuthorized(record)
+  await verifyMergedPullRequest(config, record)
+  const outcome = record.lastOutcome
+  if (record.inputRevision > record.processedRevision) {
+    await postIssueCommentOnce(
+      config,
+      record.issueNumber,
+      record.uid,
+      `follow-up-g${record.generation}`,
+      [
+        '**The current fix passed post-merge layout validation, and a newer update is queued.**',
+        '',
+        `- Pull request: ${record.pr.url}`,
+        `- Layout workflow: ${run.html_url}`,
+        '',
+        'The issue will remain open while the follow-up is handled in a new isolated worktree generation.',
+      ].join('\n'),
+    )
+    await startNewGeneration(config, record)
+    writeState(config, state)
+    return
+  }
+  if (outcome.iosFollowUp.required && !record.receipts.iosVerifiedAt) {
+    await postIssueCommentOnce(
+      config,
+      record.issueNumber,
+      record.uid,
+      `ios-follow-up-${assertLayoutFinalizationAuthorized(record).merge.mergeSha}`,
+      [
+        '**Post-merge layout validation succeeded, but manual iOS verification is still required.**',
+        '',
+        outcome.iosFollowUp.reason,
+        '',
+        `- Pull request: ${record.pr.url}`,
+        `- Layout workflow: ${run.html_url}`,
+        '',
+        'After verifying the fix on the affected iOS device or simulator, reply with exactly `iOS verification passed`. The issue will remain open until then.',
+      ].join('\n'),
+    )
+    record.phase = 'awaiting-user'
+    record.receipts.awaitingIosVerificationAt = now()
+    writeState(config, state)
+    return
+  }
+
+  assertLayoutFinalizationAuthorized(record)
+  await verifyMergedPullRequest(config, record)
+  await postIssueCommentOnce(
+    config,
+    record.issueNumber,
+    record.uid,
+    'completed',
+    formatLayoutCompletionComment(record),
+  )
+  assertLayoutFinalizationAuthorized(record)
+  await verifyMergedPullRequest(config, record)
+  await ghApi(config, 'PATCH', `repos/${config.repository}/issues/${record.issueNumber}`, {
+    state: 'closed',
+    state_reason: 'completed',
+  })
+  record.receipts.issueClosedAt = now()
+  writeState(config, state)
+
+  assertLayoutFinalizationAuthorized(record)
   await verifyMergedPullRequest(config, record)
   await cleanupWorktree(config, record, true)
   cleanupInputAttachmentCopies(config, record)
@@ -5110,6 +5571,22 @@ async function processRecord(
           }
           await verifyMergedPullRequest(config, record)
           const mergeSha = record.provenance.merge.mergeSha
+          if (record.automationKind === 'layout') {
+            const run = record.provenance.layoutValidation
+              ? await loadBoundLayoutWorkflow(config, record)
+              : await waitForLayoutWorkflow(
+                  config,
+                  mergeSha,
+                  () => refreshInputs('deploying'),
+                )
+            if (!run) return
+            if (!record.provenance.layoutValidation) {
+              bindVerifiedLayoutWorkflow(record, run)
+              writeState(config, state)
+            }
+            await finalizeLayoutIssue(config, state, record, run)
+            return
+          }
           const deployment = record.provenance.deployment
             ? await loadBoundDeploymentReceipt(config, record)
             : await waitForDeploymentReceipt(

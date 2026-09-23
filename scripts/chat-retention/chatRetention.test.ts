@@ -37,6 +37,15 @@ describe('manual chat cleanup contract', () => {
       expect(read(`${component}/${file}`).length).toBeGreaterThan(0)
     }
     expect(deploy).toContain('packages/sfenton_react_chat.yaml')
+    for (const path of [
+      'packages/sfenton_admin_todo.yaml',
+      'custom_components/sfenton_admin_todo/__init__.py',
+      'custom_components/sfenton_admin_todo/attachment_store.py',
+      'custom_components/sfenton_admin_todo/manifest.json',
+    ]) {
+      expect(deploy).toContain(`'${path}'`)
+      expect(read(`home-assistant/${path}`).length).toBeGreaterThan(0)
+    }
     expect(deploy).toContain('custom_components/sfenton_home_mcp_proxy/home-mcp-server.crt')
     expect(deploy).toContain('`${file.path}.bak`')
     expect(deploy).toContain('await validateHomeAssistantConfig()')
@@ -44,6 +53,7 @@ describe('manual chat cleanup contract', () => {
     expect(deploy).toContain('await client.unlink(file.path)')
     expect(deploy).toContain('rollback was incomplete')
     expect(deploy).toContain('verify the prior daily chat purge automation is absent')
+    expect(deploy).toContain('verify authenticated Admin To-Do image filing')
     expect(deploy.indexOf('React assets were not uploaded.')).toBeLessThan(deploy.indexOf('Uploading'))
     expect(deploy).toContain('process.exitCode = 2')
     expect(read('.github/skills/release-dashboard/SKILL.md')).toContain('sfenton_react_chat')

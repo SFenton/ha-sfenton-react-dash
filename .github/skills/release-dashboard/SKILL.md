@@ -69,7 +69,13 @@ operator-authorized release path.
 7. Merge with a merge commit through `gh`, fetch `origin/master`, and prove the
    release commit is an ancestor of the merged branch. Do not force-push,
    amend, or delete a checked-out branch that still carries unrelated work.
-8. Start the merged build and deployment after proving the merge; do not insert
+8. If the merged release changed
+   `.github/workflows/deploy-dashboard.yml`, compute the SHA-256 of that exact
+   merged blob, atomically update only `workflowSha256` in the private
+   `ha-dashboard-runner` controller config, preserve mode `0600`, restart its
+   user service, and verify it is active before waiting for the deployment.
+   Never rotate trust to an unmerged candidate or PR head.
+9. Start the merged build and deployment after proving the merge; do not insert
    a post-merge layout wait. Post-merge layout automation is asynchronous
    regression detection. Do not wait for its completion or artifact before
    building, deploying, or completing a release. A failed run automatically
@@ -79,12 +85,12 @@ operator-authorized release path.
    otherwise report it as pending. Do not use `gh run watch` or download the
    `layout-automation` artifact as a prerequisite to the remaining release
    steps.
-9. For a frontend-only merge accepted by `.github/workflows/deploy-dashboard.yml`,
+10. For a frontend-only merge accepted by `.github/workflows/deploy-dashboard.yml`,
    wait for that exact merge SHA's **Deploy dashboard** workflow and inspect its
    sanitized deployment receipt. This deployment wait is independent of the
    post-merge layout workflow. Do not also build or deploy locally after the
    automated receipt succeeds.
-10. If the automatic workflow fails closed because the cumulative deployed
+11. If the automatic workflow fails closed because the cumulative deployed
     range includes Home Assistant runtime, Home MCP, or custom-panel bridge
     changes, use the restart-aware manual build/deploy path below. Never weaken
     the automatic classifier merely to avoid the manual release.
@@ -148,6 +154,14 @@ component or package files require a separately approved HA restart. After a
 restart, verify the prior daily purge automation is absent. The manual purge
 service may remain registered, but do not invoke it during release verification
 without explicit deletion authorization.
+
+Admin To-Do image filing is another restart-aware HA runtime dependency.
+Deploy the exact `home-assistant/custom_components/sfenton_admin_todo/` files
+and `home-assistant/packages/sfenton_admin_todo.yaml` with backup, config
+validation, and rollback before replacing React assets. Stop after staging and
+obtain separate restart approval. After restart, verify authenticated
+admin-only image POST/GET/DELETE behavior before deploying the image-enabled
+dashboard.
 
 ## Production verification
 

@@ -28,12 +28,14 @@ import {
   AdminIssueProvenanceError,
   assertDeploymentRunSucceeded,
   assertExactCandidateSnapshot,
+  assertSuccessfulLayoutWorkflowRun,
   assertResolvedWithoutPullRequestSnapshot,
   assertIssueCommentBodyContainsVisualEvidence,
   assertWorkerHostConfigurationSafe,
   assertWorkerChangesSafe,
   assertPullRequestBinding,
   assertPullRequestContainsVisualEvidence,
+  buildCopilotWorkerArgs,
   buildWorkerPrompt,
   classifyPullRequestHead,
   collectVisualEvidenceReceipts,
@@ -44,6 +46,8 @@ import {
   githubRepositoryFromRemote,
   hasRecoverableDeployment,
   hasRecoverableTransition,
+  latestSuccessfulDeploymentRunPath,
+  layoutWorkflowRunsPath,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
   prepareCommittedCandidate,
@@ -51,12 +55,17 @@ import {
   pullRequestBodyWithVisualEvidence,
   readWorktreeSnapshot,
   restoreReadyOutcomeFromWorkerLog,
+  runCommand,
   selectWorkerHassMcpConfig,
   selectWorkerSessionCandidate,
+  shouldRetryWorkerSessionWithoutName,
   shouldVerifyExistingPullRequestVisualEvidence,
   summarizeFailedCheckLogs,
   synchronizeCandidateBase,
   waitForMergedPullRequest,
+  updateWorkflowDigestConfig,
+  workerMutableInfrastructurePaths,
+  workflowDigestRotationRequired,
 } from './admin-issue-controller'
 import {
   CONTROLLER_COMMENT_MARKER,
@@ -68,6 +77,7 @@ import {
   assertCandidateAuthorized,
   assertCandidateVisualEvidence,
   assertFinalizationAuthorized,
+  assertLayoutFinalizationAuthorized,
   baselineAdminIssueState,
   beginAdminIssueGeneration,
   branchNameForIssue,
@@ -76,6 +86,7 @@ import {
   deploymentReceiptIsAccepted,
   formatBlockedComment,
   formatCompletionComment,
+  formatLayoutCompletionComment,
   formatPullRequestComment,
   formatQuestionsComment,
   formatResolvedWithoutPrComment,
@@ -140,6 +151,117 @@ function record(): AdminIssueRecord {
     workerRuns: 0,
   }
 }
+
+describe('deployment runner trust rotation', () => {
+  it('rotates only when the protected deployment workflow changed', () => {
+    expect(
+      workflowDigestRotationRequired(
+        ['.github/workflows/deploy-dashboard.yml'],
+        '.github/workflows/deploy-dashboard.yml',
+      ),
+    ).toBe(true)
+    expect(
+      workflowDigestRotationRequired(
+        ['scripts/deploy-dashboard-ci.ts'],
+        '.github/workflows/deploy-dashboard.yml',
+      ),
+    ).toBe(false)
+  })
+
+  it('preserves the runner config while replacing only the trusted digest', () => {
+    expect(
+      updateWorkflowDigestConfig(
+        {
+          mode: 'production',
+          runnerImageId: `sha256:${'a'.repeat(64)}`,
+          version: 1,
+          workflowSha256: 'b'.repeat(64),
+        },
+        'c'.repeat(64),
+      ),
+    ).toEqual({
+      mode: 'production',
+      runnerImageId: `sha256:${'a'.repeat(64)}`,
+      version: 1,
+      workflowSha256: 'c'.repeat(64),
+    })
+  })
+
+  it('rejects malformed runner config and digests', () => {
+    expect(() =>
+      updateWorkflowDigestConfig(
+        { version: 1, workflowSha256: 'b'.repeat(64) },
+        'not-a-digest',
+      ),
+    ).toThrow('workflowSha256')
+    expect(() =>
+      updateWorkflowDigestConfig(
+        { version: 2, workflowSha256: 'b'.repeat(64) },
+        'c'.repeat(64),
+      ),
+    ).toThrow('version')
+  })
+})
+
+describe('controller command lifecycle', () => {
+  it.skipIf(process.platform === 'win32')(
+    'kills the complete subprocess group when a command times out',
+    async () => {
+      const root = mkdtempSync(join(homedir(), '.admin-issue-controller-process-test-'))
+      temporaryDirectories.push(root)
+      const pidPath = join(root, 'grandchild.pid')
+      const script = [
+        "const { spawn } = require('node:child_process')",
+        "const { writeFileSync } = require('node:fs')",
+        "const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })",
+        'writeFileSync(process.argv[1], String(child.pid))',
+        'setInterval(() => {}, 1000)',
+      ].join(';')
+      let grandchildPid: number | undefined
+      const command = runCommand(process.execPath, ['-e', script, pidPath], {
+        timeoutMs: 1_000,
+      }).then(
+        (result) => ({ result }),
+        (error: unknown) => ({ error }),
+      )
+      const processIsAlive = (pid: number) => {
+        try {
+          process.kill(pid, 0)
+          return true
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false
+          throw error
+        }
+      }
+
+      try {
+        await expect.poll(() => {
+          try {
+            grandchildPid = Number(readFileSync(pidPath, 'utf8'))
+            return Number.isInteger(grandchildPid) && grandchildPid > 0
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+            throw error
+          }
+        }).toBe(true)
+        await expect.poll(
+          () => processIsAlive(grandchildPid as number),
+          { timeout: 3_000 },
+        ).toBe(false)
+        expect(await command).toMatchObject({
+          error: expect.objectContaining({
+            message: `${process.execPath} timed out after 1000 ms`,
+          }),
+        })
+      } finally {
+        if (grandchildPid && processIsAlive(grandchildPid)) {
+          process.kill(grandchildPid, 'SIGKILL')
+        }
+        await command
+      }
+    },
+  )
+})
 
 function authorizeRecord(issue: AdminIssueRecord) {
   const baseSha = 'a'.repeat(40)
@@ -419,6 +541,7 @@ describe('admin issue controller domain', () => {
     issue.receipts.awaitingIosVerificationAt = '2026-09-20T12:01:00.000Z'
     issue.receipts.checksPassedAt = '2026-09-20T12:01:00.000Z'
     issue.receipts.deployedAt = '2026-09-20T12:01:00.000Z'
+    issue.receipts.layoutValidatedAt = '2026-09-20T12:01:00.000Z'
     const sessionName = issue.sessionName
 
     beginAdminIssueGeneration(issue, '2026-09-20T12:02:00.000Z')
@@ -437,6 +560,7 @@ describe('admin issue controller domain', () => {
     expect(issue.receipts.awaitingIosVerificationAt).toBeUndefined()
     expect(issue.receipts.checksPassedAt).toBeUndefined()
     expect(issue.receipts.deployedAt).toBeUndefined()
+    expect(issue.receipts.layoutValidatedAt).toBeUndefined()
   })
 
   it('migrates version-1 state without granting legacy provenance', () => {
@@ -560,6 +684,39 @@ describe('admin issue controller domain', () => {
     issue.provenance.deployment.sourceSha = 'a'.repeat(40)
     expect(() => assertFinalizationAuthorized(issue)).toThrow(
       'Descendant deployment source does not match workflow head',
+    )
+  })
+
+  it('authorizes exact post-merge layout validation without a dashboard deployment', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.automationKind = 'layout'
+    issue.origin = 'github-automation'
+    if (issue.provenance.kind !== 'active' || !issue.provenance.merge) {
+      throw new Error('Expected merge provenance')
+    }
+    delete issue.provenance.deployment
+    issue.provenance.layoutValidation = {
+      conclusion: 'success',
+      epoch: issue.provenance.epoch,
+      generation: issue.generation,
+      mergeSha: issue.provenance.merge.mergeSha,
+      observedAt: '2026-09-20T12:06:00.000Z',
+      revision: issue.processedRevision,
+      workflowHeadSha: issue.provenance.merge.mergeSha,
+      workflowRunAttempt: 1,
+      workflowRunId: 24,
+      workflowUrl: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+    }
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
+    expect(() => assertLayoutFinalizationAuthorized(issue)).not.toThrow()
+    expect(() => assertFinalizationAuthorized(issue)).toThrow(
+      'Issue does not have a verified deployment',
+    )
+
+    issue.provenance.layoutValidation.workflowHeadSha = 'f'.repeat(40)
+    expect(() => assertLayoutFinalizationAuthorized(issue)).toThrow(
+      'Layout validation workflow head does not match merge',
     )
   })
 
@@ -824,6 +981,28 @@ describe('admin issue controller domain', () => {
         issue,
       }),
     ).toContain('## Fixed and deployed')
+    issue.automationKind = 'layout'
+    issue.origin = 'github-automation'
+    if (issue.provenance.kind !== 'active' || !issue.provenance.merge) {
+      throw new Error('Expected merge provenance')
+    }
+    delete issue.provenance.deployment
+    issue.provenance.layoutValidation = {
+      conclusion: 'success',
+      epoch: issue.provenance.epoch,
+      generation: issue.generation,
+      mergeSha: issue.provenance.merge.mergeSha,
+      observedAt: '2026-09-20T12:06:00.000Z',
+      revision: issue.processedRevision,
+      workflowHeadSha: issue.provenance.merge.mergeSha,
+      workflowRunAttempt: 1,
+      workflowRunId: 24,
+      workflowUrl: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+    }
+    expect(formatLayoutCompletionComment(issue)).toContain('## Fixed and validated')
+    expect(formatLayoutCompletionComment(issue)).toContain(
+      '**Post-merge layout validation:** https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+    )
   })
 
   it('allows no-PR completion only from an unchanged isolated base', () => {
@@ -941,6 +1120,41 @@ describe('admin issue controller domain', () => {
     issue.receipts.deploymentRecoveryCheckedAt = '2026-09-20T12:08:00.000Z'
     expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(false)
     expect(deploymentRecoveryDue(issue, Date.parse('2026-09-20T12:14:00.000Z'))).toBe(true)
+  })
+
+  it('recovers against the latest successful deployment instead of a newer failure', () => {
+    expect(
+      latestSuccessfulDeploymentRunPath(
+        'SFenton/ha-sfenton-react-dash',
+        'deploy-dashboard.yml',
+      ),
+    ).toBe(
+      'repos/SFenton/ha-sfenton-react-dash/actions/workflows/deploy-dashboard.yml/runs?branch=master&event=push&status=success&per_page=1',
+    )
+  })
+
+  it('binds layout validation to the exact protected master workflow run', () => {
+    const mergeSha = 'd'.repeat(40)
+    expect(
+      layoutWorkflowRunsPath('SFenton/ha-sfenton-react-dash', mergeSha),
+    ).toBe(
+      `repos/SFenton/ha-sfenton-react-dash/actions/workflows/playwright.yml/runs?head_sha=${mergeSha}&event=push&per_page=20`,
+    )
+    const run = {
+      conclusion: 'success',
+      event: 'push',
+      head_branch: 'master',
+      head_sha: mergeSha,
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+      status: 'completed',
+    }
+    expect(() => assertSuccessfulLayoutWorkflowRun(run, mergeSha)).not.toThrow()
+    expect(() =>
+      assertSuccessfulLayoutWorkflowRun({ ...run, conclusion: 'failure' }, mergeSha),
+    ).toThrow('concluded failure')
+    expect(() =>
+      assertSuccessfulLayoutWorkflowRun({ ...run, head_sha: 'f'.repeat(40) }, mergeSha),
+    ).toThrow('does not bind exact merge')
   })
 
   it('restores the exact ready outcome from the retained successful worker log', () => {
@@ -1088,6 +1302,49 @@ describe('admin issue controller security configuration', () => {
         'admin-issue-190-task',
       )?.id,
     ).toBe('e0642349-ed35-4b5a-b89e-0c5213b72a92')
+  })
+
+  it('recovers a remotely existing stable session without renaming it', () => {
+    const commonArgs = ['--model', 'gpt-5.6-sol', '-p', 'continue']
+    expect(
+      buildCopilotWorkerArgs(
+        'fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+        'admin-issue-167-task',
+        commonArgs,
+        false,
+      ),
+    ).toEqual([
+      '--session-id=fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+      '--name',
+      'admin-issue-167-task',
+      ...commonArgs,
+    ])
+
+    const conflict = {
+      exitCode: 1,
+      stderr:
+        "error: option '-n, --name <name>' cannot be used with option '--session-id <id>' when it resolves to an existing or remote session or task.",
+      stdout: '',
+    }
+    expect(shouldRetryWorkerSessionWithoutName(true, conflict)).toBe(true)
+    expect(
+      buildCopilotWorkerArgs(
+        'fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+        'admin-issue-167-task',
+        commonArgs,
+        true,
+      ),
+    ).toEqual([
+      '--session-id=fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+      ...commonArgs,
+    ])
+    expect(shouldRetryWorkerSessionWithoutName(false, conflict)).toBe(false)
+    expect(
+      shouldRetryWorkerSessionWithoutName(true, {
+        ...conflict,
+        stderr: 'error: authentication failed',
+      }),
+    ).toBe(false)
   })
 
   it('summarizes the useful failing assertion instead of leading setup logs', () => {
@@ -1909,6 +2166,16 @@ describe('admin issue controller security configuration', () => {
   })
 
   it('allows only auto-deployed dashboard paths from workers', () => {
+    expect(workerMutableInfrastructurePaths()).toEqual([])
+    expect(workerMutableInfrastructurePaths({ automationKind: 'deployment' })).toEqual([
+      '.github/workflows/deploy-dashboard.yml',
+      'scripts/deploy-dashboard-ci.test.ts',
+      'scripts/deploy-dashboard-ci.ts',
+    ])
+    expect(workerMutableInfrastructurePaths({ automationKind: 'layout' })).toEqual([
+      'docs/ux/layouts.md',
+      'scripts/layout',
+    ])
     expect(() => assertWorkerChangesSafe('/tmp', ['src/App.tsx', 'e2e/app.spec.ts'])).not.toThrow()
     expect(() => assertWorkerChangesSafe('/tmp', ['home-assistant/packages/example.yaml'])).toThrow(
       'outside the auto-deployed dashboard',
@@ -1925,6 +2192,42 @@ describe('admin issue controller security configuration', () => {
         '/tmp',
         ['scripts/admin-issue-controller.ts'],
         { automationKind: 'deployment' },
+      ),
+    ).toThrow('protected path')
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        [
+          'docs/ux/layouts.md',
+          'scripts/layout/plan.ts',
+          'scripts/layout/run.test.ts',
+          'scripts/layout/run.ts',
+        ],
+        { automationKind: 'layout' },
+      ),
+    ).not.toThrow()
+    expect(() => assertWorkerChangesSafe('/tmp', ['scripts/layout/run.ts'])).toThrow(
+      'protected path',
+    )
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        ['docs/ux/layouts.md/extra'],
+        { automationKind: 'layout' },
+      ),
+    ).toThrow('protected path')
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        ['scripts/layout/run.ts'],
+        { automationKind: 'deployment' },
+      ),
+    ).toThrow('protected path')
+    expect(() =>
+      assertWorkerChangesSafe(
+        '/tmp',
+        ['playwright.config.ts'],
+        { automationKind: 'layout' },
       ),
     ).toThrow('protected path')
   })
@@ -1965,6 +2268,7 @@ describe('admin issue controller security configuration', () => {
     const workerExtensionPath = join(root, 'worker-extension.mjs')
     const tandemSkillPath = join(root, 'tandem-research', 'SKILL.md')
     const hassMcpConfigPath = join(root, 'mcp-config.json')
+    const runnerControllerConfigPath = join(root, 'runner-controller.json')
     mkdirSync(repositoryPath, { recursive: true })
     mkdirSync(resolve(tandemSkillPath, '..'), { recursive: true })
     writeFileSync(workerExtensionPath, 'export {};\n')
@@ -1977,6 +2281,11 @@ describe('admin issue controller security configuration', () => {
           playwright: { command: '/usr/bin/false' },
         },
       }),
+      { mode: 0o600 },
+    )
+    writeFileSync(
+      runnerControllerConfigPath,
+      JSON.stringify({ version: 1, workflowSha256: 'b'.repeat(64) }),
       { mode: 0o600 },
     )
     const configPath = join(root, 'controller.json')
@@ -1998,6 +2307,8 @@ describe('admin issue controller security configuration', () => {
       requiredCheckAppId: 15368,
       requiredChecks: ['Playwright gate'],
       requiredWorkflow: 'deploy-dashboard.yml',
+      runnerControllerConfigPath,
+      runnerControllerService: 'ha-dashboard-runner-controller.service',
       stateDirectory: join(root, 'state'),
       tandemSkillPath,
       todoEntityId: 'todo.groceries',
@@ -2014,6 +2325,8 @@ describe('admin issue controller security configuration', () => {
       requiredCheckAppId: 15368,
       hassMcpConfigPath,
       hassMcpServerName: 'hass',
+      runnerControllerConfigPath,
+      runnerControllerService: 'ha-dashboard-runner-controller.service',
       workerImageId: base.workerImageId,
     })
     expect(
@@ -2046,6 +2359,21 @@ describe('admin issue controller security configuration', () => {
 
     writeFileSync(configPath, JSON.stringify({ ...base, workerImageId: 'node:latest' }))
     expect(() => loadAdminIssueControllerConfig(configPath)).toThrow('immutable sha256 image ID')
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({ ...base, runnerControllerService: '--system' }),
+    )
+    expect(() => loadAdminIssueControllerConfig(configPath)).toThrow(
+      'systemd service unit name',
+    )
+
+    chmodSync(runnerControllerConfigPath, 0o644)
+    writeFileSync(configPath, JSON.stringify(base))
+    expect(() => loadAdminIssueControllerConfig(configPath)).toThrow(
+      'runnerControllerConfigPath must not be readable',
+    )
+    chmodSync(runnerControllerConfigPath, 0o600)
 
     chmodSync(hassMcpConfigPath, 0o644)
     writeFileSync(configPath, JSON.stringify(base))
@@ -2080,8 +2408,11 @@ describe('admin issue controller security configuration', () => {
     expect(extension).toContain('".github"')
     expect(extension).toContain('"node_modules"')
     expect(extension).toContain('"scripts/lib/hassAdminTodo.ts"')
+    expect(extension).toContain('"docs/ux/layouts.md"')
+    expect(extension).toContain('"scripts/layout"')
     expect(extension).toContain('process.env.ADMIN_ISSUE_MUTABLE_PATHS')
     expect(extension).toContain('ALLOWED_MUTABLE_WORKSPACE_PATHS')
+    expect(extension).toContain('if (mutableWorkspacePaths.includes(relativePath)) continue')
     expect(extension).toContain('src=/dev/null,dst=/workspace/${relativePath},readonly')
     expect(extension).toContain('/workspace/.cache:rw,nosuid,nodev')
     expect(extension).toContain('readonly')
@@ -2106,7 +2437,9 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain("'custom-tool(admin_issue_workspace)'")
     expect(controller).toContain('config.hassMcpServerName')
     expect(controller).toContain("'GH_TOKEN'")
-    expect(controller).toContain('`--session-id=${session.id}`')
+    expect(controller).toContain(
+      'buildCopilotWorkerArgs(session.id, record.sessionName, commonArgs, session.resume)',
+    )
     expect(controller).toContain('disableAllHooks: true')
     expect(controller).toContain("'installed-plugins'")
     expect(controller).toContain("const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']")
@@ -2119,8 +2452,13 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('verifyIssueVisualEvidenceComment(')
     expect(controller).toContain('issues/comments/${existing.id}')
     expect(controller).toContain('assertDeploymentRunSucceeded(run)')
+    expect(controller).toContain('assertWorkerChangesSafe(record.worktreePath, files, record)')
     expect(controller).toContain('recoverBlockedDeployments(config, client, state)')
     expect(controller).toContain('loadBoundDeploymentReceipt(config, record)')
+    expect(controller).toContain("record.automationKind === 'layout'")
+    expect(controller).toContain('waitForLayoutWorkflow(')
+    expect(controller).toContain('bindVerifiedLayoutWorkflow(record, run)')
+    expect(controller).toContain('finalizeLayoutIssue(config, state, record, run)')
     expect(controller).toContain('restoreReadyOutcomeFromWorkerLog(config, record)')
     expect(controller).toContain('waitForPullRequestHead(')
     expect(controller).toContain(
@@ -2155,5 +2493,15 @@ describe('admin issue controller security configuration', () => {
     expect(prompt).toContain('Manual iOS follow-up is exceptional')
     expect(prompt).toContain('An iPhone involved only as a Home Assistant presence device')
     expect(prompt).not.toContain('Do not use host filesystem, shell, GitHub, Home Assistant')
+
+    const layoutRecord = record()
+    layoutRecord.automationKind = 'layout'
+    const layoutPrompt = buildWorkerPrompt(layoutRecord)
+    expect(layoutPrompt).toContain('trusted layout-failure issue')
+    expect(layoutPrompt).toContain('docs/ux/layouts.md')
+    expect(layoutPrompt).toContain('scripts/layout')
+    expect(layoutPrompt).toContain('focused provenance-bound mixed-context runs')
+    expect(layoutPrompt).toContain('protected post-merge Automated layout job')
+    expect(layoutPrompt).not.toContain('.github/workflows/deploy-dashboard.yml')
   })
 })

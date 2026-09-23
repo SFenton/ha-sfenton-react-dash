@@ -24,6 +24,8 @@
     "Playwright gate"
   ],
   "requiredWorkflow": "deploy-dashboard.yml",
+  "runnerControllerConfigPath": "~/.config/ha-dashboard-runner/controller.json",
+  "runnerControllerService": "ha-dashboard-runner-controller.service",
   "maxRepairAttempts": 3,
   "pollSeconds": 30,
   "deploymentPollSeconds": 20,
