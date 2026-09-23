@@ -56,6 +56,7 @@ import {
   neutralizeGitHubClosingReferences,
   parseAdminTodoAttachments,
   parseWorkerOutcome,
+  reauthorizePersistedIosFollowUp,
   sessionNameForIssue,
   todoFingerprint,
   type AdminIssueControllerState,
@@ -4860,6 +4861,7 @@ async function finalizeIssue(
   assertFinalizationAuthorized(record)
   await verifyMergedPullRequest(config, record)
   const outcome = record.lastOutcome
+  if (reauthorizePersistedIosFollowUp(record)) writeState(config, state)
   if (record.inputRevision > record.processedRevision) {
     await postIssueCommentOnce(
       config,
@@ -4975,6 +4977,7 @@ async function finalizeLayoutIssue(
   assertLayoutFinalizationAuthorized(record)
   await verifyMergedPullRequest(config, record)
   const outcome = record.lastOutcome
+  if (reauthorizePersistedIosFollowUp(record)) writeState(config, state)
   if (record.inputRevision > record.processedRevision) {
     await postIssueCommentOnce(
       config,
@@ -5644,6 +5647,16 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
   await reconcileTodos(config, client, state)
   await reconcileGitHubAutomationIssues(config, state)
   await reconcileGitHubInputs(config, state)
+  const reauthorizedIos = Object.values(state.issues).find((record) => (
+    record.phase === 'awaiting-user' &&
+    Boolean(record.receipts.awaitingIosVerificationAt) &&
+    !record.receipts.iosVerifiedAt &&
+    reauthorizePersistedIosFollowUp(record)
+  ))
+  if (reauthorizedIos) {
+    reauthorizedIos.phase = 'deploying'
+    writeState(config, state)
+  }
   const recovering = Object.values(state.issues).find(
     (record) => record.phase === 'blocked' && hasRecoverableTransition(record),
   )
@@ -5658,7 +5671,7 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
     .filter((record) =>
       !['completed', 'paused', 'pull-request', 'deploying', 'resolving'].includes(record.phase))
     .sort((left, right) => left.inputs[0].createdAt.localeCompare(right.inputs[0].createdAt))
-  const selected = recovering ?? inFlight ?? ready[0]
+  const selected = reauthorizedIos ?? recovering ?? inFlight ?? ready[0]
   if (selected) await processRecord(config, client, state, selected)
 }
 

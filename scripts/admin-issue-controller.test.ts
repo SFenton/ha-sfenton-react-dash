@@ -103,6 +103,7 @@ import {
   parseAdminTodoAttachments,
   parseWorkerOutcome,
   pendingIssueInputs,
+  reauthorizePersistedIosFollowUp,
   REQUIRED_DEPLOYMENT_VERIFIED_PATHS,
   sessionNameForIssue,
   todoFingerprint,
@@ -1282,6 +1283,45 @@ describe('admin issue controller security configuration', () => {
     ).toEqual({ reason: '', required: false })
   })
 
+  it('revokes persisted iOS gates that no longer satisfy the canonical issue policy', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.phase = 'awaiting-user'
+    issue.receipts.awaitingIosVerificationAt = '2026-09-20T12:06:00.000Z'
+    issue.lastOutcome = {
+      changeSummary: ['Balanced terminal spacing.'],
+      decision: 'ready_for_pr',
+      iosFollowUp: {
+        reason: 'Physical Safari safe-area behavior requires manual verification.',
+        required: true,
+      },
+      pr: { body: 'Fix terminal spacing.', title: 'Fix terminal spacing' },
+      questions: [],
+      review: { approved: true, findings: [] },
+      schemaVersion: 1,
+      summary: 'Balanced terminal spacing.',
+      tests: [{ command: 'npm run test:change-policy', result: 'passed' }],
+      visualChange: { reason: 'The spacing is visible.', required: true },
+      visualEvidence: [],
+    }
+
+    expect(reauthorizePersistedIosFollowUp(issue)).toBe(true)
+    expect(issue.lastOutcome.iosFollowUp).toEqual({ reason: '', required: false })
+    expect(issue.receipts.awaitingIosVerificationAt).toBeUndefined()
+
+    issue.inputs[0].body = 'The software keyboard on iPhone Safari obscures the modal action.'
+    issue.lastOutcome.iosFollowUp = {
+      reason: 'Physical Safari keyboard behavior cannot be certified on Linux WebKit.',
+      required: true,
+    }
+    issue.receipts.awaitingIosVerificationAt = '2026-09-20T12:07:00.000Z'
+    expect(reauthorizePersistedIosFollowUp(issue)).toBe(false)
+    expect(issue.lastOutcome.iosFollowUp.required).toBe(true)
+    expect(issue.receipts.awaitingIosVerificationAt).toBe(
+      '2026-09-20T12:07:00.000Z',
+    )
+  })
+
   it('selects the substantive stable session when an empty duplicate name exists', () => {
     expect(
       selectWorkerSessionCandidate(
@@ -2459,6 +2499,7 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('waitForLayoutWorkflow(')
     expect(controller).toContain('bindVerifiedLayoutWorkflow(record, run)')
     expect(controller).toContain('finalizeLayoutIssue(config, state, record, run)')
+    expect(controller).toContain('reauthorizePersistedIosFollowUp(record)')
     expect(controller).toContain('restoreReadyOutcomeFromWorkerLog(config, record)')
     expect(controller).toContain('waitForPullRequestHead(')
     expect(controller).toContain(

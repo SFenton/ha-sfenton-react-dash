@@ -153,7 +153,9 @@ Assistant. Reopening it creates a new worktree generation while retaining the
 stable Copilot session. Manual iOS follow-up remains open after deployment only
 when the canonical issue names platform-specific browser behavior, the
 candidate changes a browser-facing surface, and the follow-up reason identifies
-the behavior that local evidence cannot certify.
+the behavior that local evidence cannot certify. Persisted follow-up gates are
+rechecked against that policy before finalization, so a legacy overbroad gate
+cannot keep an otherwise verified issue and Admin To-Do item open.
 
 If the local receipt predates a remotely created stable session, the first
 named launch may report that the UUID already resolves remotely. The controller

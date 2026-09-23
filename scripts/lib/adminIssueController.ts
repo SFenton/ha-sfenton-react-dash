@@ -1660,6 +1660,28 @@ export function authorizedIosFollowUp(
   return { reason: '', required: false }
 }
 
+export function reauthorizePersistedIosFollowUp(record: AdminIssueRecord) {
+  const outcome = record.lastOutcome
+  const candidate = record.provenance.kind === 'active'
+    ? record.provenance.candidate
+    : undefined
+  if (!outcome?.iosFollowUp.required || !candidate) return false
+
+  const authorized = authorizedIosFollowUp(
+    record.inputs
+      .filter((input) => input.source !== 'ci-failure')
+      .map((input) => input.body)
+      .join('\n\n'),
+    candidate.diff.files,
+    outcome.iosFollowUp,
+  )
+  if (authorized.required) return false
+
+  outcome.iosFollowUp = authorized
+  delete record.receipts.awaitingIosVerificationAt
+  return true
+}
+
 export function formatPullRequestComment(
   uid: string,
   revision: number,
