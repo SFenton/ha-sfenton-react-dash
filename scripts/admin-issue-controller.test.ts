@@ -27,9 +27,13 @@ import {
   AdminIssueDeploymentRunError,
   AdminIssueProvenanceError,
   assertDeploymentRunSucceeded,
+  assertDeploymentCoversMergeSha,
   assertExactCandidateSnapshot,
+  assertExistingReleasePullRequestEvidence,
+  assertExistingReleaseVerificationSnapshot,
   assertSuccessfulLayoutWorkflowRun,
   assertResolvedWithoutPullRequestSnapshot,
+  assertSuccessfulRequiredChecksForHead,
   assertIssueCommentBodyContainsVisualEvidence,
   assertWorkerHostConfigurationSafe,
   assertWorkerChangesSafe,
@@ -42,9 +46,11 @@ import {
   commitIsAncestor,
   createCommittedDiffReceipt,
   deploymentRecoveryDue,
+  existingReleaseRecoveryDue,
   findExactMergeCommit,
   githubRepositoryFromRemote,
   hasRecoverableDeployment,
+  hasRecoverableExistingRelease,
   hasRecoverableTransition,
   latestSuccessfulDeploymentRunPath,
   layoutWorkflowRunsPath,
@@ -1124,7 +1130,189 @@ describe('admin issue controller domain', () => {
 
     issue.receipts.controllerBlockedReason =
       'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state'
-    expect(hasRecoverableDeployment(issue)).toBe(true)
+    issue.branch = 'copilot/admin-issue-321-g1'
+    issue.worktreePath = '/tmp/admin-issue-321-g1'
+    issue.workerRuns = 5
+    expect(hasRecoverableDeployment(issue)).toBe(false)
+    expect(hasRecoverableExistingRelease(issue)).toBe(true)
+    issue.inputRevision += 1
+    expect(hasRecoverableExistingRelease(issue)).toBe(false)
+    issue.inputRevision = issue.processedRevision
+    expect(existingReleaseRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(true)
+    issue.receipts.existingReleaseRecoveryCheckedAt = '2026-09-20T12:08:00.000Z'
+    expect(existingReleaseRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(false)
+    expect(existingReleaseRecoveryDue(issue, Date.parse('2026-09-20T12:14:00.000Z'))).toBe(true)
+    issue.phase = 'deploying'
+    issue.receipts.existingReleaseAwaitingIosAt = '2026-09-20T12:09:00.000Z'
+    issue.receipts.iosVerifiedAt = '2026-09-20T12:10:00.000Z'
+    expect(existingReleaseRecoveryDue(issue, Date.parse('2026-09-20T12:10:00.000Z'))).toBe(true)
+  })
+
+  it('requires an unchanged retained candidate for existing-release closure', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate) {
+      throw new Error('Expected retained candidate')
+    }
+    issue.phase = 'blocked'
+    issue.branch = 'copilot/admin-issue-321-g1'
+    issue.worktreePath = '/tmp/admin-issue-321-g1'
+    issue.workerRuns = 5
+    issue.receipts.controllerBlockedReason =
+      'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state'
+    const outcome = parseWorkerOutcome(JSON.stringify({
+      decision: 'resolved_without_pr',
+      iosFollowUp: { reason: '', required: false },
+      issueTitle: 'Fix terminal page spacing',
+      questions: [],
+      resolution: 'The existing merged release already contains the verified fix.',
+      resolutionType: 'no_repository_change',
+      schemaVersion: 1,
+      summary: 'No duplicate repository change is required.',
+      verification: ['The prior pull request is merged and deployed.'],
+      visualEvidence: [],
+    }))
+    const snapshot = {
+      branch: issue.branch,
+      gitOperations: [],
+      headSha: issue.provenance.candidate.headSha,
+      status: '',
+      treeSha: issue.provenance.candidate.treeSha,
+    }
+
+    expect(() =>
+      assertExistingReleaseVerificationSnapshot(issue, snapshot, outcome),
+    ).not.toThrow()
+    expect(() =>
+      assertExistingReleaseVerificationSnapshot(
+        issue,
+        { ...snapshot, status: '? changed-file.ts' },
+        outcome,
+      ),
+    ).toThrow('does not match the retained candidate')
+    expect(() =>
+      assertExistingReleaseVerificationSnapshot(
+        issue,
+        snapshot,
+        parseWorkerOutcome(JSON.stringify({
+          decision: 'blocked',
+          iosFollowUp: { reason: '', required: false },
+          questions: [],
+          reason: 'Verification was inconclusive.',
+          schemaVersion: 1,
+          summary: 'Blocked.',
+          visualEvidence: [],
+        })),
+      ),
+    ).toThrow('no-change outcome')
+  })
+
+  it('requires controller-owned merged PR identity and successful protected checks', () => {
+    const issue = record()
+    issue.branch = 'copilot/admin-issue-321-g1'
+    issue.pr = {
+      number: 400,
+      url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/400',
+    }
+    const finalHeadSha = 'e'.repeat(40)
+    const mergeSha = 'f'.repeat(40)
+    const pullRequest = {
+      base: {
+        ref: 'master',
+        repo: { full_name: 'SFenton/ha-sfenton-react-dash' },
+      },
+      body: 'Tracked issue: #321\n\n<!-- admin-issue-controller:pr -->',
+      draft: false,
+      head: {
+        ref: issue.branch,
+        repo: { full_name: 'SFenton/ha-sfenton-react-dash' },
+        sha: finalHeadSha,
+      },
+      html_url: issue.pr.url,
+      merge_commit_sha: mergeSha,
+      merged_at: '2026-09-20T12:05:00.000Z',
+      number: issue.pr.number,
+      state: 'closed' as const,
+      user: { id: 123, login: 'SFenton' },
+    }
+    const mergeCommit = {
+      parents: [{ sha: 'a'.repeat(40) }, { sha: finalHeadSha }],
+      sha: mergeSha,
+    }
+    const config = {
+      ownerId: 123,
+      ownerLogin: 'SFenton',
+      repository: 'SFenton/ha-sfenton-react-dash',
+    }
+    expect(() =>
+      assertExistingReleasePullRequestEvidence(
+        config,
+        issue,
+        pullRequest,
+        mergeCommit,
+      ),
+    ).not.toThrow()
+    expect(() =>
+      assertExistingReleasePullRequestEvidence(
+        config,
+        issue,
+        { ...pullRequest, user: { id: 456, login: 'other' } },
+        mergeCommit,
+      ),
+    ).toThrow('identity or merged state')
+    expect(() =>
+      assertExistingReleasePullRequestEvidence(
+        config,
+        issue,
+        { ...pullRequest, body: 'Unbound pull request' },
+        mergeCommit,
+      ),
+    ).toThrow('identity or merged state')
+    expect(() =>
+      assertExistingReleasePullRequestEvidence(
+        config,
+        issue,
+        pullRequest,
+        {
+          ...mergeCommit,
+          parents: [{ sha: 'a'.repeat(40) }, { sha: '0'.repeat(40) }],
+        },
+      ),
+    ).toThrow('does not bind the pull request head')
+
+    const successfulCheck = {
+      app: { id: 15368 },
+      completed_at: '2026-09-20T12:04:00.000Z',
+      conclusion: 'success',
+      details_url: 'https://github.com/example/check/22',
+      id: 22,
+      name: 'Playwright gate',
+      status: 'completed',
+    }
+    expect(
+      assertSuccessfulRequiredChecksForHead(
+        ['Playwright gate'],
+        15368,
+        finalHeadSha,
+        [successfulCheck],
+      ),
+    ).toEqual([successfulCheck])
+    expect(() =>
+      assertSuccessfulRequiredChecksForHead(
+        ['Playwright gate'],
+        15368,
+        finalHeadSha,
+        [{ ...successfulCheck, conclusion: 'failure' }],
+      ),
+    ).toThrow('does not retain the required successful checks')
+    expect(() =>
+      assertSuccessfulRequiredChecksForHead(
+        ['Playwright gate'],
+        15368,
+        finalHeadSha,
+        [{ ...successfulCheck, app: { id: 99 } }],
+      ),
+    ).toThrow('does not retain the required successful checks')
   })
 
   it('recovers against the latest successful deployment instead of a newer failure', () => {
@@ -1236,6 +1424,45 @@ describe('admin issue controller domain', () => {
 
     await expect(commitIsAncestor(repository, first, second)).resolves.toBe(true)
     await expect(commitIsAncestor(repository, second, first)).resolves.toBe(false)
+    const deployment = {
+      receipt: {
+        deployedAt: '2026-09-20T12:06:00.000Z',
+        deployedSha: second,
+      },
+      run: {
+        head_sha: second,
+      },
+    }
+    await expect(
+      assertDeploymentCoversMergeSha(
+        { repositoryPath: repository },
+        first,
+        '2026-09-20T12:05:00.000Z',
+        deployment,
+        second,
+      ),
+    ).resolves.toBeUndefined()
+    await expect(
+      assertDeploymentCoversMergeSha(
+        { repositoryPath: repository },
+        second,
+        '2026-09-20T12:05:00.000Z',
+        {
+          ...deployment,
+          receipt: { ...deployment.receipt, deployedSha: first },
+        },
+        second,
+      ),
+    ).rejects.toThrow('does not contain the verified issue merge')
+    await expect(
+      assertDeploymentCoversMergeSha(
+        { repositoryPath: repository },
+        first,
+        '2026-09-20T12:07:00.000Z',
+        deployment,
+        second,
+      ),
+    ).rejects.toThrow('predates the verified issue merge')
   })
 })
 
@@ -2498,7 +2725,11 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('assertDeploymentRunSucceeded(run)')
     expect(controller).toContain('assertWorkerChangesSafe(record.worktreePath, files, record)')
     expect(controller).toContain('recoverBlockedDeployments(config, client, state)')
+    expect(controller).toContain('recoverExistingReleaseVerifications(config, client, state)')
     expect(controller).toContain('loadBoundDeploymentReceipt(config, record)')
+    expect(controller).toContain('verifySuccessfulRequiredChecksForHead(')
+    expect(controller).toContain('assertExistingReleaseVerificationSnapshot(')
+    expect(controller).toContain('## Existing release verified')
     expect(controller).toContain("record.automationKind === 'layout'")
     expect(controller).toContain('waitForLayoutWorkflow(')
     expect(controller).toContain('bindVerifiedLayoutWorkflow(record, run)')
@@ -2522,6 +2753,30 @@ describe('admin issue controller security configuration', () => {
     expect(completionReceipt).toBeGreaterThan(-1)
     expect(cleanup).toBeGreaterThan(completionReceipt)
     expect(completed).toBeGreaterThan(cleanup)
+    const existingRelease = controller.indexOf(
+      'async function finalizeExistingReleaseVerification',
+    )
+    const existingComment = controller.indexOf(
+      'formatExistingReleaseCompletionComment(',
+      existingRelease,
+    )
+    const existingClose = controller.indexOf(
+      "state: 'closed'",
+      existingComment,
+    )
+    const existingTodo = controller.indexOf(
+      'if (adminTodoCompletionRequired(record))',
+      existingClose,
+    )
+    const existingCleanup = controller.indexOf(
+      'await cleanupWorktree(config, record, true)',
+      existingTodo,
+    )
+    expect(existingRelease).toBeGreaterThan(-1)
+    expect(existingComment).toBeGreaterThan(existingRelease)
+    expect(existingClose).toBeGreaterThan(existingComment)
+    expect(existingTodo).toBeGreaterThan(existingClose)
+    expect(existingCleanup).toBeGreaterThan(existingTodo)
   })
 
   it('directs workers to gather Home Assistant evidence before asking the operator', () => {

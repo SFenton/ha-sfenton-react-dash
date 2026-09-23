@@ -160,6 +160,10 @@ export interface GitHubPullRequest {
   merged_at: string | null
   number: number
   state: 'open' | 'closed'
+  user: {
+    id: number
+    login: string
+  } | null
 }
 
 interface CheckRun {
@@ -209,6 +213,8 @@ const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
 const MAX_BASE_RESYNCS_PER_GENERATION = 2
 const DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS = 5 * 60_000
+const EXISTING_RELEASE_NO_PR_CONFLICT =
+  'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state'
 const LAYOUT_WORKFLOW = 'playwright.yml'
 const LAYOUT_WORKFLOW_TIMEOUT_MINUTES = 390
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
@@ -1929,6 +1935,24 @@ function assertReadyOutcomeMatchesCandidate(
   }
 }
 
+function loadWorkerOutcomeForRun(
+  config: Pick<AdminIssueControllerConfig, 'stateDirectory'>,
+  record: Pick<AdminIssueRecord, 'issueNumber'>,
+  run: number,
+) {
+  const logPath = join(
+    config.stateDirectory,
+    'worker-logs',
+    `issue-${record.issueNumber}-run-${run}.jsonl`,
+  )
+  if (!existsSync(logPath)) {
+    throw new AdminIssueProvenanceError(`Worker log is missing: ${logPath}`)
+  }
+  return parseWorkerOutcome(
+    extractFinalAssistantResponse(readFileSync(logPath, 'utf8')),
+  )
+}
+
 export function restoreReadyOutcomeFromWorkerLog(
   config: Pick<AdminIssueControllerConfig, 'stateDirectory'>,
   record: AdminIssueRecord,
@@ -1942,19 +1966,7 @@ export function restoreReadyOutcomeFromWorkerLog(
       'Blocked deployment has no successful worker run to restore',
     )
   }
-  const logPath = join(
-    config.stateDirectory,
-    'worker-logs',
-    `issue-${record.issueNumber}-run-${record.workerRuns}.jsonl`,
-  )
-  if (!existsSync(logPath)) {
-    throw new AdminIssueProvenanceError(
-      `Blocked deployment worker log is missing: ${logPath}`,
-    )
-  }
-  const outcome = parseWorkerOutcome(
-    extractFinalAssistantResponse(readFileSync(logPath, 'utf8')),
-  )
+  const outcome = loadWorkerOutcomeForRun(config, record, record.workerRuns)
   if (outcome.decision !== 'ready_for_pr') {
     throw new AdminIssueProvenanceError(
       'Latest successful worker run did not authorize the merged candidate',
@@ -4492,10 +4504,60 @@ export function hasRecoverableDeployment(record: AdminIssueRecord) {
   }
   const reason = record.receipts.controllerBlockedReason ??
     (record.lastOutcome?.decision === 'blocked' ? record.lastOutcome.reason : '')
-  return (
-    /^Deployment run \S+ concluded (?!success\b)/.test(reason) ||
-    reason === 'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state'
+  return /^Deployment run \S+ concluded (?!success\b)/.test(reason)
+}
+
+export function hasRecoverableExistingRelease(record: AdminIssueRecord) {
+  const reason = record.receipts.controllerBlockedReason ??
+    (record.lastOutcome?.decision === 'blocked' ? record.lastOutcome.reason : '')
+  const blockedConflict = (
+    record.phase === 'blocked' &&
+    reason === EXISTING_RELEASE_NO_PR_CONFLICT
   )
+  const verifiedIosFollowUp = (
+    record.phase === 'deploying' &&
+    Boolean(record.receipts.existingReleaseAwaitingIosAt) &&
+    Boolean(record.receipts.iosVerifiedAt)
+  )
+  return (
+    (blockedConflict || verifiedIosFollowUp) &&
+    record.provenance.kind === 'active' &&
+    Boolean(record.provenance.candidate) &&
+    Boolean(record.pr) &&
+    Boolean(record.branch) &&
+    Boolean(record.worktreePath) &&
+    record.workerRuns > 0 &&
+    record.processedRevision === record.inputRevision
+  )
+}
+
+export function assertExistingReleaseVerificationSnapshot(
+  record: AdminIssueRecord,
+  snapshot: AdminIssueWorktreeSnapshot,
+  outcome: AdminIssueWorkerOutcome,
+) {
+  if (
+    !hasRecoverableExistingRelease(record) ||
+    outcome.decision !== 'resolved_without_pr' ||
+    record.provenance.kind !== 'active' ||
+    !record.provenance.candidate
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Existing-release verification is missing its retained candidate or no-change outcome',
+    )
+  }
+  const candidate = record.provenance.candidate
+  if (
+    snapshot.branch !== record.branch ||
+    snapshot.headSha !== candidate.headSha ||
+    snapshot.treeSha !== candidate.treeSha ||
+    snapshot.status !== '' ||
+    snapshot.gitOperations.length > 0
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Existing-release verification worktree does not match the retained candidate',
+    )
+  }
 }
 
 export function deploymentRecoveryDue(
@@ -4506,6 +4568,59 @@ export function deploymentRecoveryDue(
   const checkedAt = Date.parse(record.receipts.deploymentRecoveryCheckedAt ?? '')
   return Number.isNaN(checkedAt) ||
     currentTime - checkedAt >= DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS
+}
+
+export function existingReleaseRecoveryDue(
+  record: AdminIssueRecord,
+  currentTime = Date.now(),
+) {
+  if (!hasRecoverableExistingRelease(record)) return false
+  if (
+    record.receipts.existingReleaseAwaitingIosAt &&
+    record.receipts.iosVerifiedAt
+  ) {
+    return true
+  }
+  const checkedAt = Date.parse(record.receipts.existingReleaseRecoveryCheckedAt ?? '')
+  return Number.isNaN(checkedAt) ||
+    currentTime - checkedAt >= DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS
+}
+
+export async function assertDeploymentCoversMergeSha(
+  config: Pick<AdminIssueControllerConfig, 'repositoryPath'>,
+  mergeSha: string,
+  mergedAt: string,
+  deployment: {
+    receipt: DeploymentReceipt
+    run: WorkflowRun
+  },
+  currentMasterSha: string,
+) {
+  if (
+    Date.parse(deployment.receipt.deployedAt) < Date.parse(mergedAt)
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Recovered deployment predates the verified issue merge',
+    )
+  }
+  const [workflowOnMaster, deployedOnMaster, mergeDeployed] = await Promise.all([
+    commitIsAncestor(config.repositoryPath, deployment.run.head_sha, currentMasterSha),
+    commitIsAncestor(
+      config.repositoryPath,
+      deployment.receipt.deployedSha,
+      currentMasterSha,
+    ),
+    commitIsAncestor(
+      config.repositoryPath,
+      mergeSha,
+      deployment.receipt.deployedSha,
+    ),
+  ])
+  if (!workflowOnMaster || !deployedOnMaster || !mergeDeployed) {
+    throw new AdminIssueProvenanceError(
+      'Recovered deployment does not contain the verified issue merge on current master',
+    )
+  }
 }
 
 async function assertDeploymentCoversMerge(
@@ -4522,32 +4637,13 @@ async function assertDeploymentCoversMerge(
       'Blocked deployment recovery is missing verified merge provenance',
     )
   }
-  const merge = record.provenance.merge
-  if (
-    Date.parse(deployment.receipt.deployedAt) < Date.parse(merge.mergedAt)
-  ) {
-    throw new AdminIssueProvenanceError(
-      'Recovered deployment predates the verified issue merge',
-    )
-  }
-  const [workflowOnMaster, deployedOnMaster, mergeDeployed] = await Promise.all([
-    commitIsAncestor(config.repositoryPath, deployment.run.head_sha, currentMasterSha),
-    commitIsAncestor(
-      config.repositoryPath,
-      deployment.receipt.deployedSha,
-      currentMasterSha,
-    ),
-    commitIsAncestor(
-      config.repositoryPath,
-      merge.mergeSha,
-      deployment.receipt.deployedSha,
-    ),
-  ])
-  if (!workflowOnMaster || !deployedOnMaster || !mergeDeployed) {
-    throw new AdminIssueProvenanceError(
-      'Recovered deployment does not contain the verified issue merge on current master',
-    )
-  }
+  await assertDeploymentCoversMergeSha(
+    config,
+    record.provenance.merge.mergeSha,
+    record.provenance.merge.mergedAt,
+    deployment,
+    currentMasterSha,
+  )
 }
 
 async function loadBoundDeploymentReceipt(
@@ -4612,6 +4708,387 @@ export function latestSuccessfulDeploymentRunPath(
   return `repos/${repository}/actions/workflows/${encodeURIComponent(
     requiredWorkflow,
   )}/runs?branch=master&event=push&status=success&per_page=1`
+}
+
+export function assertSuccessfulRequiredChecksForHead(
+  requiredChecks: readonly string[],
+  requiredCheckAppId: number,
+  headSha: string,
+  checkRuns: readonly CheckRun[],
+) {
+  const latestByName = new Map<string, CheckRun>()
+  for (const check of [...checkRuns].sort((left, right) => left.id - right.id)) {
+    if (check.app.id === requiredCheckAppId) latestByName.set(check.name, check)
+  }
+  const checks = requiredChecks.map((name) => latestByName.get(name))
+  if (
+    checks.some((check) =>
+      !check ||
+      check.status !== 'completed' ||
+      check.conclusion !== 'success' ||
+      !check.completed_at)
+  ) {
+    throw new AdminIssueProvenanceError(
+      `Existing release head ${headSha} does not retain the required successful checks`,
+    )
+  }
+  return checks as CheckRun[]
+}
+
+async function verifySuccessfulRequiredChecksForHead(
+  config: AdminIssueControllerConfig,
+  headSha: string,
+) {
+  const response = await ghApi<{ check_runs: CheckRun[] }>(
+    config,
+    'GET',
+    `repos/${config.repository}/commits/${headSha}/check-runs?per_page=100`,
+  )
+  return assertSuccessfulRequiredChecksForHead(
+    config.requiredChecks,
+    config.requiredCheckAppId,
+    headSha,
+    response.check_runs,
+  )
+}
+
+export function assertExistingReleasePullRequestEvidence(
+  config: Pick<
+    AdminIssueControllerConfig,
+    'ownerId' | 'ownerLogin' | 'repository'
+  >,
+  record: Pick<AdminIssueRecord, 'branch' | 'issueNumber' | 'pr'>,
+  pullRequest: GitHubPullRequest,
+  mergeCommit: GitHubCommit,
+) {
+  if (!record.pr || !record.branch) {
+    throw new AdminIssueProvenanceError(
+      'Existing release record is missing its pull request or branch',
+    )
+  }
+  classifyPullRequestHead(
+    config.repository,
+    record.branch,
+    pullRequest,
+    pullRequest.head.sha,
+  )
+  if (
+    pullRequest.number !== record.pr.number ||
+    pullRequest.html_url.toLowerCase() !== record.pr.url.toLowerCase() ||
+    !pullRequest.user ||
+    pullRequest.user.id !== config.ownerId ||
+    pullRequest.user.login.toLowerCase() !== config.ownerLogin.toLowerCase() ||
+    pullRequest.draft ||
+    pullRequest.state !== 'closed' ||
+    !pullRequest.merged_at ||
+    !pullRequest.merge_commit_sha ||
+    typeof pullRequest.body !== 'string' ||
+    !pullRequest.body.includes(`Tracked issue: #${record.issueNumber}`) ||
+    !pullRequest.body.includes('<!-- admin-issue-controller:pr -->')
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Existing release pull request identity or merged state is invalid',
+    )
+  }
+  if (
+    mergeCommit.sha !== pullRequest.merge_commit_sha ||
+    mergeCommit.parents.length !== 2 ||
+    mergeCommit.parents[1]?.sha !== pullRequest.head.sha
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Existing release merge commit does not bind the pull request head',
+    )
+  }
+}
+
+async function verifyExistingRelease(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+) {
+  if (
+    record.provenance.kind !== 'active' ||
+    !record.provenance.candidate ||
+    !record.pr ||
+    !record.branch ||
+    !record.worktreePath
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Existing-release verification is missing candidate, pull request, branch, or worktree state',
+    )
+  }
+  const outcome = loadWorkerOutcomeForRun(config, record, record.workerRuns)
+  const snapshot = await readWorktreeSnapshot(record.worktreePath)
+  assertExistingReleaseVerificationSnapshot(record, snapshot, outcome)
+  if (outcome.decision !== 'resolved_without_pr') {
+    throw new AdminIssueProvenanceError(
+      'Existing-release verification worker did not authorize a no-change resolution',
+    )
+  }
+  outcome.iosFollowUp = authorizedIosFollowUp(
+    record.inputs
+      .filter((input) => input.source !== 'ci-failure')
+      .map((input) => input.body)
+      .join('\n\n'),
+    record.provenance.candidate.diff.files,
+    outcome.iosFollowUp,
+  )
+
+  const pullRequest = await ghApi<GitHubPullRequest>(
+    config,
+    'GET',
+    `repos/${config.repository}/pulls/${record.pr.number}`,
+  )
+  assertPullRequestContainsVisualEvidence(
+    record,
+    pullRequest,
+    record.provenance.candidate,
+  )
+  const evidence = assertVisualEvidenceForCandidate(record.provenance.candidate, true)
+  if (evidence.length > 0) {
+    const marker = controllerReceiptMarker(
+      record.uid,
+      `pr-r${record.provenance.revision}`,
+    )
+    const comments = await listIssueComments(config, record.issueNumber)
+    const comment = comments.find((entry) => entry.body?.includes(marker))
+    if (!comment) {
+      throw new AdminIssueProvenanceError(
+        'Existing release is missing its issue visual-evidence update',
+      )
+    }
+    assertRenderedVisualEvidence(
+      comment.body ?? '',
+      evidence,
+      'GitHub issue update',
+    )
+  }
+
+  if (!pullRequest.merge_commit_sha) {
+    throw new AdminIssueProvenanceError(
+      'Existing release pull request has no merge commit',
+    )
+  }
+  const mergeCommit = await ghApi<GitHubCommit>(
+    config,
+    'GET',
+    `repos/${config.repository}/commits/${pullRequest.merge_commit_sha}`,
+  )
+  assertExistingReleasePullRequestEvidence(config, record, pullRequest, mergeCommit)
+  await verifySuccessfulRequiredChecksForHead(config, pullRequest.head.sha)
+  const currentMasterSha = await fetchCurrentMaster(config)
+  if (
+    !(await commitIsAncestor(
+      config.repositoryPath,
+      pullRequest.merge_commit_sha,
+      currentMasterSha,
+    ))
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Existing release merge is not on current master',
+    )
+  }
+  return {
+    currentMasterSha,
+    mergeSha: pullRequest.merge_commit_sha as string,
+    mergedAt: pullRequest.merged_at as string,
+    outcome,
+    pullRequest,
+  }
+}
+
+function formatExistingReleaseCompletionComment(
+  record: AdminIssueRecord,
+  outcome: Extract<AdminIssueWorkerOutcome, { decision: 'resolved_without_pr' }>,
+  mergeSha: string,
+  deployment: {
+    receipt: DeploymentReceipt
+    run: WorkflowRun
+  },
+) {
+  const verification = outcome.verification
+    .map((entry) => `- ${neutralizeGitHubClosingReferences(entry)}`)
+    .join('\n')
+  const evidenceCount = record.provenance.kind === 'active'
+    ? record.provenance.candidate?.visualEvidence?.length ?? 0
+    : 0
+  const evidence = evidenceCount > 0
+    ? `\n**Proposed fixed behavior:** ${evidenceCount} GitHub-hosted image${evidenceCount === 1 ? '' : 's'} in the pull request and issue update`
+    : ''
+  return `${CONTROLLER_COMMENT_MARKER}
+${controllerReceiptMarker(record.uid, `existing-release-r${record.processedRevision}`)}
+
+## Existing release verified
+
+${neutralizeGitHubClosingReferences(outcome.summary)}
+
+**Resolution**
+
+${neutralizeGitHubClosingReferences(outcome.resolution)}
+
+**Verification**
+${verification}
+
+**Pull request:** ${record.pr?.url}
+**Merged commit:** \`${mergeSha}\`
+**Deployment:** ${deployment.run.html_url}
+**Production result:** ${deployment.receipt.disposition} at \`${deployment.receipt.deployedSha}\`${evidence}`
+}
+
+async function finalizeExistingReleaseVerification(
+  config: AdminIssueControllerConfig,
+  client: HassAdminTodoClient,
+  state: AdminIssueControllerState,
+  record: AdminIssueRecord,
+) {
+  const verified = await verifyExistingRelease(config, record)
+  const response = await ghApi<{ workflow_runs: WorkflowRun[] }>(
+    config,
+    'GET',
+    latestSuccessfulDeploymentRunPath(
+      config.repository,
+      config.requiredWorkflow,
+    ),
+  )
+  const run = response.workflow_runs[0]
+  if (
+    !run ||
+    run.status !== 'completed' ||
+    run.conclusion !== 'success' ||
+    run.event !== 'push' ||
+    run.head_branch !== 'master'
+  ) {
+    throw new AdminIssueProvenanceError(
+      'Existing release has no successful protected deployment to verify',
+    )
+  }
+  const receipt = await downloadAcceptedDeploymentReceipt(config, run)
+  await assertDeploymentCoversMergeSha(
+    config,
+    verified.mergeSha,
+    verified.mergedAt,
+    { receipt, run },
+    verified.currentMasterSha,
+  )
+
+  record.lastOutcome = verified.outcome
+  await synchronizeIssueTitle(config, record, verified.outcome.issueTitle)
+  if (verified.outcome.iosFollowUp.required && !record.receipts.iosVerifiedAt) {
+    await postIssueCommentOnce(
+      config,
+      record.issueNumber,
+      record.uid,
+      `existing-release-ios-${verified.mergeSha}`,
+      [
+        '**The existing release is verified, but manual iOS verification is still required.**',
+        '',
+        verified.outcome.iosFollowUp.reason,
+        '',
+        `- Pull request: ${record.pr.url}`,
+        `- Deployment: ${run.html_url}`,
+        '',
+        'After verifying the fix on the affected iOS device or simulator, reply with exactly `iOS verification passed`. The issue and Admin To-Do item will remain open until then.',
+      ].join('\n'),
+    )
+    record.phase = 'awaiting-user'
+    record.receipts.awaitingIosVerificationAt = now()
+    record.receipts.existingReleaseAwaitingIosAt = now()
+    writeState(config, state)
+    return
+  }
+
+  await postIssueCommentOnce(
+    config,
+    record.issueNumber,
+    record.uid,
+    `existing-release-r${record.processedRevision}`,
+    formatExistingReleaseCompletionComment(
+      record,
+      verified.outcome,
+      verified.mergeSha,
+      { receipt, run },
+    ),
+  )
+  await ghApi(config, 'PATCH', `repos/${config.repository}/issues/${record.issueNumber}`, {
+    state: 'closed',
+    state_reason: 'completed',
+  })
+  record.receipts.issueClosedAt = now()
+  record.receipts.existingReleaseVerifiedAt = now()
+  record.receipts.existingReleaseMergeSha = verified.mergeSha
+  record.receipts.existingReleaseDeploymentRunId = String(run.id)
+  record.receipts.existingReleaseOutcomeSha256 = createHash('sha256')
+    .update(JSON.stringify(verified.outcome))
+    .digest('hex')
+  writeState(config, state)
+
+  if (adminTodoCompletionRequired(record)) {
+    let items = await client.getItems(config.todoEntityId)
+    let completed = items.find((item) => item.uid === record.uid)
+    let completionReceipt = await client.getState(config.completionReceiptEntityId)
+    if (!adminCompletionBoundarySatisfied(
+      completed?.status,
+      completionReceipt.state,
+      record.uid,
+    )) {
+      await client.completeItem(config.completionScript, record.uid)
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        await sleep(750)
+        items = await client.getItems(config.todoEntityId)
+        completed = items.find((item) => item.uid === record.uid)
+        completionReceipt = await client.getState(config.completionReceiptEntityId)
+        if (adminCompletionBoundarySatisfied(
+          completed?.status,
+          completionReceipt.state,
+          record.uid,
+        )) break
+      }
+    }
+    if (!adminCompletionBoundarySatisfied(
+      completed?.status,
+      completionReceipt.state,
+      record.uid,
+    )) {
+      throw new Error(`Admin To-Do item ${record.uid} did not become completed`)
+    }
+    record.receipts.todoCompletedAt = now()
+    writeState(config, state)
+  }
+
+  await cleanupWorktree(config, record, true)
+  cleanupInputAttachmentCopies(config, record)
+  record.phase = 'completed'
+  delete record.receipts.existingReleaseAwaitingIosAt
+  delete record.receipts.controllerBlockedAt
+  delete record.receipts.controllerBlockedReason
+  writeState(config, state)
+}
+
+async function recoverExistingReleaseVerifications(
+  config: AdminIssueControllerConfig,
+  client: HassAdminTodoClient,
+  state: AdminIssueControllerState,
+) {
+  const record = Object.values(state.issues)
+    .filter((candidate) => existingReleaseRecoveryDue(candidate))
+    .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))[0]
+  if (!record) return false
+
+  record.receipts.existingReleaseRecoveryCheckedAt = now()
+  state.activeUid = record.uid
+  writeState(config, state)
+  try {
+    await finalizeExistingReleaseVerification(config, client, state, record)
+    delete record.receipts.existingReleaseRecoveryErrorHash
+  } catch (error) {
+    record.receipts.existingReleaseRecoveryErrorHash = createHash('sha256')
+      .update(error instanceof Error ? error.message : String(error))
+      .digest('hex')
+    writeState(config, state)
+  } finally {
+    state.activeUid = undefined
+    writeState(config, state)
+  }
+  return true
 }
 
 async function recoverBlockedDeployments(
@@ -5144,7 +5621,7 @@ export function assertResolvedWithoutPullRequestSnapshot(
     record.provenance.deployment
   ) {
     throw new AdminIssueProvenanceError(
-      'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state',
+      EXISTING_RELEASE_NO_PR_CONFLICT,
     )
   }
   if (files.length > 0) {
@@ -5659,6 +6136,9 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
   if (reauthorizedIos) {
     reauthorizedIos.phase = 'deploying'
     writeState(config, state)
+  }
+  if (await recoverExistingReleaseVerifications(config, client, state)) {
+    return
   }
   const recovering = Object.values(state.issues).find(
     (record) => record.phase === 'blocked' && hasRecoverableTransition(record),
