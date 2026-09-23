@@ -7,12 +7,15 @@ import { joinSession } from "@github/copilot-sdk/extension";
 const MAX_OUTPUT_BYTES = 512 * 1024;
 const ALLOWED_MUTABLE_WORKSPACE_PATHS = new Set([
   ".github/workflows/deploy-dashboard.yml",
+  "docs/ux/layouts.md",
   "scripts/deploy-dashboard-ci.test.ts",
   "scripts/deploy-dashboard-ci.ts",
+  "scripts/layout",
 ]);
 const READ_ONLY_WORKSPACE_PATHS = [
   ".git",
   ".github",
+  "docs/ux/layouts.md",
   ".gitattributes",
   ".gitignore",
   ".gitmodules",
@@ -27,6 +30,7 @@ const READ_ONLY_WORKSPACE_PATHS = [
   "scripts/design-system",
   "scripts/e2e-coverage-check.ts",
   "scripts/i18n",
+  "scripts/layout",
   "scripts/lib/adminIssueController.ts",
   "scripts/lib/hassAdminTodo.test.ts",
   "scripts/lib/hassAdminTodo.ts",
@@ -110,8 +114,19 @@ async function runIsolated(command, timeoutSeconds) {
     "--mount",
     `type=bind,src=/dev/null,dst=/workspace/${relativePath},readonly`,
   ]);
+  const mutableWorkspacePaths = (process.env.ADMIN_ISSUE_MUTABLE_PATHS ?? "")
+    .split(",")
+    .map((path) => path.trim())
+    .filter(Boolean);
+  if (mutableWorkspacePaths.some((path) => !ALLOWED_MUTABLE_WORKSPACE_PATHS.has(path))) {
+    return {
+      textResultForLlm: "The mutable workspace path policy is invalid.",
+      resultType: "failure",
+    };
+  }
   const readOnlyMounts = [];
   for (const relativePath of READ_ONLY_WORKSPACE_PATHS) {
+    if (mutableWorkspacePaths.includes(relativePath)) continue;
     const source = `${workspace}/${relativePath}`;
     try {
       await access(source);
@@ -122,16 +137,6 @@ async function runIsolated(command, timeoutSeconds) {
     } catch {
       // Missing paths remain covered by the controller's post-run validation.
     }
-  }
-  const mutableWorkspacePaths = (process.env.ADMIN_ISSUE_MUTABLE_PATHS ?? "")
-    .split(",")
-    .map((path) => path.trim())
-    .filter(Boolean);
-  if (mutableWorkspacePaths.some((path) => !ALLOWED_MUTABLE_WORKSPACE_PATHS.has(path))) {
-    return {
-      textResultForLlm: "The mutable workspace path policy is invalid.",
-      resultType: "failure",
-    };
   }
   const mutableMounts = [];
   for (const relativePath of mutableWorkspacePaths) {

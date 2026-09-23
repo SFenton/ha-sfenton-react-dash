@@ -213,7 +213,13 @@ const DEPLOYMENT_WORKER_MUTABLE_PATHS = [
   'scripts/deploy-dashboard-ci.test.ts',
   'scripts/deploy-dashboard-ci.ts',
 ] as const
+const LAYOUT_WORKER_MUTABLE_PATHS = [
+  'docs/ux/layouts.md',
+  'scripts/layout',
+] as const
+const RECURSIVE_WORKER_MUTABLE_PATHS = new Set<string>(['scripts/layout'])
 const PROTECTED_WORKER_PATHS = [
+  'docs/ux/layouts.md',
   '.gitattributes',
   '.git',
   '.gitignore',
@@ -229,6 +235,7 @@ const PROTECTED_WORKER_PATHS = [
   'scripts/design-system/',
   'scripts/e2e-coverage-check.ts',
   'scripts/i18n/',
+  'scripts/layout/',
   'scripts/lib/adminIssueController.ts',
   'scripts/lib/hassAdminTodo.test.ts',
   'scripts/lib/hassAdminTodo.ts',
@@ -1752,12 +1759,13 @@ function buildWorkerEnvironment(
   record?: Pick<AdminIssueRecord, 'automationKind'>,
 ) {
   const copilotHome = join(config.workerHome, '.copilot')
+  const mutableInfrastructurePaths = workerMutableInfrastructurePaths(record)
   const environment: NodeJS.ProcessEnv = {
     ADMIN_ISSUE_GIT_COMMON_DIR: gitCommonDirectory,
     ADMIN_ISSUE_WORKER_IMAGE: config.workerImageId,
     ADMIN_ISSUE_WORKSPACE: worktreePath,
-    ...(record?.automationKind === 'deployment'
-      ? { ADMIN_ISSUE_MUTABLE_PATHS: DEPLOYMENT_WORKER_MUTABLE_PATHS.join(',') }
+    ...(mutableInfrastructurePaths.length > 0
+      ? { ADMIN_ISSUE_MUTABLE_PATHS: mutableInfrastructurePaths.join(',') }
       : {}),
     COPILOT_HOME: copilotHome,
     GH_TOKEN: githubToken,
@@ -1784,9 +1792,12 @@ export function buildWorkerPrompt(record: AdminIssueRecord) {
       },
     )
     .join('\n\n')
-  const protectedSurfaceGuidance = record.automationKind === 'deployment'
-    ? `This trusted deployment-failure issue may modify only these infrastructure paths in addition to ordinary dashboard paths: ${DEPLOYMENT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to deployment diagnosis, recovery, or regression coverage.`
-    : 'Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.'
+  const protectedSurfaceGuidance =
+    record.automationKind === 'deployment'
+      ? `This trusted deployment-failure issue may modify only these infrastructure paths in addition to ordinary dashboard paths: ${DEPLOYMENT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to deployment diagnosis, recovery, or regression coverage.`
+      : record.automationKind === 'layout'
+        ? `This trusted layout-failure issue may modify only these layout infrastructure paths in addition to ordinary dashboard paths: ${LAYOUT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to layout planning, execution, evidence, verification, or directly owned regression coverage.`
+        : 'Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.'
   return `/tandem-research ${record.title}
 
 You are working on GitHub issue #${record.issueNumber} in ${record.issueUrl}.
@@ -2189,6 +2200,7 @@ async function changedFiles(worktreePath: string) {
         '.gitignore',
         '.gitmodules',
         'eslint.config.js',
+        'docs/ux/layouts.md',
         'ops/admin-issue-controller',
         'package-lock.json',
         'package.json',
@@ -2198,6 +2210,7 @@ async function changedFiles(worktreePath: string) {
         'scripts/design-system',
         'scripts/e2e-coverage-check.ts',
         'scripts/i18n',
+        'scripts/layout',
         'scripts/lib/adminIssueController.ts',
         'scripts/lib/hassAdminTodo.test.ts',
         'scripts/lib/hassAdminTodo.ts',
@@ -2217,9 +2230,23 @@ async function changedFiles(worktreePath: string) {
   return [...new Set([...tracked, ...untracked, ...ignoredProtected])].sort()
 }
 
-function workerMutableInfrastructurePaths(record?: Pick<AdminIssueRecord, 'automationKind'>) {
-  return new Set<string>(
-    record?.automationKind === 'deployment' ? DEPLOYMENT_WORKER_MUTABLE_PATHS : [],
+export function workerMutableInfrastructurePaths(
+  record?: Pick<AdminIssueRecord, 'automationKind'>,
+) {
+  if (record?.automationKind === 'deployment') return [...DEPLOYMENT_WORKER_MUTABLE_PATHS]
+  if (record?.automationKind === 'layout') return [...LAYOUT_WORKER_MUTABLE_PATHS]
+  return []
+}
+
+function workerCanModifyInfrastructurePath(
+  normalizedPath: string,
+  record?: Pick<AdminIssueRecord, 'automationKind'>,
+) {
+  return workerMutableInfrastructurePaths(record).some(
+    (allowedPath) =>
+      normalizedPath === allowedPath ||
+      (RECURSIVE_WORKER_MUTABLE_PATHS.has(allowedPath) &&
+        normalizedPath.startsWith(`${allowedPath}/`)),
   )
 }
 
@@ -2227,10 +2254,9 @@ function assertProtectedPathsUntouched(
   files: string[],
   record?: Pick<AdminIssueRecord, 'automationKind'>,
 ) {
-  const mutableInfrastructurePaths = workerMutableInfrastructurePaths(record)
   for (const file of files) {
     const normalized = file.replaceAll('\\', '/')
-    if (mutableInfrastructurePaths.has(normalized)) {
+    if (workerCanModifyInfrastructurePath(normalized, record)) {
       continue
     }
     if (
@@ -2260,10 +2286,10 @@ export function assertWorkerChangesSafe(
     if (
       normalized !== 'index.html' &&
       !ALLOWED_WORKER_PATHS.some((allowedPath) => normalized.startsWith(allowedPath)) &&
-      !mutableInfrastructurePaths.has(normalized)
+      !workerCanModifyInfrastructurePath(normalized, record)
     ) {
       throw new Error(
-        mutableInfrastructurePaths.size > 0
+        mutableInfrastructurePaths.length > 0
           ? `Worker changed a path outside its authorized repair scope: ${file}`
           : `Worker changed a path outside the auto-deployed dashboard: ${file}`,
       )
@@ -2984,7 +3010,7 @@ export async function prepareCommittedCandidate(
     }
     throw new Error('Worker reported ready_for_pr but made no repository changes')
   }
-  assertWorkerChangesSafe(record.worktreePath, files)
+  assertWorkerChangesSafe(record.worktreePath, files, record)
   const expectedRemoteHeadSha = previousCandidate?.headSha
   const targetBaseSha = previousCandidate?.targetBaseSha ?? provenance.preparedBaseSha
   const committed = await commitWorkerChanges(record, outcome)
