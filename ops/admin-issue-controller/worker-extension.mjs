@@ -5,6 +5,7 @@ import { isAbsolute } from "node:path";
 import { joinSession } from "@github/copilot-sdk/extension";
 
 const MAX_OUTPUT_BYTES = 512 * 1024;
+const MAX_COMMAND_TIMEOUT_SECONDS = 80 * 60;
 const ALLOWED_MUTABLE_WORKSPACE_PATHS = new Set([
   ".github/workflows/deploy-dashboard.yml",
   "docs/ux/layouts.md",
@@ -272,8 +273,10 @@ await joinSession({
           },
           timeout_seconds: {
             type: "integer",
+            description:
+              "Bounded command timeout. Use the 300-second default normally; request up to 4800 seconds only for an already-selected long validation such as an exact layout replay.",
             minimum: 1,
-            maximum: 1800,
+            maximum: MAX_COMMAND_TIMEOUT_SECONDS,
             default: 300,
           },
         },

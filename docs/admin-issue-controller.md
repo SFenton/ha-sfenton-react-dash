@@ -160,6 +160,10 @@ output-limit enforcement kill the launcher and its local descendants together,
 so a Copilot core or Docker client cannot retain the controller's output pipe
 after the launcher exits. The next controller cycle also removes any labeled
 worker container left behind by a forcibly disconnected Docker client.
+Isolated repository commands default to five minutes. A worker may request up
+to 80 minutes only for an already-selected long validation such as an exact
+layout replay; the controller's separate worker timeout remains the outer cap
+and kills the complete process group if that run does not return.
 
 ## Candidate provenance
 
