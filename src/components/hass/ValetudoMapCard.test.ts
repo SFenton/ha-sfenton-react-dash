@@ -14,6 +14,16 @@ import {
 } from './ValetudoMapCard.utils'
 import { materialIconPath } from '../core/iconPaths'
 
+function mapWithLayers(layers: ReturnType<typeof createMockValetudoMap>['layers']) {
+  return {
+    __class: 'ValetudoMap' as const,
+    entities: [],
+    layers,
+    pixelSize: 5,
+    size: { x: 20, y: 30 },
+  }
+}
+
 function chunk(type: string, data = Buffer.alloc(0)) {
   const length = Buffer.alloc(4)
   length.writeUInt32BE(data.length)
@@ -172,6 +182,91 @@ describe('ValetudoMapCard helpers', () => {
 
     expect(valetudoRoomAtGridPoint(rooms, { x: 700.4, y: 600.4 })?.entityId).toBe('input_boolean.music_room')
     expect(valetudoRoomAtGridPoint(rooms, { x: 500, y: 500 })).toBeNull()
+  })
+
+  it('derives bounds from rendered pixels instead of empty layer dimensions', () => {
+    const map = mapWithLayers([
+      {
+        type: 'segment',
+        dimensions: { x: { min: 558, max: 728 }, y: { min: 639, max: 1027 } },
+        compressedPixels: [558, 639, 171, 558, 1027, 171],
+      },
+      {
+        type: 'floor',
+        dimensions: { x: { min: 558, max: 728 }, y: { min: 0, max: 6554 } },
+        pixels: [],
+      },
+    ])
+
+    expect(valetudoMapBounds(map)).toEqual({ minX: 558, maxX: 728, minY: 639, maxY: 1027 })
+  })
+
+  it('uses the same pixel precedence for bounds and rendering', () => {
+    expect(valetudoMapBounds(mapWithLayers([{
+      type: 'segment',
+      dimensions: { x: { min: 0, max: 999 }, y: { min: 0, max: 999 } },
+      pixels: [4, 5, 6, 7],
+      compressedPixels: [100, 200, 3],
+    }]))).toEqual({ minX: 4, maxX: 6, minY: 5, maxY: 7 })
+
+    expect(valetudoMapBounds(mapWithLayers([{
+      type: 'segment',
+      dimensions: { x: { min: 0, max: 999 }, y: { min: 0, max: 999 } },
+      pixels: [],
+      compressedPixels: [8, 9, 2],
+    }]))).toEqual({ minX: 8, maxX: 9, minY: 9, maxY: 9 })
+  })
+
+  it('derives equivalent bounds from compressed and uncompressed pixels', () => {
+    const pixels = mapWithLayers([{
+      type: 'segment',
+      pixels: [10, 20, 11, 20, 12, 20],
+    }])
+    const compressedPixels = mapWithLayers([{
+      type: 'segment',
+      compressedPixels: [10, 20, 3],
+    }])
+
+    expect(valetudoMapBounds(pixels)).toEqual(valetudoMapBounds(compressedPixels))
+  })
+
+  it('does not fall back to dimensions for malformed explicit pixels', () => {
+    const map = mapWithLayers([{
+      type: 'segment',
+      dimensions: { x: { min: 100, max: 200 }, y: { min: 300, max: 400 } },
+      pixels: [Number.NaN, Number.POSITIVE_INFINITY, 5],
+    }])
+
+    expect(valetudoMapBounds(map)).toEqual({ minX: 0, maxX: 4, minY: 0, maxY: 6 })
+  })
+
+  it('uses only valid dimensions when pixel representations are absent', () => {
+    const valid = mapWithLayers([{
+      type: 'metadata',
+      dimensions: { x: { min: 2, max: 6 }, y: { min: 3, max: 7 } },
+    }])
+    const invalid = mapWithLayers([
+      {
+        type: 'metadata',
+        dimensions: { x: { min: 6, max: 2 }, y: { min: 3, max: 7 } },
+      },
+      {
+        type: 'metadata',
+        dimensions: { x: { min: 2, max: Number.NaN }, y: { min: 3, max: 7 } },
+      },
+    ])
+
+    expect(valetudoMapBounds(valid)).toEqual({ minX: 2, maxX: 6, minY: 3, maxY: 7 })
+    expect(valetudoMapBounds(invalid)).toEqual({ minX: 0, maxX: 4, minY: 0, maxY: 6 })
+  })
+
+  it('keeps the Main Floor mock bounds stable with an empty extreme layer', () => {
+    expect(valetudoMapBounds(createMockValetudoMap('valetudo_exaltedsneakydeer'))).toEqual({
+      minX: 558,
+      maxX: 728,
+      minY: 639,
+      maxY: 1027,
+    })
   })
 
   it('extracts ValetudoMap JSON from a zTXt PNG chunk', async () => {
