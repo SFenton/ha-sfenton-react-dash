@@ -204,7 +204,6 @@ type ActionableTodoItem = HassTodoItem & {
 
 const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
-const LAYOUT_WORKER_TIMEOUT_MINUTES = 240
 const MAX_BASE_RESYNCS_PER_GENERATION = 2
 const DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS = 5 * 60_000
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
@@ -1797,7 +1796,7 @@ export function buildWorkerPrompt(record: AdminIssueRecord) {
     record.automationKind === 'deployment'
       ? `This trusted deployment-failure issue may modify only these infrastructure paths in addition to ordinary dashboard paths: ${DEPLOYMENT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to deployment diagnosis, recovery, or regression coverage.`
       : record.automationKind === 'layout'
-        ? `This trusted layout-failure issue may modify only these layout infrastructure paths in addition to ordinary dashboard paths: ${LAYOUT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to layout planning, execution, evidence, verification, or directly owned regression coverage.`
+        ? `This trusted layout-failure issue may modify only these layout infrastructure paths in addition to ordinary dashboard paths: ${LAYOUT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to layout planning, execution, evidence, verification, or directly owned regression coverage. Use changed tests and focused provenance-bound mixed-context runs for local acceptance. Do not make a full historical or full-known-mock layout replay a pre-PR gate; the protected post-merge Automated layout job owns exact full-corpus evidence.`
         : 'Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.'
   return `/tandem-research ${record.title}
 
@@ -2125,10 +2124,7 @@ async function runCopilotWorker(
     cwd: worktreePath,
     env: environment,
     maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
-    timeoutMs: workerTimeoutMinutesForRecord(
-      config.workerTimeoutMinutes,
-      record,
-    ) * 60_000,
+    timeoutMs: config.workerTimeoutMinutes * 60_000,
   }
   let result = await runCommand(
     'copilot',
@@ -2240,15 +2236,6 @@ export function workerMutableInfrastructurePaths(
   if (record?.automationKind === 'deployment') return [...DEPLOYMENT_WORKER_MUTABLE_PATHS]
   if (record?.automationKind === 'layout') return [...LAYOUT_WORKER_MUTABLE_PATHS]
   return []
-}
-
-export function workerTimeoutMinutesForRecord(
-  configuredTimeoutMinutes: number,
-  record?: Pick<AdminIssueRecord, 'automationKind'>,
-) {
-  return record?.automationKind === 'layout'
-    ? Math.max(configuredTimeoutMinutes, LAYOUT_WORKER_TIMEOUT_MINUTES)
-    : configuredTimeoutMinutes
 }
 
 function workerCanModifyInfrastructurePath(

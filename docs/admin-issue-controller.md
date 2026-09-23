@@ -160,12 +160,10 @@ output-limit enforcement kill the launcher and its local descendants together,
 so a Copilot core or Docker client cannot retain the controller's output pipe
 after the launcher exits. The next controller cycle also removes any labeled
 worker container left behind by a forcibly disconnected Docker client.
-Isolated repository commands default to five minutes. Ordinary workers may
-request up to 80 minutes under the configured 90-minute outer worker cap.
-Trusted workflow-authenticated layout incidents may request up to 210 minutes
-for an already-selected exact replay and receive a 240-minute outer cap. The
-longer allowance is tied to the same narrow layout path authorization; timeout
-still kills the complete process group if the run does not return.
+Workflow-authenticated layout workers use changed tests and focused
+provenance-bound mixed-context runs for local acceptance. They must not turn a
+full historical or full-known-mock replay into a pre-PR gate; the protected
+post-merge `Automated layout` job owns exact full-corpus evidence.
 
 ## Candidate provenance
 

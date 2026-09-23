@@ -62,7 +62,6 @@ import {
   waitForMergedPullRequest,
   updateWorkflowDigestConfig,
   workerMutableInfrastructurePaths,
-  workerTimeoutMinutesForRecord,
   workflowDigestRotationRequired,
 } from './admin-issue-controller'
 import {
@@ -2080,10 +2079,6 @@ describe('admin issue controller security configuration', () => {
       'docs/ux/layouts.md',
       'scripts/layout',
     ])
-    expect(workerTimeoutMinutesForRecord(90)).toBe(90)
-    expect(workerTimeoutMinutesForRecord(90, { automationKind: 'deployment' })).toBe(90)
-    expect(workerTimeoutMinutesForRecord(90, { automationKind: 'layout' })).toBe(240)
-    expect(workerTimeoutMinutesForRecord(300, { automationKind: 'layout' })).toBe(300)
     expect(() => assertWorkerChangesSafe('/tmp', ['src/App.tsx', 'e2e/app.spec.ts'])).not.toThrow()
     expect(() => assertWorkerChangesSafe('/tmp', ['home-assistant/packages/example.yaml'])).toThrow(
       'outside the auto-deployed dashboard',
@@ -2312,11 +2307,6 @@ describe('admin issue controller security configuration', () => {
     expect(extension).toContain('"--network",\n    "none"')
     expect(extension).toContain('"--read-only"')
     expect(extension).toContain('"--cap-drop",\n    "ALL"')
-    expect(extension).toContain('mutableWorkspacePaths.includes("scripts/layout")')
-    expect(extension).toContain('? 210 * 60')
-    expect(extension).toContain(': 80 * 60')
-    expect(extension).toContain('maximum: MAX_COMMAND_TIMEOUT_SECONDS')
-    expect(extension).toContain('request up to ${MAX_COMMAND_TIMEOUT_SECONDS} seconds')
     expect(extension).toContain('"ADMIN_ISSUE_GIT_COMMON_DIR"')
     expect(extension).toContain('".github"')
     expect(extension).toContain('"node_modules"')
@@ -2409,6 +2399,8 @@ describe('admin issue controller security configuration', () => {
     expect(layoutPrompt).toContain('trusted layout-failure issue')
     expect(layoutPrompt).toContain('docs/ux/layouts.md')
     expect(layoutPrompt).toContain('scripts/layout')
+    expect(layoutPrompt).toContain('focused provenance-bound mixed-context runs')
+    expect(layoutPrompt).toContain('protected post-merge Automated layout job')
     expect(layoutPrompt).not.toContain('.github/workflows/deploy-dashboard.yml')
   })
 })
