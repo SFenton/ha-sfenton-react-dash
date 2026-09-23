@@ -380,9 +380,9 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   camera: {
     family: 'modal', states: ['loading', 'live'],
-    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera', 'src/components/hass/haHlsSession', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/hls-js-light.d.ts'],
+    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera', 'src/components/hass/RtcPilotCamera', 'src/components/hass/haHlsSession', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/constants/rtcPilot', 'src/hls-js-light.d.ts'],
     legacy: ['feedback-regressions.spec.ts', 'landscape-modal-adaptation.spec.ts'],
-    question: 'Do camera tiles and modal media preserve their geometry while the Home Assistant HLS stream transitions from loading to decoded live video?',
+    question: 'Do the shared camera tiles and modal media preserve their geometry from loading to decoded live video? The RTC pilot transport and audible output require separate real-media evidence.',
   },
   summary: {
     family: 'modal', states: ['overdue', 'upcoming', 'expired'],
@@ -454,10 +454,10 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     question: 'Do content, viewer-relative room controls, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey?',
   },
   host: {
-    family: 'host', states: ['legacy', 'panel'],
+    family: 'host', states: ['legacy', 'pilot', 'panel'],
     owners: ['src/panel/', 'src/lifecycle/', 'src/constants/dashboardHosts'],
     legacy: ['iframe-lifecycle.spec.ts'],
-    question: 'Does the actual product bridge preserve its app during synthetic resizing and forward independent outer safe edges to the correctly sized inner viewport?',
+    question: 'Do both maintained hosts and the admin-only RTC pilot host retain their frames through synthetic resizing and forward independent outer safe edges to the correctly sized inner viewport?',
   },
   preload: {
     family: 'preload', states: ['inert'],

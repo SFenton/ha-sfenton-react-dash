@@ -1,4 +1,10 @@
+// @covers src/panel/sfentonReactAppCard.ts
+// @covers e2e/layout/foldBridgeFixture.ts
+// @covers e2e/layout/app.ts
 import { expect, test, type Page } from './layout/fixture'
+import { FOLD_TEST_CARD_TAG } from '../src/constants/rtcPilot'
+import { openHost } from './layout/app'
+import { serveFoldBridge } from './layout/foldBridgeFixture'
 import {
   REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY,
   REACT_DASHBOARD_LIFECYCLE_PROPERTY,
@@ -194,10 +200,11 @@ test('notification landing remains correct on tablet and fine-pointer desktop', 
   }
 })
 
-test('legacy wrapper preserves one lifecycle across reconnect replacements', async ({ page }) => {
+for (const path of ['/sfenton-react-dash/home', '/sfenton-react-fold-test/home']) {
+test(`${path} wrapper preserves one lifecycle across reconnect replacements`, async ({ page }) => {
   await openLifecycleHost(
     page,
-    '/sfenton-react-dash/home',
+    path,
     '/sfenton-react-app-card.js',
   )
   await page.waitForFunction((tag) => Boolean(customElements.get(tag)), SFENTON_REACT_APP_CARD_TAG)
@@ -240,6 +247,51 @@ test('legacy wrapper preserves one lifecycle across reconnect replacements', asy
   const disposals = history.filter((entry: { event: string }) => entry.event === 'disposed')
   expect(disposals).toHaveLength(1)
   expect(disposals[0].reason).toBe('legacy-card-disconnected')
+})
+}
+
+test('Fold-only card resource preserves the iframe without replacing the production card', async ({ page }) => {
+  const script = await serveFoldBridge(page)
+  await openLifecycleHost(
+    page,
+    '/sfenton-react-fold-test/home',
+    script,
+  )
+  await page.waitForFunction((tag) => Boolean(customElements.get(tag)), FOLD_TEST_CARD_TAG)
+  expect(await page.evaluate(() => Boolean(customElements.get('sfenton-react-app-card')))).toBe(false)
+
+  const innerOrigins = new Set<number>()
+  const instanceIds = new Set<string>()
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    await page.evaluate((tag) => {
+      const card = document.createElement(tag) as HTMLElement & {
+        setConfig: (config: { url: string }) => void
+      }
+      card.dataset.foldHost = 'true'
+      card.setConfig({ url: '/index.html' })
+      document.body.append(card)
+    }, FOLD_TEST_CARD_TAG)
+    const mounted = await waitForMountedApp(page)
+    innerOrigins.add(mounted.timeOrigin)
+    instanceIds.add(mounted.instanceId)
+    await page.locator('[data-fold-host="true"]').evaluate((element) => element.remove())
+  }
+
+  expect(innerOrigins.size).toBe(1)
+  expect(instanceIds.size).toBe(1)
+  await page.waitForTimeout(5_100)
+  await expectDisposed(page)
+})
+
+test('Fold layout host opens its own card and keeps the app frame on resize', async ({ page }) => {
+  const frame = await openHost(page, 'pilot')
+  const initialOrigin = await frame.evaluate(() => performance.timeOrigin)
+
+  await expect(page.locator('[data-layout-host="pilot"]')).toHaveCount(1)
+  expect(await page.evaluate((tag) => Boolean(customElements.get(tag)), FOLD_TEST_CARD_TAG)).toBe(true)
+  await page.setViewportSize({ width: 852, height: 393 })
+  await expect.poll(() => frame.evaluate(() => innerWidth)).toBe(852)
+  expect(await frame.evaluate(() => performance.timeOrigin)).toBe(initialOrigin)
 })
 
 test('custom panel preserves one lifecycle across outer-frame replacements', async ({ page }) => {

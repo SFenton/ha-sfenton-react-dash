@@ -6,6 +6,8 @@ import { applyProfile, waitForModalReady, waitForRoute } from './evidence'
 import { openQuickLinksTab } from '../quick-links'
 import { enterWakeState, isWakeScenario } from './wakeLight'
 import { HOUSEHOLD_RESIDENTS } from '../../src/constants/householdResidents'
+import { FOLD_TEST_CARD_TAG } from '../../src/constants/rtcPilot'
+import { serveFoldBridge } from './foldBridgeFixture'
 
 const HOUSEHOLD_AWAY_STATUS_ENTITY_ID = 'sensor.household_away_status'
 
@@ -244,13 +246,17 @@ export async function enterState(dialog: Locator, scenario: ScenarioId, state: s
 }
 
 export async function openHost(page: Page, state: string) {
-  const tag = state === 'legacy' ? 'sfenton-react-app-card' : 'sfenton-react-panel'
-  const script = state === 'legacy' ? 'sfenton-react-app-card.js' : 'sfenton-react-panel.js'
-  await page.route(`**/layout-host-${state}.html`, (route) => route.fulfill({
+  const isCard = state !== 'panel'
+  const tag = state === 'pilot' ? FOLD_TEST_CARD_TAG : isCard ? 'sfenton-react-app-card' : 'sfenton-react-panel'
+  const script = state === 'pilot'
+    ? (await serveFoldBridge(page)).slice(1)
+    : isCard ? 'sfenton-react-app-card.js' : 'sfenton-react-panel.js'
+  const hostPath = state === 'pilot' ? '/sfenton-react-fold-test/home' : `/layout-host-${state}.html`
+  await page.route(`**${hostPath}`, (route) => route.fulfill({
     contentType: 'text/html',
     body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body style="margin:0"><script type="module" src="/${script}"></script></body></html>`,
   }))
-  await page.goto(`/layout-host-${state}.html`)
+  await page.goto(hostPath)
   await page.waitForFunction((name) => Boolean(customElements.get(name)), tag)
   await page.evaluate(({ tag, state }) => {
     const host = document.createElement(tag) as HTMLElement & {
@@ -258,7 +264,7 @@ export async function openHost(page: Page, state: string) {
       panel?: { config: { app_url: string }; title: string }
     }
     host.dataset.layoutHost = state
-    if (state === 'legacy') host.setConfig!({ url: '/index.html?path=overview' })
+    if (state !== 'panel') host.setConfig!({ url: '/index.html?path=overview' })
     else host.panel = { config: { app_url: '/index.html?path=overview' }, title: 'Synthetic custom-panel host' }
     document.body.append(host)
   }, { tag, state })

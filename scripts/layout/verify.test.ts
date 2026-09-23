@@ -1,4 +1,5 @@
 // @covers scripts/layout/plan.ts
+// @covers e2e/layout/contracts.ts
 import type { Checkpoint, CollectedTest, ExecutionLedger, LayoutPlan, ManualLedger, RunIdentity } from '../../e2e/layout/types'
 import { SURFACE_CONTRACTS } from '../../e2e/layout/contracts'
 import {
@@ -53,6 +54,14 @@ function fixture() {
 }
 
 describe('layout scope and selection', () => {
+  it('assigns RTC camera and Fold host changes to their declared layout scenarios', () => {
+    expect(SURFACE_CONTRACTS.camera.owners).toContain('src/components/hass/RtcPilotCamera')
+    expect(SURFACE_CONTRACTS.camera.owners).toContain('src/constants/rtcPilot')
+    expect(SURFACE_CONTRACTS.host.states).toEqual(['legacy', 'pilot', 'panel'])
+    expect(classifyChanges(['src/components/hass/RtcPilotCamera.tsx']).scenarios).toContain('camera')
+    expect(classifyChanges(['src/panel/sfentonReactAppCard.ts']).scenarios).toContain('host')
+  })
+
   it('rejects a newly rendered or missing tab instead of deriving the expected set from observation', () => {
     expect(() => assertDeclaredTabs(['First', 'Second'], ['^First$', '^Second$'])).not.toThrow()
     expect(() => assertDeclaredTabs(['First', 'Second', 'New'], ['^First$', '^Second$'])).toThrow(/inventory changed/)

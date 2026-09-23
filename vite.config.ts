@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 import { existsSync, readFileSync } from 'node:fs'
 import type { ServerOptions as HttpsServerOptions } from 'node:https'
 import { resolve } from 'node:path'
-import { fileURLToPath, URL } from 'node:url'
 
 const DEFAULT_DEV_HTTPS_CERT = '.certs/localhost.pem'
 const DEFAULT_DEV_HTTPS_KEY = '.certs/localhost-key.pem'
@@ -25,6 +24,22 @@ function devHttpsOptions(mode: string, env: Record<string, string>): HttpsServer
     cert: readFileSync(certPath),
     key: readFileSync(keyPath),
   }
+}
+
+export function dashboardCameraAliases(mode: string) {
+  if (mode === 'test') {
+    return {
+      '@hakit/components': resolve('src/test/mocks/hakitComponents.tsx'),
+      '@hakit/core': resolve('src/test/mocks/hakitCore.ts'),
+    }
+  }
+  if (mode === 'rtc-pilot') {
+    return [{
+      find: './HlsCamera',
+      replacement: resolve('src/components/hass/RtcPilotCamera.tsx'),
+    }]
+  }
+  return undefined
 }
 
 // https://vite.dev/config/
@@ -57,12 +72,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     resolve: {
-      alias: mode === 'test'
-        ? {
-            '@hakit/components': fileURLToPath(new URL('./src/test/mocks/hakitComponents.tsx', import.meta.url)),
-            '@hakit/core': fileURLToPath(new URL('./src/test/mocks/hakitCore.ts', import.meta.url)),
-          }
-        : undefined,
+      alias: dashboardCameraAliases(mode),
     },
     server: {
       host: '0.0.0.0',

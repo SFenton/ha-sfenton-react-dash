@@ -346,6 +346,34 @@ go2rtc APIs, a parallel custom-card path, or a dependency on the
 `webrtc-camera-sfenton` integration. RTSP remains the server-side transport
 from Frigate to Home Assistant.
 
+The explicitly approved SFenton-RTC pilot is a **build-time-only exception** for
+the admin-only `/sfenton-react-fold-test/home` experiment. `vite build --mode
+rtc-pilot` replaces the camera adapter in that build with the
+`webrtc-camera-sfenton` v3.10.3 card, staged at
+`/local/ha-sfenton-react-dash-fold-test/rtc/`; that card signs the backend
+`/api/webrtc/ws` route through Home Assistant. The ordinary production build
+stays HLS and has no browser transport switch or fork frontend dependency.
+The fork's pilot frontend assets remain within the Fold test dashboard folder:
+do not replace the globally registered v3.10.1 card resource or copy a pilot
+build to `/sfenton-react-dash/home`, `/sfenton-react-panel`, or the existing
+iOS/Duo test hosts. A second, self-contained `fold-bridge` build of the
+existing card source registers only `sfenton-react-fold-app-card` and is served
+from the Fold asset folder. Its Lovelace resource is registered globally, but
+the unique tag is used only by the Fold dashboard; the existing global
+`sfenton-react-app-card` resource and both maintained hosts remain untouched.
+The Fold card preserves its own iframe during immediate replacement without
+changing source-change or route-departure disposal. A prior authorization
+created this particular test host and enabled the integration; that is not
+standing permission to redeploy, change other hosts, or enable it elsewhere.
+Every future live mutation needs its own explicit authorization and rollback.
+Pilot styling must size the RTC custom-element host and shadow video to the
+tile or fill-modal frame. Retain `cover` for tiles and `contain` for modals.
+Verify card/video geometry across loading, live, and unavailable states in
+both a mock browser and the deployed Fold host. Prove advancing
+decoded video, a received audio track, actual audible output after an unmute
+gesture, and stable document identity separately; a mock connected state does
+not certify any of them.
+
 When implementing camera sections or modals:
 
 - Inspect the Home Assistant camera cards/modals first.
