@@ -81,7 +81,11 @@ mutable user extensions or unrelated personal skills.
 3. Apply later Admin To-Do edits to the issue and queue them as a new input
    revision.
 4. Accept follow-up comments only when the numeric user ID, login, and
-   `OWNER` association all match the pinned repository owner.
+   `OWNER` association all match the pinned repository owner. Read embedded
+   GitHub uploads from raw issue bodies and owner comments, including HTML
+   images, Markdown images and links, and standalone video URLs. Track comment
+   edits rather than treating a numeric comment cursor as proof that the
+   content has not changed.
 5. Create or resume the stable UUID-bound Copilot session with `gpt-5.6-sol`,
    `max` effort, `/tandem-research`, the isolated repository tool, and the
    operator's configured `hass` MCP server. Legacy named sessions are resolved
@@ -192,7 +196,7 @@ post-merge `Automated layout` job owns exact full-corpus evidence.
 
 ## Candidate provenance
 
-Controller state version 2 uses one provenance record as the sole lifecycle
+Controller state version 3 uses one provenance record as the sole lifecycle
 authority. It keeps the prepared base, current candidate head and tree,
 committed-diff manifest, validation receipt, protected-check runs, PR merge
 receipt, deployment binding, and optional visual-evidence receipts distinct.
@@ -208,6 +212,26 @@ remote SHA. Retries preserve the confirmed publication and reject deleted or
 divergent published branches. A pre-upgrade candidate with validation but no
 publication evidence fails closed rather than assuming its branch was never
 published; an owner comment can start a fresh generation.
+
+Input media is separate from proposed fixed-behavior images. The controller
+records each source occurrence, stable GitHub URL (never a signed redirect),
+type, byte count and SHA-256, or an explicit unsupported reason. It scans up to
+32 references, downloads at most 10 MiB per GitHub upload and 32 MiB per
+input, and passes at most eight current verified files into one worker run.
+Only PNG, JPEG, GIF and WebP use Copilot CLI's native `--attachment`
+input. A synthetic check confirmed image recognition in fresh and resumed
+`gpt-5.6-sol` sessions; PDF did not reach that pinned model without granting
+host file-read permission, so it is explicitly unsupported. Animated GIF and
+WebP files are also reported as unsupported; a static-frame check does not
+certify motion. GitHub-supported
+video, audio, SVG, bitmap/TIFF, Office, text and
+archive uploads are still discovered, but a worker cannot claim to have
+inspected their content; it must request a supported image, PDF or description
+before the controller can approve a fix. Unknown external or signed URLs are
+never fetched. Authentication goes only to the first approved GitHub origin;
+bounded GitHub-managed redirects receive no Authorization header. The
+controller verifies local media bytes again before copying them into the
+networkless, ignored worker artifact directory.
 
 The following rules are fail closed:
 
@@ -350,18 +374,21 @@ systemctl --user daemon-reload
 systemctl --user enable --now admin-issue-controller.service
 ```
 
-Upgrading an existing controller from state version 1 is a separate operational
-rollout. Stop the old service first and retain its state. The first locked
-version-2 `once` or `run` invocation validates the version-1 journal, writes a
-mode-`0600` backup, and atomically migrates it. In-flight records with prior
+Upgrading an existing controller from state version 1 or 2 is a separate
+operational rollout. Stop the old service first and retain its state. The first
+locked version-3 `once` or `run` invocation validates the old journal, writes
+a mode-`0600` versioned backup, and atomically migrates it. A version-2 paused
+issue retains its published PR, candidate provenance, input revisions and
+manual-close receipt unchanged. Version-1 in-flight records with prior
 worktrees, PRs, or authorization-like receipts become `legacy-untrusted` and
 cannot continue until an owner comment starts a fresh generation. Completed
 history and pristine queued records remain readable, but no legacy SHA or
-timestamp is promoted into trusted provenance. Version-1 binaries reject the
-new journal; rollback requires stopping the service and explicitly restoring
-the retained backup.
+timestamp is promoted into trusted provenance. Old binaries reject a version-3
+journal. Before replay or any external side effect, rollback requires stopping
+the service and restoring the matching old binary **and** its retained journal
+backup. After replay or GitHub branch/PR changes, repair forward instead.
 
-Visual-evidence enforcement is additive within state version 2. Existing
+Visual-evidence enforcement remains additive within state version 3. Existing
 runtime candidates without a complete attachment receipt cannot pass live-PR
 verification or finalization. An owner comment starts a fresh worker revision
 that can generate the required issue-scoped images; existing non-runtime
@@ -389,7 +416,7 @@ node "$HOME/.local/share/admin-issue-controller/controller.mjs" \
   "$HOME/.config/admin-issue-controller/controller.json"
 ```
 
-State is an atomic, strictly validated version-2 `0600` JSON journal under
+State is an atomic, strictly validated version-3 `0600` JSON journal under
 `~/.local/state/admin-issue-controller`. Worker JSON event logs are retained in
 its `worker-logs` child directory. Stable issue, comment, branch, session, PR,
 merge, deployment, Home Assistant receipt, and worktree receipts make retries
@@ -400,7 +427,19 @@ unpublished local commits needed for diagnosis first: the controller removes the
 old worktree and branch as part of that transition. Do not clear quarantine by
 editing the journal or bypassing the remote-head guard.
 
+To pause one running issue while keeping other issues available, stop the user
+service first, preserve its journal and candidate, manually close the issue,
+then restart and verify that its journal phase is `paused`, its PR has not merged
+or enabled auto-merge, and Home Assistant has not completed its to-do. After
+the new bundle is merged, installed and active, reopening first downloads the
+current owner media into private receipts. Only after that succeeds does it
+close the superseded PR, remove its worktree/branch and enqueue a new
+media-bearing input **after** old input revisions are marked processed.
+Uninterpretable or inaccessible media leaves the old candidate paused rather
+than restarting blindly; a controller comment explains the blocker. Reopening
+is not a reuse of the old PR's checks.
+
 Do not delete or edit the journal while the service runs. If intervention is
 required, stop the service first and retain the journal and worker logs for
-diagnosis. The `status` command intentionally refuses to migrate version-1
+diagnosis. The `status` command intentionally refuses to migrate older
 state outside the controller lock.
