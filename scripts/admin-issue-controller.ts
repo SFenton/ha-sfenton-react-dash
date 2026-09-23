@@ -2027,6 +2027,31 @@ function bindWorkerSessionId(
   return { id: record.sessionId, resume: false }
 }
 
+export function buildCopilotWorkerArgs(
+  sessionId: string,
+  sessionName: string,
+  commonArgs: readonly string[],
+  resume: boolean,
+) {
+  return [
+    `--session-id=${sessionId}`,
+    ...(resume ? [] : ['--name', sessionName]),
+    ...commonArgs,
+  ]
+}
+
+export function shouldRetryWorkerSessionWithoutName(
+  namedSessionAttempt: boolean,
+  result: CommandResult,
+) {
+  return (
+    namedSessionAttempt &&
+    result.exitCode !== 0 &&
+    result.stderr.includes("cannot be used with option '--session-id <id>'") &&
+    result.stderr.includes('existing or remote session or task')
+  )
+}
+
 async function runCopilotWorker(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
@@ -2083,21 +2108,28 @@ async function runCopilotWorker(
     '-p',
     buildWorkerPrompt(record),
   ]
-  const result = await runCommand(
+  const commandOptions = {
+    allowFailure: true,
+    cwd: worktreePath,
+    env: environment,
+    maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
+    timeoutMs: config.workerTimeoutMinutes * 60_000,
+  }
+  let result = await runCommand(
     'copilot',
-    [
-      `--session-id=${session.id}`,
-      ...(session.resume ? [] : ['--name', record.sessionName]),
-      ...commonArgs,
-    ],
-    {
-      allowFailure: true,
-      cwd: worktreePath,
-      env: environment,
-      maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
-      timeoutMs: config.workerTimeoutMinutes * 60_000,
-    },
+    buildCopilotWorkerArgs(session.id, record.sessionName, commonArgs, session.resume),
+    commandOptions,
   )
+  if (shouldRetryWorkerSessionWithoutName(!session.resume, result)) {
+    record.receipts.sessionCreatedAt ??= now()
+    record.updatedAt = now()
+    writeState(config, state)
+    result = await runCommand(
+      'copilot',
+      buildCopilotWorkerArgs(session.id, record.sessionName, commonArgs, true),
+      commandOptions,
+    )
+  }
 
   mkdirSync(join(config.stateDirectory, 'worker-logs'), { mode: 0o700, recursive: true })
   const logPath = join(

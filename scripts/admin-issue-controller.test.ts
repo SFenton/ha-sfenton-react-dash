@@ -34,6 +34,7 @@ import {
   assertWorkerChangesSafe,
   assertPullRequestBinding,
   assertPullRequestContainsVisualEvidence,
+  buildCopilotWorkerArgs,
   buildWorkerPrompt,
   classifyPullRequestHead,
   collectVisualEvidenceReceipts,
@@ -54,6 +55,7 @@ import {
   runCommand,
   selectWorkerHassMcpConfig,
   selectWorkerSessionCandidate,
+  shouldRetryWorkerSessionWithoutName,
   shouldVerifyExistingPullRequestVisualEvidence,
   summarizeFailedCheckLogs,
   synchronizeCandidateBase,
@@ -1204,6 +1206,49 @@ describe('admin issue controller security configuration', () => {
     ).toBe('e0642349-ed35-4b5a-b89e-0c5213b72a92')
   })
 
+  it('recovers a remotely existing stable session without renaming it', () => {
+    const commonArgs = ['--model', 'gpt-5.6-sol', '-p', 'continue']
+    expect(
+      buildCopilotWorkerArgs(
+        'fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+        'admin-issue-167-task',
+        commonArgs,
+        false,
+      ),
+    ).toEqual([
+      '--session-id=fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+      '--name',
+      'admin-issue-167-task',
+      ...commonArgs,
+    ])
+
+    const conflict = {
+      exitCode: 1,
+      stderr:
+        "error: option '-n, --name <name>' cannot be used with option '--session-id <id>' when it resolves to an existing or remote session or task.",
+      stdout: '',
+    }
+    expect(shouldRetryWorkerSessionWithoutName(true, conflict)).toBe(true)
+    expect(
+      buildCopilotWorkerArgs(
+        'fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+        'admin-issue-167-task',
+        commonArgs,
+        true,
+      ),
+    ).toEqual([
+      '--session-id=fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+      ...commonArgs,
+    ])
+    expect(shouldRetryWorkerSessionWithoutName(false, conflict)).toBe(false)
+    expect(
+      shouldRetryWorkerSessionWithoutName(true, {
+        ...conflict,
+        stderr: 'error: authentication failed',
+      }),
+    ).toBe(false)
+  })
+
   it('summarizes the useful failing assertion instead of leading setup logs', () => {
     const setup = Array.from({ length: 250 }, (_, index) => `setup line ${index}`).join('\n')
     const summary = summarizeFailedCheckLogs(
@@ -2245,7 +2290,9 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain("'custom-tool(admin_issue_workspace)'")
     expect(controller).toContain('config.hassMcpServerName')
     expect(controller).toContain("'GH_TOKEN'")
-    expect(controller).toContain('`--session-id=${session.id}`')
+    expect(controller).toContain(
+      'buildCopilotWorkerArgs(session.id, record.sessionName, commonArgs, session.resume)',
+    )
     expect(controller).toContain('disableAllHooks: true')
     expect(controller).toContain("'installed-plugins'")
     expect(controller).toContain("const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']")
