@@ -848,7 +848,7 @@ for (const scenario of SCENARIO_IDS) {
     if (scenario === 'form') {
       await page.evaluate(() => window.__mockHass!.setCallServiceOutcome('todo', 'add_item', 'reject'))
       await dialog.getByRole('button', { name: 'Add Task', exact: true }).click()
-      await expect(dialog).toContainText('Mock service rejection')
+      await expect(dialog).toContainText('Unable to add this task. Try again.')
       await expect(dialog.getByRole('textbox')).toHaveValue('Layout validation draft')
     }
     await closeMounted(dialog)

@@ -89,6 +89,21 @@ async function runIsolated(command, timeoutSeconds) {
   const configuredGitCommonDirectory = requiredEnvironment(
     "ADMIN_ISSUE_GIT_COMMON_DIR",
   );
+  const issueUid = requiredEnvironment("ADMIN_ISSUE_CONTAINER_UID");
+  if (!/^[a-f0-9]{64}$/.test(issueUid)) {
+    return {
+      textResultForLlm: "The issue worker container identity is invalid.",
+      resultType: "failure",
+    };
+  }
+  const readOnlyMode = requiredEnvironment("ADMIN_ISSUE_READ_ONLY");
+  if (!["0", "1"].includes(readOnlyMode)) {
+    return {
+      textResultForLlm: "The issue worker write policy is invalid.",
+      resultType: "failure",
+    };
+  }
+  const readOnly = readOnlyMode === "1";
   if (!isAbsolute(configuredGitCommonDirectory)) {
     return {
       textResultForLlm: "The Git common directory must be an absolute path.",
@@ -121,6 +136,12 @@ async function runIsolated(command, timeoutSeconds) {
   if (mutableWorkspacePaths.some((path) => !ALLOWED_MUTABLE_WORKSPACE_PATHS.has(path))) {
     return {
       textResultForLlm: "The mutable workspace path policy is invalid.",
+      resultType: "failure",
+    };
+  }
+  if (readOnly && mutableWorkspacePaths.length > 0) {
+    return {
+      textResultForLlm: "Research-only issue cannot mount mutable workspace paths.",
       resultType: "failure",
     };
   }
@@ -161,6 +182,8 @@ async function runIsolated(command, timeoutSeconds) {
     name,
     "--label",
     "com.sfenton.admin-issue-controller=true",
+    "--label",
+    `com.sfenton.admin-issue-worker=${issueUid}`,
     "--network",
     "none",
     "--read-only",
@@ -181,7 +204,7 @@ async function runIsolated(command, timeoutSeconds) {
     "--workdir",
     "/workspace",
     "--mount",
-    `type=bind,src=${workspace},dst=/workspace`,
+    `type=bind,src=${workspace},dst=/workspace${readOnly ? ",readonly" : ""}`,
     ...maskedMounts,
     ...readOnlyMounts,
     ...mutableMounts,

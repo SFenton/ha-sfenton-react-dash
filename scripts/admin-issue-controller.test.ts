@@ -1,5 +1,6 @@
 // @covers scripts/admin-issue-controller.ts
 // @covers scripts/lib/adminIssueController.ts
+// @covers scripts/lib/adminIssueConcurrency.ts
 // @covers ops/admin-issue-controller/worker-extension.mjs
 // @covers ops/admin-issue-controller/controller.json.example
 // @covers ops/admin-issue-controller/admin-issue-controller.service
@@ -27,10 +28,15 @@ import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   AdminIssueDeploymentRunError,
+  AdminIssueNewInputError,
   AdminIssueProvenanceError,
+  AdminIssueTodoSourceDriftError,
+  AdminIssueWorkerDeferredError,
   assertDeploymentRunSucceeded,
   assertDeploymentCoversMergeSha,
+  assertCandidateReleaseCurrent,
   assertExactCandidateSnapshot,
+  assertFrontendOnlyRecovery,
   assertPausedCandidateUnchanged,
   assertExistingReleasePullRequestEvidence,
   assertExistingReleaseVerificationSnapshot,
@@ -38,39 +44,60 @@ import {
   assertResolvedWithoutPullRequestSnapshot,
   assertSuccessfulRequiredChecksForHead,
   assertIssueCommentBodyContainsVisualEvidence,
+  assertFreshFinalizationInputs,
+  assertNoNewInputsBeforeClose,
+  assertResearchOnlyOutcome,
   assertWorkerHostConfigurationSafe,
+  assertWorkerClaimCanStart,
   assertWorkerChangesSafe,
   assertPullRequestBinding,
   assertPullRequestContainsVisualEvidence,
   buildCopilotWorkerArgs,
+  buildInitialInput,
   buildWorkerPrompt,
+  canonicalWorkerIssueBody,
   classifyPullRequestHead,
+  closeIssueWithReceipt,
+  completeAdminTodoGuarded,
   collectVisualEvidenceReceipts,
   commitIsAncestor,
+  controllerClosedIssueDisposition,
   createCommittedDiffReceipt,
   deploymentRecoveryDue,
+  ensureRunnerTrustRotation,
   existingReleaseRecoveryDue,
   findExactMergeCommit,
+  frontendRecoveryObservationDue,
+  handleLateOwnerInput,
+  isolatedWorkerConfig,
   githubRepositoryFromRemote,
   hasRecoverableDeployment,
   hasRecoverableExistingRelease,
   hasRecoverableTransition,
   issueBodyMediaPlan,
+  isControllerOwnedCloseWindow,
   latestSuccessfulDeploymentRunPath,
   layoutWorkflowRunsPath,
+  layoutEvidenceRequeueAllowed,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
   materializeWorkerInputAttachments,
   mediaInputRequired,
   mediaSourceExternalId,
+  mergedReleaseWaitStillCurrent,
+  markFrontendOnlyRecoveryObserved,
   prepareCommittedCandidate,
   prepareCopilotHome,
   prepareGitHubMediaInput,
   prepareReopenedMedia,
+  publishPullRequestIssueComment,
   pullRequestBodyWithVisualEvidence,
   pushCandidate,
+  queueVerifiedLayoutEvidence,
   queueReopenedMediaInputs,
+  reconcileClosedIssueRecord,
   readWorktreeSnapshot,
+  researchOnlyRequested,
   restoreReadyOutcomeFromWorkerLog,
   runCommand,
   selectWorkerHassMcpConfig,
@@ -83,6 +110,8 @@ import {
   waitForMergedPullRequest,
   workerInputAttachments,
   workerMediaAttachmentArgs,
+  workerHassPermissionArgs,
+  workerInputSnapshot,
   updateWorkflowDigestConfig,
   workerMutableInfrastructurePaths,
   workflowDigestRotationRequired,
@@ -103,6 +132,8 @@ import {
   branchNameForIssue,
   candidateRequiresVisualEvidence,
   canonicalIssueTextForIos,
+  clearTodoIntakeReceipts,
+  confirmTodoAttachmentUpload,
   controllerReceiptMarker,
   deploymentReceiptIsAccepted,
   formatBlockedComment,
@@ -124,9 +155,13 @@ import {
   parseAdminTodoAttachments,
   parseWorkerOutcome,
   pendingIssueInputs,
+  recordTodoIntakeFailure,
+  retainTodoAttachmentUploads,
+  reserveTodoAttachmentUpload,
   reauthorizePersistedIosFollowUp,
   REQUIRED_DEPLOYMENT_VERIFIED_PATHS,
   sessionNameForIssue,
+  todoIntakeKey,
   todoFingerprint,
   type AdminIssueRecord,
   type AdminIssueControllerState,
@@ -134,6 +169,22 @@ import {
   type AdminIssueValidationReceipt,
 } from './lib/adminIssueController'
 import { discoverEmbeddedGitHubMedia } from './lib/adminIssueMedia'
+import {
+  AdminIssueWorkerPool,
+  AsyncSerial,
+  beginIssueReleaseClaim,
+  beginIssueWorkerClaim,
+  completionRepairRecords,
+  finishIssueReleaseClaim,
+  finishIssueWorkerClaim,
+  guardedIssueRecords,
+  pendingIssueWorkers,
+  recoverInterruptedIssueWorkers,
+  runParallelSupervisorTick,
+  withTodoIntakeFailure,
+  withIssueReleaseClaim,
+} from './lib/adminIssueConcurrency'
+import type { EvidenceWorkflowRun } from './lib/adminIssueWorkflowEvidence'
 
 const temporaryDirectories: string[] = []
 
@@ -174,6 +225,930 @@ function record(): AdminIssueRecord {
     workerRuns: 0,
   }
 }
+
+function awaitingLayoutEvidence(): AdminIssueRecord {
+  const issue = record()
+  issue.origin = 'github-automation'
+  issue.automationKind = 'layout'
+  issue.phase = 'awaiting-user'
+  issue.processedRevision = issue.inputRevision
+  issue.inputs[0].source = 'github-issue'
+  issue.lastOutcome = {
+    decision: 'needs_input',
+    iosFollowUp: { reason: '', required: false },
+    questions: [{
+      options: ['Failed-step log and layout-artifact summary', 'Neither is retrievable'],
+      question: 'Which original failure evidence can be attached for run 123?',
+    }],
+    schemaVersion: 1,
+    summary: 'Original CI evidence is unavailable to the worker.',
+    visualEvidence: [],
+  }
+  return issue
+}
+
+describe('bounded issue worker admission', () => {
+  it('keeps later todo intake running after a failed item but propagates a failed receipt', async () => {
+    const attempted: string[] = []
+    const failures: string[] = []
+    for (const uid of ['unavailable', 'available']) {
+      await withTodoIntakeFailure(uid, async () => {
+        attempted.push(uid)
+        if (uid === 'unavailable') throw new Error('attachment lookup failed')
+      }, async (item) => { failures.push(item) })
+    }
+    expect(attempted).toEqual(['unavailable', 'available'])
+    expect(failures).toEqual(['unavailable'])
+    await expect(withTodoIntakeFailure('unavailable', async () => {
+      throw new Error('attachment lookup failed')
+    }, async () => {
+      throw new Error('intake receipt could not be persisted')
+    })).rejects.toThrow('receipt could not be persisted')
+  })
+
+  it('runs exactly ten distinct UIDs while an eleventh waits and intake still proceeds', async () => {
+    const resolvers: Array<() => void> = []
+    const releaseResolvers: Array<() => void> = []
+    const diagnosticResolvers: Array<() => void> = []
+    const failures: string[] = []
+    const pool = new AdminIssueWorkerPool(10, async (uid) => { failures.push(uid) })
+    const release = new AdminIssueWorkerPool(1, async (uid) => { failures.push(uid) })
+    const diagnostics = new AdminIssueWorkerPool(1, async (uid) => { failures.push(uid) })
+    const intake = new AsyncSerial()
+    const records = Array.from({ length: 11 }, (_, index) => {
+      const issue = record()
+      issue.uid = `task-${index + 1}`
+      issue.issueNumber = index + 1
+      return issue
+    })
+    const state = { issues: Object.fromEntries(records.map((issue) => [issue.uid, issue])) }
+    let intakePolls = 0
+    const reconcile = async () => await intake.run(async () => { intakePolls += 1 })
+    const runWorker = async () =>
+      await new Promise<void>((resolve) => { resolvers.push(resolve) })
+    const runRelease = async () =>
+      await new Promise<void>((resolve) => { releaseResolvers.push(resolve) })
+    const runDiagnostics = async () =>
+      await new Promise<void>((resolve) => { diagnosticResolvers.push(resolve) })
+    expect(await runParallelSupervisorTick(
+      state, pool, release, diagnostics, reconcile, runWorker, runRelease, runDiagnostics,
+    )).toEqual({ admitted: 10, releaseStarted: true, diagnosticStarted: true })
+    await Promise.resolve()
+    expect(pool.size).toBe(10)
+    expect(resolvers).toHaveLength(10)
+    expect(release.size).toBe(1)
+    expect(releaseResolvers).toHaveLength(1)
+    expect(diagnostics.size).toBe(1)
+    expect(diagnosticResolvers).toHaveLength(1)
+    expect(pool.start(records[0].uid, async () => { throw new Error('duplicate') })).toBe(false)
+    expect(pool.start(records[10].uid, async () => { throw new Error('over limit') })).toBe(false)
+    expect(await runParallelSupervisorTick(
+      state, pool, release, diagnostics, reconcile, runWorker, runRelease, runDiagnostics,
+    )).toEqual({ admitted: 0, releaseStarted: false, diagnosticStarted: false })
+    expect(intakePolls).toBe(2)
+    expect(releaseResolvers).toHaveLength(1)
+    expect(diagnosticResolvers).toHaveLength(1)
+    resolvers[0]()
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    expect(pool.size).toBe(9)
+    records[0].phase = 'awaiting-user'
+    records[0].processedRevision = records[0].inputRevision
+    expect(pendingIssueWorkers(state, pool).map((issue) => issue.uid)).toEqual([records[10].uid])
+    expect(await runParallelSupervisorTick(
+      state, pool, release, diagnostics, reconcile, runWorker, runRelease, runDiagnostics,
+    )).toEqual({ admitted: 1, releaseStarted: false, diagnosticStarted: false })
+    await Promise.resolve()
+    expect(pool.size).toBe(10)
+    for (const resolve of resolvers.slice(1)) resolve()
+    releaseResolvers[0]()
+    diagnosticResolvers[0]()
+    await pool.waitForIdle()
+    await release.waitForIdle()
+    await diagnostics.waitForIdle()
+    expect(failures).toEqual([])
+  })
+
+  it('journals a new image issue while ten workers, release and diagnostics are busy', async () => {
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    for (let index = 0; index < 10; index += 1) {
+      const issue = record()
+      issue.uid = `occupied-${index}`
+      issue.issueNumber = index + 1
+      state.issues[issue.uid] = issue
+    }
+    const workers = new AdminIssueWorkerPool(10, async () => {})
+    const release = new AdminIssueWorkerPool(1, async () => {})
+    const diagnostics = new AdminIssueWorkerPool(1, async () => {})
+    const waiting: Array<() => void> = []
+    let finishBackground!: () => void
+    const background = new Promise<void>((resolve) => { finishBackground = resolve })
+    let polls = 0
+    const uid = 'new-camera-report'
+    const attachment = {
+      id: '11111111-1111-4111-8111-111111111111',
+      localPath: '/private/image-input/11111111-1111-4111-8111-111111111111.png',
+      mediaType: 'image/png' as const,
+      name: 'camera.png',
+      sha256: 'a'.repeat(64),
+      sizeBytes: 2_241_798,
+    }
+    const asset = 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111'
+    const reconcile = async () => {
+      polls += 1
+      if (polls !== 2) return
+      reserveTodoAttachmentUpload(state, uid, attachment, '2026-09-24T16:01:00.000Z')
+      confirmTodoAttachmentUpload(state, uid, attachment.id, asset)
+      const issue = record()
+      issue.uid = uid
+      issue.issueNumber = 337
+      issue.inputs[0].attachments = [{ ...attachment, githubUrl: asset }]
+      state.issues[uid] = issue
+      clearTodoIntakeReceipts(state, uid)
+    }
+    const runWorker = async () =>
+      await new Promise<void>((resolve) => { waiting.push(resolve) })
+    await runParallelSupervisorTick(
+      state, workers, release, diagnostics, reconcile, runWorker,
+      async () => await background, async () => await background,
+    )
+    await Promise.resolve()
+    expect(workers.size).toBe(10)
+    expect((await runParallelSupervisorTick(
+      state, workers, release, diagnostics, reconcile, runWorker,
+      async () => await background, async () => await background,
+    )).admitted).toBe(0)
+    expect(state.issues[uid].inputs[0].attachments?.[0]).toMatchObject({
+      githubUrl: asset,
+      sha256: attachment.sha256,
+      sizeBytes: attachment.sizeBytes,
+    })
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
+    for (const done of waiting) done()
+    finishBackground()
+    await Promise.all([workers.waitForIdle(), release.waitForIdle(), diagnostics.waitForIdle()])
+  })
+
+  it('serializes overlapping intake callbacks so they cannot publish the same UID twice', async () => {
+    const serial = new AsyncSerial()
+    const order: string[] = []
+    let resume!: () => void
+    const first = serial.run(async () => {
+      order.push('first started')
+      await new Promise<void>((resolve) => { resume = resolve })
+      order.push('first finished')
+    })
+    const second = serial.run(async () => { order.push('second started') })
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    expect(order).toEqual(['first started'])
+    resume()
+    await Promise.all([first, second])
+    expect(order).toEqual(['first started', 'first finished', 'second started'])
+  })
+
+  it('releases failed slots and surfaces a failed worker error handler', async () => {
+    const failures: string[] = []
+    const pool = new AdminIssueWorkerPool(2, async (uid) => { failures.push(uid) })
+    expect(pool.start('one', async () => { throw new Error('worker failed') })).toBe(true)
+    await pool.waitForIdle()
+    expect(failures).toEqual(['one'])
+    expect(pool.size).toBe(0)
+    const fatal = new AdminIssueWorkerPool(1, async () => { throw new Error('journal failed') })
+    expect(fatal.start('two', async () => { throw new Error('worker failed') })).toBe(true)
+    await expect(fatal.waitForIdle()).rejects.toThrow('error handling failed')
+    expect(() => new AdminIssueWorkerPool(11, async () => {})).toThrow('between 1 and 10')
+  })
+
+  it('fences worker generation and revision while input changes remain pending', () => {
+    const issue = record()
+    const claim = beginIssueWorkerClaim(issue, 'claim-1', '2026-09-24T16:00:00.000Z')
+    const snapshot = workerInputSnapshot(issue, claim.inputRevision)
+    expect(() => assertWorkerClaimCanStart(issue, claim)).not.toThrow()
+    expect(() => beginIssueWorkerClaim(issue, 'claim-2', '2026-09-24T16:00:01.000Z'))
+      .toThrow('already has an active worker')
+    appendIssueInput(issue, {
+      body: 'New owner feedback',
+      createdAt: '2026-09-24T16:00:02.000Z',
+      externalId: 'comment:999',
+      source: 'issue-comment',
+    })
+    issue.phase = 'queued'
+    expect(() => assertWorkerClaimCanStart(issue, claim))
+      .toThrow(AdminIssueWorkerDeferredError)
+
+    expect(snapshot.inputs).toHaveLength(1)
+    expect(buildWorkerPrompt(snapshot)).not.toContain('New owner feedback')
+    markIssueInputsProcessed(issue, claim.inputRevision, '2026-09-24T16:01:00.000Z')
+    expect(issue.processedRevision).toBe(1)
+    expect(issue.inputRevision).toBe(2)
+    expect(() => finishIssueWorkerClaim(issue, { ...claim, id: 'wrong-claim' }))
+      .toThrow('claim changed')
+    finishIssueWorkerClaim(issue, claim)
+    expect(issue.workerClaim).toBeUndefined()
+    expect(issue.inputRevision).toBeGreaterThan(issue.processedRevision)
+    issue.provenance = {
+      kind: 'legacy-untrusted',
+      migratedAt: '2026-09-24T16:01:00.000Z',
+      reason: 'v1-missing-exact-provenance',
+    }
+    const laterClaim = beginIssueWorkerClaim(issue, 'claim-3', '2026-09-24T16:02:00.000Z')
+    expect(() => assertWorkerClaimCanStart(issue, laterClaim))
+      .toThrow('provenance changed')
+  })
+
+  it('never closes a resolved issue with owner input received during an asynchronous release', () => {
+    const issue = record()
+    expect(() => assertNoNewInputsBeforeClose(issue)).toThrow('cannot be closed')
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:00:00.000Z')
+    expect(() => assertNoNewInputsBeforeClose(issue)).not.toThrow()
+    appendIssueInput(issue, {
+      body: 'A correction arrived while checks completed',
+      createdAt: '2026-09-24T16:01:00.000Z',
+      externalId: 'comment:late',
+      source: 'issue-comment',
+    })
+    expect(() => assertNoNewInputsBeforeClose(issue)).toThrow('cannot be closed')
+    expect(() => assertNoNewInputsBeforeClose(issue)).toThrow(AdminIssueNewInputError)
+  })
+
+  it('keeps exact merged release waits alive for late feedback but fences repair and identity drift', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.merge) {
+      throw new Error('Expected verified merge provenance')
+    }
+    delete issue.provenance.deployment
+    issue.phase = 'deploying'
+    const generation = issue.generation
+    const mergeSha = issue.provenance.merge.mergeSha
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(true)
+    appendIssueInput(issue, {
+      body: 'The merged fix needs a follow-up',
+      createdAt: '2026-09-24T16:01:00.000Z',
+      externalId: 'comment:post-merge',
+      source: 'issue-comment',
+    })
+    expect(issue.inputRevision).toBeGreaterThan(issue.processedRevision)
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(true)
+    issue.automationKind = 'layout'
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(true)
+
+    issue.receipts.issueCloseAttemptAt = '2026-09-24T16:02:00.000Z'
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(false)
+    delete issue.receipts.issueCloseAttemptAt
+    issue.receipts.todoCompletionAttemptAt = '2026-09-24T16:02:01.000Z'
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(false)
+    delete issue.receipts.todoCompletionAttemptAt
+    issue.phase = 'paused'
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(false)
+    issue.phase = 'deploying'
+    expect(mergedReleaseWaitStillCurrent(issue, generation + 1, mergeSha)).toBe(false)
+    expect(mergedReleaseWaitStillCurrent(issue, generation, 'f'.repeat(40))).toBe(false)
+    issue.provenance = { kind: 'none' }
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(false)
+  })
+
+  it('reopens a controller-closed issue for late input without completing stale HA work', async () => {
+    const issue = record()
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:00:00.000Z')
+    appendIssueInput(issue, {
+      body: 'Owner correction during finalization',
+      createdAt: '2026-09-24T16:01:00.000Z',
+      externalId: 'comment:late-finalization',
+      source: 'issue-comment',
+    })
+    issue.phase = 'resolving'
+    let reopened = 0
+    let generations = 0
+    let persisted = 0
+    const actions = {
+      persist: () => { persisted += 1 },
+      reopenIssue: async () => { reopened += 1 },
+      startNewGeneration: async () => {
+        generations += 1
+        beginAdminIssueGeneration(issue, '2026-09-24T16:02:00.000Z')
+      },
+    }
+    await handleLateOwnerInput(issue, actions)
+    expect({ reopened, generations, phase: issue.phase }).toEqual({
+      reopened: 0, generations: 0, phase: 'queued',
+    })
+    expect(issue.inputRevision).toBeGreaterThan(issue.processedRevision)
+    issue.phase = 'resolving'
+    issue.receipts.issueClosedAt = '2026-09-24T16:02:00.000Z'
+    await handleLateOwnerInput(issue, actions)
+    expect({ reopened, generations, phase: issue.phase }).toEqual({
+      reopened: 1, generations: 1, phase: 'queued',
+    })
+    expect(issue.receipts.issueClosedAt).toBeUndefined()
+    expect(issue.receipts.todoCompletedAt).toBeUndefined()
+    expect(issue.generation).toBe(2)
+    expect(persisted).toBe(3)
+
+    const merged = record()
+    authorizeRecord(merged)
+    if (merged.provenance.kind !== 'active') throw new Error('Expected active candidate')
+    delete merged.provenance.deployment
+    appendIssueInput(merged, {
+      body: 'Owner correction before exact deployment',
+      createdAt: '2026-09-24T16:03:00.000Z',
+      externalId: 'comment:deployment-follow-up',
+      source: 'issue-comment',
+    })
+    merged.phase = 'deploying'
+    await handleLateOwnerInput(merged, {
+      ...actions,
+      startNewGeneration: async () => { throw new Error('Unverified release cannot advance generation') },
+    })
+    expect(merged.phase).toBe('deploying')
+    expect(merged.inputRevision).toBeGreaterThan(merged.processedRevision)
+  })
+
+  it('routes interrupted HA completion to release repair rather than starting a new worker', () => {
+    const issue = record()
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    state.issues[issue.uid] = issue
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:00:00.000Z')
+    appendIssueInput(issue, {
+      body: 'New owner instructions during HA completion',
+      createdAt: '2026-09-24T16:01:00.000Z',
+      externalId: 'comment:ha-completion-race',
+      source: 'issue-comment',
+    })
+    issue.phase = 'queued'
+    issue.receipts.todoCompletionAttemptAt = '2026-09-24T16:00:30.000Z'
+    const workers = new AdminIssueWorkerPool(10, async () => {})
+    expect(pendingIssueWorkers(state, workers)).toEqual([])
+    expect(completionRepairRecords(state, workers)).toEqual([issue])
+    delete issue.receipts.todoCompletionAttemptAt
+    expect(completionRepairRecords(state, workers)).toEqual([])
+    expect(pendingIssueWorkers(state, workers)).toEqual([issue])
+  })
+
+  it('recovers a controller-owned close interrupted before its journal receipt', async () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.phase = 'blocked'
+    issue.branch = 'copilot/admin-todo-321-g1'
+    issue.worktreePath = '/private/issue-321-g1'
+    issue.workerRuns = 2
+    issue.receipts.controllerBlockedReason =
+      'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state'
+    const marker = controllerReceiptMarker(
+      issue.uid, `existing-release-r${issue.processedRevision}`,
+    )
+    let saved: AdminIssueRecord | undefined
+    let writes = 0
+    let closed = false
+    await expect(closeIssueWithReceipt(
+      issue,
+      () => {
+        writes += 1
+        if (writes === 1) saved = structuredClone(issue)
+        else throw new Error('Crash after GitHub accepted the close request')
+      },
+      async () => { closed = true },
+    )).rejects.toThrow('Crash after GitHub accepted')
+    if (!saved) throw new Error('Missing pre-close journal snapshot')
+    expect(closed).toBe(true)
+    expect(saved.receipts.issueCloseAttemptAt).toBeDefined()
+    const comments = [{ body: marker }]
+    expect(isControllerOwnedCloseWindow(saved, 'closed')).toBe(true)
+    expect(controllerClosedIssueDisposition(saved, comments)).toBe('existing-release')
+    reconcileClosedIssueRecord(saved, 'existing-release', '2026-09-24T16:04:00.000Z')
+    expect(saved.phase).toBe('blocked')
+    expect(saved.receipts.issueClosedAt).toBeDefined()
+    expect(saved.receipts.manuallyClosedAt).toBeUndefined()
+    expect(hasRecoverableExistingRelease(saved)).toBe(true)
+    const ownerComment = {
+      author_association: 'OWNER',
+      body: 'New owner context while completion is pending',
+      id: 900,
+      user: { id: 3988463, login: 'SFenton' },
+    }
+    expect(isTrustedIssueComment(ownerComment, 3988463, 'SFenton')).toBe(true)
+    if (isControllerOwnedCloseWindow(saved, 'closed')) {
+      appendIssueInput(saved, {
+        body: ownerComment.body,
+        createdAt: '2026-09-24T16:04:01.000Z',
+        externalId: 'comment:closed-window',
+        source: 'issue-comment',
+      })
+    }
+    expect(saved.inputRevision).toBeGreaterThan(saved.processedRevision)
+    const staleMarker = structuredClone(saved)
+    delete staleMarker.receipts.issueClosedAt
+    expect(controllerClosedIssueDisposition(staleMarker, comments)).toBe('existing-release')
+    expect(isControllerOwnedCloseWindow(staleMarker, 'closed')).toBe(false)
+    const manual = record()
+    expect(isControllerOwnedCloseWindow(manual, 'closed')).toBe(false)
+    reconcileClosedIssueRecord(manual, 'manual', '2026-09-24T16:04:00.000Z')
+    expect(manual.phase).toBe('paused')
+    await expect(assertFreshFinalizationInputs(manual, async () => {}))
+      .rejects.toThrow('manually closed')
+  })
+
+  it('reopens HA when owner input arrives while the completion service is in flight', async () => {
+    const issue = record()
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:00:00.000Z')
+    issue.taskFingerprint = todoFingerprint(issue.title, '')
+    const config = {
+      completionReceiptEntityId: 'input_text.admin_todo_completion_receipt',
+      completionScript: 'script.complete_admin_todo_item',
+      todoEntityId: 'todo.groceries',
+    }
+    let status = 'needs_action'
+    let receipt = 'none'
+    let beginCompletion!: () => void
+    const completionStarted = new Promise<void>((resolve) => { beginCompletion = resolve })
+    let finishCompletion!: () => void
+    let reopenCount = 0
+    let writes = 0
+    const client = {
+      getItems: async () => [{ uid: issue.uid, summary: issue.title, status }],
+      getState: async () => ({ entity_id: config.completionReceiptEntityId, state: receipt }),
+      completeItem: async () => {
+        beginCompletion()
+        await new Promise<void>((resolve) => { finishCompletion = resolve })
+        status = 'completed'
+        receipt = issue.uid
+      },
+      reopenItem: async () => {
+        reopenCount += 1
+        status = 'needs_action'
+      },
+    }
+    const completion = completeAdminTodoGuarded(
+      config, client, issue, () => { writes += 1 }, async () => {},
+    )
+    await completionStarted
+    appendIssueInput(issue, {
+      body: 'Follow-up while HA completion was pending',
+      createdAt: '2026-09-24T16:01:00.000Z',
+      externalId: 'todo:late-edit',
+      source: 'todo-updated',
+    })
+    finishCompletion()
+    await expect(completion).rejects.toThrow(AdminIssueNewInputError)
+    expect(status).toBe('needs_action')
+    expect(reopenCount).toBe(1)
+    expect(writes).toBeGreaterThanOrEqual(2)
+    expect(issue.receipts.todoReopenedAt).toBeDefined()
+    expect(issue.receipts.todoCompletedAt).toBeUndefined()
+    expect(issue.inputRevision).toBeGreaterThan(issue.processedRevision)
+  })
+
+  it('reopens an image-edited HA item changed during the deferred completion service', async () => {
+    const issue = record()
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:00:00.000Z')
+    let description = 'Original task details'
+    issue.taskFingerprint = todoFingerprint(issue.title, description)
+    let status = 'needs_action'
+    let receipt = 'none'
+    let reopens = 0
+    let beginCompletion!: () => void
+    const completionStarted = new Promise<void>((resolve) => { beginCompletion = resolve })
+    let finishCompletion!: () => void
+    const config = {
+      completionReceiptEntityId: 'input_text.admin_todo_completion_receipt',
+      completionScript: 'script.complete_admin_todo_item',
+      todoEntityId: 'todo.groceries',
+    }
+    const client = {
+      getItems: async () => [{ uid: issue.uid, summary: issue.title, description, status }],
+      getState: async () => ({ entity_id: config.completionReceiptEntityId, state: receipt }),
+      completeItem: async () => {
+        beginCompletion()
+        await new Promise<void>((resolve) => { finishCompletion = resolve })
+        status = 'completed'
+        receipt = issue.uid
+      },
+      reopenItem: async () => {
+        reopens += 1
+        status = 'needs_action'
+      },
+    }
+    const completion = completeAdminTodoGuarded(
+      config, client, issue, () => {}, async () => {},
+    )
+    await completionStarted
+    description = 'Original task details\n\nNew image: camera-after.png'
+    finishCompletion()
+    await expect(completion)
+      .rejects.toThrow(AdminIssueTodoSourceDriftError)
+    expect(reopens).toBe(1)
+    expect(status).toBe('needs_action')
+    expect(issue.inputRevision).toBe(issue.processedRevision)
+    expect(issue.receipts.todoSourceDriftAt).toBeDefined()
+    expect(issue.receipts.todoCompletedAt).toBeUndefined()
+    await expect(assertFreshFinalizationInputs(issue, async () => {}))
+      .rejects.toThrow(AdminIssueTodoSourceDriftError)
+  })
+
+  it('refreshes a trusted closed-issue image comment during HA completion without a polling tick', async () => {
+    const issue = record()
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:00:00.000Z')
+    issue.taskFingerprint = todoFingerprint(issue.title, '')
+    issue.receipts.issueClosedAt = '2026-09-24T16:01:00.000Z'
+    const config = {
+      completionReceiptEntityId: 'input_text.admin_todo_completion_receipt',
+      completionScript: 'script.complete_admin_todo_item',
+      todoEntityId: 'todo.groceries',
+    }
+    let status = 'needs_action'
+    let receipt = 'none'
+    let beginCompletion!: () => void
+    const completionStarted = new Promise<void>((resolve) => { beginCompletion = resolve })
+    let finishCompletion!: () => void
+    let reopens = 0
+    let refreshes = 0
+    const comments: Array<{
+      author_association: 'OWNER'
+      body: string
+      id: number
+      user: { id: number; login: string }
+    }> = []
+    const reconcileInputs = async () => {
+      refreshes += 1
+      if (!isControllerOwnedCloseWindow(issue, 'closed')) return
+      for (const comment of comments) {
+        if (!isTrustedIssueComment(comment, 3988463, 'SFenton')) continue
+        appendIssueInput(issue, {
+          body: comment.body,
+          createdAt: '2026-09-24T16:02:00.000Z',
+          externalId: `comment:${comment.id}`,
+          source: 'issue-comment',
+        })
+      }
+    }
+    const client = {
+      getItems: async () => [{ uid: issue.uid, summary: issue.title, status }],
+      getState: async () => ({ entity_id: config.completionReceiptEntityId, state: receipt }),
+      completeItem: async () => {
+        beginCompletion()
+        await new Promise<void>((resolve) => { finishCompletion = resolve })
+        status = 'completed'
+        receipt = issue.uid
+      },
+      reopenItem: async () => {
+        reopens += 1
+        status = 'needs_action'
+      },
+    }
+    const completion = completeAdminTodoGuarded(
+      config, client, issue, () => {}, reconcileInputs,
+    )
+    await completionStarted
+    comments.push({
+      author_association: 'OWNER',
+      body: 'The camera still fails here.\n\n![Updated screenshot](https://github.com/user-attachments/assets/22222222-2222-4222-8222-222222222222)',
+      id: 812,
+      user: { id: 3988463, login: 'SFenton' },
+    })
+    finishCompletion()
+    await expect(completion).rejects.toThrow(AdminIssueNewInputError)
+    expect(refreshes).toBeGreaterThanOrEqual(3)
+    expect(status).toBe('needs_action')
+    expect(reopens).toBe(1)
+    expect(issue.receipts.todoCompletedAt).toBeUndefined()
+    let issueReopens = 0
+    await handleLateOwnerInput(issue, {
+      persist: () => {},
+      reopenIssue: async () => { issueReopens += 1 },
+      startNewGeneration: async () => { beginAdminIssueGeneration(issue, '2026-09-24T16:03:00.000Z') },
+    })
+    expect(issueReopens).toBe(1)
+    expect(issue.phase).toBe('queued')
+    expect(issue.generation).toBe(2)
+    expect(issue.receipts.issueClosedAt).toBeUndefined()
+    expect(issue.inputRevision).toBeGreaterThan(issue.processedRevision)
+  })
+
+  it('blocks a terminal phase when closed-issue feedback arrives during cleanup', async () => {
+    const issue = record()
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:00:00.000Z')
+    issue.phase = 'deploying'
+    issue.receipts.issueClosedAt = '2026-09-24T16:01:00.000Z'
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    state.issues[issue.uid] = issue
+    let cleanupFinished = false
+    const reconcileInputs = async () => {
+      if (cleanupFinished && isControllerOwnedCloseWindow(issue, 'closed')) {
+        appendIssueInput(issue, {
+          body: 'The fixed behavior still fails in the screenshot',
+          createdAt: '2026-09-24T16:02:00.000Z',
+          externalId: 'comment:after-cleanup',
+          source: 'issue-comment',
+        })
+      }
+    }
+    await assertFreshFinalizationInputs(issue, reconcileInputs)
+    cleanupFinished = true
+    await expect(assertFreshFinalizationInputs(issue, reconcileInputs))
+      .rejects.toThrow(AdminIssueNewInputError)
+    expect(issue.phase).not.toBe('completed')
+    expect(completionRepairRecords(state, new AdminIssueWorkerPool(10, async () => {})))
+      .toEqual([issue])
+  })
+
+  it('fences PR publication and merge against newer owner feedback or a changed phase', () => {
+    const issue = record()
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:00:00.000Z')
+    issue.phase = 'ready-for-pr'
+    expect(() => assertCandidateReleaseCurrent(issue, 'ready-for-pr')).not.toThrow()
+    issue.phase = 'pull-request'
+    expect(() => assertCandidateReleaseCurrent(issue, 'pull-request')).not.toThrow()
+    appendIssueInput(issue, {
+      body: 'Correction while remote PR metadata was fetched',
+      createdAt: '2026-09-24T16:01:00.000Z',
+      externalId: 'comment:before-publish',
+      source: 'issue-comment',
+    })
+    issue.phase = 'queued'
+    expect(() => assertCandidateReleaseCurrent(issue, 'pull-request'))
+      .toThrow(AdminIssueNewInputError)
+    markIssueInputsProcessed(issue, issue.inputRevision, '2026-09-24T16:02:00.000Z')
+    expect(() => assertCandidateReleaseCurrent(issue, 'pull-request'))
+      .toThrow('phase changed')
+  })
+
+  it('recovers interrupted claims after restart without losing a pending revision', () => {
+    const issue = record()
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    state.issues[issue.uid] = issue
+    beginIssueWorkerClaim(issue, 'interrupted-claim', '2026-09-24T16:00:01.000Z')
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
+    expect(recoverInterruptedIssueWorkers(state, '2026-09-24T16:01:00.000Z')).toBe(1)
+    expect(issue.phase).toBe('queued')
+    expect(issue.workerClaim).toBeUndefined()
+    expect(issue.receipts.workerInterruptedClaimId).toBe('interrupted-claim')
+    expect(recoverInterruptedIssueWorkers(state, '2026-09-24T16:01:01.000Z')).toBe(0)
+    issue.receipts.workerRetryAfter = '2026-09-24T16:05:00.000Z'
+    const pool = new AdminIssueWorkerPool(1, async () => {})
+    expect(pendingIssueWorkers(state, pool, Date.parse('2026-09-24T16:04:59.000Z')))
+      .toEqual([])
+    expect(pendingIssueWorkers(state, pool, Date.parse('2026-09-24T16:05:01.000Z')))
+      .toEqual([issue])
+  })
+
+  it('fences new input behind an active release claim and recovers that claim after restart', () => {
+    const issue = record()
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    state.issues[issue.uid] = issue
+    const pool = new AdminIssueWorkerPool(10, async () => {})
+    const claim = beginIssueReleaseClaim(issue, 'release-1', '2026-09-24T16:00:01.000Z')
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
+    appendIssueInput(issue, {
+      body: 'Owner correction while release awaits CI',
+      createdAt: '2026-09-24T16:00:02.000Z',
+      externalId: 'comment:while-release',
+      source: 'issue-comment',
+    })
+    issue.phase = 'queued'
+    expect(pendingIssueWorkers(state, pool)).toEqual([])
+    expect(() => beginIssueWorkerClaim(issue, 'worker-2', '2026-09-24T16:00:03.000Z'))
+      .toThrow('already has an active worker or release')
+    finishIssueReleaseClaim(issue, claim)
+    expect(pendingIssueWorkers(state, pool)).toEqual([issue])
+    beginIssueReleaseClaim(issue, 'release-2', '2026-09-24T16:00:04.000Z')
+    expect(recoverInterruptedIssueWorkers(state, '2026-09-24T16:01:00.000Z')).toBe(1)
+    expect(issue.releaseClaim).toBeUndefined()
+    expect(issue.receipts.releaseInterruptedClaimId).toBe('release-2')
+    expect(pendingIssueWorkers(state, pool)).toEqual([issue])
+  })
+
+  it('holds release ownership across asynchronous waits before admitting the same UID', async () => {
+    const issue = record()
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    state.issues[issue.uid] = issue
+    const pool = new AdminIssueWorkerPool(10, async () => {})
+    let release!: () => void
+    let writes = 0
+    const pending = withIssueReleaseClaim(
+      issue,
+      'release-while-checking',
+      '2026-09-24T16:00:01.000Z',
+      () => { writes += 1 },
+      async () => await new Promise<void>((resolve) => { release = resolve }),
+    )
+    appendIssueInput(issue, {
+      body: 'Owner comment after check started',
+      createdAt: '2026-09-24T16:00:02.000Z',
+      externalId: 'comment:late-release',
+      source: 'issue-comment',
+    })
+    issue.phase = 'queued'
+    expect(pendingIssueWorkers(state, pool)).toEqual([])
+    expect(writes).toBe(1)
+    release()
+    await pending
+    expect(writes).toBe(2)
+    expect(pendingIssueWorkers(state, pool)).toEqual([issue])
+  })
+
+  it('routes legacy and quarantined issues to the release guard instead of an unsafe worker', () => {
+    const legacy = record()
+    legacy.provenance = {
+      kind: 'legacy-untrusted',
+      migratedAt: '2026-09-24T16:00:00.000Z',
+      reason: 'v1-missing-exact-provenance',
+    }
+    const quarantined = record()
+    quarantined.uid = 'quarantined'
+    quarantined.provenance = {
+      epoch: 'epoch-1',
+      generation: 1,
+      kind: 'active',
+      preparedBaseSha: 'a'.repeat(40),
+      quarantine: {
+        detectedAt: '2026-09-24T16:00:00.000Z',
+        diagnosticsSha256: 'b'.repeat(64),
+        reason: 'Candidate metadata changed unexpectedly',
+      },
+      resyncAttempts: 0,
+      revision: 0,
+    }
+    const ready = record()
+    ready.uid = 'ready'
+    const state = { issues: {
+      [legacy.uid]: legacy,
+      [quarantined.uid]: quarantined,
+      [ready.uid]: ready,
+    } }
+    const pool = new AdminIssueWorkerPool(10, async () => {})
+    expect(pendingIssueWorkers(state, pool).map((issue) => issue.uid)).toEqual(['ready'])
+    expect(guardedIssueRecords(state, pool).map((issue) => issue.uid))
+      .toEqual([legacy.uid, quarantined.uid])
+  })
+})
+
+describe('trusted workflow evidence and outstanding decisions', () => {
+  const reference = { headSha: 'a'.repeat(40), runId: 123 }
+  const observedAt = '2026-09-23T12:10:00.000Z'
+
+  it('queues one exact-run diagnostic input without answering an evidence-only question', () => {
+    const issue = awaitingLayoutEvidence()
+    const originalOutcome = issue.lastOutcome
+    const packet = {
+      body: 'Host-verified failed layout run 123: five failed WebKit tests.',
+      externalId: `workflow-evidence:123:1:${'b'.repeat(64)}`,
+      fingerprint: 'b'.repeat(64),
+    }
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(true)
+    expect(queueVerifiedLayoutEvidence(issue, reference, packet, observedAt)).toBe(true)
+    expect(issue.phase).toBe('queued')
+    expect(issue.inputRevision).toBe(2)
+    expect(issue.processedRevision).toBe(1)
+    expect(issue.inputs[1]).toMatchObject({
+      body: packet.body,
+      externalId: packet.externalId,
+      source: 'workflow-evidence',
+    })
+    expect(issue.lastOutcome).toBe(originalOutcome)
+    markIssueInputsProcessed(issue, issue.inputRevision, observedAt)
+    issue.phase = 'awaiting-user'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    expect(queueVerifiedLayoutEvidence(issue, reference, packet, observedAt)).toBe(false)
+    expect(issue.inputRevision).toBe(2)
+  })
+
+  it('never requeues an authorization, product, pending-input, or mismatched question', () => {
+    const issue = awaitingLayoutEvidence()
+    if (issue.lastOutcome?.decision !== 'needs_input') throw new Error('Expected needs_input')
+    issue.lastOutcome.questions[0].reason = 'ci_evidence_unavailable'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(true)
+    issue.lastOutcome.questions[0].question = 'Do you authorize a Home Assistant restart?'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.lastOutcome.questions[0].question =
+      'Which original failure evidence can be attached for run 123?'
+    issue.lastOutcome.questions[0].options[0] = 'Authorize restart and deployment'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.lastOutcome.questions[0].options[0] = 'Failed-step log'
+    issue.lastOutcome.questions.push({
+      options: ['A', 'B'],
+      question: 'Should we close the issue?',
+    })
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.lastOutcome.questions.pop()
+    expect(layoutEvidenceRequeueAllowed(issue, { ...reference, runId: 124 })).toBe(false)
+    issue.automationKind = 'deployment'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.automationKind = 'layout'
+    issue.processedRevision = 0
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.processedRevision = 1
+    issue.pr = { number: 400, url: 'https://github.com/example/pull/400' }
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    expect(queueVerifiedLayoutEvidence(issue, reference, {
+      body: 'Unbound diagnostic.',
+      externalId: `workflow-evidence:999:1:${'b'.repeat(64)}`,
+      fingerprint: 'b'.repeat(64),
+    }, observedAt)).toBe(false)
+  })
+
+  it('validates optional evidence-only question reasons without classifying authorization', () => {
+    const issue = awaitingLayoutEvidence()
+    const input = issue.lastOutcome
+    const marked = parseWorkerOutcome(JSON.stringify({
+      ...input,
+      questions: [{
+        options: ['Attach original log', 'Neither is retrievable'],
+        question: 'Which original failure evidence can be attached for run 123?',
+        reason: 'ci_evidence_unavailable',
+      }],
+    }))
+    if (marked.decision !== 'needs_input') throw new Error('Expected needs_input')
+    expect(marked.questions[0].reason).toBe('ci_evidence_unavailable')
+    expect(() => parseWorkerOutcome(JSON.stringify({
+      ...input,
+      questions: [{
+        options: ['Authorize', 'Defer'],
+        question: 'Authorize a runtime restart?',
+        reason: 'operator_approval',
+      }],
+    }))).toThrow('reason must be ci_evidence_unavailable')
+  })
+
+  it('verifies full v2 frontend delivery and git ancestry without claiming HA activation', async () => {
+    const failedSha = 'a'.repeat(40)
+    const deployedSha = 'b'.repeat(40)
+    const masterSha = 'c'.repeat(40)
+    const failed: EvidenceWorkflowRun = {
+      conclusion: 'failure',
+      created_at: '2026-09-20T12:00:00.000Z',
+      event: 'push',
+      head_branch: 'master',
+      head_sha: failedSha,
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/123',
+      id: 123,
+      name: 'Deploy dashboard',
+      path: '.github/workflows/deploy-dashboard.yml',
+      run_attempt: 1,
+      status: 'completed',
+    }
+    const successful: EvidenceWorkflowRun = {
+      ...failed,
+      conclusion: 'success',
+      created_at: '2026-09-23T12:00:00.000Z',
+      head_sha: deployedSha,
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/789',
+      id: 789,
+    }
+    const receipt = {
+      deploymentHash: 'c'.repeat(64),
+      deployedAt: observedAt,
+      deployedSha,
+      disposition: 'forward',
+      leaseReleased: true,
+      manifestHash: 'd'.repeat(64),
+      panelRegistered: true,
+      runAttempt: 1,
+      runId: '789',
+      sourceSha: deployedSha,
+      status: 'success',
+      verifiedPaths: [...REQUIRED_DEPLOYMENT_VERIFIED_PATHS],
+      version: 2,
+    }
+    const ancestry: typeof commitIsAncestor = async (_path, ancestor, descendant) =>
+      (ancestor === failedSha && descendant === deployedSha) ||
+      (ancestor === deployedSha && descendant === masterSha)
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful, receipt, masterSha, ancestry,
+    )).resolves.toBeUndefined()
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful,
+      { ...receipt, deployedSha: 'e'.repeat(40) }, masterSha, ancestry,
+    )).rejects.toThrow('does not cover')
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful,
+      { ...receipt, verifiedPaths: ['index.html'] }, masterSha, ancestry,
+    )).rejects.toThrow('accepted, newer')
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful,
+      { ...receipt, status: 'failed' }, masterSha, ancestry,
+    )).rejects.toThrow('accepted, newer')
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful,
+      { ...receipt, deployedAt: failed.created_at }, masterSha, ancestry,
+    )).rejects.toThrow('accepted, newer')
+
+    const issue = awaitingLayoutEvidence()
+    issue.automationKind = 'deployment'
+    if (issue.lastOutcome?.decision !== 'needs_input') throw new Error('Expected needs_input')
+    issue.lastOutcome.questions[0].question = 'Do you authorize a Home Assistant restart?'
+    const authorizationQuestion = issue.lastOutcome
+    expect(frontendRecoveryObservationDue(issue, Date.parse(observedAt))).toBe(true)
+    issue.receipts.frontendRecoveryCheckedAt = observedAt
+    expect(frontendRecoveryObservationDue(issue, Date.parse(observedAt) + 120_000)).toBe(false)
+    expect(frontendRecoveryObservationDue(issue, Date.parse(observedAt) + 360_000)).toBe(true)
+    markFrontendOnlyRecoveryObserved(issue, deployedSha, successful.id, observedAt)
+    expect(issue.phase).toBe('awaiting-user')
+    expect(issue.lastOutcome).toBe(authorizationQuestion)
+    expect(issue.receipts.frontendRecoveryDeployedSha).toBe(deployedSha)
+    expect(frontendRecoveryObservationDue(issue, Date.parse(observedAt) + 360_000)).toBe(false)
+    expect(() => markFrontendOnlyRecoveryObserved(issue, deployedSha, successful.id, observedAt))
+      .toThrow('cannot replace an unresolved decision')
+  })
+})
 
 describe('deployment runner trust rotation', () => {
   it('rotates only when the protected deployment workflow changed', () => {
@@ -223,6 +1198,61 @@ describe('deployment runner trust rotation', () => {
         'c'.repeat(64),
       ),
     ).toThrow('version')
+  })
+
+  it('retries a failed workflow trust rotation before entering deployment', async () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.candidate) {
+      throw new Error('Expected authorized candidate')
+    }
+    issue.provenance.candidate.diff.files = ['.github/workflows/deploy-dashboard.yml']
+    issue.phase = 'pull-request'
+    let attempts = 0
+    let journalWrites = 0
+    const rotate = async () => {
+      attempts += 1
+      if (attempts === 1) throw new Error('Temporary runner restart failure')
+    }
+    const persist = () => { journalWrites += 1 }
+    const workflowPath = '.github/workflows/deploy-dashboard.yml'
+    await expect(ensureRunnerTrustRotation(issue, workflowPath, rotate, persist, 3))
+      .rejects.toThrow('Temporary runner restart failure')
+    expect(issue.phase).toBe('pull-request')
+    expect(issue.receipts.workflowRotationPendingAt).toBeDefined()
+    expect(issue.receipts.workflowRotationCompletedAt).toBeUndefined()
+    expect(issue.receipts.workflowRotationAttempts).toBe('1')
+    await ensureRunnerTrustRotation(issue, workflowPath, rotate, persist, 3)
+    expect(attempts).toBe(2)
+    expect(journalWrites).toBe(4)
+    expect(issue.receipts.workflowRotationPendingAt).toBeUndefined()
+    expect(issue.receipts.workflowRotationCompletedAt).toBeDefined()
+    const source = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
+    const merge = source.slice(
+      source.indexOf('async function mergePullRequest('),
+      source.indexOf('async function downloadAcceptedDeploymentReceipt('),
+    )
+    expect(merge.indexOf('await ensureRunnerTrustRotation(')).toBeGreaterThan(-1)
+    expect(merge.indexOf('await ensureRunnerTrustRotation('))
+      .toBeLessThan(merge.indexOf("record.phase = 'deploying'"))
+    const another = record()
+    authorizeRecord(another)
+    if (another.provenance.kind !== 'active' || !another.provenance.candidate) {
+      throw new Error('Expected another authorized candidate')
+    }
+    another.provenance.candidate.diff.files = [workflowPath]
+    let exhaustedCalls = 0
+    const alwaysFails = async () => {
+      exhaustedCalls += 1
+      throw new Error('Runner remains unavailable')
+    }
+    await expect(ensureRunnerTrustRotation(another, workflowPath, alwaysFails, () => {}, 2))
+      .rejects.toThrow('Runner remains unavailable')
+    await expect(ensureRunnerTrustRotation(another, workflowPath, alwaysFails, () => {}, 2))
+      .rejects.toThrow('Runner remains unavailable')
+    await expect(ensureRunnerTrustRotation(another, workflowPath, alwaysFails, () => {}, 2))
+      .rejects.toThrow('retry limit')
+    expect(exhaustedCalls).toBe(2)
   })
 })
 
@@ -547,6 +1577,86 @@ describe('admin issue controller domain', () => {
         '<!-- admin-todo-attachments:{"version":1,"attachments":[]} -->',
       ),
     ).toThrow('one to four images')
+  })
+
+  it('journals image upload intent, fails closed after ambiguous interruption and reuses confirmed uploads', () => {
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    const uid = 'image-task-1'
+    const attachment = {
+      id: '11111111-1111-4111-8111-111111111111',
+      localPath: '/private/input-attachments/image-task-1/11111111-1111-4111-8111-111111111111.png',
+      mediaType: 'image/png' as const,
+      name: 'reported.png',
+      sha256: 'a'.repeat(64),
+      sizeBytes: 321,
+    }
+    const attemptedAt = '2026-09-24T16:00:01.000Z'
+    expect(reserveTodoAttachmentUpload(state, uid, attachment, attemptedAt).created).toBe(true)
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
+    const afterCrash: unknown = JSON.parse(JSON.stringify(state))
+    assertAdminIssueControllerState(afterCrash)
+    expect(() => reserveTodoAttachmentUpload(afterCrash, uid, attachment, attemptedAt))
+      .toThrow('outcome is unknown')
+    const asset = 'https://github.com/user-attachments/assets/11111111-1111-1111-1111-111111111111'
+    expect(confirmTodoAttachmentUpload(afterCrash, uid, attachment.id, asset).githubUrl).toBe(asset)
+    expect(reserveTodoAttachmentUpload(afterCrash, uid, attachment, attemptedAt)).toMatchObject({
+      created: false,
+      receipt: { status: 'uploaded', githubUrl: asset },
+    })
+    expect(() => reserveTodoAttachmentUpload(afterCrash, uid, {
+      ...attachment,
+      sha256: 'b'.repeat(64),
+    }, attemptedAt)).toThrow('does not match its verified manifest')
+    recordTodoIntakeFailure(afterCrash, uid, 'c'.repeat(64), attemptedAt, 'upload-outcome-unknown')
+    expect(afterCrash.intakeFailures?.[todoIntakeKey(uid)]).toMatchObject({
+      attempts: 1,
+      reason: 'upload-outcome-unknown',
+    })
+    const replacement = {
+      ...attachment,
+      id: '22222222-2222-4222-8222-222222222222',
+      localPath: '/private/input-attachments/image-task-1/replacement.png',
+    }
+    expect(retainTodoAttachmentUploads(afterCrash, uid, new Set([replacement.id]))).toBe(true)
+    expect(reserveTodoAttachmentUpload(afterCrash, uid, replacement, attemptedAt).created).toBe(true)
+    expect(afterCrash.pendingUploads?.[todoIntakeKey(uid)]).toHaveLength(1)
+    confirmTodoAttachmentUpload(
+      afterCrash, uid, replacement.id,
+      'https://github.com/user-attachments/assets/22222222-2222-2222-2222-222222222222',
+    )
+    clearTodoIntakeReceipts(afterCrash, uid)
+    expect(afterCrash.pendingUploads?.[todoIntakeKey(uid)]).toBeUndefined()
+    expect(afterCrash.intakeFailures?.[todoIntakeKey(uid)]).toBeUndefined()
+    expect(() => assertAdminIssueControllerState(afterCrash)).not.toThrow()
+  })
+
+  it('retains ambiguous upload tombstones when an owner replaces and restores an image', () => {
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    const uid = 'image-task-2'
+    const original = {
+      id: '11111111-1111-4111-8111-111111111111',
+      localPath: '/private/input-attachments/original.png',
+      mediaType: 'image/png' as const,
+      name: 'original.png',
+      sha256: 'a'.repeat(64),
+      sizeBytes: 321,
+    }
+    const startedAt = '2026-09-24T16:00:01.000Z'
+    reserveTodoAttachmentUpload(state, uid, original, startedAt)
+    expect(retainTodoAttachmentUploads(state, uid, new Set(['replacement']))).toBe(false)
+    const replacement = { ...original, id: 'replacement', localPath: '/private/replacement.png' }
+    reserveTodoAttachmentUpload(state, uid, replacement, startedAt)
+    confirmTodoAttachmentUpload(
+      state, uid, replacement.id,
+      'https://github.com/user-attachments/assets/22222222-2222-2222-2222-222222222222',
+    )
+    clearTodoIntakeReceipts(state, uid)
+    expect(state.pendingUploads?.[todoIntakeKey(uid)]).toMatchObject([
+      { id: original.id, status: 'uploading' },
+    ])
+    expect(() => reserveTodoAttachmentUpload(state, uid, original, startedAt))
+      .toThrow('outcome is unknown')
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
   })
 
   it('validates persisted input attachment receipts', () => {
@@ -901,6 +2011,9 @@ describe('admin issue controller domain', () => {
     expect(skill).toContain('native image attachments')
     expect(skill).toContain('Inspect the attached pixels, not merely a path')
     expect(skill).toContain('unsupported media')
+    expect(skill).toContain('GPT-5.6 Luna `medium/default`')
+    expect(skill).toContain('not the global guarded Sol/Opus tandem')
+    expect(skill).not.toContain('Astra')
   })
 
   it('preserves duplicate media contexts but downloads a GitHub asset once per input', async () => {
@@ -1541,6 +2654,45 @@ describe('admin issue controller domain', () => {
     expect(formatLayoutCompletionComment(issue)).toContain(
       '**Post-merge layout validation:** https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
     )
+  })
+
+  it('replays a failed PR issue-comment publication without losing its receipt or PR', async () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.phase = 'pull-request'
+    const outcome = parseWorkerOutcome(JSON.stringify({
+      changeSummary: ['Corrected the visible layout.'],
+      decision: 'ready_for_pr',
+      iosFollowUp: { reason: '', required: false },
+      pr: { body: 'Corrected layout.', title: 'Correct layout' },
+      questions: [],
+      review: { approved: true, findings: [] },
+      schemaVersion: 1,
+      summary: 'The layout was corrected.',
+      tests: [{ command: 'npm run test:run', result: 'passed' }],
+    }))
+    if (outcome.decision !== 'ready_for_pr') throw new Error('Expected ready_for_pr')
+    issue.lastOutcome = outcome
+    issue.receipts.prCommentPendingAt = '2026-09-24T16:00:00.000Z'
+    issue.receipts.prCommentRevision = String(issue.processedRevision)
+    let attempts = 0
+    let writes = 0
+    const post = async (_receipt: string, body: string) => {
+      attempts += 1
+      if (attempts === 1) throw new Error('Transient issue-comment POST failure')
+      return { body }
+    }
+    const persist = () => { writes += 1 }
+    await expect(publishPullRequestIssueComment(issue, outcome, post, persist))
+      .rejects.toThrow('Transient issue-comment POST failure')
+    expect(issue.receipts.prCommentPendingAt).toBeDefined()
+    expect(issue.phase).toBe('pull-request')
+    await publishPullRequestIssueComment(issue, outcome, post, persist)
+    expect(attempts).toBe(2)
+    expect(writes).toBe(1)
+    expect(issue.receipts.prCommentPendingAt).toBeUndefined()
+    expect(issue.receipts.prCommentPublishedAt).toBeDefined()
+    expect(issue.pr?.number).toBe(400)
   })
 
   it('allows no-PR completion only from an unchanged isolated base', () => {
@@ -3318,6 +4470,7 @@ describe('admin issue controller security configuration', () => {
       runnerControllerConfigPath,
       runnerControllerService: 'ha-dashboard-runner-controller.service',
       workerImageId: base.workerImageId,
+      maxConcurrentWorkers: 1,
     })
     expect(
       selectWorkerHassMcpConfig(JSON.parse(readFileSync(hassMcpConfigPath, 'utf8')), 'hass'),
@@ -3335,6 +4488,16 @@ describe('admin issue controller security configuration', () => {
       },
     })
     expect(statSync(join(base.workerHome, '.copilot/mcp-config.json')).mode & 0o777).toBe(0o600)
+    const first = isolatedWorkerConfig(loaded, record())
+    const second = isolatedWorkerConfig(loaded, { issueNumber: 322, uid: 'another-task' })
+    expect(first.workerHome).not.toBe(second.workerHome)
+    prepareCopilotHome(first)
+    const firstMcp = readFileSync(join(first.workerHome, '.copilot/mcp-config.json'), 'utf8')
+    prepareCopilotHome(second)
+    expect(readFileSync(join(first.workerHome, '.copilot/mcp-config.json'), 'utf8'))
+      .toBe(firstMcp)
+    expect(statSync(join(second.workerHome, '.copilot/mcp-config.json')).mode & 0o777)
+      .toBe(0o600)
     expect(() =>
       selectWorkerHassMcpConfig(JSON.parse(readFileSync(hassMcpConfigPath, 'utf8')), 'missing'),
     ).toThrow('is not configured')
@@ -3346,6 +4509,10 @@ describe('admin issue controller security configuration', () => {
     expect(() => loadAdminIssueControllerConfig(configPath)).toThrow(
       'requiredChecks must include at least one protected check',
     )
+    writeFileSync(configPath, JSON.stringify({ ...base, maxConcurrentWorkers: 10 }))
+    expect(loadAdminIssueControllerConfig(configPath).maxConcurrentWorkers).toBe(10)
+    writeFileSync(configPath, JSON.stringify({ ...base, maxConcurrentWorkers: 11 }))
+    expect(() => loadAdminIssueControllerConfig(configPath)).toThrow('at most 10')
 
     writeFileSync(configPath, JSON.stringify({ ...base, workerImageId: 'node:latest' }))
     expect(() => loadAdminIssueControllerConfig(configPath)).toThrow('immutable sha256 image ID')
@@ -3392,6 +4559,11 @@ describe('admin issue controller security configuration', () => {
       'utf8',
     )
     expect(extension).toContain('"--network",\n    "none"')
+    expect(extension).toContain('com.sfenton.admin-issue-worker=${issueUid}')
+    expect(extension).toContain('"ADMIN_ISSUE_CONTAINER_UID"')
+    expect(extension).toContain('"ADMIN_ISSUE_READ_ONLY"')
+    expect(extension).toContain('dst=/workspace${readOnly ? ",readonly" : ""}')
+    expect(extension).toContain('Research-only issue cannot mount mutable workspace paths.')
     expect(extension).toContain('"--read-only"')
     expect(extension).toContain('"--cap-drop",\n    "ALL"')
     expect(extension).toContain('"ADMIN_ISSUE_GIT_COMMON_DIR"')
@@ -3443,16 +4615,27 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('issues/comments/${existing.id}')
     expect(controller).toContain('assertDeploymentRunSucceeded(run)')
     expect(controller).toContain('assertWorkerChangesSafe(record.worktreePath, files, record)')
-    expect(controller).toContain('recoverBlockedDeployments(config, client, state)')
-    expect(controller).toContain('recoverExistingReleaseVerifications(config, client, state)')
+    expect(controller).toContain('recoverBlockedDeployments(config, client, state, reconcileInputs)')
+    expect(controller).toContain('recoverExistingReleaseVerifications(config, client, state, reconcileInputs)')
     expect(controller).toContain('loadBoundDeploymentReceipt(config, record)')
     expect(controller).toContain('verifySuccessfulRequiredChecksForHead(')
     expect(controller).toContain('assertExistingReleaseVerificationSnapshot(')
     expect(controller).toContain('## Existing release verified')
     expect(controller).toContain("record.automationKind === 'layout'")
     expect(controller).toContain('waitForLayoutWorkflow(')
+    expect(controller).toContain('return mergedReleaseWaitStillCurrent(record, generation, mergeSha)')
+    expect(controller).not.toContain("() => refreshInputs('deploying')")
+    const layoutWait = controller.slice(
+      controller.indexOf('async function waitForLayoutWorkflow('),
+      controller.indexOf('function bindVerifiedLayoutWorkflow('),
+    )
+    expect(layoutWait).toContain(
+      'assertSuccessfulLayoutWorkflowRun(run, mergeSha)\n    if (!(await refreshInputs())) return undefined',
+    )
     expect(controller).toContain('bindVerifiedLayoutWorkflow(record, run)')
-    expect(controller).toContain('finalizeLayoutIssue(config, state, record, run)')
+    expect(controller).toContain('finalizeLayoutIssue(config, state, record, run, reconcileInputs)')
+    expect(controller).toContain('await closeControllerIssue(config, state, record, reconcileInputs)')
+    expect(controller).toContain('await assertFreshFinalizationInputs(record, reconcileInputs)')
     expect(controller).toContain('reauthorizePersistedIosFollowUpFromGitHub(config, record)')
     expect(controller).toContain('canonicalIssueTextFromGitHub(config, record)')
     expect(controller).toContain('restoreReadyOutcomeFromWorkerLog(config, record)')
@@ -3481,11 +4664,11 @@ describe('admin issue controller security configuration', () => {
       existingRelease,
     )
     const existingClose = controller.indexOf(
-      "state: 'closed'",
+      'await closeControllerIssue(config, state, record, reconcileInputs)',
       existingComment,
     )
     const existingTodo = controller.indexOf(
-      'if (adminTodoCompletionRequired(record))',
+      'await completeAdminTodoGuarded(',
       existingClose,
     )
     const existingCleanup = controller.indexOf(
@@ -3495,6 +4678,10 @@ describe('admin issue controller security configuration', () => {
     expect(existingRelease).toBeGreaterThan(-1)
     expect(existingComment).toBeGreaterThan(existingRelease)
     expect(existingClose).toBeGreaterThan(existingComment)
+    expect(controller.slice(
+      controller.indexOf('async function closeControllerIssue('),
+      existingRelease,
+    )).toContain("state: 'closed'")
     expect(existingTodo).toBeGreaterThan(existingClose)
     expect(existingCleanup).toBeGreaterThan(existingTodo)
   })
@@ -3523,5 +4710,70 @@ describe('admin issue controller security configuration', () => {
     expect(layoutPrompt).toContain('focused provenance-bound mixed-context runs')
     expect(layoutPrompt).toContain('protected post-merge Automated layout job')
     expect(layoutPrompt).not.toContain('.github/workflows/deploy-dashboard.yml')
+  })
+
+  it('keeps a long operator research-only issue open and prevents implementation', () => {
+    const summary =
+      `${'Investigate the vacuum actions and dock clean interaction. '.repeat(6)}` +
+      'I want you to research and propose what we should do next, but I don’t want you to actually go implement anything yet.'
+    const issue = record()
+    issue.title = issueTitle(summary)
+    issue.description = ''
+    issue.inputs[0].body = ''
+    issue.receipts.researchOnlyScope = 'true'
+    issue.worktreePath = '/private/issue-worktree'
+    const config = { ownerId: 3988463, ownerLogin: 'SFenton' }
+    const body = issueBody({ description: '', summary, uid: issue.uid })
+    const githubIssue = {
+      author_association: 'OWNER',
+      body,
+      created_at: issue.createdAt,
+      html_url: issue.issueUrl,
+      number: issue.issueNumber,
+      state: 'open' as const,
+      title: issue.title,
+      updated_at: issue.updatedAt,
+      user: { id: config.ownerId, login: config.ownerLogin },
+    }
+    expect(issue.title).not.toContain('don’t want you')
+    expect(buildInitialInput({
+      status: 'needs_action', summary, uid: issue.uid,
+    }).body).toBe(summary)
+    expect(canonicalWorkerIssueBody(config, issue, githubIssue)).toBe(body)
+    expect(researchOnlyRequested(issue, body)).toBe(true)
+    const prompt = buildWorkerPrompt(issue, body)
+    expect(prompt).toContain('research-only')
+    expect(prompt).toContain('don’t want you to actually go implement anything yet')
+    expect(prompt).not.toContain('Otherwise implement the complete fix')
+    expect(workerHassPermissionArgs('hass', true)).toContain('hass(ha_get_state)')
+    expect(workerHassPermissionArgs('hass', true)).toContain('hass(ha_get_history)')
+    expect(workerHassPermissionArgs('hass', true)).not.toContain('hass')
+    expect(workerHassPermissionArgs('hass', true)).not.toContain('hass(ha_call_service)')
+    expect(workerHassPermissionArgs('hass', false)).toEqual(['--allow-tool', 'hass'])
+    expect(() => assertResearchOnlyOutcome(issue, { decision: 'ready_for_pr' }, []))
+      .toThrow('cannot implement or close')
+    expect(() => assertResearchOnlyOutcome(issue, { decision: 'resolved_without_pr' }, []))
+      .toThrow('cannot implement or close')
+    expect(() => assertResearchOnlyOutcome(issue, { decision: 'needs_input' }, ['src/changed.tsx']))
+      .toThrow('must leave its assigned worktree clean')
+    expect(() => assertResearchOnlyOutcome(issue, { decision: 'needs_input' }, []))
+      .not.toThrow()
+    expect(() => canonicalWorkerIssueBody(config, issue, {
+      ...githubIssue,
+      body: 'Owner marker missing',
+    })).toThrow('lost its owner or UID')
+    expect(() => canonicalWorkerIssueBody(config, issue, {
+      ...githubIssue,
+      state: 'closed',
+    })).toThrow('not a bound, open')
+
+    appendIssueInput(issue, {
+      body: 'Please implement this now',
+      createdAt: '2026-09-24T17:00:00.000Z',
+      externalId: 'comment:owner-approval',
+      source: 'issue-comment',
+    })
+    expect(researchOnlyRequested(issue, body)).toBe(false)
+    expect(buildWorkerPrompt(issue, body)).toContain('Otherwise implement the complete fix')
   })
 })

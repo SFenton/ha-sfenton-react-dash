@@ -2,6 +2,8 @@
 // @covers src/components/hass/TodoListPanel.tsx
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
+// @covers src/components/hass/CreateTodoItemSheet.tsx
+// @covers src/components/hass/CreateTodoItemSheet.module.css
 // @covers src/components/core/DynamicGrid.tsx
 // @covers src/components/core/dynamicGridLayout.ts
 // @covers src/components/core/ModalSheet.tsx
@@ -47,6 +49,121 @@ async function openQuickLinks(page: Page) {
   await expect(dialog).toBeVisible()
   return { dialog, menuBox }
 }
+
+async function configureDelayedCameraHydration(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 1_200
+  })
+}
+
+async function selectMockTodoImages(input: Locator, count = 4) {
+  await input.evaluate(async (element, imageCount) => {
+    const target = element as HTMLInputElement
+    const transfer = new DataTransfer()
+    const colors = ['#d65745', '#3677b8', '#498b62', '#a268b6']
+    for (let index = 0; index < imageCount; index += 1) {
+      const canvas = document.createElement('canvas')
+      canvas.width = 160
+      canvas.height = 160
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Canvas context unavailable')
+      context.fillStyle = colors[index % colors.length]
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.strokeStyle = 'rgba(255, 255, 255, 0.72)'
+      context.lineWidth = 12
+      context.beginPath()
+      context.moveTo(20, 140)
+      context.lineTo(140, 20)
+      context.stroke()
+      context.fillStyle = 'white'
+      context.font = '700 64px sans-serif'
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText(String(index + 1), 80, 84)
+      const blob = await new Promise<Blob>((resolveBlob, reject) => {
+        canvas.toBlob((value) => {
+          if (value) resolveBlob(value)
+          else reject(new Error('Mock image encoding failed'))
+        }, 'image/png')
+      })
+      transfer.items.add(new File([blob], `mock-${index + 1}.png`, { type: 'image/png' }))
+    }
+    target.files = transfer.files
+    target.dispatchEvent(new Event('change', { bubbles: true }))
+  }, count)
+}
+
+test('Admin To-Do attachment previews stay square, removable, and responsive', async ({ page }) => {
+  test.setTimeout(120_000)
+  const viewports = [
+    { height: 852, width: 393 },
+    { height: 320, width: 568 },
+    { height: 393, width: 852 },
+    { height: 900, width: 1440 },
+  ]
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport)
+    await page.goto(`/index.html?path=to-do&feedback-admin-images=${viewport.width}x${viewport.height}`)
+    await page.getByRole('button', { name: 'Add Task', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Add Task' })
+    await expect(dialog).toBeVisible()
+    const before = await dialog.boundingBox()
+    const input = dialog.getByLabel('Images')
+    await selectMockTodoImages(input)
+
+    const previews = dialog.locator('[data-selected-image-preview="true"]')
+    await expect(previews).toHaveCount(4)
+    await expect(dialog.getByRole('img')).toHaveCount(4)
+    const previewGeometry = await previews.evaluateAll((items) => items.map((item) => {
+      const box = item.getBoundingClientRect()
+      return { height: box.height, width: box.width, x: box.x, y: box.y }
+    }))
+    for (const geometry of previewGeometry) {
+      expect(Math.abs(geometry.width - 80)).toBeLessThanOrEqual(1)
+      expect(Math.abs(geometry.height - 80)).toBeLessThanOrEqual(1)
+    }
+    expect(Math.max(...previewGeometry.map((geometry) => geometry.y)) - Math.min(...previewGeometry.map((geometry) => geometry.y))).toBeLessThanOrEqual(1)
+    for (let index = 1; index < previewGeometry.length; index += 1) {
+      const gap = previewGeometry[index].x - (previewGeometry[index - 1].x + previewGeometry[index - 1].width)
+      expect(Math.abs(gap - 8)).toBeLessThanOrEqual(1)
+    }
+
+    const fieldOrder = await dialog.locator('[data-todo-image-field="true"]').evaluate((field) => (
+      [...field.children].map((child) => child.tagName)
+    ))
+    expect(fieldOrder).toEqual(['LABEL', 'UL', 'INPUT', 'SMALL'])
+    const previewListFits = await dialog.locator('[data-selected-image-previews="true"]').evaluate((list) => list.scrollWidth <= list.clientWidth + 1)
+    expect(previewListFits).toBe(true)
+
+    const removeButtons = dialog.locator('[data-selected-image-remove="true"]')
+    const removeGeometry = await removeButtons.first().evaluate((button) => {
+      const box = button.getBoundingClientRect()
+      const target = getComputedStyle(button, '::before')
+      return { beforeRight: target.right, beforeTop: target.top, height: box.height, width: box.width }
+    })
+    expect(Math.abs(removeGeometry.width - 38)).toBeLessThanOrEqual(1)
+    expect(Math.abs(removeGeometry.height - 38)).toBeLessThanOrEqual(1)
+    expect(removeGeometry.beforeTop).toBe('-3px')
+    expect(removeGeometry.beforeRight).toBe('-3px')
+
+    const after = await dialog.boundingBox()
+    expect(before).not.toBeNull()
+    expect(after).not.toBeNull()
+    expect(Math.abs((after?.width ?? 0) - (before?.width ?? 0))).toBeLessThanOrEqual(1)
+    expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(1)
+    expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth)).toBe(true)
+    await expect(dialog.getByRole('button', { name: 'Add Task', exact: true })).toBeVisible()
+
+    if (viewport.width === 393) {
+      await removeButtons.nth(1).focus()
+      await removeButtons.nth(1).press('Enter')
+      await expect(previews).toHaveCount(3)
+      await expect(dialog.locator('[data-selected-image-remove="true"]').nth(1)).toBeFocused()
+    }
+  }
+})
 
 test('Admin To-Do edits by UID with a title-only responsive modal', async ({ page }) => {
   await page.setViewportSize(PHONE)
@@ -576,9 +693,7 @@ test('Home cameras and Security tiles keep stable equal tracks at every tier', a
 
 test('camera tracks do not resize while streams hydrate on phone portrait', async ({ page }) => {
   await page.setViewportSize({ width: 402, height: 874 })
-  await page.addInitScript(() => {
-    ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 1_200
-  })
+  await configureDelayedCameraHydration(page)
   await page.goto('/at-a-glance/security?feedback-camera-hydration=402')
 
   const root = activeRoute(page, 'security')
@@ -619,9 +734,7 @@ test('camera tracks do not resize while streams hydrate on phone portrait', asyn
 
 test('camera modal media keeps its configured geometry while the stream hydrates on phone portrait', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  await page.addInitScript(() => {
-    ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 1_200
-  })
+  await configureDelayedCameraHydration(page)
 
   for (const surface of [
     { route: 'overview', url: '/at-a-glance/overview?feedback-camera-modal-hydration=home' },
@@ -688,9 +801,14 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
   await page.evaluate(({ sources, style }) => {
     for (const [index, card] of [...document.querySelectorAll('webrtc-camera-sfenton')].entries()) {
       const shadow = card.attachShadow({ mode: 'open' })
-      shadow.innerHTML = `<style>ha-card { display: block; } ${style}</style>
+      shadow.innerHTML = `<style>
+        ha-card { display: block; background: #000; }
+        .rtc-spinner { position: absolute; top: 50%; left: 50%; width: 24px; height: 24px;
+          margin: -12px; border: 3px solid transparent; border-top-color: #fff; border-radius: 50%; }
+        ${style}
+      </style>
         <ha-card><div class="player"><div class="ptz-transform">
-          <video width="${sources[index].width}" height="${sources[index].height}"></video>
+          <div class="rtc-spinner"></div><video width="${sources[index].width}" height="${sources[index].height}"></video>
         </div></div></ha-card>`
     }
   }, { sources: cameras, style: shadowStyle })
@@ -706,12 +824,20 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
     }, { columns, tileWidth })
 
     let originalTiles: { width: number; height: number }[] | undefined
-    for (const status of ['connecting', 'connected', 'error']) {
+    for (const status of ['connecting', 'disconnected', 'connected', 'error']) {
       const boxes = await page.locator('[data-rtc-stream]').evaluateAll((tiles, phase) => tiles.map((tile) => {
         const frame = tile.querySelector('[data-camera-transport="webrtc"]') as HTMLElement
         const card = tile.querySelector('webrtc-camera-sfenton') as HTMLElement
         frame.dataset.loaded = phase === 'connected' ? 'true' : 'false'
         card.dataset.streamStatus = phase
+        card.dataset.dashboardVisible = phase === 'connected' ? 'true' : 'false'
+        if (phase === 'connected') {
+          card.removeAttribute('aria-hidden')
+          card.removeAttribute('inert')
+        } else {
+          card.setAttribute('aria-hidden', 'true')
+          card.setAttribute('inert', '')
+        }
         const video = card.shadowRoot!.querySelector('video')!
         const dimensions = (element: Element) => {
           const box = element.getBoundingClientRect()
@@ -723,6 +849,8 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
           card: dimensions(card),
           video: dimensions(video),
           fit: getComputedStyle(video).objectFit,
+          opacity: getComputedStyle(card).opacity,
+          pointerEvents: getComputedStyle(card).pointerEvents,
         }
       }), status)
       expect(boxes).toHaveLength(4)
@@ -733,6 +861,8 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
         expect(Math.abs(box.card.height - box.frame.height)).toBeLessThanOrEqual(1)
         expect(Math.abs(box.video.height - box.frame.height)).toBeLessThanOrEqual(1)
         expect(box.fit).toBe('cover')
+        expect(box.opacity).toBe(status === 'connected' ? '1' : '0')
+        expect(box.pointerEvents).toBe(status === 'connected' ? 'auto' : 'none')
       }
     }
   }
@@ -750,9 +880,11 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
     const card = focus.querySelector('webrtc-camera-sfenton')!
     const shadow = card.attachShadow({ mode: 'open' })
     // The live WebKit card falls back to half its width until its host has a definite height.
-    shadow.innerHTML = `<style>:host { aspect-ratio: 2 / 1; } ha-card { display: block; } ${style}</style>
+    shadow.innerHTML = `<style>:host { aspect-ratio: 2 / 1; } ha-card { display: block; background: #000; }
+      .rtc-spinner { width: 24px; height: 24px; border: 3px solid transparent; border-top-color: #fff; border-radius: 50%; }
+      ${style}</style>
       <ha-card><div class="player"><div class="ptz-transform">
-        <video width="300" height="150"></video>
+        <div class="rtc-spinner"></div><video width="300" height="150"></video>
       </div></div></ha-card>`
   }, shadowStyle)
 
@@ -767,13 +899,14 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
       focus.style.width = `${dimensions.modalWidth}px`
       focus.style.height = `${dimensions.modalHeight}px`
     }, { modalWidth, modalHeight })
-    for (const status of ['connecting', 'connected', 'error']) {
+    for (const status of ['connecting', 'disconnected', 'connected', 'error']) {
       const boxes = await page.locator('#rtc-modal-fixture').evaluate((focus, phase) => {
         const frame = focus.querySelector('[data-camera-transport="webrtc"]') as HTMLElement
         const host = frame.querySelector('.host')!
         const card = frame.querySelector('webrtc-camera-sfenton') as HTMLElement
         frame.dataset.loaded = phase === 'connected' ? 'true' : 'false'
         card.dataset.streamStatus = phase
+        card.dataset.dashboardVisible = phase === 'connected' ? 'true' : 'false'
         const shadow = card.shadowRoot!
         const video = shadow.querySelector('video')!
         const dimensions = (element: Element) => {
@@ -788,6 +921,8 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
           player: dimensions(shadow.querySelector('.player')!),
           video: dimensions(video),
           fit: getComputedStyle(video).objectFit,
+          opacity: getComputedStyle(card).opacity,
+          pointerEvents: getComputedStyle(card).pointerEvents,
         }
       }, status)
       expect(Math.abs(boxes.frame.width - modalWidth)).toBeLessThanOrEqual(1)
@@ -797,6 +932,8 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
         expect(Math.abs(part.height - boxes.frame.height)).toBeLessThanOrEqual(1)
       }
       expect(boxes.fit).toBe('contain')
+      expect(boxes.opacity).toBe(status === 'connected' ? '1' : '0')
+      expect(boxes.pointerEvents).toBe(status === 'connected' ? 'auto' : 'none')
     }
   }
 })
@@ -855,6 +992,8 @@ test('room source grids stay within two columns and fill every row', async ({ pa
 
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
+// @covers src/components/hass/CreateTodoItemSheet.tsx
+// @covers src/components/hass/CreateTodoItemSheet.module.css
 // @covers src/components/hass/TodoListPanel.tsx
 test('Chores uses content-aware Quick Links and reflows task rows without reordering', async ({ page }) => {
   test.setTimeout(120_000)
