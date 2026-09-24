@@ -98,6 +98,18 @@ function watchRtcStatus(card: RtcCardElement, onStatus: (status: CameraStreamSta
   return () => observer.disconnect()
 }
 
+function setRtcCardPresentation(card: RtcCardElement, status: CameraStreamStatus) {
+  const visible = status === 'live'
+  card.dataset.dashboardVisible = visible ? 'true' : 'false'
+  if (visible) {
+    card.removeAttribute('aria-hidden')
+    card.removeAttribute('inert')
+  } else {
+    card.setAttribute('aria-hidden', 'true')
+    card.setAttribute('inert', '')
+  }
+}
+
 function disabledDigitalPtzConfig() {
   return {
     mouse_drag_pan: false,
@@ -169,6 +181,7 @@ export function RtcPilotCamera({
     let unregisterActions: (() => void) | null = null
     const report = (next: CameraStreamStatus) => {
       if (cancelled) return
+      if (cardRef.current) setRtcCardPresentation(cardRef.current, next)
       setStatus(next)
       onStatusChangeRef.current?.(next)
     }
@@ -201,6 +214,7 @@ export function RtcPilotCamera({
         card.style.width = '100%'
         card.dataset.dashboardVariant = variant
         card.dataset.dashboardFill = fill ? 'true' : 'false'
+        setRtcCardPresentation(card, 'loading')
         card.setConfig({
           card_id: cardId,
           id: cardId,
