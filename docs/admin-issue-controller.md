@@ -225,6 +225,14 @@ Retries reuse confirmed uploads. An interrupted upload with unknown outcome
 is explicitly held for reconciliation rather than claiming success or
 uploading a duplicate. Source images are deleted only after the issue input
 has been durably journaled.
+Each intake cycle shares one complete open-issue snapshot between workflow
+adoption and tracked-issue reconciliation. Open issues still fetch comments on
+every poll, including edits with unchanged comment IDs and embedded media.
+Manually closed, paused issues need no per-issue reads until they reappear in
+the open snapshot; controller-owned close windows and other unexpectedly
+closed active issues retain direct lookup and completion repair. This keeps
+the normal polling cadence without spending GitHub requests on unchanged
+closed issues.
 
 Controller-owned issue closure records intent before the GitHub PATCH, and
 trusted owner comments remain ingestible during that close window even when
