@@ -194,6 +194,38 @@ provenance-bound mixed-context runs for local acceptance. They must not turn a
 full historical or full-known-mock replay into a pre-PR gate; the protected
 post-merge `Automated layout` job owns exact full-corpus evidence.
 
+## Reconsidering unavailable workflow evidence
+
+A restricted worker has no direct GitHub Actions or host-network access.
+For a trusted layout-failure issue paused solely on the exact original
+CI-evidence question, the host controller binds the issue's commit and run
+link to the failed `master` push workflow, its failed `Automated layout` job,
+and the unexpired `layout-automation` artifact. It retrieves a bounded
+failed-job log and ZIP, verifies the repository/run/attempt/artifact identities,
+and inspects only the small assessment and WebKit execution JSON entries.
+Signed artifact redirects never receive the GitHub authorization header.
+The worker receives only test file locations and failure categories,
+checkpoint and WebKit counts, plus hashes and run provenance; it cannot read
+raw logs, screenshots or signed URLs from that packet. Malformed, expired,
+oversized or mismatched evidence leaves the question open and records an
+explicit verification error.
+
+Only the single evidence-availability question, including its exact legacy
+wording, can receive one fingerprinted `workflow-evidence` input and resume
+the existing session. An operator-authorization or product-decision question
+cannot be answered by automation. A worker may close without a pull request
+only after proving the original failure genuinely needs no further action;
+passing later tests or finding no proposed code diff is not sufficient.
+
+For a trusted deployment-failure issue still awaiting restart authorization,
+the host may separately observe a later accepted v2 frontend deployment
+whose verified deployed SHA contains the originally failed commit on current
+`master`. It posts one frontend-only status receipt but does not requeue the
+worker, infer a Home Assistant restart or endpoint-health result, authorize
+manual deployment, or close the issue. A source merge alone does not activate
+these host-controller changes: installing and restarting its separately
+managed bundle requires separate operator approval.
+
 ## Candidate provenance
 
 Controller state version 3 uses one provenance record as the sole lifecycle

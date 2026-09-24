@@ -41,6 +41,7 @@ export type AdminIssueInputSource =
   | 'issue-body'
   | 'github-issue'
   | 'ci-failure'
+  | 'workflow-evidence'
 
 export interface AdminIssueInputAttachment {
   githubUrl?: string
@@ -310,6 +311,7 @@ export interface AdminIssueControllerState {
 export interface AdminIssueQuestion {
   options: string[]
   question: string
+  reason?: 'ci_evidence_unavailable'
   recommendation?: string
 }
 
@@ -1516,9 +1518,16 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
         entry.recommendation === undefined || typeof entry.recommendation === 'string',
         `questions[${index}].recommendation must be a string`,
       )
+      assert(
+        entry.reason === undefined || entry.reason === 'ci_evidence_unavailable',
+        `questions[${index}].reason must be ci_evidence_unavailable when present`,
+      )
+      const reason: AdminIssueQuestion['reason'] =
+        entry.reason === 'ci_evidence_unavailable' ? entry.reason : undefined
       return {
         question: entry.question.trim(),
         options: normalizedOptions,
+        ...(reason ? { reason } : {}),
         ...(typeof entry.recommendation === 'string'
           ? { recommendation: entry.recommendation.trim() }
           : {}),

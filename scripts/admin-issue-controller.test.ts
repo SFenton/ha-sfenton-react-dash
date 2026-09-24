@@ -31,6 +31,7 @@ import {
   assertDeploymentRunSucceeded,
   assertDeploymentCoversMergeSha,
   assertExactCandidateSnapshot,
+  assertFrontendOnlyRecovery,
   assertPausedCandidateUnchanged,
   assertExistingReleasePullRequestEvidence,
   assertExistingReleaseVerificationSnapshot,
@@ -51,6 +52,7 @@ import {
   deploymentRecoveryDue,
   existingReleaseRecoveryDue,
   findExactMergeCommit,
+  frontendRecoveryObservationDue,
   githubRepositoryFromRemote,
   hasRecoverableDeployment,
   hasRecoverableExistingRelease,
@@ -58,17 +60,20 @@ import {
   issueBodyMediaPlan,
   latestSuccessfulDeploymentRunPath,
   layoutWorkflowRunsPath,
+  layoutEvidenceRequeueAllowed,
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
   materializeWorkerInputAttachments,
   mediaInputRequired,
   mediaSourceExternalId,
+  markFrontendOnlyRecoveryObserved,
   prepareCommittedCandidate,
   prepareCopilotHome,
   prepareGitHubMediaInput,
   prepareReopenedMedia,
   pullRequestBodyWithVisualEvidence,
   pushCandidate,
+  queueVerifiedLayoutEvidence,
   queueReopenedMediaInputs,
   readWorktreeSnapshot,
   restoreReadyOutcomeFromWorkerLog,
@@ -134,6 +139,7 @@ import {
   type AdminIssueValidationReceipt,
 } from './lib/adminIssueController'
 import { discoverEmbeddedGitHubMedia } from './lib/adminIssueMedia'
+import type { EvidenceWorkflowRun } from './lib/adminIssueWorkflowEvidence'
 
 const temporaryDirectories: string[] = []
 
@@ -174,6 +180,196 @@ function record(): AdminIssueRecord {
     workerRuns: 0,
   }
 }
+
+function awaitingLayoutEvidence(): AdminIssueRecord {
+  const issue = record()
+  issue.origin = 'github-automation'
+  issue.automationKind = 'layout'
+  issue.phase = 'awaiting-user'
+  issue.processedRevision = issue.inputRevision
+  issue.inputs[0].source = 'github-issue'
+  issue.lastOutcome = {
+    decision: 'needs_input',
+    iosFollowUp: { reason: '', required: false },
+    questions: [{
+      options: ['Failed-step log and layout-artifact summary', 'Neither is retrievable'],
+      question: 'Which original failure evidence can be attached for run 123?',
+    }],
+    schemaVersion: 1,
+    summary: 'Original CI evidence is unavailable to the worker.',
+    visualEvidence: [],
+  }
+  return issue
+}
+
+describe('trusted workflow evidence and outstanding decisions', () => {
+  const reference = { headSha: 'a'.repeat(40), runId: 123 }
+  const observedAt = '2026-09-23T12:10:00.000Z'
+
+  it('queues one exact-run diagnostic input without answering an evidence-only question', () => {
+    const issue = awaitingLayoutEvidence()
+    const originalOutcome = issue.lastOutcome
+    const packet = {
+      body: 'Host-verified failed layout run 123: five failed WebKit tests.',
+      externalId: `workflow-evidence:123:1:${'b'.repeat(64)}`,
+      fingerprint: 'b'.repeat(64),
+    }
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(true)
+    expect(queueVerifiedLayoutEvidence(issue, reference, packet, observedAt)).toBe(true)
+    expect(issue.phase).toBe('queued')
+    expect(issue.inputRevision).toBe(2)
+    expect(issue.processedRevision).toBe(1)
+    expect(issue.inputs[1]).toMatchObject({
+      body: packet.body,
+      externalId: packet.externalId,
+      source: 'workflow-evidence',
+    })
+    expect(issue.lastOutcome).toBe(originalOutcome)
+    markIssueInputsProcessed(issue, issue.inputRevision, observedAt)
+    issue.phase = 'awaiting-user'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    expect(queueVerifiedLayoutEvidence(issue, reference, packet, observedAt)).toBe(false)
+    expect(issue.inputRevision).toBe(2)
+  })
+
+  it('never requeues an authorization, product, pending-input, or mismatched question', () => {
+    const issue = awaitingLayoutEvidence()
+    if (issue.lastOutcome?.decision !== 'needs_input') throw new Error('Expected needs_input')
+    issue.lastOutcome.questions[0].reason = 'ci_evidence_unavailable'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(true)
+    issue.lastOutcome.questions[0].question = 'Do you authorize a Home Assistant restart?'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.lastOutcome.questions[0].question =
+      'Which original failure evidence can be attached for run 123?'
+    issue.lastOutcome.questions[0].options[0] = 'Authorize restart and deployment'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.lastOutcome.questions[0].options[0] = 'Failed-step log'
+    issue.lastOutcome.questions.push({
+      options: ['A', 'B'],
+      question: 'Should we close the issue?',
+    })
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.lastOutcome.questions.pop()
+    expect(layoutEvidenceRequeueAllowed(issue, { ...reference, runId: 124 })).toBe(false)
+    issue.automationKind = 'deployment'
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.automationKind = 'layout'
+    issue.processedRevision = 0
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    issue.processedRevision = 1
+    issue.pr = { number: 400, url: 'https://github.com/example/pull/400' }
+    expect(layoutEvidenceRequeueAllowed(issue, reference)).toBe(false)
+    expect(queueVerifiedLayoutEvidence(issue, reference, {
+      body: 'Unbound diagnostic.',
+      externalId: `workflow-evidence:999:1:${'b'.repeat(64)}`,
+      fingerprint: 'b'.repeat(64),
+    }, observedAt)).toBe(false)
+  })
+
+  it('validates optional evidence-only question reasons without classifying authorization', () => {
+    const issue = awaitingLayoutEvidence()
+    const input = issue.lastOutcome
+    const marked = parseWorkerOutcome(JSON.stringify({
+      ...input,
+      questions: [{
+        options: ['Attach original log', 'Neither is retrievable'],
+        question: 'Which original failure evidence can be attached for run 123?',
+        reason: 'ci_evidence_unavailable',
+      }],
+    }))
+    if (marked.decision !== 'needs_input') throw new Error('Expected needs_input')
+    expect(marked.questions[0].reason).toBe('ci_evidence_unavailable')
+    expect(() => parseWorkerOutcome(JSON.stringify({
+      ...input,
+      questions: [{
+        options: ['Authorize', 'Defer'],
+        question: 'Authorize a runtime restart?',
+        reason: 'operator_approval',
+      }],
+    }))).toThrow('reason must be ci_evidence_unavailable')
+  })
+
+  it('verifies full v2 frontend delivery and git ancestry without claiming HA activation', async () => {
+    const failedSha = 'a'.repeat(40)
+    const deployedSha = 'b'.repeat(40)
+    const masterSha = 'c'.repeat(40)
+    const failed: EvidenceWorkflowRun = {
+      conclusion: 'failure',
+      created_at: '2026-09-20T12:00:00.000Z',
+      event: 'push',
+      head_branch: 'master',
+      head_sha: failedSha,
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/123',
+      id: 123,
+      name: 'Deploy dashboard',
+      path: '.github/workflows/deploy-dashboard.yml',
+      run_attempt: 1,
+      status: 'completed',
+    }
+    const successful: EvidenceWorkflowRun = {
+      ...failed,
+      conclusion: 'success',
+      created_at: '2026-09-23T12:00:00.000Z',
+      head_sha: deployedSha,
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/789',
+      id: 789,
+    }
+    const receipt = {
+      deploymentHash: 'c'.repeat(64),
+      deployedAt: observedAt,
+      deployedSha,
+      disposition: 'forward',
+      leaseReleased: true,
+      manifestHash: 'd'.repeat(64),
+      panelRegistered: true,
+      runAttempt: 1,
+      runId: '789',
+      sourceSha: deployedSha,
+      status: 'success',
+      verifiedPaths: [...REQUIRED_DEPLOYMENT_VERIFIED_PATHS],
+      version: 2,
+    }
+    const ancestry: typeof commitIsAncestor = async (_path, ancestor, descendant) =>
+      (ancestor === failedSha && descendant === deployedSha) ||
+      (ancestor === deployedSha && descendant === masterSha)
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful, receipt, masterSha, ancestry,
+    )).resolves.toBeUndefined()
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful,
+      { ...receipt, deployedSha: 'e'.repeat(40) }, masterSha, ancestry,
+    )).rejects.toThrow('does not cover')
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful,
+      { ...receipt, verifiedPaths: ['index.html'] }, masterSha, ancestry,
+    )).rejects.toThrow('accepted, newer')
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful,
+      { ...receipt, status: 'failed' }, masterSha, ancestry,
+    )).rejects.toThrow('accepted, newer')
+    await expect(assertFrontendOnlyRecovery(
+      '/test/repository', failed, successful,
+      { ...receipt, deployedAt: failed.created_at }, masterSha, ancestry,
+    )).rejects.toThrow('accepted, newer')
+
+    const issue = awaitingLayoutEvidence()
+    issue.automationKind = 'deployment'
+    if (issue.lastOutcome?.decision !== 'needs_input') throw new Error('Expected needs_input')
+    issue.lastOutcome.questions[0].question = 'Do you authorize a Home Assistant restart?'
+    const authorizationQuestion = issue.lastOutcome
+    expect(frontendRecoveryObservationDue(issue, Date.parse(observedAt))).toBe(true)
+    issue.receipts.frontendRecoveryCheckedAt = observedAt
+    expect(frontendRecoveryObservationDue(issue, Date.parse(observedAt) + 120_000)).toBe(false)
+    expect(frontendRecoveryObservationDue(issue, Date.parse(observedAt) + 360_000)).toBe(true)
+    markFrontendOnlyRecoveryObserved(issue, deployedSha, successful.id, observedAt)
+    expect(issue.phase).toBe('awaiting-user')
+    expect(issue.lastOutcome).toBe(authorizationQuestion)
+    expect(issue.receipts.frontendRecoveryDeployedSha).toBe(deployedSha)
+    expect(frontendRecoveryObservationDue(issue, Date.parse(observedAt) + 360_000)).toBe(false)
+    expect(() => markFrontendOnlyRecoveryObserved(issue, deployedSha, successful.id, observedAt))
+      .toThrow('cannot replace an unresolved decision')
+  })
+})
 
 describe('deployment runner trust rotation', () => {
   it('rotates only when the protected deployment workflow changed', () => {
