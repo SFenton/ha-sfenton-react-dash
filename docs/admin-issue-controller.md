@@ -256,6 +256,11 @@ user, paused, blocked and completed issues occupy no worker slot. A separate
 single-slot lane owns candidate publication, protected checks, normal merge,
 deployment verification, HA completion and worktree cleanup. It never
 auto-merges a PR from an author other than `SFenton`.
+Before a merge, new owner input interrupts protected publication. After the
+merge, the release lane continues waiting for that exact deployment or layout
+run despite new input; it then keeps the issue and Admin To-Do item open and
+routes the update into a fresh worktree generation. A changed phase, generation,
+merge identity, or pending completion repair still interrupts the wait.
 
 The protected Playwright workflow queues up to GitHub's supported maximum
 of 100 runs per ref, without cancelling a prior merged commit's layout

@@ -84,6 +84,7 @@ import {
   materializeWorkerInputAttachments,
   mediaInputRequired,
   mediaSourceExternalId,
+  mergedReleaseWaitStillCurrent,
   markFrontendOnlyRecoveryObserved,
   prepareCommittedCandidate,
   prepareCopilotHome,
@@ -467,6 +468,43 @@ describe('bounded issue worker admission', () => {
     })
     expect(() => assertNoNewInputsBeforeClose(issue)).toThrow('cannot be closed')
     expect(() => assertNoNewInputsBeforeClose(issue)).toThrow(AdminIssueNewInputError)
+  })
+
+  it('keeps exact merged release waits alive for late feedback but fences repair and identity drift', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    if (issue.provenance.kind !== 'active' || !issue.provenance.merge) {
+      throw new Error('Expected verified merge provenance')
+    }
+    delete issue.provenance.deployment
+    issue.phase = 'deploying'
+    const generation = issue.generation
+    const mergeSha = issue.provenance.merge.mergeSha
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(true)
+    appendIssueInput(issue, {
+      body: 'The merged fix needs a follow-up',
+      createdAt: '2026-09-24T16:01:00.000Z',
+      externalId: 'comment:post-merge',
+      source: 'issue-comment',
+    })
+    expect(issue.inputRevision).toBeGreaterThan(issue.processedRevision)
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(true)
+    issue.automationKind = 'layout'
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(true)
+
+    issue.receipts.issueCloseAttemptAt = '2026-09-24T16:02:00.000Z'
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(false)
+    delete issue.receipts.issueCloseAttemptAt
+    issue.receipts.todoCompletionAttemptAt = '2026-09-24T16:02:01.000Z'
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(false)
+    delete issue.receipts.todoCompletionAttemptAt
+    issue.phase = 'paused'
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(false)
+    issue.phase = 'deploying'
+    expect(mergedReleaseWaitStillCurrent(issue, generation + 1, mergeSha)).toBe(false)
+    expect(mergedReleaseWaitStillCurrent(issue, generation, 'f'.repeat(40))).toBe(false)
+    issue.provenance = { kind: 'none' }
+    expect(mergedReleaseWaitStillCurrent(issue, generation, mergeSha)).toBe(false)
   })
 
   it('reopens a controller-closed issue for late input without completing stale HA work', async () => {
@@ -4585,6 +4623,15 @@ describe('admin issue controller security configuration', () => {
     expect(controller).toContain('## Existing release verified')
     expect(controller).toContain("record.automationKind === 'layout'")
     expect(controller).toContain('waitForLayoutWorkflow(')
+    expect(controller).toContain('return mergedReleaseWaitStillCurrent(record, generation, mergeSha)')
+    expect(controller).not.toContain("() => refreshInputs('deploying')")
+    const layoutWait = controller.slice(
+      controller.indexOf('async function waitForLayoutWorkflow('),
+      controller.indexOf('function bindVerifiedLayoutWorkflow('),
+    )
+    expect(layoutWait).toContain(
+      'assertSuccessfulLayoutWorkflowRun(run, mergeSha)\n    if (!(await refreshInputs())) return undefined',
+    )
     expect(controller).toContain('bindVerifiedLayoutWorkflow(record, run)')
     expect(controller).toContain('finalizeLayoutIssue(config, state, record, run, reconcileInputs)')
     expect(controller).toContain('await closeControllerIssue(config, state, record, reconcileInputs)')
