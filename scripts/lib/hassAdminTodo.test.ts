@@ -39,6 +39,54 @@ describe('HassAdminTodoClient', () => {
     )
   })
 
+  it('reopens an already-completed item by exact UID and verifies needs_action', async () => {
+    let status = 'completed'
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+      const path = String(input)
+      if (path.endsWith('/api/services/todo/get_items?return_response')) {
+        return new Response(JSON.stringify({
+          service_response: {
+            'todo.groceries': { items: [{ uid: 'task-1', summary: 'Updated task', status }] },
+          },
+        }), { status: 200 })
+      }
+      if (path.endsWith('/api/services/todo/update_item')) {
+        expect(JSON.parse(String(init?.body))).toEqual({
+          entity_id: 'todo.groceries',
+          item: 'task-1',
+          status: 'needs_action',
+        })
+        status = 'needs_action'
+        return new Response('[]', { status: 200 })
+      }
+      throw new Error(`Unexpected HA request: ${path}`)
+    })
+    const client = new HassAdminTodoClient({ token: 'test-token', url: 'http://ha.local:8123' }, fetchMock)
+    await client.reopenItem('todo.groceries', 'task-1')
+    expect(status).toBe('needs_action')
+    await client.reopenItem('todo.groceries', 'task-1')
+    expect(fetchMock.mock.calls.filter(([input]) =>
+      String(input).endsWith('/api/services/todo/update_item'))).toHaveLength(1)
+  })
+
+  it('refuses to claim a todo reopened when HA did not confirm its new status', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      if (String(input).endsWith('/api/services/todo/get_items?return_response')) {
+        return new Response(JSON.stringify({
+          service_response: {
+            'todo.groceries': {
+              items: [{ uid: 'task-1', summary: 'Updated task', status: 'completed' }],
+            },
+          },
+        }), { status: 200 })
+      }
+      return new Response('[]', { status: 200 })
+    })
+    const client = new HassAdminTodoClient({ token: 'test-token', url: 'http://ha.local:8123' }, fetchMock)
+    await expect(client.reopenItem('todo.groceries', 'task-1'))
+      .rejects.toThrow('did not reopen')
+  })
+
   it('reads the HA completion receipt helper state', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       entity_id: 'input_text.admin_todo_completion_receipt',

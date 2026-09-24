@@ -3,11 +3,11 @@ import { unzipSync } from 'fflate'
 
 const SHA = /^[a-f0-9]{40}$/
 export const MAX_JOB_LOG_BYTES = 512 * 1024
-const MAX_ARCHIVE_BYTES = 60 * 1024 * 1024
-const MAX_ARCHIVE_ENTRIES = 2_000
-const MAX_ARCHIVE_EXPANDED_BYTES = 128 * 1024 * 1024
-const MAX_ARCHIVE_ENTRY_BYTES = 16 * 1024 * 1024
-const MAX_SUMMARY_ENTRY_BYTES = 128 * 1024
+const MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
+const MAX_ARCHIVE_ENTRIES = 10_000
+const MAX_ARCHIVE_EXPANDED_BYTES = 768 * 1024 * 1024
+const MAX_ARCHIVE_ENTRY_BYTES = 80 * 1024 * 1024
+const MAX_SUMMARY_ENTRY_BYTES = 10 * 1024 * 1024
 const MAX_PACKET_BYTES = 8 * 1024
 
 export class WorkflowEvidenceError extends Error {}
@@ -56,6 +56,7 @@ export interface EvidenceWorkflowArtifact {
 }
 
 export interface FailedLayoutTest {
+  browser: string
   failureKind: 'content-readiness' | 'responsive-scroll-end' | 'timeout' | 'other'
   location: string
 }
@@ -64,6 +65,7 @@ export interface LayoutJobLogSummary {
   failedCount: number
   failedTests: FailedLayoutTest[]
   passedCount: number
+  skippedCount: number
 }
 
 export interface LayoutArtifactSummary {
@@ -71,11 +73,18 @@ export interface LayoutArtifactSummary {
   automatedPassed: false
   executedCheckpoints: number
   failedCheckpoints: number
+  inspectedBrowsers: Array<'non-webkit' | 'webkit'>
   missingCheckpoints: number
   passedCheckpoints: number
   plannedCheckpoints: number
-  webkitFailed: number
-  webkitPassed: number
+  nonWebkitFailed?: number
+  nonWebkitPassed?: number
+  nonWebkitSkipped?: number
+  nonWebkitTimedOut?: number
+  webkitFailed?: number
+  webkitPassed?: number
+  webkitSkipped?: number
+  webkitTimedOut?: number
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -318,19 +327,21 @@ export function summarizeFailedLayoutJobLog(raw: string): LayoutJobLogSummary {
     .map((line) => line.replace(/^\d{4}-\d{2}-\d{2}T\S+Z\s+/, '').trimEnd())
   const failedTests: FailedLayoutTest[] = []
   let current: FailedLayoutTest | undefined
-  let reportedFailures: number | undefined
+  let reportedFailures = 0
+  let sawFailureSummary = false
   let passedCount = 0
+  let skippedCount = 0
   for (const line of lines) {
     const heading = line.match(
-      /^\s*\d+\)\s+\[webkit\]\s+›\s+(e2e\/[A-Za-z0-9._/-]+\.spec\.ts:\d{1,6}:\d{1,6})\s+›\s+.{1,500}$/,
+      /^\s*\d+\)\s+\[([A-Za-z0-9_-]{1,40})\]\s+›\s+(e2e\/[A-Za-z0-9._/-]+\.spec\.ts:\d{1,6}:\d{1,6})\s+›\s+.{1,500}$/,
     )
     if (heading) {
-      const location = heading[1]
+      const location = heading[2]
       if (location.length > 200 ||
         location.split(':')[0].split('/').some((segment) => segment === '.' || segment === '..')) {
         throw new WorkflowEvidenceError('Automated layout test identity is unsafe')
       }
-      current = { failureKind: 'other', location }
+      current = { browser: heading[1], failureKind: 'other', location }
       failedTests.push(current)
       if (failedTests.length > 20) throw new WorkflowEvidenceError('Automated layout has too many failures')
       continue
@@ -346,14 +357,43 @@ export function summarizeFailedLayoutJobLog(raw: string): LayoutJobLogSummary {
             : 'other'
     }
     const failed = line.match(/^\s*(\d+)\s+failed\s*$/)
-    if (failed) reportedFailures = Number(failed[1])
+    if (failed) {
+      reportedFailures += Number(failed[1])
+      sawFailureSummary = true
+    }
     const passed = line.match(/^\s*(\d+)\s+passed(?:\s|$)/)
-    if (passed) passedCount = Number(passed[1])
+    if (passed) passedCount += Number(passed[1])
+    const skipped = line.match(/^\s*(\d+)\s+skipped(?:\s|$)/)
+    if (skipped) skippedCount += Number(skipped[1])
   }
-  if (reportedFailures === undefined || reportedFailures !== failedTests.length) {
+  if (!sawFailureSummary || reportedFailures !== failedTests.length) {
     throw new WorkflowEvidenceError('Automated layout job log lacks a complete failed-test summary')
   }
-  return { failedCount: reportedFailures, failedTests, passedCount }
+  return { failedCount: reportedFailures, failedTests, passedCount, skippedCount }
+}
+
+function summarizeExecution(value: unknown, name: string) {
+  if (!record(value) || value.complete !== true ||
+    !Array.isArray(value.attempts) || value.attempts.length > 1_000) {
+    throw new WorkflowEvidenceError(`${name} execution attempts are incomplete`)
+  }
+  let passed = 0
+  let failed = 0
+  let skipped = 0
+  let timedOut = 0
+  for (const attempt of value.attempts) {
+    if (!record(attempt)) throw new WorkflowEvidenceError(`${name} has an invalid execution attempt`)
+    if (attempt.status === 'passed') passed += 1
+    else if (attempt.status === 'failed') failed += 1
+    else if (attempt.status === 'skipped') skipped += 1
+    else if (attempt.status === 'timedOut') timedOut += 1
+    else throw new WorkflowEvidenceError(`${name} has an unknown execution status`)
+  }
+  if ((failed + timedOut > 0 && value.status !== 'failed') ||
+    (failed + timedOut === 0 && !['passed', 'success'].includes(String(value.status)))) {
+    throw new WorkflowEvidenceError(`${name} execution result contradicts its attempts`)
+  }
+  return { attempts: value.attempts.length, failed: failed + timedOut, passed, skipped, timedOut }
 }
 
 export function summarizeLayoutArtifactZip(zip: Uint8Array): LayoutArtifactSummary {
@@ -364,11 +404,15 @@ export function summarizeLayoutArtifactZip(zip: Uint8Array): LayoutArtifactSumma
   let originalBytes = 0
   let assessmentCount = 0
   let executionCount = 0
+  let nonWebkitCount = 0
   let extracted: Record<string, Uint8Array>
   try {
     extracted = unzipSync(zip, {
       filter: (file) => {
         entries += 1
+        if (!Number.isSafeInteger(file.originalSize) || file.originalSize < 0) {
+          throw new WorkflowEvidenceError('Layout artifact has an invalid entry size')
+        }
         originalBytes += file.originalSize
         if (
           entries > MAX_ARCHIVE_ENTRIES ||
@@ -386,8 +430,10 @@ export function summarizeLayoutArtifactZip(zip: Uint8Array): LayoutArtifactSumma
         }
         if (file.name === 'automated-assessment.json') assessmentCount += 1
         if (file.name === 'execution-webkit.json') executionCount += 1
+        if (file.name === 'execution-non-webkit.json') nonWebkitCount += 1
         const selected = file.name === 'automated-assessment.json' ||
-          file.name === 'execution-webkit.json'
+          file.name === 'execution-webkit.json' ||
+          file.name === 'execution-non-webkit.json'
         if (selected && file.originalSize > MAX_SUMMARY_ENTRY_BYTES) {
           throw new WorkflowEvidenceError('Layout artifact summary exceeds its byte limit')
         }
@@ -399,28 +445,45 @@ export function summarizeLayoutArtifactZip(zip: Uint8Array): LayoutArtifactSumma
     throw new WorkflowEvidenceError('Layout artifact ZIP could not be read safely')
   }
   if (
-    assessmentCount !== 1 || executionCount !== 1 ||
+    assessmentCount !== 1 || executionCount > 1 || nonWebkitCount > 1 ||
+    executionCount + nonWebkitCount < 1 ||
     !extracted['automated-assessment.json'] ||
-    !extracted['execution-webkit.json'] ||
+    (executionCount === 1 && !extracted['execution-webkit.json']) ||
+    (nonWebkitCount === 1 && !extracted['execution-non-webkit.json']) ||
     extracted['automated-assessment.json'].byteLength > MAX_SUMMARY_ENTRY_BYTES ||
-    extracted['execution-webkit.json'].byteLength > MAX_SUMMARY_ENTRY_BYTES
+    (extracted['execution-webkit.json']?.byteLength ?? 0) > MAX_SUMMARY_ENTRY_BYTES ||
+    (extracted['execution-non-webkit.json']?.byteLength ?? 0) > MAX_SUMMARY_ENTRY_BYTES
   ) {
     throw new WorkflowEvidenceError('Layout artifact is missing one exact summary entry')
   }
   let assessment: unknown
   let execution: unknown
+  let nonWebkitExecution: unknown
   try {
     const decoder = new TextDecoder('utf-8', { fatal: true })
     assessment = JSON.parse(decoder.decode(extracted['automated-assessment.json']))
-    execution = JSON.parse(decoder.decode(extracted['execution-webkit.json']))
+    if (executionCount === 1) {
+      execution = JSON.parse(decoder.decode(extracted['execution-webkit.json']))
+    }
+    if (nonWebkitCount === 1) {
+      nonWebkitExecution = JSON.parse(decoder.decode(extracted['execution-non-webkit.json']))
+    }
   } catch {
     throw new WorkflowEvidenceError('Layout artifact summary is not valid UTF-8 JSON')
   }
   if (!record(assessment) || !record(assessment.counts) ||
-    assessment.automatedPassed !== false ||
-    !record(execution) || execution.status !== 'failed' ||
-    !Array.isArray(execution.attempts) || execution.attempts.length > 500) {
+    assessment.automatedPassed !== false) {
     throw new WorkflowEvidenceError('Layout artifact does not contain a failed assessment')
+  }
+  const webkit = executionCount === 1 ? summarizeExecution(execution, 'WebKit') : undefined
+  const nonWebkit = nonWebkitCount === 1
+    ? summarizeExecution(nonWebkitExecution, 'Non-WebKit')
+    : undefined
+  if ((webkit?.failed ?? 0) + (nonWebkit?.failed ?? 0) < 1 ||
+    (assessment.counts.attempts !== undefined &&
+      boundedInteger(assessment.counts.attempts, 'planned attempts') !==
+        (webkit?.attempts ?? 0) + (nonWebkit?.attempts ?? 0))) {
+    throw new WorkflowEvidenceError('Layout artifact execution counts do not match the failed assessment')
   }
   const plannedCheckpoints = boundedInteger(assessment.counts.plannedCheckpoints, 'planned checkpoints')
   const executedCheckpoints = boundedInteger(assessment.counts.executedCheckpoints, 'executed checkpoints')
@@ -430,23 +493,34 @@ export function summarizeLayoutArtifactZip(zip: Uint8Array): LayoutArtifactSumma
     executedCheckpoints > plannedCheckpoints) {
     throw new WorkflowEvidenceError('Layout artifact checkpoint counts contradict each other')
   }
-  const webkitFailed = execution.attempts.filter((attempt) =>
-    record(attempt) && attempt.status === 'failed').length
-  const webkitPassed = execution.attempts.filter((attempt) =>
-    record(attempt) && attempt.status === 'passed').length
-  if (webkitFailed < 1 || webkitFailed + webkitPassed !== execution.attempts.length) {
-    throw new WorkflowEvidenceError('Layout artifact WebKit attempts are incomplete')
-  }
   return {
     archiveSha256: createHash('sha256').update(zip).digest('hex'),
     automatedPassed: false,
     executedCheckpoints,
     failedCheckpoints,
+    inspectedBrowsers: [
+      ...(nonWebkit ? ['non-webkit' as const] : []),
+      ...(webkit ? ['webkit' as const] : []),
+    ],
     missingCheckpoints: plannedCheckpoints - executedCheckpoints,
     passedCheckpoints,
     plannedCheckpoints,
-    webkitFailed,
-    webkitPassed,
+    ...(nonWebkit
+      ? {
+        nonWebkitFailed: nonWebkit.failed,
+        nonWebkitPassed: nonWebkit.passed,
+        nonWebkitSkipped: nonWebkit.skipped,
+        nonWebkitTimedOut: nonWebkit.timedOut,
+      }
+      : {}),
+    ...(webkit
+      ? {
+        webkitFailed: webkit.failed,
+        webkitPassed: webkit.passed,
+        webkitSkipped: webkit.skipped,
+        webkitTimedOut: webkit.timedOut,
+      }
+      : {}),
   }
 }
 
@@ -458,9 +532,15 @@ export function buildLayoutEvidencePacket(
   log: string,
   archive: Uint8Array,
 ) {
+  if (archive.byteLength !== artifact.size_in_bytes) {
+    throw new WorkflowEvidenceError('Layout artifact bytes do not match GitHub metadata')
+  }
   const logSummary = summarizeFailedLayoutJobLog(log)
   const artifactSummary = summarizeLayoutArtifactZip(archive)
-  if (logSummary.failedCount !== artifactSummary.webkitFailed) {
+  const webkitLogFailures = logSummary.failedTests.filter((test) => test.browser === 'webkit').length
+  const otherLogFailures = logSummary.failedCount - webkitLogFailures
+  if (webkitLogFailures !== (artifactSummary.webkitFailed ?? 0) ||
+    otherLogFailures !== (artifactSummary.nonWebkitFailed ?? 0)) {
     throw new WorkflowEvidenceError('CI log and layout artifact disagree on failed test count')
   }
   const failedSteps = job.steps.filter((step) => step.conclusion === 'failure')
@@ -483,16 +563,32 @@ export function buildLayoutEvidencePacket(
       failedStep: failedSteps[0],
       failedTests: logSummary.failedTests,
       passedTests: logSummary.passedCount,
+      skippedTests: logSummary.skippedCount,
     },
     artifact: {
       automatedPassed: false,
       executedCheckpoints: artifactSummary.executedCheckpoints,
       failedCheckpoints: artifactSummary.failedCheckpoints,
+      inspectedBrowsers: artifactSummary.inspectedBrowsers,
       missingCheckpoints: artifactSummary.missingCheckpoints,
       passedCheckpoints: artifactSummary.passedCheckpoints,
       plannedCheckpoints: artifactSummary.plannedCheckpoints,
-      webkitFailed: artifactSummary.webkitFailed,
-      webkitPassed: artifactSummary.webkitPassed,
+      ...(artifactSummary.nonWebkitFailed !== undefined
+        ? {
+          nonWebkitFailed: artifactSummary.nonWebkitFailed,
+          nonWebkitPassed: artifactSummary.nonWebkitPassed,
+          nonWebkitSkipped: artifactSummary.nonWebkitSkipped,
+          nonWebkitTimedOut: artifactSummary.nonWebkitTimedOut,
+        }
+        : {}),
+      ...(artifactSummary.webkitFailed !== undefined
+        ? {
+          webkitFailed: artifactSummary.webkitFailed,
+          webkitPassed: artifactSummary.webkitPassed,
+          webkitSkipped: artifactSummary.webkitSkipped,
+          webkitTimedOut: artifactSummary.webkitTimedOut,
+        }
+        : {}),
     },
   }
   const serialized = JSON.stringify(summary)

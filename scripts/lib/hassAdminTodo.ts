@@ -62,6 +62,24 @@ export class HassAdminTodoClient {
     await this.callService('script', service, { item })
   }
 
+  async reopenItem(entityId: string, item: string) {
+    const current = (await this.getItems(entityId)).find((entry) => entry.uid === item)
+    if (!current) throw new Error(`Admin To-Do item ${item} was not found for reopening`)
+    if (current.status === 'needs_action') return
+    if (current.status !== 'completed') {
+      throw new Error(`Admin To-Do item ${item} has an unexpected status before reopening`)
+    }
+    await this.callService('todo', 'update_item', {
+      entity_id: entityId,
+      item,
+      status: 'needs_action',
+    })
+    const reopened = (await this.getItems(entityId)).find((entry) => entry.uid === item)
+    if (reopened?.status !== 'needs_action') {
+      throw new Error(`Admin To-Do item ${item} did not reopen after the service call`)
+    }
+  }
+
   async updateDescription(entityId: string, item: string, description: string) {
     await this.callService('todo', 'update_item', { description, entity_id: entityId, item })
   }

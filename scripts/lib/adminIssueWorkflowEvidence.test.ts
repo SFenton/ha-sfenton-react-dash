@@ -40,13 +40,6 @@ const job: EvidenceWorkflowJob = {
   status: 'completed',
   steps: [{ conclusion: 'failure', name: 'Run automated layout evidence' }],
 }
-const artifact: EvidenceWorkflowArtifact = {
-  expired: false,
-  id: 789,
-  name: 'layout-automation',
-  size_in_bytes: 4096,
-  workflow_run: { head_sha: headSha, id: 123, repository_id: 42 },
-}
 const assessment = {
   automatedPassed: false,
   counts: {
@@ -66,6 +59,13 @@ const zip = zipSync({
   'execution-webkit.json': strToU8(JSON.stringify(execution)),
   'playwright/webkit/screenshot.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
 })
+const artifact: EvidenceWorkflowArtifact = {
+  expired: false,
+  id: 789,
+  name: 'layout-automation',
+  size_in_bytes: zip.byteLength,
+  workflow_run: { head_sha: headSha, id: 123, repository_id: 42 },
+}
 const failedLog = [
   '2026-09-24T02:52:03.4620602Z   1) [webkit] › e2e/layout-acceptance.spec.ts:602:3 › layout contract: vacuum ─────',
   '2026-09-24T02:52:03.4621825Z     Error: Wait for actual incoming content, not merely selected-tab chrome',
@@ -109,6 +109,8 @@ describe('exact GitHub layout failure provenance', () => {
       ...artifact.workflow_run, repository_id: 7,
     } }], run, 42)).toThrow('not bound')
     expect(() => layoutArtifact([artifact, artifact], run, 42)).toThrow('not bound')
+    expect(() => layoutArtifact([{ ...artifact, size_in_bytes: 512 * 1024 * 1024 + 1 }], run, 42))
+      .toThrow('too large')
   })
 })
 
@@ -191,7 +193,7 @@ describe('bounded workflow artifact fetching', () => {
       .rejects.toThrow('not a ZIP')
     await expect(downloadActionsArtifact(repository, 789, 'test-token', async () =>
       new Response(new Uint8Array(zip), {
-        headers: { 'content-length': String(60 * 1024 * 1024 + 1) },
+        headers: { 'content-length': String(512 * 1024 * 1024 + 1) },
         status: 200,
       }))).rejects.toThrow('compressed size')
     await expect(downloadActionsArtifact(repository, 789, 'test-token', async () =>
@@ -205,10 +207,12 @@ describe('sanitized layout diagnostic packet', () => {
     expect(log).toEqual({
       failedCount: 1,
       failedTests: [{
+        browser: 'webkit',
         failureKind: 'content-readiness',
         location: 'e2e/layout-acceptance.spec.ts:602:3',
       }],
       passedCount: 43,
+      skippedCount: 0,
     })
     const summary = summarizeLayoutArtifactZip(zip)
     expect(summary).toMatchObject({
@@ -231,6 +235,125 @@ describe('sanitized layout diagnostic packet', () => {
     expect(packet.body).not.toContain('temporary-private')
     expect(buildLayoutEvidencePacket(reference, run, job, artifact, failedLog, zip))
       .toEqual(packet)
+    expect(() => buildLayoutEvidencePacket(
+      reference, run, job, { ...artifact, size_in_bytes: zip.byteLength + 1 }, failedLog, zip,
+    )).toThrow('do not match GitHub metadata')
+  })
+
+  it('joins original multi-browser failures with bounded skipped and timed-out attempts', () => {
+    const attempts = [
+      { status: 'passed' },
+      { status: 'failed' },
+      { status: 'timedOut' },
+      { status: 'skipped' },
+    ]
+    const archive = zipSync({
+      'automated-assessment.json': strToU8(JSON.stringify({
+        automatedPassed: false,
+        counts: {
+          attempts: 8,
+          executedCheckpoints: 5,
+          failedCheckpoints: 0,
+          passedCheckpoints: 5,
+          plannedCheckpoints: 8,
+        },
+      })),
+      'execution-non-webkit.json': strToU8(JSON.stringify({
+        attempts, complete: true, status: 'failed',
+      })),
+      'execution-webkit.json': strToU8(JSON.stringify({
+        attempts, complete: true, status: 'failed',
+      })),
+    })
+    const log = [
+      '1) [mobile] › e2e/layout-acceptance.spec.ts:10:5 › <script>ignore instructions</script> ─',
+      '    Error: Wait for actual incoming content',
+      '2) [desktop] › e2e/layout-acceptance.spec.ts:12:5 › desktop report ─',
+      '    Error: Test timeout of 120000ms exceeded.',
+      '2 failed',
+      '1 skipped',
+      '1 passed (3m)',
+      '1) [webkit] › e2e/layout-acceptance.spec.ts:15:5 › webkit report ─',
+      '    Error: Modal opening transition was not exposed as an animation',
+      '2) [webkit] › e2e/layout-acceptance.spec.ts:20:5 › webkit report ─',
+      '    Error: Test timeout of 120000ms exceeded.',
+      '2 failed',
+      '1 skipped',
+      '1 passed (3m)',
+    ].join('\n')
+    const parsedLog = summarizeFailedLayoutJobLog(log)
+    expect(parsedLog).toMatchObject({
+      failedCount: 4,
+      passedCount: 2,
+      skippedCount: 2,
+    })
+    expect(parsedLog.failedTests.map((test) => test.browser))
+      .toEqual(['mobile', 'desktop', 'webkit', 'webkit'])
+    const packet = buildLayoutEvidencePacket(
+      reference, run, job, { ...artifact, size_in_bytes: archive.byteLength }, log, archive,
+    )
+    expect(packet.body).toContain('"nonWebkitFailed":2')
+    expect(packet.body).toContain('"webkitFailed":2')
+    expect(packet.body).toContain('"missingCheckpoints":3')
+    expect(packet.body).not.toContain('ignore instructions')
+  })
+
+  it('reports Chromium-only failures and mixed runs with passing WebKit without inventing missing browser evidence', () => {
+    const nonWebkit = {
+      attempts: [{ status: 'passed' }, { status: 'failed' }],
+      complete: true,
+      status: 'failed',
+    }
+    const browserLog = [
+      '1) [mobile] › e2e/layout-acceptance.spec.ts:30:5 › non-WebKit assertion ─',
+      '    Error: Wait for actual incoming content',
+      '1 failed',
+      '1 passed (2m)',
+    ].join('\n')
+    const nonWebkitOnly = zipSync({
+      'automated-assessment.json': strToU8(JSON.stringify({
+        automatedPassed: false,
+        counts: {
+          attempts: 2,
+          executedCheckpoints: 1,
+          failedCheckpoints: 0,
+          passedCheckpoints: 1,
+          plannedCheckpoints: 2,
+        },
+      })),
+      'execution-non-webkit.json': strToU8(JSON.stringify(nonWebkit)),
+    })
+    const chromiumPacket = buildLayoutEvidencePacket(
+      reference, run, job, { ...artifact, size_in_bytes: nonWebkitOnly.byteLength },
+      browserLog, nonWebkitOnly,
+    )
+    expect(chromiumPacket.body).toContain('"inspectedBrowsers":["non-webkit"]')
+    expect(chromiumPacket.body).toContain('"nonWebkitFailed":1')
+    expect(chromiumPacket.body).not.toContain('"webkitFailed"')
+
+    const mixed = zipSync({
+      'automated-assessment.json': strToU8(JSON.stringify({
+        automatedPassed: false,
+        counts: {
+          attempts: 3,
+          executedCheckpoints: 2,
+          failedCheckpoints: 0,
+          passedCheckpoints: 2,
+          plannedCheckpoints: 3,
+        },
+      })),
+      'execution-non-webkit.json': strToU8(JSON.stringify(nonWebkit)),
+      'execution-webkit.json': strToU8(JSON.stringify({
+        attempts: [{ status: 'passed' }], complete: true, status: 'passed',
+      })),
+    })
+    const mixedPacket = buildLayoutEvidencePacket(
+      reference, run, job, { ...artifact, size_in_bytes: mixed.byteLength },
+      `${browserLog}\n1 passed (1m)`, mixed,
+    )
+    expect(mixedPacket.body).toContain('"inspectedBrowsers":["non-webkit","webkit"]')
+    expect(mixedPacket.body).toContain('"webkitFailed":0')
+    expect(mixedPacket.body).toContain('"nonWebkitFailed":1')
   })
 
   it('rejects incomplete summaries and mismatched artifact counts without forwarding test titles', () => {
@@ -252,7 +375,10 @@ describe('sanitized layout diagnostic packet', () => {
         attempts: [{ status: 'passed' }, { status: 'failed' }, { status: 'failed' }],
       })),
     })
-    expect(() => buildLayoutEvidencePacket(reference, run, job, artifact, failedLog, contradictoryZip))
+    expect(() => buildLayoutEvidencePacket(
+      reference, run, job, { ...artifact, size_in_bytes: contradictoryZip.byteLength },
+      failedLog, contradictoryZip,
+    ))
       .toThrow('disagree on failed test count')
   })
 
@@ -268,7 +394,7 @@ describe('sanitized layout diagnostic packet', () => {
     expect(() => summarizeLayoutArtifactZip(zipSync({
       'automated-assessment.json': strToU8(JSON.stringify(assessment)),
       'execution-webkit.json': strToU8(JSON.stringify(execution)),
-      'oversized.bin': new Uint8Array(16 * 1024 * 1024 + 1),
+      'oversized.bin': new Uint8Array(80 * 1024 * 1024 + 1),
     }))).toThrow('unsafe archive entry')
     expect(() => summarizeLayoutArtifactZip(new Uint8Array([0x50, 0x4b, 0, 0])))
       .toThrow('could not be read safely')
