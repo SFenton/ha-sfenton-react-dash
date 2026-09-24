@@ -801,9 +801,14 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
   await page.evaluate(({ sources, style }) => {
     for (const [index, card] of [...document.querySelectorAll('webrtc-camera-sfenton')].entries()) {
       const shadow = card.attachShadow({ mode: 'open' })
-      shadow.innerHTML = `<style>ha-card { display: block; } ${style}</style>
+      shadow.innerHTML = `<style>
+        ha-card { display: block; background: #000; }
+        .rtc-spinner { position: absolute; top: 50%; left: 50%; width: 24px; height: 24px;
+          margin: -12px; border: 3px solid transparent; border-top-color: #fff; border-radius: 50%; }
+        ${style}
+      </style>
         <ha-card><div class="player"><div class="ptz-transform">
-          <video width="${sources[index].width}" height="${sources[index].height}"></video>
+          <div class="rtc-spinner"></div><video width="${sources[index].width}" height="${sources[index].height}"></video>
         </div></div></ha-card>`
     }
   }, { sources: cameras, style: shadowStyle })
@@ -819,12 +824,20 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
     }, { columns, tileWidth })
 
     let originalTiles: { width: number; height: number }[] | undefined
-    for (const status of ['connecting', 'connected', 'error']) {
+    for (const status of ['connecting', 'disconnected', 'connected', 'error']) {
       const boxes = await page.locator('[data-rtc-stream]').evaluateAll((tiles, phase) => tiles.map((tile) => {
         const frame = tile.querySelector('[data-camera-transport="webrtc"]') as HTMLElement
         const card = tile.querySelector('webrtc-camera-sfenton') as HTMLElement
         frame.dataset.loaded = phase === 'connected' ? 'true' : 'false'
         card.dataset.streamStatus = phase
+        card.dataset.dashboardVisible = phase === 'connected' ? 'true' : 'false'
+        if (phase === 'connected') {
+          card.removeAttribute('aria-hidden')
+          card.removeAttribute('inert')
+        } else {
+          card.setAttribute('aria-hidden', 'true')
+          card.setAttribute('inert', '')
+        }
         const video = card.shadowRoot!.querySelector('video')!
         const dimensions = (element: Element) => {
           const box = element.getBoundingClientRect()
@@ -836,6 +849,8 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
           card: dimensions(card),
           video: dimensions(video),
           fit: getComputedStyle(video).objectFit,
+          opacity: getComputedStyle(card).opacity,
+          pointerEvents: getComputedStyle(card).pointerEvents,
         }
       }), status)
       expect(boxes).toHaveLength(4)
@@ -846,6 +861,8 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
         expect(Math.abs(box.card.height - box.frame.height)).toBeLessThanOrEqual(1)
         expect(Math.abs(box.video.height - box.frame.height)).toBeLessThanOrEqual(1)
         expect(box.fit).toBe('cover')
+        expect(box.opacity).toBe(status === 'connected' ? '1' : '0')
+        expect(box.pointerEvents).toBe(status === 'connected' ? 'auto' : 'none')
       }
     }
   }
@@ -863,9 +880,11 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
     const card = focus.querySelector('webrtc-camera-sfenton')!
     const shadow = card.attachShadow({ mode: 'open' })
     // The live WebKit card falls back to half its width until its host has a definite height.
-    shadow.innerHTML = `<style>:host { aspect-ratio: 2 / 1; } ha-card { display: block; } ${style}</style>
+    shadow.innerHTML = `<style>:host { aspect-ratio: 2 / 1; } ha-card { display: block; background: #000; }
+      .rtc-spinner { width: 24px; height: 24px; border: 3px solid transparent; border-top-color: #fff; border-radius: 50%; }
+      ${style}</style>
       <ha-card><div class="player"><div class="ptz-transform">
-        <video width="300" height="150"></video>
+        <div class="rtc-spinner"></div><video width="300" height="150"></video>
       </div></div></ha-card>`
   }, shadowStyle)
 
@@ -880,13 +899,14 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
       focus.style.width = `${dimensions.modalWidth}px`
       focus.style.height = `${dimensions.modalHeight}px`
     }, { modalWidth, modalHeight })
-    for (const status of ['connecting', 'connected', 'error']) {
+    for (const status of ['connecting', 'disconnected', 'connected', 'error']) {
       const boxes = await page.locator('#rtc-modal-fixture').evaluate((focus, phase) => {
         const frame = focus.querySelector('[data-camera-transport="webrtc"]') as HTMLElement
         const host = frame.querySelector('.host')!
         const card = frame.querySelector('webrtc-camera-sfenton') as HTMLElement
         frame.dataset.loaded = phase === 'connected' ? 'true' : 'false'
         card.dataset.streamStatus = phase
+        card.dataset.dashboardVisible = phase === 'connected' ? 'true' : 'false'
         const shadow = card.shadowRoot!
         const video = shadow.querySelector('video')!
         const dimensions = (element: Element) => {
@@ -901,6 +921,8 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
           player: dimensions(shadow.querySelector('.player')!),
           video: dimensions(video),
           fit: getComputedStyle(video).objectFit,
+          opacity: getComputedStyle(card).opacity,
+          pointerEvents: getComputedStyle(card).pointerEvents,
         }
       }, status)
       expect(Math.abs(boxes.frame.width - modalWidth)).toBeLessThanOrEqual(1)
@@ -910,6 +932,8 @@ test('RTC pilot card and shadow video fill tiles and media modals in loading, li
         expect(Math.abs(part.height - boxes.frame.height)).toBeLessThanOrEqual(1)
       }
       expect(boxes.fit).toBe('contain')
+      expect(boxes.opacity).toBe(status === 'connected' ? '1' : '0')
+      expect(boxes.pointerEvents).toBe(status === 'connected' ? 'auto' : 'none')
     }
   }
 })
