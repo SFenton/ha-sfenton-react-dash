@@ -1,13 +1,17 @@
 ---
 name: tandem-research
-description: Explicit-only independent Sol/Astra research with shared raw intent, matched evidence, cross-critique, and Sol adjudication.
+description: Controller-local independent Sol/Luna research with shared raw intent, matched evidence, cross-critique, and Sol adjudication.
 ---
 
 # Tandem research
 
 Use this skill only when the operator explicitly invokes `/tandem-research`,
-requests Sol/Astra tandem research, or asks for two independent frontier
+requests controller-local Sol/Luna research, or asks for two independent
 researchers. Never trigger it from task importance alone.
+
+This isolated worker profile is not the global guarded Sol/Opus tandem.
+If the operator requires that exact global pair, report the unavailable
+guarded Opus evidence lane rather than claiming it ran.
 
 ## Invariants
 
@@ -19,7 +23,7 @@ researchers. Never trigger it from task importance alone.
    asking the operator to provide diagnostics already available there. For a
    named recurring system, search relevant session history with the original
    nouns before the first research pass.
-3. Sol `max/default` and Astra `medium/default` receive the same raw prompt and
+3. Sol `max/default` and GPT-5.6 Luna `medium/default` receive the same raw prompt and
    the same evidence bundle. They reason independently before seeing the other
    report.
 4. Evidence bundles may be hashed for reproducibility, but packet machinery and

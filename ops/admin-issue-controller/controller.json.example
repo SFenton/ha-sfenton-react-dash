@@ -13,6 +13,7 @@
   "hassMcpServerName": "hass",
   "workerImageId": "sha256:9bd26ad900bb5e0f4dee75839e957a89ae89c2b7ab1e76050e559790e946b948",
   "workerTimeoutMinutes": 90,
+  "maxConcurrentWorkers": 1,
   "todoEntityId": "todo.groceries",
   "completionScript": "script.complete_admin_todo_item",
   "completionReceiptEntityId": "input_text.admin_todo_completion_receipt",

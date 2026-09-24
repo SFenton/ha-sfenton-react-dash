@@ -268,6 +268,25 @@ export interface AdminIssueDeployment {
   url?: string
 }
 
+export interface AdminIssueWorkerClaim {
+  generation: number
+  id: string
+  inputRevision: number
+  startedAt: string
+}
+
+export interface AdminIssuePendingUpload extends AdminIssueInputAttachment {
+  startedAt: string
+  status: 'uploading' | 'uploaded'
+}
+
+export interface AdminIssueIntakeFailure {
+  attemptedAt: string
+  attempts: number
+  errorHash: string
+  reason: 'upload-outcome-unknown' | 'http-error' | 'intake-error'
+}
+
 export interface AdminIssueRecord {
   automationKind?: 'deployment' | 'layout'
   branch?: string
@@ -295,6 +314,8 @@ export interface AdminIssueRecord {
   title: string
   uid: string
   updatedAt: string
+  releaseClaim?: AdminIssueWorkerClaim
+  workerClaim?: AdminIssueWorkerClaim
   workerRuns: number
   worktreePath?: string
 }
@@ -303,7 +324,9 @@ export interface AdminIssueControllerState {
   activeUid?: string
   baselineCompletedAt: string
   ignoredUids: string[]
+  intakeFailures?: Record<string, AdminIssueIntakeFailure>
   issues: Record<string, AdminIssueRecord>
+  pendingUploads?: Record<string, AdminIssuePendingUpload[]>
   updatedAt: string
   version: typeof ADMIN_ISSUE_STATE_VERSION
 }
@@ -932,6 +955,41 @@ function validateAdminIssueControllerState(value: unknown, version: 2 | 3) {
   isoTimestamp(value.updatedAt, 'state.updatedAt')
   stringArray(value.ignoredUids, 'state.ignoredUids')
   if (value.activeUid !== undefined) nonEmptyString(value.activeUid, 'state.activeUid')
+  if (value.intakeFailures !== undefined) {
+    assert(object(value.intakeFailures), 'state.intakeFailures must be an object')
+    for (const [key, failure] of Object.entries(value.intakeFailures)) {
+      sha256(key, 'state.intakeFailures key')
+      assert(object(failure), `state.intakeFailures.${key} must be an object`)
+      isoTimestamp(failure.attemptedAt, `state.intakeFailures.${key}.attemptedAt`)
+      positiveInteger(failure.attempts, `state.intakeFailures.${key}.attempts`)
+      sha256(failure.errorHash, `state.intakeFailures.${key}.errorHash`)
+      assert(
+        ['upload-outcome-unknown', 'http-error', 'intake-error'].includes(String(failure.reason)),
+        `state.intakeFailures.${key}.reason is invalid`,
+      )
+    }
+  }
+  if (value.pendingUploads !== undefined) {
+    assert(object(value.pendingUploads), 'state.pendingUploads must be an object')
+    for (const [key, uploads] of Object.entries(value.pendingUploads)) {
+      sha256(key, 'state.pendingUploads key')
+      assert(Array.isArray(uploads) && uploads.length <= 32, `state.pendingUploads.${key} is invalid`)
+      const seen = new Set<string>()
+      for (const [index, upload] of uploads.entries()) {
+        const field = `state.pendingUploads.${key}[${index}]`
+        assertInputAttachment(upload, field)
+        assert(object(upload), `${field} must be an object`)
+        isoTimestamp(upload.startedAt, `${field}.startedAt`)
+        assert(upload.status === 'uploading' || upload.status === 'uploaded', `${field}.status is invalid`)
+        assert(
+          (upload.status === 'uploaded') === (typeof upload.githubUrl === 'string'),
+          `${field}.githubUrl does not match upload status`,
+        )
+        assert(!seen.has(String(upload.id)), `${field}.id is duplicated`)
+        seen.add(String(upload.id))
+      }
+    }
+  }
   assert(object(value.issues), 'state.issues must be an object')
   for (const [uid, rawRecord] of Object.entries(value.issues)) {
     assert(object(rawRecord), `state.issues.${uid} must be an object`)
@@ -1049,6 +1107,24 @@ function validateAdminIssueControllerState(value: unknown, version: 2 | 3) {
         `state.issues.${uid}.sessionId is invalid`,
       )
     }
+    for (const claimName of ['workerClaim', 'releaseClaim'] as const) {
+      const claim = rawRecord[claimName]
+      if (claim === undefined) continue
+      assert(object(claim), `state.issues.${uid}.${claimName} must be an object`)
+      nonEmptyString(claim.id, `state.issues.${uid}.${claimName}.id`)
+      positiveInteger(claim.generation, `state.issues.${uid}.${claimName}.generation`)
+      nonNegativeInteger(claim.inputRevision, `state.issues.${uid}.${claimName}.inputRevision`)
+      isoTimestamp(claim.startedAt, `state.issues.${uid}.${claimName}.startedAt`)
+      assert(
+        Number(claim.generation) <= Number(rawRecord.generation) &&
+        Number(claim.inputRevision) <= Number(rawRecord.inputRevision),
+        `state.issues.${uid}.${claimName} exceeds the current issue generation or revision`,
+      )
+    }
+    assert(
+      rawRecord.workerClaim === undefined || rawRecord.releaseClaim === undefined,
+      `state.issues.${uid} cannot own a worker and release claim simultaneously`,
+    )
     assertProvenance(rawRecord.provenance, `state.issues.${uid}.provenance`)
     if (object(rawRecord.provenance) && rawRecord.provenance.kind === 'active') {
       assert(
@@ -1427,6 +1503,113 @@ export function baselineAdminIssueState(
   }
 }
 
+export function todoIntakeKey(uid: string) {
+  assert(uid.trim(), 'Admin To-Do UID is required for attachment intake')
+  return createHash('sha256').update(uid).digest('hex')
+}
+
+export function reserveTodoAttachmentUpload(
+  state: AdminIssueControllerState,
+  uid: string,
+  attachment: Omit<AdminIssueInputAttachment, 'githubUrl'>,
+  startedAt: string,
+) {
+  const key = todoIntakeKey(uid)
+  const uploads = state.pendingUploads?.[key] ?? []
+  const existing = uploads.find((upload) => upload.id === attachment.id)
+  if (existing) {
+    assert(
+      existing.sha256 === attachment.sha256 &&
+      existing.sizeBytes === attachment.sizeBytes &&
+      existing.mediaType === attachment.mediaType &&
+      existing.name === attachment.name &&
+      existing.localPath === attachment.localPath,
+      'Saved Admin To-Do attachment upload does not match its verified manifest',
+    )
+    assert(
+      existing.status === 'uploaded',
+      'Admin To-Do attachment upload outcome is unknown; manual reconciliation is required',
+    )
+    return { created: false, receipt: existing }
+  }
+  assert(
+    uploads.filter((upload) => upload.status === 'uploaded').length < 4,
+    'Admin To-Do attachment uploads exceed the four-image limit',
+  )
+  assert(uploads.length < 32, 'Unreconciled Admin To-Do attachment uploads exceed the safety bound')
+  const receipt: AdminIssuePendingUpload = {
+    ...attachment,
+    startedAt,
+    status: 'uploading',
+  }
+  state.pendingUploads ??= {}
+  state.pendingUploads[key] = [...uploads, receipt]
+  return { created: true, receipt }
+}
+
+export function confirmTodoAttachmentUpload(
+  state: AdminIssueControllerState,
+  uid: string,
+  attachmentId: string,
+  githubUrl: string,
+) {
+  const receipt = state.pendingUploads?.[todoIntakeKey(uid)]
+    ?.find((upload) => upload.id === attachmentId)
+  assert(receipt?.status === 'uploading', 'Admin To-Do attachment has no pending upload intent')
+  assert(
+    stableGitHubMediaUrl(githubUrl, 'SFenton/ha-sfenton-react-dash') === githubUrl,
+    'Admin To-Do attachment upload URL is not a stable GitHub asset',
+  )
+  receipt.status = 'uploaded'
+  receipt.githubUrl = githubUrl
+  return receipt
+}
+
+export function retainTodoAttachmentUploads(
+  state: AdminIssueControllerState,
+  uid: string,
+  currentIds: ReadonlySet<string>,
+) {
+  const key = todoIntakeKey(uid)
+  const pending = state.pendingUploads
+  const uploads = pending?.[key]
+  if (!pending || !uploads) return false
+  const retained = uploads.filter((upload) =>
+    currentIds.has(upload.id) || upload.status === 'uploading')
+  if (retained.length === uploads.length) return false
+  if (retained.length > 0) pending[key] = retained
+  else delete pending[key]
+  return true
+}
+
+export function recordTodoIntakeFailure(
+  state: AdminIssueControllerState,
+  uid: string,
+  errorHash: string,
+  attemptedAt: string,
+  reason: AdminIssueIntakeFailure['reason'],
+) {
+  assert(/^[a-f0-9]{64}$/.test(errorHash), 'Admin To-Do intake diagnostic hash is invalid')
+  const key = todoIntakeKey(uid)
+  const previous = state.intakeFailures?.[key]
+  state.intakeFailures ??= {}
+  state.intakeFailures[key] = {
+    attemptedAt,
+    attempts: (previous?.attempts ?? 0) + 1,
+    errorHash,
+    reason,
+  }
+}
+
+export function clearTodoIntakeReceipts(state: AdminIssueControllerState, uid: string) {
+  const key = todoIntakeKey(uid)
+  if (state.intakeFailures) delete state.intakeFailures[key]
+  const pending = state.pendingUploads
+  const unresolved = pending?.[key]?.filter((upload) => upload.status === 'uploading') ?? []
+  if (pending && unresolved.length > 0) pending[key] = unresolved
+  else if (pending) delete pending[key]
+}
+
 export function beginAdminIssueGeneration(record: AdminIssueRecord, updatedAt: string) {
   record.generation += 1
   record.branch = undefined
@@ -1444,9 +1627,25 @@ export function beginAdminIssueGeneration(record: AdminIssueRecord, updatedAt: s
     'deployedAt',
     'deploymentRunUrl',
     'iosVerifiedAt',
+    'issueClosedAt',
+    'issueCloseAttemptAt',
     'layoutValidatedAt',
     'mergedAt',
+    'prCommentPendingAt',
+    'prCommentRevision',
+    'prCommentPublishedAt',
     'prOpenedAt',
+    'researchOnlyScope',
+    'todoCompletionAttemptAt',
+    'todoCompletionRaceAt',
+    'todoCompletedAt',
+    'todoReopenedAt',
+    'todoSourceDriftAt',
+    'workflowRotationPendingAt',
+    'workflowRotationCompletedAt',
+    'workflowRotationAttempts',
+    'workflowRotationErrorHash',
+    'workflowRotationLastErrorAt',
     'validatedAt',
     'validatedWorkerInput',
   ]) {
