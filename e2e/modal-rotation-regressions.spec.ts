@@ -4,7 +4,7 @@
 // @covers src/components/core/GlassTile.tsx
 // @covers src/components/shell/GlobalQuickLinksAction.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
-import { modalFacts, waitForModalReady, type ModalReadiness } from './layout/evidence'
+import { MODAL_READY_TIMEOUT_MS, modalFacts, waitForModalReady, waitForResponsiveScrollEnd, type ModalReadiness } from './layout/evidence'
 import { openSurface } from './layout/app'
 import { writeFileSync } from 'node:fs'
 import { ROOM_PAGE_CONFIGS } from '../src/constants/roomPages'
@@ -30,7 +30,7 @@ type Profile = typeof PORTRAIT
 type Box = { x: number; y: number; width: number; height: number }
 
 async function settle(dialog: Locator, readiness: ModalReadiness = 'tabs') {
-  await waitForModalReady(dialog, 5_000, readiness)
+  await waitForModalReady(dialog, MODAL_READY_TIMEOUT_MS, readiness)
 }
 
 async function resize(page: Page, profile: Profile) {
@@ -928,13 +928,9 @@ const BODY_INSET_PROFILES = [
 
 async function bodyInsetMetrics(dialog: Locator) {
   await settle(dialog)
-  const previous = await dialog.locator('[data-modal-sheet-body]').evaluate((body) => body.scrollTop)
-  await expect.poll(() => dialog.evaluate(async (element) => {
-    const body = element.querySelector<HTMLElement>('[data-modal-sheet-body]')!
-    body.scrollTo({ top: body.scrollHeight, behavior: 'instant' })
-    await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
-    return Math.abs(body.scrollTop - Math.max(0, body.scrollHeight - body.clientHeight))
-  }), { message: 'Reach the real end after responsive content reflow' }).toBeLessThanOrEqual(1)
+  const body = dialog.locator('[data-modal-sheet-body]')
+  const previous = await body.evaluate((element) => element.scrollTop)
+  await waitForResponsiveScrollEnd(body)
   return dialog.evaluate(async (element, originalScrollTop) => {
     const body = element.querySelector<HTMLElement>('[data-modal-sheet-body]')!
     const measure = body.querySelector<HTMLElement>('[data-modal-content-measure]')!
