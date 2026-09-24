@@ -50,6 +50,13 @@ async function openQuickLinks(page: Page) {
   return { dialog, menuBox }
 }
 
+async function configureDelayedCameraHydration(page: Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 1_200
+  })
+}
+
 async function selectMockTodoImages(input: Locator, count = 4) {
   await input.evaluate(async (element, imageCount) => {
     const target = element as HTMLInputElement
@@ -686,9 +693,7 @@ test('Home cameras and Security tiles keep stable equal tracks at every tier', a
 
 test('camera tracks do not resize while streams hydrate on phone portrait', async ({ page }) => {
   await page.setViewportSize({ width: 402, height: 874 })
-  await page.addInitScript(() => {
-    ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 1_200
-  })
+  await configureDelayedCameraHydration(page)
   await page.goto('/at-a-glance/security?feedback-camera-hydration=402')
 
   const root = activeRoute(page, 'security')
@@ -729,9 +734,7 @@ test('camera tracks do not resize while streams hydrate on phone portrait', asyn
 
 test('camera modal media keeps its configured geometry while the stream hydrates on phone portrait', async ({ page }) => {
   await page.setViewportSize({ width: 393, height: 852 })
-  await page.addInitScript(() => {
-    ;(window as unknown as { __mockCameraDelayMs?: number }).__mockCameraDelayMs = 1_200
-  })
+  await configureDelayedCameraHydration(page)
 
   for (const surface of [
     { route: 'overview', url: '/at-a-glance/overview?feedback-camera-modal-hydration=home' },
