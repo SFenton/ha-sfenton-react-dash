@@ -1,4 +1,5 @@
 // @covers src/constants/roomPages.ts
+// @covers src/components/hass/ValetudoMapCard.utils.ts
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { NINE_ROOM_VACUUM_OUTCOME_CONTRACT } from '../src/test/fixtures/vacuumOutcomes'
 import { RESPONSIVE_ROUTES, RESPONSIVE_ROUTE_TITLES } from './responsive-acceptance-data'
@@ -371,6 +372,46 @@ test('music room focused map omits scope controls in a fine-pointer desktop cont
       && frame.bottom <= dialog!.bottom
   })
   expect(containment).toBe(true)
+})
+
+test('main floor fitted map ignores empty layer dimensions in fullscreen desktop', async ({ page }) => {
+  await page.setViewportSize({ height: 1822, width: 3651 })
+  await page.goto('/index.html?path=vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  const modalBody = dialog.locator('[data-layout-preparation-phase]')
+  const mapPane = dialog.getByRole('group', { name: 'Main Floor map and status' })
+  const map = dialog.getByRole('region', { name: 'Main Floor Valetudo map' })
+  await expect(modalBody).toHaveAttribute('data-layout-preparation-phase', 'content', { timeout: 15_000 })
+  await expect(map).toHaveAttribute('data-loaded', 'true')
+  await expect(map.locator('[data-map-fallback]')).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: 'Locate' })).toBeVisible()
+
+  const geometry = await Promise.all([mapPane.boundingBox(), map.boundingBox()])
+  expect(geometry[0]).not.toBeNull()
+  expect(geometry[1]).not.toBeNull()
+  expect((geometry[1]?.width ?? 0) / (geometry[0]?.width ?? 1)).toBeGreaterThan(0.4)
+  expect((geometry[1]?.height ?? 0) / (geometry[0]?.height ?? 1)).toBeGreaterThan(0.9)
+
+  const paint = await map.locator('[data-valetudo-map-canvas="true"]').evaluate((canvas) => {
+    if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Valetudo map canvas is unavailable')
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    if (!context) throw new Error('Valetudo map canvas context is unavailable')
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+    const background = pixels.slice(0, 4)
+    let differentPixels = 0
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (
+        pixels[index] !== background[0]
+        || pixels[index + 1] !== background[1]
+        || pixels[index + 2] !== background[2]
+        || pixels[index + 3] !== background[3]
+      ) differentPixels += 1
+    }
+    return { differentPixels, totalPixels: pixels.length / 4 }
+  })
+  expect(paint.differentPixels / paint.totalPixels).toBeGreaterThan(0.1)
 })
 
 test('Music Room media controls remain usable in a fine-pointer desktop context', async ({ page }) => {

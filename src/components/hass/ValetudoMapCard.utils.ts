@@ -290,7 +290,7 @@ function createMockMainFloorMap(): ValetudoMap {
       { type: 'charger_location', points: [(bounds.minX + inset + 4) * 5, (bounds.minY + inset + 4) * 5] },
       { type: 'robot_position', points: [Math.round((bounds.minX + bounds.maxX) * 2.5), Math.round((bounds.minY + bounds.maxY) * 2.5)], metaData: { angle: 90 } },
     ],
-    layers: [
+    layers: [{ type: 'floor', dimensions: { x: { min: bounds.minX, max: bounds.maxX }, y: { min: 0, max: 6554 } }, pixels: [] },
       ...rooms.map((room) => ({
         type: 'segment',
         dimensions: { x: { min: room.minX, max: room.maxX }, y: { min: room.minY, max: room.maxY } },
@@ -502,12 +502,63 @@ export function valetudoRoomAtGridPoint(rooms: ValetudoSelectableRoom[], point: 
   return rooms.find((room) => candidates.some(([x, y]) => room.pixelKeys.has(pixelKey(x, y)))) ?? null
 }
 
-export function valetudoMapBounds(map: ValetudoMap): ValetudoMapBounds {
-  const axes = map.layers
-    .map((layer) => layer.dimensions)
-    .filter((dimensions): dimensions is NonNullable<ValetudoMapLayer['dimensions']> => Boolean(dimensions))
+function layerHasPixelRepresentation(layer: ValetudoMapLayer) {
+  return Object.prototype.hasOwnProperty.call(layer, 'pixels')
+    || Object.prototype.hasOwnProperty.call(layer, 'compressedPixels')
+}
 
-  if (axes.length === 0) {
+function finitePixelBounds(pixels: readonly number[]): ValetudoMapBounds | null {
+  const bounds = {
+    minX: Number.POSITIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+  }
+  let found = false
+
+  for (let index = 0; index + 1 < pixels.length; index += 2) {
+    const x = pixels[index]
+    const y = pixels[index + 1]
+    if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) continue
+    bounds.minX = Math.min(bounds.minX, x)
+    bounds.minY = Math.min(bounds.minY, y)
+    bounds.maxX = Math.max(bounds.maxX, x)
+    bounds.maxY = Math.max(bounds.maxY, y)
+    found = true
+  }
+
+  return found ? bounds : null
+}
+
+function validDimensionBounds(dimensions: ValetudoMapLayer['dimensions']): ValetudoMapBounds | null {
+  if (!dimensions) return null
+  const bounds = {
+    minX: dimensions.x.min,
+    minY: dimensions.y.min,
+    maxX: dimensions.x.max,
+    maxY: dimensions.y.max,
+  }
+  if (!Object.values(bounds).every((value) => Number.isFinite(value))) return null
+  if (bounds.minX > bounds.maxX || bounds.minY > bounds.maxY) return null
+  return bounds
+}
+
+export function valetudoMapBounds(map: ValetudoMap): ValetudoMapBounds {
+  const drawableBounds: ValetudoMapBounds[] = []
+  const legacyDimensionBounds: ValetudoMapBounds[] = []
+
+  for (const layer of map.layers) {
+    const hasPixelRepresentation = layerHasPixelRepresentation(layer)
+    const bounds = hasPixelRepresentation
+      ? finitePixelBounds(expandValetudoLayerPixels(layer))
+      : validDimensionBounds(layer.dimensions)
+    if (!bounds) continue
+    if (hasPixelRepresentation) drawableBounds.push(bounds)
+    else legacyDimensionBounds.push(bounds)
+  }
+
+  const layerBounds = drawableBounds.length > 0 ? drawableBounds : legacyDimensionBounds
+  if (layerBounds.length === 0) {
     return {
       minX: 0,
       minY: 0,
@@ -516,12 +567,12 @@ export function valetudoMapBounds(map: ValetudoMap): ValetudoMapBounds {
     }
   }
 
-  return axes.reduce(
-    (bounds, dimensions) => ({
-      minX: Math.min(bounds.minX, dimensions.x.min),
-      minY: Math.min(bounds.minY, dimensions.y.min),
-      maxX: Math.max(bounds.maxX, dimensions.x.max),
-      maxY: Math.max(bounds.maxY, dimensions.y.max),
+  return layerBounds.reduce(
+    (bounds, layer) => ({
+      minX: Math.min(bounds.minX, layer.minX),
+      minY: Math.min(bounds.minY, layer.minY),
+      maxX: Math.max(bounds.maxX, layer.maxX),
+      maxY: Math.max(bounds.maxY, layer.maxY),
     }),
     {
       minX: Number.POSITIVE_INFINITY,
