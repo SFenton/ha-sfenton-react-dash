@@ -5632,6 +5632,7 @@ async function waitForLayoutWorkflow(
       continue
     }
     assertSuccessfulLayoutWorkflowRun(run, mergeSha)
+    if (!(await refreshInputs())) return undefined
     return run
   }
   throw new AdminIssueProvenanceError(
@@ -7343,6 +7344,18 @@ export function hasRecoverableTransition(record: AdminIssueRecord) {
   )
 }
 
+export function mergedReleaseWaitStillCurrent(
+  record: AdminIssueRecord,
+  generation: number,
+  mergeSha: string,
+) {
+  return record.phase === 'deploying' &&
+    record.generation === generation &&
+    record.provenance.kind === 'active' &&
+    record.provenance.merge?.mergeSha === mergeSha &&
+    !issueRequiresCompletionRepair(record)
+}
+
 async function processRecord(
   config: AdminIssueControllerConfig,
   client: HassAdminTodoClient,
@@ -7605,13 +7618,18 @@ async function processRecord(
           }
           await verifyMergedPullRequest(config, record)
           const mergeSha = record.provenance.merge.mergeSha
+          const generation = record.generation
+          const refreshMergedInputs = async () => {
+            await reconcileInputs()
+            return mergedReleaseWaitStillCurrent(record, generation, mergeSha)
+          }
           if (record.automationKind === 'layout') {
             const run = record.provenance.layoutValidation
               ? await loadBoundLayoutWorkflow(config, record)
               : await waitForLayoutWorkflow(
                   config,
                   mergeSha,
-                  () => refreshInputs('deploying'),
+                  refreshMergedInputs,
                 )
             if (!run) return
             if (!record.provenance.layoutValidation) {
@@ -7626,7 +7644,7 @@ async function processRecord(
             : await waitForDeploymentReceipt(
                 config,
                 mergeSha,
-                () => refreshInputs('deploying'),
+                refreshMergedInputs,
               )
           if (!deployment) return
           if (!record.provenance.deployment) {
