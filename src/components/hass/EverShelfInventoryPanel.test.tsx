@@ -329,21 +329,22 @@ describe('EverShelfInventoryPanel item edit modal', () => {
 
   it('moves the whole batch to the new expiration before adding extra items', async () => {
     const dialog = await openGreekYogurtEditModal()
+    const newExpiry = offsetIsoDate(7)
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add one Greek Yogurt' }))
-    fireEvent.change(within(dialog).getByLabelText('Expiration date for Greek Yogurt'), { target: { value: '2026-09-30' } })
+    fireEvent.change(within(dialog).getByLabelText('Expiration date for Greek Yogurt'), { target: { value: newExpiry } })
 
     mockCallServiceCalls.length = 0
     await clickAndFlush(within(dialog).getByRole('button', { name: 'Save Greek Yogurt' }))
 
     expect(inventoryServiceCalls()).toEqual([
-      { domain: 'evershelf', service: 'update_inventory_item', serviceData: { expiry_date: '2026-09-30', inventory_id: 203 } },
-      { domain: 'evershelf', service: 'update_inventory_item', serviceData: { expiry_date: '2026-09-30', inventory_id: 203 } },
+      { domain: 'evershelf', service: 'update_inventory_item', serviceData: { expiry_date: newExpiry, inventory_id: 203 } },
+      { domain: 'evershelf', service: 'update_inventory_item', serviceData: { expiry_date: newExpiry, inventory_id: 203 } },
       {
         domain: 'evershelf',
         service: 'add_scanned_item',
         serviceData: {
-          expiry_date: '2026-09-30',
+          expiry_date: newExpiry,
           inventory_prepared_food: false,
           location: 'frigo',
           name: 'Greek Yogurt',
@@ -443,14 +444,16 @@ describe('EverShelfInventoryPanel item edit modal', () => {
     ])
   })
 
-  it('restores the saved quantity and expiration when the edit is reset', async () => {    const dialog = await openGreekYogurtEditModal()
+  it('restores the saved quantity and expiration when the edit is reset', async () => {
+    const dialog = await openGreekYogurtEditModal()
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Add one Greek Yogurt' }))
-    fireEvent.change(within(dialog).getByLabelText('Expiration date for Greek Yogurt'), { target: { value: '2026-09-30' } })
+    fireEvent.change(within(dialog).getByLabelText('Expiration date for Greek Yogurt'), { target: { value: offsetIsoDate(7) } })
     mockCallServiceCalls.length = 0
     fireEvent.click(within(dialog).getByRole('button', { name: 'Reset' }))
 
     expect(within(dialog).getByRole('spinbutton', { name: 'Quantity for Greek Yogurt' })).toHaveTextContent('2')
+    expect(within(dialog).getByLabelText('Expiration date for Greek Yogurt')).toHaveValue(offsetIsoDate(5))
     expect(within(dialog).queryByRole('button', { name: 'Save Greek Yogurt' })).not.toBeInTheDocument()
     expect(mockCallServiceCalls).toEqual([])
   })
