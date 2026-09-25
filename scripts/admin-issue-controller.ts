@@ -2315,13 +2315,35 @@ export function reconcileClosedIssueRecord(
 export function githubIssueInputFetchPlan(
   record: Pick<AdminIssueRecord, 'phase' | 'receipts'>,
   isOpen: boolean,
+  needsExactLookup = false,
 ): 'skip' | 'open-snapshot' | 'direct-lookup' {
-  if (record.phase === 'completed' ||
-    (record.phase === 'paused' && !isOpen &&
-      !record.receipts.issueClosedAt && !record.receipts.issueCloseAttemptAt)) {
+  if (record.phase === 'completed') return 'skip'
+  if (needsExactLookup) return 'direct-lookup'
+  if (record.phase === 'paused' && !isOpen &&
+    !record.receipts.issueClosedAt && !record.receipts.issueCloseAttemptAt) {
     return 'skip'
   }
   return isOpen ? 'open-snapshot' : 'direct-lookup'
+}
+
+export function indexGitHubOpenIssues<T extends Pick<GitHubIssue, 'number' | 'state'>>(
+  issues: readonly T[],
+) {
+  const openByNumber = new Map<number, T>()
+  const needsExactLookup = new Set<number>()
+  for (const issue of issues) {
+    if (!Number.isSafeInteger(issue.number) || issue.number <= 0 ||
+      (issue.state !== 'open' && issue.state !== 'closed')) {
+      throw new Error('GitHub open-issue snapshot has an invalid issue identity')
+    }
+    if (issue.state === 'closed' || openByNumber.has(issue.number)) {
+      needsExactLookup.add(issue.number)
+      openByNumber.delete(issue.number)
+    } else if (!needsExactLookup.has(issue.number)) {
+      openByNumber.set(issue.number, issue)
+    }
+  }
+  return { needsExactLookup, openByNumber }
 }
 
 async function reconcileGitHubInputs(
@@ -2329,17 +2351,17 @@ async function reconcileGitHubInputs(
   state: AdminIssueControllerState,
   openIssues: readonly GitHubIssue[],
 ) {
-  const openByNumber = new Map<number, GitHubIssue>()
-  for (const issue of openIssues) {
-    if (!Number.isSafeInteger(issue.number) || issue.number <= 0 ||
-      issue.state !== 'open' || openByNumber.has(issue.number)) {
-      throw new AdminIssueProvenanceError('Open GitHub issue snapshot is inconsistent')
-    }
-    openByNumber.set(issue.number, issue)
+  const { needsExactLookup, openByNumber } = indexGitHubOpenIssues(openIssues)
+  if (needsExactLookup.size > 0) {
+    process.stderr.write(
+      `[${now()}] Rechecking ${needsExactLookup.size} stale GitHub issue-list entr${needsExactLookup.size === 1 ? 'y' : 'ies'} by exact issue number\n`,
+    )
   }
   for (const record of Object.values(state.issues)) {
     const openIssue = openByNumber.get(record.issueNumber)
-    if (githubIssueInputFetchPlan(record, Boolean(openIssue)) === 'skip') continue
+    if (githubIssueInputFetchPlan(
+      record, Boolean(openIssue), needsExactLookup.has(record.issueNumber),
+    ) === 'skip') continue
     const issue = openIssue ?? await getIssue(config, record.issueNumber)
     const comments = await listIssueComments(config, record.issueNumber)
     if (issue.state === 'open' && record.phase === 'paused') {
@@ -5870,6 +5892,85 @@ export function existingReleaseRecoveryDue(
     currentTime - checkedAt >= DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS
 }
 
+const INTERRUPTED_SNAPSHOT_CLOSE_REASON = 'Open GitHub issue snapshot is inconsistent'
+
+function interruptedSnapshotCloseEligible(record: AdminIssueRecord) {
+  const closedAt = Date.parse(record.receipts.issueClosedAt ?? '')
+  const blockedAt = Date.parse(record.receipts.controllerBlockedAt ?? '')
+  return record.phase === 'blocked' &&
+    record.receipts.controllerBlockedReason === INTERRUPTED_SNAPSHOT_CLOSE_REASON &&
+    record.lastOutcome?.decision === 'blocked' &&
+    Boolean(record.pr) &&
+    record.workerRuns > 0 &&
+    record.provenance.kind === 'active' &&
+    Boolean(record.provenance.candidate && record.provenance.merge) &&
+    Boolean(record.provenance.deployment || record.provenance.layoutValidation) &&
+    record.inputRevision === record.processedRevision &&
+    !record.receipts.issueCloseAttemptAt &&
+    !record.receipts.todoCompletionAttemptAt &&
+    !record.receipts.todoCompletionRaceAt &&
+    !record.receipts.todoCompletedAt &&
+    Number.isFinite(closedAt) &&
+    Number.isFinite(blockedAt) &&
+    blockedAt >= closedAt &&
+    blockedAt - closedAt <= 60_000
+}
+
+export function interruptedSnapshotCloseRecoveryDue(
+  record: AdminIssueRecord,
+  currentTime = Date.now(),
+) {
+  if (!interruptedSnapshotCloseEligible(record)) return false
+  const checkedAt = Date.parse(record.receipts.snapshotRecoveryCheckedAt ?? '')
+  return Number.isNaN(checkedAt) ||
+    currentTime - checkedAt >= DEPLOYMENT_RECOVERY_POLL_INTERVAL_MS
+}
+
+export async function resumeInterruptedSnapshotClose(
+  record: AdminIssueRecord,
+  actions: {
+    getComments: () => Promise<readonly Pick<GitHubIssueComment, 'body'>[]>
+    getIssue: () => Promise<Pick<GitHubIssue, 'number' | 'html_url' | 'state'>>
+    persist: () => void
+    reconcileInputs: () => Promise<void>
+    restoreOutcome: () => void
+  },
+) {
+  if (!interruptedSnapshotCloseRecoveryDue(record)) return false
+  record.receipts.snapshotRecoveryCheckedAt = now()
+  actions.persist()
+  await actions.reconcileInputs()
+  if (!interruptedSnapshotCloseEligible(record)) return false
+  const issue = await actions.getIssue()
+  if (issue.number !== record.issueNumber ||
+    issue.html_url !== record.issueUrl ||
+    issue.state !== 'closed') {
+    throw new AdminIssueProvenanceError(
+      'Snapshot-blocked issue is not the controller-closed issue',
+    )
+  }
+  if (controllerClosedIssueDisposition(record, await actions.getComments()) !== 'completed') {
+    throw new AdminIssueProvenanceError(
+      'Snapshot-blocked issue lacks its exact controller completion marker',
+    )
+  }
+  await actions.reconcileInputs()
+  if (!interruptedSnapshotCloseEligible(record)) return false
+  actions.restoreOutcome()
+  if (record.lastOutcome?.decision !== 'ready_for_pr') {
+    throw new AdminIssueProvenanceError(
+      'Snapshot-blocked issue lost its authorized worker outcome',
+    )
+  }
+  record.phase = 'deploying'
+  record.receipts.snapshotRecoveryStartedAt = now()
+  delete record.receipts.controllerBlockedAt
+  delete record.receipts.controllerBlockedReason
+  delete record.receipts.snapshotRecoveryErrorHash
+  actions.persist()
+  return true
+}
+
 export async function assertDeploymentCoversMergeSha(
   config: Pick<AdminIssueControllerConfig, 'repositoryPath'>,
   mergeSha: string,
@@ -7926,6 +8027,33 @@ async function advanceParallelReleaseLane(
   if (guarded) {
     await runClaimedRelease(config, state, guarded, async () =>
       await processRecord(config, client, state, guarded, reconcileInputs, false))
+    return
+  }
+  const snapshotRecovery = Object.values(state.issues)
+    .filter((record) => available(record) && interruptedSnapshotCloseRecoveryDue(record))
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0]
+  if (snapshotRecovery) {
+    await runClaimedRelease(config, state, snapshotRecovery, async () => {
+      let recovered: boolean
+      try {
+        recovered = await resumeInterruptedSnapshotClose(snapshotRecovery, {
+          getComments: async () => await listIssueComments(config, snapshotRecovery.issueNumber),
+          getIssue: async () => await getIssue(config, snapshotRecovery.issueNumber),
+          persist: () => writeState(config, state),
+          reconcileInputs,
+          restoreOutcome: () => { restoreReadyOutcomeFromWorkerLog(config, snapshotRecovery) },
+        })
+      } catch (error) {
+        snapshotRecovery.receipts.snapshotRecoveryErrorHash = createHash('sha256')
+          .update(error instanceof Error ? error.message : String(error))
+          .digest('hex')
+        writeState(config, state)
+        throw error
+      }
+      if (recovered) {
+        await processRecord(config, client, state, snapshotRecovery, reconcileInputs, false)
+      }
+    })
     return
   }
   const unfinishedOutcome = Object.values(state.issues).find((record) =>

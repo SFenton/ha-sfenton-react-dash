@@ -25,7 +25,7 @@ import {
 } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AdminIssueDeploymentRunError,
   AdminIssueNewInputError,
@@ -72,9 +72,11 @@ import {
   isolatedWorkerConfig,
   githubIssueInputFetchPlan,
   githubRepositoryFromRemote,
+  indexGitHubOpenIssues,
   hasRecoverableDeployment,
   hasRecoverableExistingRelease,
   hasRecoverableTransition,
+  interruptedSnapshotCloseRecoveryDue,
   issueBodyMediaPlan,
   isControllerOwnedCloseWindow,
   latestSuccessfulDeploymentRunPath,
@@ -99,6 +101,7 @@ import {
   reconcileClosedIssueRecord,
   readWorktreeSnapshot,
   researchOnlyRequested,
+  resumeInterruptedSnapshotClose,
   restoreReadyOutcomeFromWorkerLog,
   runCommand,
   selectWorkerHassMcpConfig,
@@ -168,6 +171,7 @@ import {
   type AdminIssueControllerState,
   type AdminIssueDiffReceipt,
   type AdminIssueValidationReceipt,
+  type AdminIssueWorkerOutcome,
 } from './lib/adminIssueController'
 import { discoverEmbeddedGitHubMedia } from './lib/adminIssueMedia'
 import {
@@ -288,6 +292,33 @@ describe('bounded issue worker admission', () => {
     expect(source.match(/await reconcileGitHubInputs\(config, state, openIssues\)/g))
       .toHaveLength(3)
     expect(source).toContain('const comments = await listIssueComments(config, record.issueNumber)')
+  })
+
+  it('rechecks stale closed and duplicate open-list entries without blocking a release', () => {
+    const { needsExactLookup, openByNumber } = indexGitHubOpenIssues([
+      { number: 235, state: 'closed' },
+      { number: 238, state: 'open' },
+      { number: 238, state: 'open' },
+      { number: 240, state: 'open' },
+    ])
+    expect([...openByNumber.keys()]).toEqual([240])
+    expect([...needsExactLookup].sort()).toEqual([235, 238])
+    const recentlyClosed = record()
+    recentlyClosed.phase = 'deploying'
+    recentlyClosed.receipts.issueClosedAt = '2026-09-24T16:00:00.000Z'
+    expect(githubIssueInputFetchPlan(recentlyClosed, false, needsExactLookup.has(235)))
+      .toBe('direct-lookup')
+    const manuallyPaused = record()
+    manuallyPaused.phase = 'paused'
+    expect(githubIssueInputFetchPlan(manuallyPaused, false, needsExactLookup.has(235)))
+      .toBe('direct-lookup')
+    manuallyPaused.phase = 'completed'
+    expect(githubIssueInputFetchPlan(manuallyPaused, false, true)).toBe('skip')
+    expect(() => indexGitHubOpenIssues([{ number: NaN, state: 'open' }]))
+      .toThrow('invalid issue identity')
+
+    const source = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
+    expect(source).toContain('const issue = openIssue ?? await getIssue(config, record.issueNumber)')
   })
 
   it('keeps later todo intake running after a failed item but propagates a failed receipt', async () => {
@@ -687,6 +718,181 @@ describe('bounded issue worker admission', () => {
     expect(manual.phase).toBe('paused')
     await expect(assertFreshFinalizationInputs(manual, async () => {}))
       .rejects.toThrow('manually closed')
+  })
+
+  it('replays only the verified controller closure interrupted by a stale issue snapshot', async () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.phase = 'blocked'
+    issue.workerRuns = 2
+    issue.receipts.issueClosedAt = '2026-09-24T16:00:00.000Z'
+    issue.receipts.controllerBlockedAt = '2026-09-24T16:00:00.500Z'
+    issue.receipts.controllerBlockedReason = 'Open GitHub issue snapshot is inconsistent'
+    issue.lastOutcome = {
+      decision: 'blocked',
+      iosFollowUp: { reason: '', required: false },
+      questions: [],
+      reason: issue.receipts.controllerBlockedReason,
+      schemaVersion: 1,
+      summary: 'Completion was interrupted.',
+      visualEvidence: [],
+    }
+    const dueAt = Date.parse('2026-09-24T16:02:00.000Z')
+    expect(interruptedSnapshotCloseRecoveryDue(issue, dueAt)).toBe(true)
+    const tooLate = structuredClone(issue)
+    tooLate.receipts.controllerBlockedAt = '2026-09-24T16:02:00.000Z'
+    expect(interruptedSnapshotCloseRecoveryDue(tooLate, dueAt)).toBe(false)
+    const unrelated = structuredClone(issue)
+    unrelated.receipts.controllerBlockedReason = 'Different provenance failure'
+    expect(interruptedSnapshotCloseRecoveryDue(unrelated, dueAt)).toBe(false)
+    const incomplete = structuredClone(issue)
+    incomplete.receipts.todoCompletionAttemptAt = '2026-09-24T16:00:00.200Z'
+    expect(interruptedSnapshotCloseRecoveryDue(incomplete, dueAt)).toBe(false)
+    const layout = structuredClone(issue)
+    layout.origin = 'github-automation'
+    layout.automationKind = 'layout'
+    if (layout.provenance.kind !== 'active' || !layout.provenance.merge) {
+      throw new Error('Expected merged layout provenance')
+    }
+    delete layout.provenance.deployment
+    layout.provenance.layoutValidation = {
+      conclusion: 'success',
+      epoch: layout.provenance.epoch,
+      generation: layout.generation,
+      mergeSha: layout.provenance.merge.mergeSha,
+      observedAt: '2026-09-24T15:59:59.000Z',
+      revision: layout.processedRevision,
+      workflowHeadSha: layout.provenance.merge.mergeSha,
+      workflowRunAttempt: 1,
+      workflowRunId: 24,
+      workflowUrl: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+    }
+    expect(interruptedSnapshotCloseRecoveryDue(layout, dueAt)).toBe(true)
+
+    const ready: AdminIssueWorkerOutcome = {
+      changeSummary: ['The existing merged fix passed validation.'],
+      decision: 'ready_for_pr',
+      iosFollowUp: { reason: '', required: false },
+      pr: { body: 'Verified candidate', title: 'Verified fix' },
+      questions: [],
+      review: { approved: true, findings: [] },
+      schemaVersion: 1,
+      summary: 'Verified existing release.',
+      tests: [{ command: 'npm test', result: 'passed' }],
+      visualChange: { reason: 'No visible change', required: false },
+      visualEvidence: [],
+    }
+    let persisted = 0
+    let reconciled = 0
+    await expect(resumeInterruptedSnapshotClose(issue, {
+      getComments: async () => [{ body: controllerReceiptMarker(issue.uid, 'completed') }],
+      getIssue: async () => ({
+        html_url: issue.issueUrl,
+        number: issue.issueNumber,
+        state: 'closed',
+      }),
+      persist: () => { persisted += 1 },
+      reconcileInputs: async () => { reconciled += 1 },
+      restoreOutcome: () => { issue.lastOutcome = ready },
+    })).resolves.toBe(true)
+    expect({ persisted, reconciled, phase: issue.phase }).toEqual({
+      persisted: 2, reconciled: 2, phase: 'deploying',
+    })
+    expect(issue.receipts.controllerBlockedAt).toBeUndefined()
+    expect(issue.receipts.controllerBlockedReason).toBeUndefined()
+    expect(issue.receipts.snapshotRecoveryStartedAt).toBeDefined()
+    expect(issue.lastOutcome?.decision).toBe('ready_for_pr')
+
+    const missingMarker = structuredClone(unrelated)
+    missingMarker.receipts.controllerBlockedReason = 'Open GitHub issue snapshot is inconsistent'
+    await expect(resumeInterruptedSnapshotClose(missingMarker, {
+      getComments: async () => [],
+      getIssue: async () => ({
+        html_url: missingMarker.issueUrl,
+        number: missingMarker.issueNumber,
+        state: 'closed',
+      }),
+      persist: () => {},
+      reconcileInputs: async () => {},
+      restoreOutcome: () => { throw new Error('Must not restore without an exact marker') },
+    })).rejects.toThrow('completion marker')
+    expect(missingMarker.phase).toBe('blocked')
+    expect(missingMarker.lastOutcome?.decision).toBe('blocked')
+    expect(interruptedSnapshotCloseRecoveryDue(missingMarker)).toBe(false)
+  })
+
+  it('leaves a snapshot-blocked closed issue to completion repair when feedback arrives', async () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.phase = 'blocked'
+    issue.workerRuns = 1
+    issue.receipts.issueClosedAt = '2026-09-24T16:00:00.000Z'
+    issue.receipts.controllerBlockedAt = '2026-09-24T16:00:00.500Z'
+    issue.receipts.controllerBlockedReason = 'Open GitHub issue snapshot is inconsistent'
+    issue.lastOutcome = {
+      decision: 'blocked',
+      iosFollowUp: { reason: '', required: false },
+      questions: [],
+      reason: issue.receipts.controllerBlockedReason,
+      schemaVersion: 1,
+      summary: 'Completion was interrupted.',
+      visualEvidence: [],
+    }
+    const afterRemote = structuredClone(issue)
+    const remoteRead = vi.fn(async () => ({
+      html_url: issue.issueUrl,
+      number: issue.issueNumber,
+      state: 'closed' as const,
+    }))
+    await expect(resumeInterruptedSnapshotClose(issue, {
+      getComments: async () => [{ body: controllerReceiptMarker(issue.uid, 'completed') }],
+      getIssue: remoteRead,
+      persist: () => {},
+      reconcileInputs: async () => {
+        appendIssueInput(issue, {
+          body: 'New owner feedback after closure',
+          createdAt: '2026-09-24T16:00:01.000Z',
+          externalId: 'comment:after-snapshot-block',
+          source: 'issue-comment',
+        })
+      },
+      restoreOutcome: () => { throw new Error('Must not restore after owner feedback') },
+    })).resolves.toBe(false)
+    expect(remoteRead).not.toHaveBeenCalled()
+    expect(issue.phase).toBe('blocked')
+    const state = baselineAdminIssueState([], '2026-09-24T16:00:00.000Z')
+    state.issues[issue.uid] = issue
+    expect(completionRepairRecords(state, new AdminIssueWorkerPool(10, async () => {})))
+      .toEqual([issue])
+
+    let refreshes = 0
+    const secondRemoteRead = vi.fn(async () => ({
+      html_url: afterRemote.issueUrl,
+      number: afterRemote.issueNumber,
+      state: 'closed' as const,
+    }))
+    await expect(resumeInterruptedSnapshotClose(afterRemote, {
+      getComments: async () => [{ body: controllerReceiptMarker(afterRemote.uid, 'completed') }],
+      getIssue: secondRemoteRead,
+      persist: () => {},
+      reconcileInputs: async () => {
+        refreshes += 1
+        if (refreshes === 2) {
+          appendIssueInput(afterRemote, {
+            body: 'Owner feedback while the closed issue was verified',
+            createdAt: '2026-09-24T16:00:02.000Z',
+            externalId: 'comment:during-snapshot-repair',
+            source: 'issue-comment',
+          })
+        }
+      },
+      restoreOutcome: () => { throw new Error('Must not restore after remote feedback') },
+    })).resolves.toBe(false)
+    expect(refreshes).toBe(2)
+    expect(secondRemoteRead).toHaveBeenCalledTimes(1)
+    state.issues[issue.uid] = afterRemote
+    expect(completionRepairRecords(state, new AdminIssueWorkerPool(10, async () => {})))
+      .toEqual([afterRemote])
   })
 
   it('reopens HA when owner input arrives while the completion service is in flight', async () => {
