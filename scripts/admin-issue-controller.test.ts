@@ -68,6 +68,8 @@ import {
   existingReleaseRecoveryDue,
   findExactMergeCommit,
   frontendRecoveryObservationDue,
+  focusedLayoutAcceptanceScenarios,
+  focusedLayoutPlaywrightConfig,
   handleLateOwnerInput,
   isolatedWorkerConfig,
   githubIssueInputFetchPlan,
@@ -117,6 +119,7 @@ import {
   workerHassPermissionArgs,
   workerInputSnapshot,
   updateWorkflowDigestConfig,
+  validationCommands,
   workerMutableInfrastructurePaths,
   workflowDigestRotationRequired,
 } from './admin-issue-controller'
@@ -253,6 +256,56 @@ function awaitingLayoutEvidence(): AdminIssueRecord {
 }
 
 describe('bounded issue worker admission', () => {
+  it('runs only changed managed layout scenarios through guarded mobile and desktop mock contexts', () => {
+    const contractDiff = [
+      'diff --git a/e2e/layout/contracts.ts b/e2e/layout/contracts.ts',
+      '@@ -448,5 +448,5 @@',
+      '   navigation: {',
+      "-    family: 'page-shell-grid', states: ['home', 'back-page'],",
+      "+    family: 'page-shell-grid', states: ['home', 'back-page', 'restricted-settings'],",
+      '   },',
+      '   host: {',
+    ].join('\n')
+    expect(focusedLayoutAcceptanceScenarios(contractDiff)).toEqual(['navigation'])
+    const commands = validationCommands(
+      ['e2e/layout-acceptance.spec.ts', 'scripts/layout/verify.test.ts'],
+      'layout',
+      contractDiff,
+    ).map(({ command }) => command)
+    expect(commands).toContain('npx vitest run \'scripts/layout/verify.test.ts\'')
+    expect(commands).toContain('npm run layout:check')
+    expect(commands).toContain(
+      "npx playwright test 'e2e/layout-acceptance.spec.ts' --config=/controller-layout/layout.config.cjs --project=mobile --project=desktop --grep 'layout contract: (navigation)$' --forbid-only --workers=2 --retries=0",
+    )
+    expect(commands.join('\n')).not.toContain('layout:run')
+    expect(commands.join('\n')).not.toContain("npx playwright test 'e2e/layout-acceptance.spec.ts'\n")
+    const source = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
+    expect(source).toContain("mkdtempSync(join(config.stateDirectory, 'layout-validation-'))")
+    expect(source).toContain('dst=/controller-layout,readonly')
+    expect(() => validationCommands(['e2e/layout-acceptance.spec.ts'], undefined, contractDiff))
+      .toThrow('Only a trusted layout issue')
+    expect(() => validationCommands(['e2e/layout-acceptance.spec.ts'], 'layout'))
+      .toThrow('explicitly changed scenario contract')
+    expect(() => focusedLayoutAcceptanceScenarios(
+      '@@ -3,1 +3,1 @@\n-  unknown: true\n+  unknown: false\n',
+    )).toThrow('focused scenario')
+
+    const root = mkdtempSync(join(homedir(), '.admin-issue-controller-layout-config-test-'))
+    temporaryDirectories.push(root)
+    const configPath = join(root, 'layout.config.cjs')
+    writeFileSync(configPath, focusedLayoutPlaywrightConfig(process.cwd()), { mode: 0o600 })
+    const listed = execFileSync(
+      resolve(process.cwd(), 'node_modules/.bin/playwright'),
+      ['test', 'e2e/layout-acceptance.spec.ts', '--config', configPath, '--project=mobile', '--project=desktop',
+        '--grep', 'layout contract: (navigation)$', '--list'],
+      { cwd: process.cwd(), encoding: 'utf8' },
+    )
+    expect(listed).toContain('[mobile] › layout-acceptance.spec.ts:')
+    expect(listed).toContain('[desktop] › layout-acceptance.spec.ts:')
+    expect(listed).toContain('Total: 2 tests in 1 file')
+    expect(() => focusedLayoutPlaywrightConfig('relative/workspace')).toThrow('absolute workspace')
+  })
+
   it('shares open issue discovery and keeps editable comments prompt while closed paused issues cost no reads', () => {
     const paused = record()
     paused.phase = 'paused'

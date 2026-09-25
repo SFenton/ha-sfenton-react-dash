@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   CONTROLLER_COMMENT_MARKER,
@@ -3483,6 +3483,7 @@ async function runWorkspaceContainer(
   worktreePath: string,
   command: string,
   timeoutMs: number,
+  focusedLayoutConfigDirectory?: string,
 ) {
   const gitCommonDirectory = await getGitCommonDirectory(worktreePath)
   const containerName = `admin-issue-validate-${process.pid}-${Date.now()}`
@@ -3539,6 +3540,9 @@ async function runWorkspaceContainer(
         `/workspace/.cache:rw,nosuid,nodev,size=256m,uid=${uid},gid=${gid}`,
         '--mount',
         `type=bind,src=${worktreePath},dst=/workspace`,
+        ...(focusedLayoutConfigDirectory
+          ? ['--mount', `type=bind,src=${focusedLayoutConfigDirectory},dst=/controller-layout,readonly`]
+          : []),
         ...maskedMounts,
         ...readOnlyMounts,
         '--mount',
@@ -3678,11 +3682,88 @@ export async function createCommittedDiffReceipt(
   }
 }
 
-function validationCommands(files: string[]) {
+export function focusedLayoutAcceptanceScenarios(contractDiff: string) {
+  const hunks = contractDiff.split(/^@@ [^\n]+\n/gm).slice(1)
+  const scenarios = new Set<string>()
+  if (hunks.length === 0) {
+    throw new AdminIssueProvenanceError(
+      'Changed layout-acceptance tests need an explicitly changed scenario contract',
+    )
+  }
+  for (const hunk of hunks) {
+    let scenario: string | undefined
+    for (const line of hunk.split('\n')) {
+      const header = line.match(/^ {3}(?:'([a-z][a-z0-9-]{0,48})'|([a-z][a-z0-9-]{0,48})): \{$/)
+      if (header) scenario = header[1] ?? header[2]
+      if (/^[+-](?![+-])/.test(line)) {
+        if (!scenario) {
+          throw new AdminIssueProvenanceError(
+            'Changed layout contract cannot be attributed to a focused scenario',
+          )
+        }
+        scenarios.add(scenario)
+      }
+    }
+  }
+  if (scenarios.size === 0 || scenarios.size > 4) {
+    throw new AdminIssueProvenanceError(
+      'Changed layout-acceptance tests require one to four focused scenario owners',
+    )
+  }
+  return [...scenarios].sort()
+}
+
+export function focusedLayoutPlaywrightConfig(workspaceRoot = '/workspace', port = 5174) {
+  if (!isAbsolute(workspaceRoot) ||
+    !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('Focused layout validation needs an absolute workspace and valid port')
+  }
+  const origin = `http://127.0.0.1:${port}`
+  const serverCommand =
+    'node node_modules/vite/bin/vite.js build --mode test --configLoader native --outDir .playwright-dist' +
+    ` && node node_modules/vite/bin/vite.js preview --config e2e/mock-preview.config.ts --configLoader native --outDir .playwright-dist --host 127.0.0.1 --port ${port} --strictPort`
+  return String.raw`const { createRequire } = require('node:module')
+const requireWorkspace = createRequire(${JSON.stringify(join(workspaceRoot, 'package.json'))})
+const { defineConfig, devices } = requireWorkspace('@playwright/test')
+module.exports = defineConfig({
+  testDir: ${JSON.stringify(join(workspaceRoot, 'e2e'))},
+  testMatch: /layout-acceptance\.spec\.ts$/,
+  retries: 0,
+  use: { baseURL: ${JSON.stringify(origin)}, trace: 'on-first-retry' },
+  projects: [
+    { name: 'mobile', use: { ...devices['iPhone 13'], browserName: 'chromium' } },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'], browserName: 'chromium', deviceScaleFactor: 1, hasTouch: false, isMobile: false, viewport: { height: 900, width: 1440 } } },
+  ],
+  webServer: {
+    command: ${JSON.stringify(serverCommand)},
+    cwd: ${JSON.stringify(workspaceRoot)},
+    reuseExistingServer: false,
+    url: ${JSON.stringify(origin)},
+  },
+})
+`
+}
+
+export function validationCommands(
+  files: string[],
+  automationKind?: AdminIssueRecord['automationKind'],
+  layoutContractDiff = '',
+): Array<{ command: string; timeoutMs: number; focusedLayout?: boolean }> {
   const unitTests = files.filter(
     (file) => /\.(test)\.(ts|tsx)$/.test(file) && !file.startsWith('e2e/'),
   )
-  const playwrightTests = files.filter((file) => file.startsWith('e2e/') && /\.spec\.ts$/.test(file))
+  const managedLayoutSpec = 'e2e/layout-acceptance.spec.ts'
+  const focusedLayout = files.includes(managedLayoutSpec)
+  if (focusedLayout && automationKind !== 'layout') {
+    throw new AdminIssueProvenanceError(
+      'Only a trusted layout issue may change the managed layout-acceptance spec',
+    )
+  }
+  const scenarios = focusedLayout
+    ? focusedLayoutAcceptanceScenarios(layoutContractDiff)
+    : []
+  const playwrightTests = files.filter((file) =>
+    file !== managedLayoutSpec && file.startsWith('e2e/') && /\.spec\.ts$/.test(file))
   return [
     { command: 'npm run test:change-policy', timeoutMs: 5 * 60_000 },
     ...(unitTests.length > 0
@@ -3696,6 +3777,16 @@ function validationCommands(files: string[]) {
         command: `npx playwright test ${playwrightTests.map(shellQuote).join(' ')}`,
         timeoutMs: 30 * 60_000,
       }]
+      : []),
+    ...(focusedLayout
+      ? [
+        { command: 'npm run layout:check', timeoutMs: 5 * 60_000 },
+        {
+          command: `npx playwright test ${shellQuote(managedLayoutSpec)} --config=/controller-layout/layout.config.cjs --project=mobile --project=desktop --grep ${shellQuote(`layout contract: (${scenarios.join('|')})$`)} --forbid-only --workers=2 --retries=0`,
+          focusedLayout: true,
+          timeoutMs: 30 * 60_000,
+        },
+      ]
       : []),
     ...(files.some((file) => file.startsWith('src/'))
       ? [{ command: 'npm run i18n:check', timeoutMs: 10 * 60_000 }]
@@ -3854,38 +3945,66 @@ async function validateCommittedCandidate(
     ['diff', '--check', candidate.diff.baseSha, candidate.headSha, '--'],
     { cwd: record.worktreePath },
   )
-  const commands = validationCommands(candidate.diff.files)
-  for (const command of commands) {
-    assertExactCandidateSnapshot(
-      await readWorktreeSnapshot(record.worktreePath),
-      record,
-      candidate.headSha,
-      candidate.treeSha,
-    )
-    await runWorkspaceContainer(config, record.worktreePath, command.command, command.timeoutMs)
-    assertExactCandidateSnapshot(
-      await readWorktreeSnapshot(record.worktreePath),
-      record,
-      candidate.headSha,
-      candidate.treeSha,
-    )
+  const layoutContractDiff = candidate.diff.files.includes('e2e/layout-acceptance.spec.ts')
+    ? (await runCommand(
+      'git',
+      ['diff', '--unified=3', `${candidate.diff.baseSha}..${candidate.headSha}`, '--',
+        'e2e/layout/contracts.ts'],
+      { cwd: record.worktreePath },
+    )).stdout
+    : ''
+  const commands = validationCommands(
+    candidate.diff.files, record.automationKind, layoutContractDiff,
+  )
+  // The Docker daemon cannot bind a file from the service's PrivateTmp namespace.
+  const focusedLayoutDirectory = commands.some(({ focusedLayout }) => focusedLayout)
+    ? mkdtempSync(join(config.stateDirectory, 'layout-validation-'))
+    : undefined
+  try {
+    if (focusedLayoutDirectory) {
+      writeFileSync(
+        join(focusedLayoutDirectory, 'layout.config.cjs'),
+        focusedLayoutPlaywrightConfig(),
+        { mode: 0o600 },
+      )
+    }
+    for (const command of commands) {
+      assertExactCandidateSnapshot(
+        await readWorktreeSnapshot(record.worktreePath),
+        record,
+        candidate.headSha,
+        candidate.treeSha,
+      )
+      await runWorkspaceContainer(
+        config, record.worktreePath, command.command, command.timeoutMs,
+        command.focusedLayout ? focusedLayoutDirectory : undefined,
+      )
+      assertExactCandidateSnapshot(
+        await readWorktreeSnapshot(record.worktreePath),
+        record,
+        candidate.headSha,
+        candidate.treeSha,
+      )
+    }
+    if (record.provenance.kind !== 'active') {
+      throw new Error('Validation completed without active provenance')
+    }
+    return {
+      commands: commands.map(({ command }) => command),
+      commandsSha256: createHash('sha256')
+        .update(JSON.stringify(commands.map(({ command }) => command)))
+        .digest('hex'),
+      completedAt: now(),
+      diffManifestSha256: candidate.diff.manifestSha256,
+      epoch: record.provenance.epoch,
+      generation: record.generation,
+      headSha: candidate.headSha,
+      revision: record.processedRevision,
+      treeSha: candidate.treeSha,
+    } satisfies AdminIssueValidationReceipt
+  } finally {
+    if (focusedLayoutDirectory) rmSync(focusedLayoutDirectory, { force: true, recursive: true })
   }
-  if (record.provenance.kind !== 'active') {
-    throw new Error('Validation completed without active provenance')
-  }
-  return {
-    commands: commands.map(({ command }) => command),
-    commandsSha256: createHash('sha256')
-      .update(JSON.stringify(commands.map(({ command }) => command)))
-      .digest('hex'),
-    completedAt: now(),
-    diffManifestSha256: candidate.diff.manifestSha256,
-    epoch: record.provenance.epoch,
-    generation: record.generation,
-    headSha: candidate.headSha,
-    revision: record.processedRevision,
-    treeSha: candidate.treeSha,
-  } satisfies AdminIssueValidationReceipt
 }
 
 async function commitWorkerChanges(
