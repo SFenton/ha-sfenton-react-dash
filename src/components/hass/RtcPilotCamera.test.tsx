@@ -78,15 +78,35 @@ describe('RTC pilot camera', () => {
     })
     expect(view.container.querySelector('[data-camera-transport="webrtc"]')).toHaveAttribute('data-loaded', 'false')
     expect(onStatusChange).not.toHaveBeenCalledWith('live')
+    expect(card).toHaveAttribute('data-dashboard-visible', 'false')
+    expect(card).toHaveAttribute('aria-hidden', 'true')
+    expect(card).toHaveAttribute('inert')
 
     act(() => card.setAttribute('data-stream-status', 'connected'))
     await waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith('live'))
     expect(view.container.querySelector('[data-status="live"]')).toHaveAttribute('data-loaded', 'true')
+    expect(card).toHaveAttribute('data-dashboard-visible', 'true')
+    expect(card).not.toHaveAttribute('aria-hidden')
+    expect(card).not.toHaveAttribute('inert')
 
     act(() => card.setAttribute('data-stream-status', 'disconnected'))
     await waitFor(() => expect(view.container.querySelector('[data-status="loading"]')).toBeInTheDocument())
+    expect(card).toHaveAttribute('data-dashboard-visible', 'false')
+    expect(card).toHaveAttribute('aria-hidden', 'true')
+    expect(card).toHaveAttribute('inert')
+
+    act(() => card.setAttribute('data-stream-status', 'connecting'))
+    await waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith('loading'))
+    expect(card).toHaveAttribute('data-dashboard-visible', 'false')
+
+    act(() => card.setAttribute('data-stream-status', 'connected'))
+    await waitFor(() => expect(card).toHaveAttribute('data-dashboard-visible', 'true'))
+
     act(() => card.setAttribute('data-stream-status', 'error'))
     await waitFor(() => expect(view.container).toHaveTextContent('Camera unavailable'))
+    expect(card).toHaveAttribute('data-dashboard-visible', 'false')
+    expect(card).toHaveAttribute('aria-hidden', 'true')
+    expect(card).toHaveAttribute('inert')
     view.unmount()
   })
 

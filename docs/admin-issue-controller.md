@@ -3,8 +3,10 @@
 The Admin issue controller mirrors new Home Assistant Admin To-Do items into
 GitHub issues and also adopts trusted workflow-filed layout and deployment
 issues. It runs one serialized, resumable Copilot lifecycle for each issue.
-The controller is intentionally separate from the dashboard deployment runner:
-deployment remains owned by the protected `master` workflow.
+Issue workers may run independently up to the configured cap, while one host
+controller serializes their protected release decisions. The controller is
+intentionally separate from the dashboard deployment runner: deployment
+remains owned by the protected `master` workflow.
 
 ## Authority boundary
 
@@ -64,6 +66,9 @@ logs.
 The dedicated worker home and Copilot home are seeded with the reviewed
 `ops/admin-issue-controller/tandem-research/SKILL.md`; it does not inherit
 mutable user extensions or unrelated personal skills.
+That controller-local skill pairs Sol with non-Claude Luna for independent
+research. It is not the global guarded Sol/Opus tandem and must not claim
+independent Opus confirmation when the guarded evidence reader is unavailable.
 
 ## Lifecycle
 
@@ -90,8 +95,17 @@ mutable user extensions or unrelated personal skills.
    `max` effort, `/tandem-research`, the isolated repository tool, and the
    operator's configured `hass` MCP server. Legacy named sessions are resolved
    once and persisted by UUID; an empty duplicate name cannot stall the queue.
+   Re-read the owner- and UID-bound original GitHub issue body before each
+   worker run so long Admin To-Do summaries survive the 240-character issue
+   title limit and are included in the worker's canonical input.
 6. Gather available repository and live Home Assistant evidence, then post a
    structured question only when a consequential decision still remains.
+   Explicit "research and propose, do not implement yet" instructions remain
+   research-only: Docker mounts the assigned worktree read-only, Copilot
+   permission grants only dedicated HASS read tools, and the host requires a
+   clean worktree with a `needs_input` or `blocked` response. It cannot propose
+   a PR, close the issue, or mutate HA through the allowed tool set. A later
+   trusted owner approval is required to lift that issue-specific restriction.
 7. If verified Home Assistant work fully resolves the issue, or no repository
    change is appropriate, require a clean untouched worktree, post the
    resolution and verification, close the GitHub issue, and complete the Admin
@@ -187,12 +201,78 @@ preserving the conversation instead of creating a duplicate.
 On Linux, every bounded host command runs in its own process group. Timeout and
 output-limit enforcement kill the launcher and its local descendants together,
 so a Copilot core or Docker client cannot retain the controller's output pipe
-after the launcher exits. The next controller cycle also removes any labeled
-worker container left behind by a forcibly disconnected Docker client.
+after the launcher exits. On startup, after acquiring the exclusive lock,
+the controller removes stale labeled containers. A failed worker removes only
+its own UID-labeled containers, never its active peers.
 Workflow-authenticated layout workers use changed tests and focused
 provenance-bound mixed-context runs for local acceptance. They must not turn a
 full historical or full-known-mock replay into a pre-PR gate; the protected
 post-merge `Automated layout` job owns exact full-corpus evidence.
+
+## Independent intake and bounded workers
+
+The long-running service holds one exclusive host-controller lock. It polls
+Admin To-Do items, owner comments and trusted workflow issues on its own
+cadence even while issue workers or the protected release lane are waiting.
+Every new eligible UID is admitted dynamically, not only the issues that
+were present when the supervisor started. An eleventh issue waits for a free
+slot without delaying its GitHub issue or attached image publication.
+The state journal has one synchronous writer; intake callbacks cannot overlap.
+One failing todo records a hashed diagnostic and cannot prevent subsequent
+items from being mirrored. An attempted GitHub image upload is journaled
+before the request; a confirmed asset URL is persisted before issue creation.
+Retries reuse confirmed uploads. An interrupted upload with unknown outcome
+is explicitly held for reconciliation rather than claiming success or
+uploading a duplicate. Source images are deleted only after the issue input
+has been durably journaled.
+
+Controller-owned issue closure records intent before the GitHub PATCH, and
+trusted owner comments remain ingestible during that close window even when
+GitHub already reports the issue closed. A durable close-intent or closure
+receipt is required; a historical completion comment alone cannot turn a
+manual closure into a controller-owned close. The current completion marker
+identifies which interrupted path to resume; manual closures still pause
+automation. The serialized intake refreshes immediately
+before and after issue closure, on both sides of the HA-owned completion script,
+and after worktree cleanup before the final `completed` phase. It checks the
+exact HA UID, content fingerprint, status and completion receipt, not merely
+the last journaled input revision. If an edit arrives while completion is in
+flight, it uses the native `todo.update_item` service to restore that UID to
+`needs_action`, verifies the state, reopens the controller-closed GitHub issue
+and queues a fresh generation. If edited media cannot be journaled, the
+source-drift receipt prevents stale completion until intake succeeds. Unknown
+outcomes retain an explicit completion-attempt receipt for the one release
+lane to reconcile before any worker resumes; they are never success-shaped
+fallbacks.
+
+`maxConcurrentWorkers` accepts integers from 1 through 10 and defaults to
+**1** for existing installations. Each admitted issue has its own UUID-bound
+claim, worktree, Docker container label and private Copilot home with only
+the configured HASS MCP entry. Pending owner edits retain their input revision
+while a worker is in flight, and a restart clears only claims from the
+previous locked controller after its stale containers are removed. Failed
+workers retry with a bounded backoff or become explicitly blocked; awaiting
+user, paused, blocked and completed issues occupy no worker slot. A separate
+single-slot lane owns candidate publication, protected checks, normal merge,
+deployment verification, HA completion and worktree cleanup. It never
+auto-merges a PR from an author other than `SFenton`.
+Before a merge, new owner input interrupts protected publication. After the
+merge, the release lane continues waiting for that exact deployment or layout
+run despite new input; it then keeps the issue and Admin To-Do item open and
+routes the update into a fresh worktree generation. A changed phase, generation,
+merge identity, or pending completion repair still interrupts the wait.
+
+The protected Playwright workflow queues up to GitHub's supported maximum
+of 100 runs per ref, without cancelling a prior merged commit's layout
+evidence. CI and layout capacity therefore remain independent of the ten
+*issue-worker* ceiling. Do not treat a queued layout run as a release gate;
+monitor its exact result after merge. Runtime activation is separate from
+source merge: with operator approval, drain the installed worker, back up the
+matching bundle and private journal, install the new bundle and worker
+extension, then stage `maxConcurrentWorkers` from 1 to 2, 5 and at most 10
+as resource use and intake latency allow. Do not roll an old binary forward
+over an active new worker claim even when the additive journal fields remain
+at state version 3.
 
 ## Reconsidering unavailable workflow evidence
 
@@ -200,15 +280,19 @@ A restricted worker has no direct GitHub Actions or host-network access.
 For a trusted layout-failure issue paused solely on the exact original
 CI-evidence question, the host controller binds the issue's commit and run
 link to the failed `master` push workflow, its failed `Automated layout` job,
-and the unexpired `layout-automation` artifact. It retrieves a bounded
-failed-job log and ZIP, verifies the repository/run/attempt/artifact identities,
-and inspects only the small assessment and WebKit execution JSON entries.
+and the unexpired `layout-automation` artifact. A separate one-slot diagnostic
+lane retrieves the failed-job log and ZIP without delaying new todo intake.
+It verifies repository/run/attempt/artifact identities and inspects only the
+assessment, WebKit, and optional non-WebKit execution JSON entries.
 Signed artifact redirects never receive the GitHub authorization header.
-The worker receives only test file locations and failure categories,
-checkpoint and WebKit counts, plus hashes and run provenance; it cannot read
-raw logs, screenshots or signed URLs from that packet. Malformed, expired,
-oversized or mismatched evidence leaves the question open and records an
-explicit verification error.
+The measured original #235 ZIP requires a 512-MiB compressed limit, 10,000
+safe entries, 768 MiB of declared expanded data, 80 MiB per entry and 10 MiB
+per selected JSON; all other entries, including screenshots, remain
+unextracted. The worker receives only test locations/browser/failure
+categories, checkpoint and browser-attempt counts, hashes and run provenance.
+It cannot read raw logs, screenshots or signed URLs from that packet.
+Missing checkpoints are not passes. Malformed, expired, oversized or
+mismatched evidence leaves the question open and records an explicit error.
 
 Only the single evidence-availability question, including its exact legacy
 wording, can receive one fingerprinted `workflow-evidence` input and resume

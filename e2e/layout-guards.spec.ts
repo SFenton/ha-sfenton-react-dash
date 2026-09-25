@@ -1,6 +1,13 @@
+// @covers e2e/layout/evidence.ts
 import { test, expect } from '@playwright/test'
 import { assertGuardedContext, guardContext, networkDecision, test as guardedTest } from './layout/fixture'
-import { modalFacts, waitForModalReady } from './layout/evidence'
+import {
+  MODAL_READY_TIMEOUT_MS,
+  RESPONSIVE_SCROLL_END_TIMEOUT_MS,
+  modalFacts,
+  waitForModalReady,
+  waitForResponsiveScrollEnd,
+} from './layout/evidence'
 import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
 import { openSurface } from './layout/app'
 import { createServer } from 'node:http'
@@ -54,7 +61,9 @@ guardedTest('declared route additions cannot conceal changed inherited cards or 
 test('readiness rejects missing and outgoing selected panels, then accepts the actual incoming panel', async ({ page }) => {
   await page.setContent('<div role="dialog" data-state="open"><button id="selected" role="tab" aria-selected="true" aria-controls="panel">Current</button></div>')
   const dialog = page.getByRole('dialog')
-  await expect(waitForModalReady(dialog, 150)).rejects.toThrow()
+  await expect(waitForModalReady(dialog, 150)).rejects.toThrow(
+    /^Wait for actual incoming content, not merely selected-tab chrome\nelapsed=\d+ms; budget=150ms; unmet=panelsMatch/,
+  )
   await dialog.evaluate((element) => {
     element.insertAdjacentHTML('beforeend', '<div id="panel" role="tabpanel" aria-labelledby="selected" data-modal-tab-transition-state="exiting">Outgoing</div>')
   })
@@ -65,6 +74,50 @@ test('readiness rejects missing and outgoing selected panels, then accepts the a
   })
   await waitForModalReady(dialog)
   await expect(page.getByRole('tabpanel')).toHaveText('Incoming')
+})
+
+test('default stabilization budgets accept content and scrolling that settle after five seconds', async ({ page }) => {
+  const delayedReadyMs = 5_100
+  expect(MODAL_READY_TIMEOUT_MS).toBeGreaterThan(delayedReadyMs)
+  expect(RESPONSIVE_SCROLL_END_TIMEOUT_MS).toBeGreaterThan(delayedReadyMs)
+  await page.setContent(`<div role="dialog" data-state="open">
+    <button id="selected" role="tab" aria-selected="true" aria-controls="panel">Current</button>
+    <div id="panel" role="tabpanel" aria-labelledby="selected" data-modal-tab-transition-state="exiting" style="width:100px;height:40px">Incoming</div>
+  </div>
+  <div id="scroll-body" style="height:40px;overflow-y:auto"><div style="height:200px"></div></div>`)
+  await page.evaluate((delay) => {
+    const panel = document.querySelector<HTMLElement>('#panel')!
+    const body = document.querySelector<HTMLElement>('#scroll-body')!
+    const nativeScrollTo = body.scrollTo.bind(body)
+    Object.defineProperty(body, 'scrollTo', {
+      configurable: true,
+      value: (options: ScrollToOptions) => {
+        if (body.dataset.scrollReady === 'true') nativeScrollTo(options)
+      },
+    })
+    setTimeout(() => {
+      panel.setAttribute('data-modal-tab-transition-state', 'idle')
+      body.dataset.scrollReady = 'true'
+    }, delay)
+  }, delayedReadyMs)
+
+  const startedAt = Date.now()
+  await Promise.all([
+    waitForModalReady(page.getByRole('dialog')),
+    waitForResponsiveScrollEnd(page.locator('#scroll-body')),
+  ])
+  expect(Date.now() - startedAt).toBeGreaterThanOrEqual(5_000)
+})
+
+test('responsive scroll-end readiness reports the last unsettled geometry', async ({ page }) => {
+  await page.setContent('<div id="scroll-body" style="height:40px;overflow-y:auto"><div style="height:200px"></div></div>')
+  const body = page.locator('#scroll-body')
+  await body.evaluate((element) => {
+    Object.defineProperty(element, 'scrollTo', { configurable: true, value: () => undefined })
+  })
+  await expect(waitForResponsiveScrollEnd(body, 150)).rejects.toThrow(
+    /^Reach the real end after responsive content reflow\nelapsed=\d+ms; budget=150ms; last=\{.*"distance":\d+/,
+  )
 })
 
 test('isolation blocks HTTP, WebSockets, workers and service workers before upstream I/O', async ({ browser }) => {

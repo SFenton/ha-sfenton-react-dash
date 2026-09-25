@@ -41,6 +41,13 @@ type PackageJson = {
 }
 
 describe('dashboard Playwright workflow policy', () => {
+  it('queues exact master layout evidence instead of cancelling older merge runs', () => {
+    const workflow = read('.github/workflows/playwright.yml')
+    expect(workflow).toContain('group: playwright-${{ github.workflow }}-${{ github.ref }}')
+    expect(workflow).toContain('cancel-in-progress: false')
+    expect(workflow).toContain('queue: max')
+  })
+
   it('runs automated layout only after pushes to protected master', () => {
     const workflow = read('.github/workflows/playwright.yml')
     const layoutPlan = read('scripts/layout/plan.ts')
