@@ -3,6 +3,12 @@ export const DEFAULT_REACT_DASHBOARD_URL = '/local/ha-sfenton-react-dash/index.h
 const REACT_DASHBOARD_DISPOSE_PROPERTY = '__sfentonReactDashboardDispose'
 const REACT_DASHBOARD_FRAME_PROPERTY = '__sfentonReactDashboardPanelFrame'
 const REACT_DASHBOARD_REATTACH_GRACE_MS = 5_000
+const REACT_DASHBOARD_ROUTE_EVENTS = [
+  'dashboard-route-change',
+  'location-changed',
+  'pageshow',
+  'popstate',
+] as const
 const REACT_DASHBOARD_PANEL_PATH = '/sfenton-react-panel'
 const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
 
@@ -85,6 +91,7 @@ interface CustomPanelInfo {
 interface PersistentReactDashboardFrame {
   iframe: HTMLIFrameElement
   owner?: SfentonReactPanel
+  releaseRouteCleanup?: () => void
   releaseTimer?: number
 }
 
@@ -213,15 +220,28 @@ function bridgePanelGeometryToDashboardFrame(
   }
 }
 
-function disposePersistentFrame(
+function clearPersistentFrameRelease(
   hostWindow: PanelHostWindow,
   frame: PersistentReactDashboardFrame,
-  reason: string,
 ) {
   if (frame.releaseTimer !== undefined) {
     hostWindow.clearTimeout(frame.releaseTimer)
     frame.releaseTimer = undefined
   }
+  frame.releaseRouteCleanup?.()
+  frame.releaseRouteCleanup = undefined
+}
+
+function isReactDashboardPanelPath(pathname: string) {
+  return pathname.replace(/\/+$/, '') === REACT_DASHBOARD_PANEL_PATH
+}
+
+function disposePersistentFrame(
+  hostWindow: PanelHostWindow,
+  frame: PersistentReactDashboardFrame,
+  reason: string,
+) {
+  clearPersistentFrameRelease(hostWindow, frame)
   disposeReactDashboardFrame(frame.iframe, reason)
   frame.iframe.remove()
   if (hostWindow[REACT_DASHBOARD_FRAME_PROPERTY] === frame) {
@@ -233,18 +253,21 @@ function acquirePersistentFrame(panel: SfentonReactPanel) {
   const hostWindow = panelHostWindow(panel)
   let frame = hostWindow[REACT_DASHBOARD_FRAME_PROPERTY]
   if (
-    !frame
-    || frame.iframe.ownerDocument !== hostWindow.document
-    || !frame.iframe.isConnected
+    frame
+    && (
+      frame.iframe.ownerDocument !== hostWindow.document
+      || !frame.iframe.isConnected
+    )
   ) {
+    clearPersistentFrameRelease(hostWindow, frame)
+    frame = undefined
+  }
+  if (!frame) {
     frame = { iframe: createPersistentFrame(hostWindow.document) }
     hostWindow[REACT_DASHBOARD_FRAME_PROPERTY] = frame
   }
 
-  if (frame.releaseTimer !== undefined) {
-    hostWindow.clearTimeout(frame.releaseTimer)
-    frame.releaseTimer = undefined
-  }
+  clearPersistentFrameRelease(hostWindow, frame)
   frame.owner = panel
   frame.iframe.hidden = false
   syncPersistentFrameGeometry(panel, frame.iframe, hostWindow)
@@ -257,15 +280,36 @@ function releasePersistentFrame(panel: SfentonReactPanel) {
   if (!frame || frame.owner !== panel) return
 
   frame.owner = undefined
-  const currentPath = hostWindow.location.pathname.replace(/\/+$/, '')
-  if (currentPath !== REACT_DASHBOARD_PANEL_PATH) {
+  if (!isReactDashboardPanelPath(hostWindow.location.pathname)) {
     disposePersistentFrame(hostWindow, frame, 'panel-host-disconnected')
     return
   }
 
+  // Home Assistant may detach the wrapper while backgrounded; elapsed time alone is not abandonment.
+  const disposeIfDeparted = () => {
+    if (frame.owner || hostWindow[REACT_DASHBOARD_FRAME_PROPERTY] !== frame) {
+      clearPersistentFrameRelease(hostWindow, frame)
+      return
+    }
+    if (
+      !frame.iframe.isConnected
+      || frame.iframe.ownerDocument !== hostWindow.document
+      || !isReactDashboardPanelPath(hostWindow.location.pathname)
+    ) {
+      disposePersistentFrame(hostWindow, frame, 'panel-host-disconnected')
+    }
+  }
+  for (const eventName of REACT_DASHBOARD_ROUTE_EVENTS) {
+    hostWindow.addEventListener(eventName, disposeIfDeparted)
+  }
+  frame.releaseRouteCleanup = () => {
+    for (const eventName of REACT_DASHBOARD_ROUTE_EVENTS) {
+      hostWindow.removeEventListener(eventName, disposeIfDeparted)
+    }
+  }
   frame.releaseTimer = hostWindow.setTimeout(() => {
-    if (frame.owner || hostWindow[REACT_DASHBOARD_FRAME_PROPERTY] !== frame) return
-    disposePersistentFrame(hostWindow, frame, 'panel-host-disconnected')
+    frame.releaseTimer = undefined
+    disposeIfDeparted()
   }, REACT_DASHBOARD_REATTACH_GRACE_MS)
 }
 
