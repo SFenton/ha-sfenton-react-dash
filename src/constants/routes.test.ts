@@ -1,4 +1,5 @@
-import { HOME_RECIPES_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, fallbackBackPathForRoute, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl } from './routes'
+import { HOME_RECIPES_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, fallbackBackPathForRoute, isDashboardPathVisibleToResident, primaryNavPathForRoute, primaryNavRouteActive, routePathFromUrl, routeUrl, visibleDashboardPathForResident } from './routes'
+import { HOUSEHOLD_RESIDENT } from './householdResidents'
 
 describe('routes', () => {
   it('extracts at-a-glance route paths', () => {
@@ -55,6 +56,11 @@ describe('routes', () => {
     expect(primaryNavPathForRoute('groceries')).toBe('chores')
     expect(primaryNavRouteActive('stephs-chores', 'chores')).toBe(true)
     expect(primaryNavRouteActive('stephs-chores', 'overview')).toBe(false)
+  })
+
+  it('exposes resident-aware route visibility through the route module', () => {
+    expect(isDashboardPathVisibleToResident('to-do', HOUSEHOLD_RESIDENT.STEPH)).toBe(false)
+    expect(visibleDashboardPathForResident('to-do', HOUSEHOLD_RESIDENT.STEPH)).toBe('settings')
   })
 
   it('keeps the summary user param only while targeting the summary modal hash', () => {

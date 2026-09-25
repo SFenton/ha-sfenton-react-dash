@@ -266,3 +266,5 @@ export function routeUrl(path: string, currentUrl?: string, hash?: string) {
   parsedUrl.hash = nextHash
   return relativeUrl(parsedUrl)
 }
+
+export { isDashboardPathVisibleToResident, visibleDashboardPathForResident } from './dashboardAccess'
