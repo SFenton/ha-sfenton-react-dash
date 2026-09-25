@@ -53,6 +53,27 @@ describe('AtAGlancePage', () => {
     expect(screen.getByRole('button', { name: /Steph Nightstand/i })).toBeInTheDocument()
   })
 
+  it('renders shared room light brightness controls while preserving the non-dimmable switch fallback', () => {
+    const guestRoom = LIGHT_GROUPS.find((group) => group.title === 'Guest Room Lights')!
+    mockEntities['light.guest_room_tv_light'] = entity('light.guest_room_tv_light', 'on', { brightness: 64 })
+    mockEntities['light.guest_room_bed_light'] = entity('light.guest_room_bed_light', 'off')
+    const guestView = render(<LightsSheet directGroup={guestRoom} />)
+
+    const tvLight = screen.getByRole('group', { name: 'TV Light' })
+    expect(tvLight).toHaveAttribute('data-action-kind', 'value')
+    expect(tvLight.style.getPropertyValue('--fill-pct')).toBe('25%')
+    expect(screen.getByRole('button', { name: 'Toggle TV Light' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('group', { name: 'Bed Light' })).toHaveAttribute('data-active', 'false')
+
+    guestView.unmount()
+    const entryway = LIGHT_GROUPS.find((group) => group.title === 'Entryway Light')!
+    mockEntities['switch.upper_entryway_light_switch_top'] = entity('switch.upper_entryway_light_switch_top', 'off')
+    render(<LightsSheet directGroup={entryway} />)
+
+    expect(screen.queryByRole('group', { name: 'Entryway Light' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Entryway Light Off' })).toBeInTheDocument()
+  })
+
   it('uses the shared disclosure affordance on the Home weather modal opener', async () => {
     render(<AtAGlancePage />)
 
@@ -271,7 +292,8 @@ describe('AtAGlancePage', () => {
     fireEvent.click(closetCard)
 
     expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Closet Lights' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: /Closet Light Off/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'Closet Light' })).toHaveAttribute('data-action-kind', 'value')
+    expect(within(dialog).getByRole('button', { name: 'Toggle Closet Light' })).toBeInTheDocument()
   })
 
   it('groups the Lights overview by on and off rooms', async () => {

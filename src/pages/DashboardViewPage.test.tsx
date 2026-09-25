@@ -1573,8 +1573,10 @@ describe('DashboardViewPage', () => {
     dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveAttribute('data-size', 'compact')
     expect(screen.getByRole('heading', { name: 'Guest Room Lights' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /TV Light On/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Bed Light Off/i })).toBeInTheDocument()
+    expect(within(dialog).getByRole('group', { name: 'TV Light' })).toHaveAttribute('data-action-kind', 'value')
+    expect(within(dialog).getByRole('group', { name: 'Bed Light' })).toHaveAttribute('data-action-kind', 'value')
+    expect(within(dialog).getByRole('button', { name: 'Toggle TV Light' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Toggle Bed Light' })).toHaveAttribute('aria-pressed', 'false')
     view.unmount()
     window.history.replaceState(null, '', window.location.pathname)
 

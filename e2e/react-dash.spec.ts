@@ -1,6 +1,7 @@
 // @covers src/components/shell/AppShell.module.css
 // @covers src/components/core/ExpandingSearchAction.module.css
 // @covers src/pages/DashboardViewPage.tsx
+// @covers src/pages/AtAGlancePage.tsx
 import { expect, test, type FrameLocator, type Locator, type Page } from './layout/fixture'
 import { valueToThermostatPoint } from '../src/components/hass/thermostatDialGeometry'
 import { globalQuickLinksAction, openQuickLinksTab, selectQuickLinksTab } from './quick-links'
@@ -2821,6 +2822,7 @@ test.describe('desktop modal layout', () => {
     await page.mouse.up()
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('heading', { name: 'Living Room Lights' })).toBeVisible()
+    await expect(dialog.getByRole('group', { name: 'Front Left' })).toHaveAttribute('data-action-kind', 'value')
     await expect(dialog.getByRole('button', { name: 'Back to room lights' })).toBeVisible()
   })
 
@@ -3450,7 +3452,9 @@ test('guest room page opens source-aligned header popups', async ({ page }) => {
   await page.getByRole('button', { name: /^Lights On$/i }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Guest Room Lights' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /TV Light On/i })).toBeVisible()
+  const lightDialog = page.getByRole('dialog')
+  await expect(lightDialog.getByRole('group', { name: 'TV Light' })).toBeVisible()
+  await expect(lightDialog.getByRole('button', { name: 'Toggle TV Light' })).toHaveAttribute('aria-pressed', 'true')
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.getByRole('button', { name: /^Climate 69°F - 71°F$/i }).click()

@@ -166,7 +166,7 @@ describe('Sfenton React custom panel', () => {
     )
   })
 
-  it('keeps the same app frame across an immediate panel replacement', () => {
+  it('keeps the same app frame after a long same-route panel detach', () => {
     vi.useFakeTimers()
     vi.spyOn(Date, 'now').mockReturnValue(5678)
     window.history.replaceState({}, '', '/sfenton-react-panel')
@@ -181,16 +181,44 @@ describe('Sfenton React custom panel', () => {
     setIframeDisposer(iframe, dispose)
 
     firstPanel.remove()
+    vi.advanceTimersByTime(5_100)
+
+    expect(persistentIframe()).toBe(iframe)
+    expect(dispose).not.toHaveBeenCalled()
+
     const replacement = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
     replacement.panel = {
       config: { app_url: DEFAULT_REACT_DASHBOARD_URL },
       title: 'React Dash Panel',
     }
     document.body.append(replacement)
-    vi.advanceTimersByTime(5_000)
 
     expect(persistentIframe()).toBe(iframe)
     expect(dispose).not.toHaveBeenCalled()
+  })
+
+  it('disposes a retained panel iframe when resume reveals route departure', () => {
+    vi.useFakeTimers()
+    window.history.replaceState({}, '', '/sfenton-react-panel')
+    const panel = document.createElement(SFENTON_REACT_PANEL_TAG) as SfentonReactPanel
+    panel.panel = {
+      config: { app_url: DEFAULT_REACT_DASHBOARD_URL },
+      title: 'React Dash Panel',
+    }
+    document.body.append(panel)
+    const iframe = persistentIframe()
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    panel.remove()
+    vi.advanceTimersByTime(5_100)
+    expect(persistentIframe()).toBe(iframe)
+
+    window.history.replaceState({}, '', '/another-panel')
+    window.dispatchEvent(new Event('pageshow'))
+
+    expect(dispose).toHaveBeenCalledWith('panel-host-disconnected')
+    expect(iframe).not.toBeInTheDocument()
   })
 
   it('disposes the current app when Home Assistant removes the panel', () => {

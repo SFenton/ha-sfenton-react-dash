@@ -267,6 +267,7 @@ test('Admin To-Do preserves modal semantics, failure retry, and responsive actio
     await page.keyboard.press('Enter')
 
     const dialog = page.getByRole('dialog', { name: 'Edit Task' })
+    await waitForModalReady(dialog)
     const input = dialog.getByLabel('Task Name')
     await expect(input).toHaveValue('Responsive admin task')
     await expect(dialog.getByRole('button', { name: 'Reset' })).toBeDisabled()
@@ -292,14 +293,14 @@ test('Admin To-Do preserves modal semantics, failure retry, and responsive actio
 
     await opener.focus()
     await opener.click()
-    await expect(dialog).toBeVisible()
+    await waitForModalReady(dialog)
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveAttribute('data-state', 'closed')
     await expect(dialog).toHaveCount(0, { timeout: 700 })
     await expect(opener).toBeFocused()
 
     await opener.click()
-    await expect(dialog).toBeVisible()
+    await waitForModalReady(dialog)
     const box = await dialog.boundingBox()
     expect(box?.width).toBeLessThanOrEqual(viewport.width)
     expect(await page.locator('body').evaluate((body) => body.scrollWidth <= window.innerWidth)).toBe(true)

@@ -208,6 +208,19 @@ Workflow-authenticated layout workers use changed tests and focused
 provenance-bound mixed-context runs for local acceptance. They must not turn a
 full historical or full-known-mock replay into a pre-PR gate; the protected
 post-merge `Automated layout` job owns exact full-corpus evidence.
+If a layout worker changes `e2e/layout-acceptance.spec.ts`, ordinary Playwright
+projects do not collect it. Host validation identifies up to four explicitly
+changed scenario owners in the committed `e2e/layout/contracts.ts` diff and
+runs those scenarios from the changed spec in guarded mobile and fine-pointer
+desktop mock contexts against the exact candidate commit. The controller
+creates the temporary Playwright smoke config below its private state
+directory (not systemd's `PrivateTmp`) and mounts only that directory read-only
+into the networkless validation container, so an older candidate does not change
+its protected Playwright config. The host removes that config after validation
+and checks the candidate commit and tree before and after each command. An
+ambiguous or missing changed owner fails closed; it is not a skipped test.
+This focused smoke runs no managed `layout:run` and cannot certify full
+layout acceptance: the post-merge master workflow still owns that evidence.
 
 ## Independent intake and bounded workers
 
@@ -233,6 +246,16 @@ the open snapshot; controller-owned close windows and other unexpectedly
 closed active issues retain direct lookup and completion repair. This keeps
 the normal polling cadence without spending GitHub requests on unchanged
 closed issues.
+An open-list row that still appears after its issue has closed, or a duplicate
+row, is checked by exact issue number rather than treated as an issue-specific
+provenance failure. Invalid issue identities still fail intake explicitly.
+If the prior snapshot check blocked a record immediately after a journaled
+controller closure, a narrow release repair verifies the current closed issue
+and completion marker, restores the authorized outcome from its retained
+worker log, then rechecks the merged PR, layout or deployment evidence and
+applicable HA completion boundary. New owner input, a manual reopen, a
+different blocked reason, or uncertain completion state never authorizes that
+replay.
 
 Controller-owned issue closure records intent before the GitHub PATCH, and
 trusted owner comments remain ingestible during that close window even when
@@ -291,16 +314,23 @@ link to the failed `master` push workflow, its failed `Automated layout` job,
 and the unexpired `layout-automation` artifact. A separate one-slot diagnostic
 lane retrieves the failed-job log and ZIP without delaying new todo intake.
 It verifies repository/run/attempt/artifact identities and inspects only the
-assessment, WebKit, and optional non-WebKit execution JSON entries.
+assessment, WebKit, and optional non-WebKit execution JSON entries for browser
+failures. When the failed step is layout planning and both browser steps were
+skipped, it instead inspects only `plan.json`: the plan ID, base/head commits
+and supported unowned-runtime-source blockers must exactly match the failed
+job log. The packet reports the bounded source paths and blocker category,
+with zero executed browser attempts and checkpoints; it does not claim a
+browser result or expose raw plan content.
 Signed artifact redirects never receive the GitHub authorization header.
 The measured original #235 ZIP requires a 512-MiB compressed limit, 10,000
 safe entries, 768 MiB of declared expanded data, 80 MiB per entry and 10 MiB
 per selected JSON; all other entries, including screenshots, remain
 unextracted. The worker receives only test locations/browser/failure
 categories, checkpoint and browser-attempt counts, hashes and run provenance.
-It cannot read raw logs, screenshots or signed URLs from that packet.
+It cannot read raw logs, screenshots or signed URLs from either packet.
 Missing checkpoints are not passes. Malformed, expired, oversized or
-mismatched evidence leaves the question open and records an explicit error.
+mismatched evidence, or an unsupported planning failure, leaves the question
+open and records an explicit error.
 
 Only the single evidence-availability question, including its exact legacy
 wording, can receive one fingerprinted `workflow-evidence` input and resume
