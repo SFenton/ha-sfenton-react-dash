@@ -7,6 +7,12 @@ export const DEFAULT_REACT_DASHBOARD_CARD_URL = '/local/ha-sfenton-react-dash/in
 const REACT_DASHBOARD_DISPOSE_PROPERTY = '__sfentonReactDashboardDispose'
 const REACT_DASHBOARD_FRAME_PROPERTY = '__sfentonReactDashboardCardFrame'
 const REACT_DASHBOARD_REATTACH_GRACE_MS = 5_000
+const REACT_DASHBOARD_ROUTE_EVENTS = [
+  'dashboard-route-change',
+  'location-changed',
+  'pageshow',
+  'popstate',
+] as const
 const LEGACY_REACT_DASHBOARD_PATH = '/sfenton-react-dash/home'
 const RTC_PILOT_DASHBOARD_PATH = '/sfenton-react-fold-test/home'
 const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
@@ -93,6 +99,7 @@ interface CustomCardMetadata {
 interface PersistentReactDashboardFrame {
   iframe: HTMLIFrameElement
   owner?: SfentonReactAppCard
+  releaseRouteCleanup?: () => void
   releaseTimer?: number
 }
 
@@ -127,15 +134,30 @@ function createPersistentFrame(ownerDocument: Document) {
   return iframe
 }
 
-function disposePersistentFrame(
+function clearPersistentFrameRelease(
   ownerWindow: CustomCardWindow,
   frame: PersistentReactDashboardFrame,
-  reason: string,
 ) {
   if (frame.releaseTimer !== undefined) {
     ownerWindow.clearTimeout(frame.releaseTimer)
     frame.releaseTimer = undefined
   }
+  frame.releaseRouteCleanup?.()
+  frame.releaseRouteCleanup = undefined
+}
+
+function isReactDashboardCardPath(pathname: string) {
+  const currentPath = pathname.replace(/\/+$/, '')
+  return currentPath === LEGACY_REACT_DASHBOARD_PATH
+    || currentPath === RTC_PILOT_DASHBOARD_PATH
+}
+
+function disposePersistentFrame(
+  ownerWindow: CustomCardWindow,
+  frame: PersistentReactDashboardFrame,
+  reason: string,
+) {
+  clearPersistentFrameRelease(ownerWindow, frame)
   disposeReactDashboardFrame(frame.iframe, reason)
   frame.iframe.remove()
   if (ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] === frame) {
@@ -147,18 +169,21 @@ function acquirePersistentFrame(card: SfentonReactAppCard) {
   const ownerWindow = cardWindow(card)
   let frame = ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY]
   if (
-    !frame
-    || frame.iframe.ownerDocument !== card.ownerDocument
-    || !frame.iframe.isConnected
+    frame
+    && (
+      frame.iframe.ownerDocument !== card.ownerDocument
+      || !frame.iframe.isConnected
+    )
   ) {
+    clearPersistentFrameRelease(ownerWindow, frame)
+    frame = undefined
+  }
+  if (!frame) {
     frame = { iframe: createPersistentFrame(card.ownerDocument) }
     ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] = frame
   }
 
-  if (frame.releaseTimer !== undefined) {
-    ownerWindow.clearTimeout(frame.releaseTimer)
-    frame.releaseTimer = undefined
-  }
+  clearPersistentFrameRelease(ownerWindow, frame)
   frame.owner = card
   frame.iframe.hidden = false
   return frame
@@ -170,15 +195,36 @@ function releasePersistentFrame(card: SfentonReactAppCard) {
   if (!frame || frame.owner !== card) return
 
   frame.owner = undefined
-  const currentPath = card.ownerDocument.location.pathname.replace(/\/+$/, '')
-  if (currentPath !== LEGACY_REACT_DASHBOARD_PATH && currentPath !== RTC_PILOT_DASHBOARD_PATH) {
+  if (!isReactDashboardCardPath(card.ownerDocument.location.pathname)) {
     disposePersistentFrame(ownerWindow, frame, 'legacy-card-disconnected')
     return
   }
 
+  // Home Assistant may detach the wrapper while backgrounded; elapsed time alone is not abandonment.
+  const disposeIfDeparted = () => {
+    if (frame.owner || ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] !== frame) {
+      clearPersistentFrameRelease(ownerWindow, frame)
+      return
+    }
+    if (
+      !frame.iframe.isConnected
+      || frame.iframe.ownerDocument !== ownerWindow.document
+      || !isReactDashboardCardPath(ownerWindow.location.pathname)
+    ) {
+      disposePersistentFrame(ownerWindow, frame, 'legacy-card-disconnected')
+    }
+  }
+  for (const eventName of REACT_DASHBOARD_ROUTE_EVENTS) {
+    ownerWindow.addEventListener(eventName, disposeIfDeparted)
+  }
+  frame.releaseRouteCleanup = () => {
+    for (const eventName of REACT_DASHBOARD_ROUTE_EVENTS) {
+      ownerWindow.removeEventListener(eventName, disposeIfDeparted)
+    }
+  }
   frame.releaseTimer = ownerWindow.setTimeout(() => {
-    if (frame.owner || ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] !== frame) return
-    disposePersistentFrame(ownerWindow, frame, 'legacy-card-disconnected')
+    frame.releaseTimer = undefined
+    disposeIfDeparted()
   }, REACT_DASHBOARD_REATTACH_GRACE_MS)
 }
 
