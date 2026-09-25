@@ -9,6 +9,7 @@ import {
   waitForResponsiveScrollEnd,
 } from './layout/evidence'
 import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
+import { openSurface } from './layout/app'
 import { createServer } from 'node:http'
 
 guardedTest('built-in Playwright page and context receive the isolation fixture', async ({ page, context }) => {
@@ -16,6 +17,13 @@ guardedTest('built-in Playwright page and context receive the isolation fixture'
   expect(() => assertGuardedContext(context)).not.toThrow()
   await page.goto('about:blank')
   expect(await page.evaluate(() => '__layoutWorkerAttempt' in window)).toBe(true)
+})
+
+// @covers e2e/layout/app.ts
+guardedTest('mock camera layout fixture stays online through live playback', async ({ page }) => {
+  const dialog = await openSurface(page, 'camera', 'live')
+  expect(await page.evaluate(() => navigator.onLine)).toBe(true)
+  await expect(dialog.locator('[data-variant="modal"]')).toHaveAttribute('data-status', 'live')
 })
 
 guardedTest('declared route additions cannot conceal changed inherited cards or extra sections', async ({ context }) => {
