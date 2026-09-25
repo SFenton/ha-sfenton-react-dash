@@ -106,6 +106,19 @@ independent Opus confirmation when the guarded evidence reader is unavailable.
    clean worktree with a `needs_input` or `blocked` response. It cannot propose
    a PR, close the issue, or mutate HA through the allowed tool set. A later
    trusted owner approval is required to lift that issue-specific restriction.
+   Direct implementation approval remains valid; short replies such as
+   `Approve`, `Yes, please`, or `Go ahead`, as well as an exact full approval
+   option copied from the question, count when the controller binds
+   the unchanged owner comment to its exact UID/revision decision question with
+   one unqualified implementation, deletion, or closure choice. Missing or
+   edited questions, multiple full approval choices, unrelated design replies,
+   and combined restart/deployment decisions do not lift the restriction.
+   The worker receives the exact approved question/option as a bounded scope,
+   not blanket authorization for Home Assistant actions.
+   Operational comments must carry the controller marker so they cannot be
+   mistaken for owner instructions. A previously blocked issue still needs a
+   genuine owner follow-up to resume; a source update alone never replays a
+   blocked destructive action.
 7. If verified Home Assistant work fully resolves the issue, or no repository
    change is appropriate, require a clean untouched worktree, post the
    resolution and verification, close the GitHub issue, and complete the Admin
