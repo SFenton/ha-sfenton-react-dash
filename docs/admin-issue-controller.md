@@ -208,6 +208,19 @@ Workflow-authenticated layout workers use changed tests and focused
 provenance-bound mixed-context runs for local acceptance. They must not turn a
 full historical or full-known-mock replay into a pre-PR gate; the protected
 post-merge `Automated layout` job owns exact full-corpus evidence.
+If a layout worker changes `e2e/layout-acceptance.spec.ts`, ordinary Playwright
+projects do not collect it. Host validation identifies up to four explicitly
+changed scenario owners in the committed `e2e/layout/contracts.ts` diff and
+runs those scenarios from the changed spec in guarded mobile and fine-pointer
+desktop mock contexts against the exact candidate commit. The controller
+creates the temporary Playwright smoke config below its private state
+directory (not systemd's `PrivateTmp`) and mounts only that directory read-only
+into the networkless validation container, so an older candidate does not change
+its protected Playwright config. The host removes that config after validation
+and checks the candidate commit and tree before and after each command. An
+ambiguous or missing changed owner fails closed; it is not a skipped test.
+This focused smoke runs no managed `layout:run` and cannot certify full
+layout acceptance: the post-merge master workflow still owns that evidence.
 
 ## Independent intake and bounded workers
 
