@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useUser } from '@hakit/core'
 import type { RouteTransitionState } from './components/shell/SmoothRouteOutlet'
 import { AtAGlancePage } from './pages/AtAGlancePage'
 import { DashboardViewPage } from './pages/DashboardViewPage'
@@ -13,11 +14,12 @@ import { useRecipeControls, type RecipeControls } from './components/hass/recipe
 import { SmoothRouteOutlet } from './components/shell/SmoothRouteOutlet'
 import { hasDashboardFloatingAction } from './components/shell/dashboardFloatingAction'
 import { MUSIC_ROOM_MEDIA_LIVE_CHANGE_OPTIMISTIC_ENTITY_IDS, MUSIC_ROOM_MEDIA_OPTIMISTIC_ENTITY_IDS } from './constants/mediaRemotes'
-import { HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES, routeUrl } from './constants/routes'
+import { HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, PRIMARY_NAV_ROUTES, routePathFromUrl, routeUrl, visibleDashboardPathForResident } from './constants/routes'
 import { pageMeasureForPath } from './constants/pageLayout'
-import { dashboardHref } from './hooks/dashboardLocation'
+import { dashboardHref, replaceDashboardUrl } from './hooks/dashboardLocation'
 import { DASHBOARD_PAGE_LOAD_TIMEOUT_MS } from './constants/loading'
 import { markDeferredRouteHydrated } from './hooks/useDeferredRouteHydration'
+import { householdResidentForHaUserId } from './constants/householdResidents'
 import { useDashboardRoute } from './hooks/useDashboardRoute'
 import { useSmoothDisplayedRoute } from './hooks/useSmoothDisplayedRoute'
 import { ModalAcceptanceHarness } from './test/ModalAcceptanceHarness'
@@ -57,7 +59,9 @@ function routeUsesMenuChrome(path: string) {
 }
 
 function Dashboard() {
-  const { path, navigate, navigateBack } = useDashboardRoute()
+  const { path: requestedPath, navigate, navigateBack } = useDashboardRoute()
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
+  const path = visibleDashboardPathForResident(requestedPath, viewerResident)
   const [initialRoute] = useState(() => ({
     path,
     preloadCompleted: initialPreloadCompleted,
@@ -93,6 +97,11 @@ function Dashboard() {
   const pageInitialContentTransitionState = initialContentTransitionState
   const modalAcceptanceHarness = import.meta.env.MODE === 'test'
     && new URLSearchParams(window.location.search).has('__modalAcceptance')
+
+  useEffect(() => {
+    if (path === requestedPath || routePathFromUrl(dashboardHref()) === path) return
+    replaceDashboardUrl(routeUrl(path, dashboardHref()))
+  }, [path, requestedPath])
 
   const handleRecipesInitialResolved = useCallback(() => {
     setInitialRecipesResolved(true)
