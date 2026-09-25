@@ -449,7 +449,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   navigation: {
     family: 'page-shell-grid', states: ['home', 'back-page'],
-    owners: ['src/pages/Page.', 'src/pages/AtAGlancePage', 'src/pages/ControlShowcasePage', 'src/i18n/locales/en/pages/chores.json', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/i18n/locales/en.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/atAGlance', 'src/constants/householdResidents', 'src/constants/navigationLayout', 'src/constants/roomPages'],
+    owners: ['src/Dashboard.tsx', 'src/pages/Page.', 'src/pages/AtAGlancePage', 'src/pages/ControlShowcasePage', 'src/pages/DashboardViewPage.tsx', 'src/i18n/locales/en/pages/chores.json', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/i18n/locales/en.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/atAGlance', 'src/constants/dashboardAccess', 'src/constants/householdResidents', 'src/constants/navigationLayout', 'src/constants/roomPages'],
     legacy: ['adaptive-navigation.spec.ts', 'responsive-pages-all.spec.ts', 'desktop-responsive.spec.ts', 'safe-area-responsive.spec.ts'],
     question: 'Do content, viewer-relative room controls, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey?',
   },
