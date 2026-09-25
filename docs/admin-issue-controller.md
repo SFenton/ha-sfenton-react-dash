@@ -233,6 +233,16 @@ the open snapshot; controller-owned close windows and other unexpectedly
 closed active issues retain direct lookup and completion repair. This keeps
 the normal polling cadence without spending GitHub requests on unchanged
 closed issues.
+An open-list row that still appears after its issue has closed, or a duplicate
+row, is checked by exact issue number rather than treated as an issue-specific
+provenance failure. Invalid issue identities still fail intake explicitly.
+If the prior snapshot check blocked a record immediately after a journaled
+controller closure, a narrow release repair verifies the current closed issue
+and completion marker, restores the authorized outcome from its retained
+worker log, then rechecks the merged PR, layout or deployment evidence and
+applicable HA completion boundary. New owner input, a manual reopen, a
+different blocked reason, or uncertain completion state never authorizes that
+replay.
 
 Controller-owned issue closure records intent before the GitHub PATCH, and
 trusted owner comments remain ingestible during that close window even when
