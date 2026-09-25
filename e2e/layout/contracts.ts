@@ -448,10 +448,10 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     question: 'Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with complete carousel pages centered and incomplete final pages aligned left, equal small-tile heights, no preview dropdown and unchanged return geometry?',
   },
   navigation: {
-    family: 'page-shell-grid', states: ['home', 'back-page'],
-    owners: ['src/pages/Page.', 'src/pages/AtAGlancePage', 'src/pages/ControlShowcasePage', 'src/i18n/locales/en/pages/chores.json', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/i18n/locales/en.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/atAGlance', 'src/constants/householdResidents', 'src/constants/navigationLayout', 'src/constants/roomPages'],
+    family: 'page-shell-grid', states: ['home', 'back-page', 'settings', 'restricted-settings'],
+    owners: ['src/Dashboard.tsx', 'src/pages/Page.', 'src/pages/AtAGlancePage', 'src/pages/ControlShowcasePage', 'src/pages/DashboardViewPage.tsx', 'src/i18n/locales/en/pages/chores.json', 'src/i18n/locales/en/pages/controlShowcase.json', 'src/i18n/locales/en.json', 'src/components/shell/AdaptiveNavigation', 'src/components/shell/AppHeader', 'src/constants/atAGlance', 'src/constants/dashboardAccess', 'src/constants/householdResidents', 'src/constants/navigationLayout', 'src/constants/roomPages'],
     legacy: ['adaptive-navigation.spec.ts', 'responsive-pages-all.spec.ts', 'desktop-responsive.spec.ts', 'safe-area-responsive.spec.ts'],
-    question: 'Do content, viewer-relative room controls, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey?',
+    question: 'Do content, viewer-relative room controls, resident-specific Settings access, canonical restricted-route replacement, grid, fixed controls, Back/menu and focus remain usable across the named form-factor and stretch-return journey?',
   },
   host: {
     family: 'host', states: ['legacy', 'pilot', 'panel'],

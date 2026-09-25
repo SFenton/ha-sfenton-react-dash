@@ -73,6 +73,30 @@ describe('layout scope and selection', () => {
     expect(classifyChanges(['.github/workflows/playwright.yml'])).toMatchObject({ mode: 'non-layout', scenarios: [] })
     expect(classifyChanges(['README.md']).mode).toBe('non-layout')
   })
+  it('owns resident-specific dashboard access under the navigation contract', () => {
+    expect(SURFACE_CONTRACTS.navigation.owners).toEqual(expect.arrayContaining([
+      'src/Dashboard.tsx',
+      'src/pages/DashboardViewPage.tsx',
+      'src/constants/dashboardAccess',
+    ]))
+    expect(SURFACE_CONTRACTS.navigation.states).toEqual(['home', 'back-page', 'settings', 'restricted-settings'])
+
+    expect(classifyChanges(['src/Dashboard.tsx', 'src/constants/dashboardAccess.ts'])).toMatchObject({
+      mode: 'focused',
+      scenarios: ['navigation'],
+      unowned: [],
+    })
+
+    const historical = classifyChanges([
+      'src/Dashboard.tsx',
+      'src/constants/dashboardAccess.ts',
+      'src/constants/routes.ts',
+      'src/pages/DashboardViewPage.tsx',
+    ])
+    expect(historical.mode).toBe('full-known-mock')
+    expect(historical.unowned).toEqual([])
+    expect(historical.reasons).toContain('Shared owner expands all surface families: src/constants/routes.ts')
+  })
   it('limits shared modal navigation changes to modal surface families', () => {
     const result = classifyChanges(['src/components/core/ModalTabNav.tsx'])
     const modalScenarios = Object.entries(SURFACE_CONTRACTS)
