@@ -8,12 +8,19 @@ import { artifactPath, hash, readJson, relativeArtifact, writeJson } from '../..
 
 export type AuditedDocument = Page | Frame
 
+export const MODAL_READY_TIMEOUT_MS = 15_000
+export const RESPONSIVE_SCROLL_END_TIMEOUT_MS = 15_000
+
+const MODAL_READINESS_MESSAGE = 'Wait for actual incoming content, not merely selected-tab chrome'
+const RESPONSIVE_SCROLL_END_MESSAGE = 'Reach the real end after responsive content reflow'
+
 const DETAIL_READINESS = {
   'recipe-planner': { control: 'input[type="date"]', backLabel: 'Back to recipe', nativePicker: true },
   'recipe-product-picker': { control: 'input[aria-label="Search inventory products"]', backLabel: 'Back and mark ingredient available', nativePicker: false },
 } as const
 
 export type ModalReadiness = 'tabs' | 'vacuum-tabs' | keyof typeof DETAIL_READINESS
+type DetailReadiness = (typeof DETAIL_READINESS)[keyof typeof DETAIL_READINESS] | null
 
 export function assertDeclaredTabs(observed: string[], declared: readonly string[]) {
   if (observed.length !== declared.length
@@ -33,12 +40,8 @@ export async function waitForRoute(page: AuditedDocument, route: string, backgro
   await expect(root.getByRole('heading', { level: 1, name: title, exact: true, includeHidden: background })).toBeVisible()
 }
 
-export async function waitForModalReady(dialog: Locator, timeout = 5_000, readiness: ModalReadiness = 'tabs') {
-  if (readiness !== 'tabs' && readiness !== 'vacuum-tabs' && !Object.hasOwn(DETAIL_READINESS, readiness)) throw new Error(`Unknown modal readiness state: ${readiness}`)
-  const detail = Object.hasOwn(DETAIL_READINESS, readiness) ? DETAIL_READINESS[readiness as keyof typeof DETAIL_READINESS] : null
-  await expect(dialog).toBeVisible({ timeout })
-  await expect(dialog).toHaveAttribute('data-state', 'open', { timeout })
-  await expect.poll(() => dialog.evaluate((element, { readiness, detail }) => {
+async function readModalReadiness(dialog: Locator, readiness: ModalReadiness, detail: DetailReadiness) {
+  return dialog.evaluate((element, { readiness, detail }) => {
     const style = getComputedStyle(element)
     const selected = Array.from(element.querySelectorAll('[role="tab"][aria-selected="true"]'))
     const tabCount = element.querySelectorAll('[role="tab"]').length
@@ -97,11 +100,80 @@ export async function waitForModalReady(dialog: Locator, timeout = 5_000, readin
         )
       }),
     }
-  }, { readiness, detail }), { timeout, message: 'Wait for actual incoming content, not merely selected-tab chrome' }).toEqual({
-    opacity: 1, starting: false, running: [], tabsValid: true, incoming: true, vacuumPrepared: true, panelsMatch: true,
-  })
+  }, { readiness, detail })
+}
+
+type ModalReadinessSnapshot = Awaited<ReturnType<typeof readModalReadiness>>
+
+function unmetModalReadiness(snapshot: ModalReadinessSnapshot) {
+  const unmet: string[] = []
+  if (snapshot.opacity !== 1) unmet.push(`opacity=${snapshot.opacity}`)
+  if (snapshot.starting) unmet.push('starting')
+  if (snapshot.running.length) unmet.push(`running=${snapshot.running.length}`)
+  if (!snapshot.tabsValid) unmet.push('tabsValid')
+  if (!snapshot.incoming) unmet.push('incoming')
+  if (!snapshot.vacuumPrepared) unmet.push('vacuumPrepared')
+  if (!snapshot.panelsMatch) unmet.push('panelsMatch')
+  return unmet
+}
+
+export async function waitForModalReady(dialog: Locator, timeout = MODAL_READY_TIMEOUT_MS, readiness: ModalReadiness = 'tabs') {
+  if (readiness !== 'tabs' && readiness !== 'vacuum-tabs' && !Object.hasOwn(DETAIL_READINESS, readiness)) throw new Error(`Unknown modal readiness state: ${readiness}`)
+  const detail = Object.hasOwn(DETAIL_READINESS, readiness) ? DETAIL_READINESS[readiness as keyof typeof DETAIL_READINESS] : null
+  const startedAt = Date.now()
+  const deadline = startedAt + timeout
+  const remaining = () => Math.max(1, deadline - Date.now())
+  let stage = 'visible'
+  let lastSnapshot: ModalReadinessSnapshot | undefined
+  try {
+    await expect(dialog).toBeVisible({ timeout: remaining() })
+    stage = 'open'
+    await expect(dialog).toHaveAttribute('data-state', 'open', { timeout: remaining() })
+    stage = 'content'
+    await expect.poll(async () => {
+      lastSnapshot = await readModalReadiness(dialog, readiness, detail)
+      return lastSnapshot
+    }, { timeout: remaining(), message: MODAL_READINESS_MESSAGE }).toEqual({
+      opacity: 1, starting: false, running: [], tabsValid: true, incoming: true, vacuumPrepared: true, panelsMatch: true,
+    })
+  } catch (error) {
+    const elapsed = Date.now() - startedAt
+    const diagnostics = lastSnapshot
+      ? `unmet=${unmetModalReadiness(lastSnapshot).join(',') || 'unknown'}; last=${JSON.stringify(lastSnapshot)}`
+      : `stage=${stage}; last=unavailable`
+    throw new Error(`${MODAL_READINESS_MESSAGE}\nelapsed=${elapsed}ms; budget=${timeout}ms; ${diagnostics}`, {
+      cause: error,
+    })
+  }
   await dialog.evaluate(() => document.fonts.ready)
   await dialog.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))))
+}
+
+export async function waitForResponsiveScrollEnd(body: Locator, timeout = RESPONSIVE_SCROLL_END_TIMEOUT_MS) {
+  const startedAt = Date.now()
+  let lastSnapshot: { clientHeight: number; distance: number; scrollHeight: number; scrollTop: number } | undefined
+  try {
+    await expect.poll(async () => {
+      lastSnapshot = await body.evaluate(async (element) => {
+        element.scrollTo({ top: element.scrollHeight, behavior: 'instant' })
+        await new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+        return {
+          clientHeight: element.clientHeight,
+          distance: Math.abs(element.scrollTop - Math.max(0, element.scrollHeight - element.clientHeight)),
+          scrollHeight: element.scrollHeight,
+          scrollTop: element.scrollTop,
+        }
+      })
+      return lastSnapshot.distance
+    }, { timeout, message: RESPONSIVE_SCROLL_END_MESSAGE }).toBeLessThanOrEqual(1)
+  } catch (error) {
+    const elapsed = Date.now() - startedAt
+    throw new Error(`${RESPONSIVE_SCROLL_END_MESSAGE}\nelapsed=${elapsed}ms; budget=${timeout}ms; last=${lastSnapshot ? JSON.stringify(lastSnapshot) : 'unavailable'}`, {
+      cause: error,
+    })
+  }
+  if (!lastSnapshot) throw new Error(`${RESPONSIVE_SCROLL_END_MESSAGE}; no geometry sample was recorded`)
+  return lastSnapshot
 }
 
 export async function applyProfile(page: Page, name: string, target: AuditedDocument = page) {
