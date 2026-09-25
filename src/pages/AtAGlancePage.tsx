@@ -17,7 +17,7 @@ import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
 import { CameraModalContent } from '../components/hass/CameraModalContent'
-import { CameraTile } from '../components/hass/CameraTile'
+import { CameraTile } from '../components/hass/CameraTile'; import { LightBrightnessCard } from '../components/hass/LightBrightnessCard'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { SECURITY_SYSTEM_CENTERED_GEOMETRY, securitySystemModalSubtitle } from '../components/hass/securityControlsConfig'
 import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from '../components/hass/GuestPresenceSecurity'
@@ -567,21 +567,21 @@ function RoomLightDetailCards({ group, onToggle }: { group: EntityGroupConfig; o
   return (
     <section className={styles.roomLightDetail}>
       <div className={styles.roomLightGrid}>
-        {group.items.map((item) => (
-          <div className={styles.roomLightCardShell} key={item.entityId}>
-            <LightCard
-              entityId={item.entityId}
-              onClick={() => onToggle(item.entityId)}
-              pressed
-              size="compact"
-              title={item.resident && viewerResident
-                ? item.resident === viewerResident
-                  ? copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.yourNightstand)
-                  : copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.residentNightstand, { resident: householdResidentName(item.resident) })
-                : item.title}
-            />
+        {group.items.map((item) => {
+          const title = item.resident && viewerResident
+            ? item.resident === viewerResident
+              ? copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.yourNightstand)
+              : copy(COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS.residentNightstand, { resident: householdResidentName(item.resident) })
+            : item.title
+
+          return <div className={styles.roomLightCardShell} key={item.entityId}>
+            {item.entityId.startsWith('light.') ? (
+              <LightBrightnessCard entityId={item.entityId} showStatus title={title} />
+            ) : (
+              <LightCard entityId={item.entityId} onClick={() => onToggle(item.entityId)} pressed size="compact" title={title} />
+            )}
           </div>
-        ))}
+        })}
       </div>
     </section>
   )
