@@ -17,7 +17,7 @@ import {
   MISLEADING_V2_LEGACY_VACUUM_OUTCOMES,
   NINE_ROOM_VACUUM_OUTCOME_CONTRACT,
 } from '../test/fixtures/vacuumOutcomes'
-import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState, setMockUser } from '../test/mocks/hakitCoreState'
 
 // @covers src/constants/portedDashboard.ts
 // @covers src/constants/roomPages.ts
@@ -1997,6 +1997,26 @@ describe('DashboardViewPage', () => {
     expect(hassSettings).toHaveAttribute('data-external-path', '/config')
     expect(hassSettings.querySelector('[data-surface-accessory="external"]')).toBeInTheDocument()
     expect(hassSettings.querySelector('[data-modal-disclosure]')).not.toBeInTheDocument()
+  })
+
+  it('removes the To-Do Settings destination for Steph', () => {
+    setMockUser({ id: HOUSEHOLD_RESIDENTS.steph.haUserId, name: 'Steph' })
+
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="settings" />)
+
+    expect(screen.getByRole('navigation', { name: 'Settings pages' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /To-Do An admin panel for to-do tasks\./i })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['an unknown user', { id: 'unknown-user', name: 'Unknown' }],
+    ['a missing user', null],
+  ] as const)('keeps the To-Do Settings destination for %s', (_label, user) => {
+    setMockUser(user ? { ...user } : null)
+
+    render(<DashboardViewPage activePath="settings" onNavigate={() => undefined} path="settings" />)
+
+    expect(screen.getByRole('button', { name: /To-Do An admin panel for to-do tasks\./i })).toBeInTheDocument()
   })
 
   it('renders Special Device Modes as an optimistic typed High AQI toggle', () => {

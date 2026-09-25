@@ -141,7 +141,7 @@ import {
   OCCUPANCY_GROUPS,
   type EntityGroupConfig,
 } from '../constants/atAGlance'
-import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, SOLO_TRIP_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, VACATION_MODE_ROUTE_PATH, fallbackBackPathForRoute } from '../constants/routes'
+import { DASHBOARD_ROUTES, HOME_ALL_FOOD_ROUTE_PATH, HOME_CABINET_ROUTE_PATH, HOME_FOOD_ROUTE_PATH, HOME_FREEZER_ROUTE_PATH, HOME_FRIDGE_ROUTE_PATH, HOME_GROCERY_LIST_ROUTE_PATH, HOME_PANTRY_ROUTE_PATH, HOME_RECIPES_ROUTE_PATH, HOME_SPICE_RACK_ROUTE_PATH, HOME_SPRINKLERS_ROUTE_PATH, LIGHT_CONTROLS_SHOWCASE_ROUTE_PATH, SOLO_TRIP_ROUTE_PATH, THERMOSTAT_ROUTE_PATH, VACATION_MODE_ROUTE_PATH, fallbackBackPathForRoute, isDashboardPathVisibleToResident } from '../constants/routes'
 import {
   ADMIN_AUTO_REENABLE_ITEMS,
   CHORE_QUICK_LINKS,
@@ -1905,7 +1905,7 @@ function SettingsLinkList({ ariaLabel, items, onNavigate }: {
 }
 
 function SettingsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
-  return <SettingsLinkList ariaLabel="Settings pages" items={SETTINGS_PAGE_ITEMS} onNavigate={onNavigate} />
+  return <SettingsLinkList ariaLabel="Settings pages" items={useVisibleSettingsPageItems()} onNavigate={onNavigate} />
 }
 
 function GuestControlsPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -7467,4 +7467,9 @@ export function DashboardViewPage({ activePath, appChromeHidden = false, initial
       {page}
     </AppShell>
   )
+}
+
+function useVisibleSettingsPageItems() {
+  const viewerResident = householdResidentForHaUserId(useUser()?.id)
+  return SETTINGS_PAGE_ITEMS.filter((item) => !item.path || isDashboardPathVisibleToResident(item.path, viewerResident))
 }
