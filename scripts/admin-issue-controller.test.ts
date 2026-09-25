@@ -4957,6 +4957,8 @@ describe('admin issue controller security configuration', () => {
     expect(layoutPrompt).toContain('scripts/layout')
     expect(layoutPrompt).toContain('focused provenance-bound mixed-context runs')
     expect(layoutPrompt).toContain('protected post-merge Automated layout job')
+    expect(layoutPrompt).toContain('For a failed layout plan, inspect the named source')
+    expect(layoutPrompt).toContain('no browser attempts or checkpoints ran')
     expect(layoutPrompt).not.toContain('.github/workflows/deploy-dashboard.yml')
   })
 

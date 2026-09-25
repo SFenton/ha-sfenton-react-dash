@@ -301,16 +301,23 @@ link to the failed `master` push workflow, its failed `Automated layout` job,
 and the unexpired `layout-automation` artifact. A separate one-slot diagnostic
 lane retrieves the failed-job log and ZIP without delaying new todo intake.
 It verifies repository/run/attempt/artifact identities and inspects only the
-assessment, WebKit, and optional non-WebKit execution JSON entries.
+assessment, WebKit, and optional non-WebKit execution JSON entries for browser
+failures. When the failed step is layout planning and both browser steps were
+skipped, it instead inspects only `plan.json`: the plan ID, base/head commits
+and supported unowned-runtime-source blockers must exactly match the failed
+job log. The packet reports the bounded source paths and blocker category,
+with zero executed browser attempts and checkpoints; it does not claim a
+browser result or expose raw plan content.
 Signed artifact redirects never receive the GitHub authorization header.
 The measured original #235 ZIP requires a 512-MiB compressed limit, 10,000
 safe entries, 768 MiB of declared expanded data, 80 MiB per entry and 10 MiB
 per selected JSON; all other entries, including screenshots, remain
 unextracted. The worker receives only test locations/browser/failure
 categories, checkpoint and browser-attempt counts, hashes and run provenance.
-It cannot read raw logs, screenshots or signed URLs from that packet.
+It cannot read raw logs, screenshots or signed URLs from either packet.
 Missing checkpoints are not passes. Malformed, expired, oversized or
-mismatched evidence leaves the question open and records an explicit error.
+mismatched evidence, or an unsupported planning failure, leaves the question
+open and records an explicit error.
 
 Only the single evidence-availability question, including its exact legacy
 wording, can receive one fingerprinted `workflow-evidence` input and resume
