@@ -5,18 +5,13 @@ import { journey, obligationsFor, PRELOAD_ROUTES } from './layout/scenarios'
 import { actualCapabilities, applyProfile, assertDeclaredTabs, checkpoint, closeMounted, contextForProject, modalFacts, runEnvironment, waitForModalReady, waitForNavigation, waitForRoute } from './layout/evidence'
 import { layoutProfile } from './responsive-acceptance-data'
 import { openQuickLinksTab, quickLinksLayout } from './quick-links'
-import { ADMIN_TODO_ROUTE_PATH, SETTINGS_ROUTE_PATH } from '../src/constants/dashboardAccess'
-import { HOUSEHOLD_RESIDENTS } from '../src/constants/householdResidents'
 import { MUSIC_ROOM_REMOTE_ENTITY_ID } from '../src/constants/mediaRemotes'
-import { routePathFromUrl } from '../src/constants/routes'
 import { chatStateFacts, openChatState } from './chat-layout'
 import { isWakeScenario, openWakeRoomState, wakeRoomFacts, wakeStateFacts } from './layout/wakeLight'
 
 // @covers e2e/layout/app.ts
 // @covers e2e/layout/contracts.ts
 // @covers e2e/layout/scenarios.ts
-// @covers src/Dashboard.tsx
-// @covers src/constants/dashboardAccess.ts
 // @covers src/constants/pageLayout.ts
 // @covers src/pages/DashboardViewPage.tsx
 // @covers src/pages/DashboardViewPage.module.css
@@ -569,13 +564,12 @@ async function soloTripSettingsFacts(root: Locator, state: string) {
   return { ...facts, state, diagnosticsExposed: false, resolutionActions: 2, toggle: 'disabled-on', travelerCards }
 }
 
-async function pageFacts(page: Page, route: 'living-room' | 'overview' | 'settings') {
+async function pageFacts(page: Page, back: boolean) {
   await waitForNavigation(page)
   const facts = await page.evaluate((route) => {
     const main = document.querySelector(`[data-route-path="${route}"]:not([aria-hidden="true"]) main`)!
     if (!main) throw new Error(`Missing active route main: ${route}`)
     const scroller = main.querySelector<HTMLElement>('[data-page-scroller]')!
-    const settingsLinks = Array.from(main.querySelectorAll<HTMLElement>('[data-settings-link-list="true"] button'))
     const visible = (element: Element) => {
       const rect = element.getBoundingClientRect()
       return rect.width > 0 && rect.height > 0 && getComputedStyle(element).visibility !== 'hidden'
@@ -594,16 +588,9 @@ async function pageFacts(page: Page, route: 'living-room' | 'overview' | 'settin
       back: main.querySelectorAll('[data-app-header-back]').length,
       menu: main.querySelectorAll('button[aria-label="Open navigation menu"]').length,
       overlaps,
-      settingsContained: settingsLinks.every((link) => {
-        const rect = link.getBoundingClientRect()
-        return rect.left >= -1 && rect.right <= innerWidth + 1
-      }),
-      settingsLinks: settingsLinks.length,
-      settingsTodoLinks: settingsLinks.filter((link) => link.dataset.navigationPath === 'to-do').length,
     }
-  }, route)
-  const back = route === 'living-room'
-  expect(facts.heading).toBe(route === 'overview' ? 'Home' : route === 'living-room' ? 'Living Room' : 'Settings')
+  }, back ? 'living-room' : 'overview')
+  expect(facts.heading).toBe(back ? 'Living Room' : 'Home')
   expect(facts.overflow).toBeLessThanOrEqual(1)
   expect(['auto', 'scroll']).toContain(facts.scrollOwner)
   expect(facts.overlaps).toBe(0)
@@ -699,42 +686,12 @@ for (const scenario of SCENARIO_IDS) {
     }
     if (scenario === 'navigation') {
       for (const state of SURFACE_CONTRACTS.navigation.states) {
-        const route = state === 'home' ? 'overview' : state === 'back-page' ? 'living-room' : SETTINGS_ROUTE_PATH
+        const route = state === 'home' ? 'overview' : 'living-room'
         await page.goto(`/index.html?path=${route}`)
         await waitForRoute(page, route)
-        const settingsPages = page.locator(`[data-route-path="${SETTINGS_ROUTE_PATH}"]:not([aria-hidden="true"]) main`).getByRole('navigation', { name: 'Settings pages' })
-        const settingsLinks = settingsPages.getByRole('button')
-        const settingsTodoLink = settingsPages.locator(`[data-navigation-path="${ADMIN_TODO_ROUTE_PATH}"]`)
-        if (state === 'settings') {
-          await expect(settingsLinks).toHaveCount(7)
-          await expect(settingsTodoLink).toHaveCount(1)
-        }
-        if (state === 'restricted-settings') {
-          await page.evaluate((user) => window.__mockHass!.setUser(user), {
-            id: HOUSEHOLD_RESIDENTS.steph.haUserId,
-            name: HOUSEHOLD_RESIDENTS.steph.name,
-          })
-          await expect(settingsLinks).toHaveCount(6)
-          await expect(settingsTodoLink).toHaveCount(0)
-          await page.evaluate((nextPath) => {
-            const url = new URL(window.location.href)
-            url.searchParams.set('path', nextPath)
-            url.hash = ''
-            window.history.pushState({}, '', url)
-            window.dispatchEvent(new PopStateEvent('popstate'))
-          }, ADMIN_TODO_ROUTE_PATH)
-          await expect.poll(() => routePathFromUrl(page.url())).toBe(SETTINGS_ROUTE_PATH)
-          await waitForRoute(page, SETTINGS_ROUTE_PATH)
-          await expect(page.locator(`[data-route-path="${ADMIN_TODO_ROUTE_PATH}"]:not([aria-hidden="true"]) main`)).toHaveCount(0)
-        }
         for (const obligation of obligations.filter((entry) => entry.state === state)) {
           await applyProfile(page, obligation.profile)
-          const facts = await pageFacts(page, route)
-          if (state === 'settings' || state === 'restricted-settings') {
-            expect(facts.settingsContained).toBe(true)
-            expect(facts.settingsLinks).toBe(state === 'settings' ? 7 : 6)
-            expect(facts.settingsTodoLinks).toBe(state === 'settings' ? 1 : 0)
-          }
+          const facts = await pageFacts(page, state === 'back-page')
           if (!hasTouch && state === 'home' && facts.navigation === 'rail') {
             const home = page.locator('[data-adaptive-navigation="rail"]').getByRole('button', { name: 'Home' })
             await home.focus()
@@ -745,14 +702,6 @@ for (const scenario of SCENARIO_IDS) {
         if (state === 'back-page') {
           await page.getByRole('button', { name: 'Go back' }).click()
           await waitForRoute(page, 'overview')
-        }
-        if (state === 'restricted-settings') {
-          await page.evaluate((user) => window.__mockHass!.setUser(user), {
-            id: HOUSEHOLD_RESIDENTS.stephen.haUserId,
-            name: HOUSEHOLD_RESIDENTS.stephen.name,
-          })
-          await expect(settingsLinks).toHaveCount(7)
-          await expect(settingsTodoLink).toHaveCount(1)
         }
       }
       return

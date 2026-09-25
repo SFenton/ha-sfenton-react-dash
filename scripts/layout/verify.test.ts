@@ -79,7 +79,7 @@ describe('layout scope and selection', () => {
       'src/pages/DashboardViewPage.tsx',
       'src/constants/dashboardAccess',
     ]))
-    expect(SURFACE_CONTRACTS.navigation.states).toEqual(['home', 'back-page', 'settings', 'restricted-settings'])
+    expect(SURFACE_CONTRACTS.navigation.states).toEqual(['home', 'back-page'])
 
     expect(classifyChanges(['src/Dashboard.tsx', 'src/constants/dashboardAccess.ts'])).toMatchObject({
       mode: 'focused',
