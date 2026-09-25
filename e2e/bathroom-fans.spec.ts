@@ -38,18 +38,16 @@ test.describe('bathroom fan controls', () => {
     })
   }
 
-  test('fan modal exposes status, controls, timer intent, and mounted close behavior', async ({ page }) => {
+  test('fan modal exposes controls, timer intent, and mounted close behavior', async ({ page }) => {
     await page.goto('/at-a-glance/guest-bathroom')
     await page.getByRole('button', { name: 'Fan Off' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Guest Bathroom Fan' })
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByText('Room occupancy')).toBeVisible()
-    await expect(dialog.getByText('Room temperature range')).toBeVisible()
-    await expect(dialog.getByText('Humidity')).toBeVisible()
-    await expect(dialog.locator('[data-icon="mdi:motion-sensor-off"]')).toBeVisible()
-    await expect(dialog.locator('[data-icon="mdi:thermometer"]')).toBeVisible()
-    await expect(dialog.locator('[data-icon="mdi:water-percent"]')).toBeVisible()
+    await expect(dialog.getByText('Room occupancy')).toHaveCount(0)
+    await expect(dialog.getByText('Room temperature range')).toHaveCount(0)
+    await expect(dialog.getByText('Humidity')).toHaveCount(0)
+    await expect(dialog.locator('[data-dynamic-grid="true"]')).toHaveCount(0)
     await expect(dialog.getByRole('navigation')).toHaveCount(0)
 
     await dialog.getByRole('switch', { name: 'Power Off' }).click()
@@ -103,13 +101,20 @@ test.describe('bathroom fan controls', () => {
     await expect(dialog).toHaveCount(0)
   })
 
-  test('fan modal keeps the desktop status and timer rows aligned without overflow', async ({ page }) => {
+  test('fan modal keeps desktop controls and timer rows aligned without overflow', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
     await page.goto('/at-a-glance/guest-bathroom')
     await page.getByRole('button', { name: 'Fan Off' }).click()
 
     const dialog = page.getByRole('dialog', { name: 'Guest Bathroom Fan' })
-    await dialog.getByRole('switch', { name: 'Power Off' }).click()
+    const power = dialog.getByRole('switch', { name: 'Power Off' })
+    const lock = dialog.getByRole('switch', { name: 'Lock Unlocked' })
+    const [powerBox, lockBox] = await Promise.all([power.boundingBox(), lock.boundingBox()])
+    if (!powerBox || !lockBox) throw new Error('Desktop fan controls were not measurable')
+    expect(Math.abs(powerBox.y - lockBox.y)).toBeLessThanOrEqual(2)
+    expect(Math.abs(powerBox.height - lockBox.height)).toBeLessThanOrEqual(2)
+
+    await power.click()
     const select = dialog.getByRole('combobox', { name: 'Timer' })
     const set = dialog.getByRole('button', { name: 'Set' })
     await select.selectOption('10')
@@ -118,16 +123,6 @@ test.describe('bathroom fan controls', () => {
     if (!selectBox || !setBox) throw new Error('Desktop timer setup controls were not measurable')
     expect(Math.abs(selectBox.y - setBox.y)).toBeLessThanOrEqual(2)
     await set.click()
-
-    const statuses = dialog.locator('[data-icon="mdi:motion-sensor-off"], [data-icon="mdi:thermometer"], [data-icon="mdi:water-percent"]')
-    await expect(statuses).toHaveCount(3)
-    const statusBoxes = await statuses.evaluateAll((elements) => elements.map((element) => {
-      const box = element.getBoundingClientRect()
-      return { height: box.height, width: box.width, y: box.y }
-    }))
-    expect(Math.round(statusBoxes[0].y)).toBe(Math.round(statusBoxes[1].y))
-    expect(statusBoxes[2].y).toBeGreaterThan(statusBoxes[0].y)
-    expect(statusBoxes[2].width).toBeGreaterThan(statusBoxes[0].width * 1.8)
 
     const timerBox = await dialog.locator('[data-timer-row="true"]').boundingBox()
     if (!timerBox) throw new Error('Desktop timer row was not measurable')
@@ -138,11 +133,11 @@ test.describe('bathroom fan controls', () => {
     expect(await dialog.evaluate((element) => element.scrollWidth)).toBe(await dialog.evaluate((element) => element.clientWidth))
   })
 
-  test('shared fan and vacuum status titles render white', async ({ page }) => {
+  test('shared fan control and vacuum status titles render white', async ({ page }) => {
     await page.goto('/at-a-glance/guest-bathroom')
     await page.getByRole('button', { name: 'Fan Off' }).click()
     const fanDialog = page.getByRole('dialog', { name: 'Guest Bathroom Fan' })
-    await expect(fanDialog.getByText('Room occupancy', { exact: true })).toHaveCSS('color', 'rgb(247, 251, 255)')
+    await expect(fanDialog.getByText('Power', { exact: true })).toHaveCSS('color', 'rgb(247, 251, 255)')
 
     await fanDialog.getByRole('button', { name: 'Close' }).click()
     await page.waitForTimeout(650)

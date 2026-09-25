@@ -10,41 +10,24 @@ const config = BATHROOM_FANS.guest
 describe('BathroomFanModalContent', () => {
   beforeEach(() => {
     resetMockHass()
-    mockEntities[config.occupancyEntityId].state = 'on'
-    mockEntities[config.temperatureRangeEntityId].state = '70°F - 72°F'
-    mockEntities[config.humidityEntityId].state = '44.6'
   })
 
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  it('renders read-only room status and hides timer controls while power is off', () => {
-    const { container } = render(<BathroomFanModalContent config={config} />)
+  it('renders only fan controls and hides timer controls while power is off', () => {
+    render(<BathroomFanModalContent config={config} />)
 
-    const occupancy = screen.getByRole('group', { name: 'Room occupancy Occupied' })
-    const temperature = screen.getByRole('group', { name: 'Room temperature range 70°F - 72°F' })
-    const humidity = screen.getByRole('group', { name: 'Humidity 45%' })
-    expect(occupancy).toHaveAttribute('data-icon', 'mdi:motion-sensor')
-    expect(occupancy).toHaveAttribute('data-tone', 'ok')
-    expect(temperature).toHaveStyle('--status-pill-color: rgb(0 200 120 / 0.6)')
-    expect(humidity).toHaveStyle('--status-pill-color: rgb(117 207 65 / 0.6)')
-    expect(Array.from(container.querySelector('[data-dynamic-grid="true"]')?.children ?? []).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '2'])
+    expect(screen.queryByText('Room occupancy')).not.toBeInTheDocument()
+    expect(screen.queryByText('Room temperature range')).not.toBeInTheDocument()
+    expect(screen.queryByText('Humidity')).not.toBeInTheDocument()
+    expect(document.querySelector('[data-dynamic-grid="true"]')).not.toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Power Off' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByRole('switch', { name: 'Lock Unlocked' })).toHaveAttribute('aria-checked', 'false')
     expect(screen.queryByRole('note', { name: 'Hint' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Timer' })).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: 'Timer' })).not.toBeInTheDocument()
-  })
-
-  it('updates the occupancy status icon and color when the room clears', () => {
-    render(<BathroomFanModalContent config={config} />)
-
-    act(() => setMockEntityState(config.occupancyEntityId, 'off'))
-
-    const occupancy = screen.getByRole('group', { name: 'Room occupancy Clear' })
-    expect(occupancy).toHaveAttribute('data-icon', 'mdi:motion-sensor-off')
-    expect(occupancy).toHaveAttribute('data-tone', 'neutral')
   })
 
   it('keeps an active timer cancellable if live fan power drops unexpectedly', () => {
@@ -174,7 +157,7 @@ describe('BathroomFanModalContent', () => {
     const setIntervalSpy = vi.spyOn(window, 'setInterval')
     render(<BathroomFanModalContent config={config} preload />)
 
-    expect(screen.getAllByText('Unavailable')).toHaveLength(5)
+    expect(screen.getAllByText('Unavailable')).toHaveLength(2)
     expect(setIntervalSpy).not.toHaveBeenCalled()
     setIntervalSpy.mockRestore()
   })
