@@ -70,6 +70,7 @@ import {
   frontendRecoveryObservationDue,
   handleLateOwnerInput,
   isolatedWorkerConfig,
+  githubIssueInputFetchPlan,
   githubRepositoryFromRemote,
   hasRecoverableDeployment,
   hasRecoverableExistingRelease,
@@ -248,6 +249,47 @@ function awaitingLayoutEvidence(): AdminIssueRecord {
 }
 
 describe('bounded issue worker admission', () => {
+  it('shares open issue discovery and keeps editable comments prompt while closed paused issues cost no reads', () => {
+    const paused = record()
+    paused.phase = 'paused'
+    expect(githubIssueInputFetchPlan(paused, false)).toBe('skip')
+    expect(githubIssueInputFetchPlan(paused, true)).toBe('open-snapshot')
+    paused.receipts.issueCloseAttemptAt = '2026-09-24T16:01:00.000Z'
+    expect(githubIssueInputFetchPlan(paused, false)).toBe('direct-lookup')
+    delete paused.receipts.issueCloseAttemptAt
+    paused.receipts.issueClosedAt = '2026-09-24T16:01:00.000Z'
+    expect(githubIssueInputFetchPlan(paused, false)).toBe('direct-lookup')
+
+    const completed = record()
+    completed.phase = 'completed'
+    expect(githubIssueInputFetchPlan(completed, false)).toBe('skip')
+    expect(githubIssueInputFetchPlan(completed, true)).toBe('skip')
+    const awaiting = record()
+    awaiting.phase = 'awaiting-user'
+    expect(githubIssueInputFetchPlan(awaiting, true)).toBe('open-snapshot')
+    expect(githubIssueInputFetchPlan(awaiting, false)).toBe('direct-lookup')
+
+    delete paused.receipts.issueClosedAt
+    const plans = [
+      ...Array.from({ length: 11 }, () => githubIssueInputFetchPlan(paused, false)),
+      ...Array.from({ length: 9 }, () => githubIssueInputFetchPlan(awaiting, true)),
+      githubIssueInputFetchPlan(awaiting, false),
+    ]
+    expect(plans.filter((plan) => plan === 'skip')).toHaveLength(11)
+    expect(plans.filter((plan) => plan === 'open-snapshot')).toHaveLength(9)
+    expect(plans.filter((plan) => plan === 'direct-lookup')).toHaveLength(1)
+    const issueReads = 1 + plans.filter((plan) => plan !== 'skip').length +
+      plans.filter((plan) => plan === 'direct-lookup').length
+    expect(issueReads).toBe(12)
+
+    const source = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
+    expect(source.match(/const openIssues = await reconcileGitHubAutomationIssues\(config, state\)/g))
+      .toHaveLength(3)
+    expect(source.match(/await reconcileGitHubInputs\(config, state, openIssues\)/g))
+      .toHaveLength(3)
+    expect(source).toContain('const comments = await listIssueComments(config, record.issueNumber)')
+  })
+
   it('keeps later todo intake running after a failed item but propagates a failed receipt', async () => {
     const attempted: string[] = []
     const failures: string[] = []
