@@ -774,6 +774,7 @@ for (const scenario of SCENARIO_IDS) {
     if (scenario === 'camera') {
       for (const state of SURFACE_CONTRACTS.camera.states) {
         const dialog = await openSurface(page, scenario, state)
+        expect(await page.evaluate(() => navigator.onLine), 'Mock camera layout fixture must remain online').toBe(true)
         for (const obligation of obligations.filter((entry) => entry.state === state)) {
           await applyProfile(page, obligation.profile)
           const facts = await stateFacts(page, dialog, scenario, state)

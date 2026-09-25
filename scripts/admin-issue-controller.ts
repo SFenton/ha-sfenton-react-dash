@@ -1549,7 +1549,8 @@ async function reconcileGitHubAutomationIssues(
   const trackedIssueNumbers = new Set(
     Object.values(state.issues).map((record) => record.issueNumber),
   )
-  for (const issue of await listOpenIssues(config)) {
+  const openIssues = await listOpenIssues(config)
+  for (const issue of openIssues) {
     const marker = trustedGitHubAutomationIssue(config, issue)
     if (trackedIssueNumbers.has(issue.number) || !marker) {
       continue
@@ -1591,6 +1592,7 @@ async function reconcileGitHubAutomationIssues(
     trackedIssueNumbers.add(issue.number)
     writeState(config, state)
   }
+  return openIssues
 }
 
 async function getIssue(config: AdminIssueControllerConfig, issueNumber: number) {
@@ -2310,13 +2312,35 @@ export function reconcileClosedIssueRecord(
   delete record.receipts.issueCloseAttemptAt
 }
 
+export function githubIssueInputFetchPlan(
+  record: Pick<AdminIssueRecord, 'phase' | 'receipts'>,
+  isOpen: boolean,
+): 'skip' | 'open-snapshot' | 'direct-lookup' {
+  if (record.phase === 'completed' ||
+    (record.phase === 'paused' && !isOpen &&
+      !record.receipts.issueClosedAt && !record.receipts.issueCloseAttemptAt)) {
+    return 'skip'
+  }
+  return isOpen ? 'open-snapshot' : 'direct-lookup'
+}
+
 async function reconcileGitHubInputs(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
+  openIssues: readonly GitHubIssue[],
 ) {
+  const openByNumber = new Map<number, GitHubIssue>()
+  for (const issue of openIssues) {
+    if (!Number.isSafeInteger(issue.number) || issue.number <= 0 ||
+      issue.state !== 'open' || openByNumber.has(issue.number)) {
+      throw new AdminIssueProvenanceError('Open GitHub issue snapshot is inconsistent')
+    }
+    openByNumber.set(issue.number, issue)
+  }
   for (const record of Object.values(state.issues)) {
-    if (record.phase === 'completed') continue
-    const issue = await getIssue(config, record.issueNumber)
+    const openIssue = openByNumber.get(record.issueNumber)
+    if (githubIssueInputFetchPlan(record, Boolean(openIssue)) === 'skip') continue
+    const issue = openIssue ?? await getIssue(config, record.issueNumber)
     const comments = await listIssueComments(config, record.issueNumber)
     if (issue.state === 'open' && record.phase === 'paused') {
       let prepared: Awaited<ReturnType<typeof prepareReopenedMedia>>
@@ -5632,6 +5656,7 @@ async function waitForLayoutWorkflow(
       continue
     }
     assertSuccessfulLayoutWorkflowRun(run, mergeSha)
+    if (!(await refreshInputs())) return undefined
     return run
   }
   throw new AdminIssueProvenanceError(
@@ -7343,6 +7368,18 @@ export function hasRecoverableTransition(record: AdminIssueRecord) {
   )
 }
 
+export function mergedReleaseWaitStillCurrent(
+  record: AdminIssueRecord,
+  generation: number,
+  mergeSha: string,
+) {
+  return record.phase === 'deploying' &&
+    record.generation === generation &&
+    record.provenance.kind === 'active' &&
+    record.provenance.merge?.mergeSha === mergeSha &&
+    !issueRequiresCompletionRepair(record)
+}
+
 async function processRecord(
   config: AdminIssueControllerConfig,
   client: HassAdminTodoClient,
@@ -7350,8 +7387,8 @@ async function processRecord(
   record: AdminIssueRecord,
   reconcileInputs: () => Promise<void> = async () => {
     await reconcileTodos(config, client, state)
-    await reconcileGitHubAutomationIssues(config, state)
-    await reconcileGitHubInputs(config, state)
+    const openIssues = await reconcileGitHubAutomationIssues(config, state)
+    await reconcileGitHubInputs(config, state, openIssues)
   },
   allowWorker = true,
 ) {
@@ -7605,13 +7642,18 @@ async function processRecord(
           }
           await verifyMergedPullRequest(config, record)
           const mergeSha = record.provenance.merge.mergeSha
+          const generation = record.generation
+          const refreshMergedInputs = async () => {
+            await reconcileInputs()
+            return mergedReleaseWaitStillCurrent(record, generation, mergeSha)
+          }
           if (record.automationKind === 'layout') {
             const run = record.provenance.layoutValidation
               ? await loadBoundLayoutWorkflow(config, record)
               : await waitForLayoutWorkflow(
                   config,
                   mergeSha,
-                  () => refreshInputs('deploying'),
+                  refreshMergedInputs,
                 )
             if (!run) return
             if (!record.provenance.layoutValidation) {
@@ -7626,7 +7668,7 @@ async function processRecord(
             : await waitForDeploymentReceipt(
                 config,
                 mergeSha,
-                () => refreshInputs('deploying'),
+                refreshMergedInputs,
               )
           if (!deployment) return
           if (!record.provenance.deployment) {
@@ -7685,8 +7727,8 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
   const state = loadAdminIssueControllerState(config, true)
   const reconcileInputs = async () => {
     await reconcileTodos(config, client, state)
-    await reconcileGitHubAutomationIssues(config, state)
-    await reconcileGitHubInputs(config, state)
+    const openIssues = await reconcileGitHubAutomationIssues(config, state)
+    await reconcileGitHubInputs(config, state, openIssues)
   }
   await reconcileInputs()
   await reconcileOutstandingWorkflowEvidence(config, state)
@@ -7960,8 +8002,8 @@ async function runParallelSupervisor(
   const intake = new AsyncSerial()
   const reconcileInputs = async () => await intake.run(async () => {
     await reconcileTodos(config, client, state)
-    await reconcileGitHubAutomationIssues(config, state)
-    await reconcileGitHubInputs(config, state)
+    const openIssues = await reconcileGitHubAutomationIssues(config, state)
+    await reconcileGitHubInputs(config, state, openIssues)
   })
   const workers = new AdminIssueWorkerPool(config.maxConcurrentWorkers, async (uid, error) =>
     await handleParallelWorkerError(config, state, uid, error))

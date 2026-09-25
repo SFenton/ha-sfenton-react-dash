@@ -59,6 +59,10 @@ async function seedSoloTripBed(page: Page, viewer: 'steph' | 'stephen' = 'stephe
 }
 
 export async function openSurface(page: Page, scenario: ScenarioId, state?: string): Promise<Locator> {
+  if (scenario === 'camera') await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+  })
+
   const route = isWakeScenario(scenario) || (scenario === 'solo-trip-bed' && !state?.startsWith('editor'))
     ? 'master-bedroom'
     : scenario === 'solo-trip-settings' || (scenario === 'solo-trip-bed' && state?.startsWith('editor'))
