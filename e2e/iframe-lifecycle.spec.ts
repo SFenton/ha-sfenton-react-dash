@@ -119,6 +119,14 @@ async function expectDisposed(page: Page) {
   })
 }
 
+async function leaveLifecycleHost(page: Page) {
+  await page.evaluate(() => {
+    window.history.replaceState({}, '', '/another-dashboard/home')
+    window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } }))
+  })
+  await expectDisposed(page)
+}
+
 async function currentReactDashboardFrame(page: Page) {
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const frame = page.frames().find((candidate) => (
@@ -201,7 +209,7 @@ test('notification landing remains correct on tablet and fine-pointer desktop', 
 })
 
 for (const path of ['/sfenton-react-dash/home', '/sfenton-react-fold-test/home']) {
-test(`${path} wrapper preserves one lifecycle across reconnect replacements`, async ({ page }) => {
+test(`${path} wrapper preserves one lifecycle across long same-route disconnects`, async ({ page }) => {
   await openLifecycleHost(
     page,
     path,
@@ -235,7 +243,35 @@ test(`${path} wrapper preserves one lifecycle across reconnect replacements`, as
   expect(instanceIds.size).toBe(1)
   expect(timeOrigins.size).toBe(1)
   await page.waitForTimeout(5_100)
-  await expectDisposed(page)
+  const retained = await page.evaluate(({ lifecycleProperty }) => {
+    const hostWindow = window as unknown as LifecycleHostWindow
+    const registration = hostWindow[lifecycleProperty]
+    return {
+      instanceId: registration?.instanceId ?? '',
+      listenerCount: hostWindow.__lifecycleHostAudit.activeRouteListeners.size,
+      timeOrigin: registration?.timeOrigin ?? 0,
+    }
+  }, { lifecycleProperty: REACT_DASHBOARD_LIFECYCLE_PROPERTY })
+  expect(instanceIds).toContain(retained.instanceId)
+  expect(timeOrigins).toContain(retained.timeOrigin)
+
+  await page.evaluate(({ tag }) => {
+    const card = document.createElement(tag) as HTMLElement & {
+      setConfig: (config: { url: string }) => void
+    }
+    card.dataset.lifecycleHost = 'true'
+    card.setConfig({ url: '/index.html' })
+    document.body.append(card)
+  }, { tag: SFENTON_REACT_APP_CARD_TAG })
+  const resumed = await waitForMountedApp(page)
+  expect(resumed).toMatchObject({
+    instanceId: retained.instanceId,
+    timeOrigin: retained.timeOrigin,
+  })
+  expect(resumed.listenerCount).toBe(retained.listenerCount - 1)
+  await page.locator('[data-lifecycle-host="true"]').evaluate((element) => element.remove())
+
+  await leaveLifecycleHost(page)
   await expect.poll(() => page.evaluate(() => (
     (window as unknown as LifecycleHostWindow).__lifecycleHostAudit.supersededReason
   ))).toBe('superseded-by-new-instance')
@@ -280,7 +316,33 @@ test('Fold-only card resource preserves the iframe without replacing the product
   expect(innerOrigins.size).toBe(1)
   expect(instanceIds.size).toBe(1)
   await page.waitForTimeout(5_100)
-  await expectDisposed(page)
+  const retained = await page.evaluate(({ lifecycleProperty }) => {
+    const hostWindow = window as unknown as LifecycleHostWindow
+    const registration = hostWindow[lifecycleProperty]
+    return {
+      instanceId: registration?.instanceId ?? '',
+      listenerCount: hostWindow.__lifecycleHostAudit.activeRouteListeners.size,
+      timeOrigin: registration?.timeOrigin ?? 0,
+    }
+  }, { lifecycleProperty: REACT_DASHBOARD_LIFECYCLE_PROPERTY })
+  expect(instanceIds).toContain(retained.instanceId)
+  expect(innerOrigins).toContain(retained.timeOrigin)
+
+  await page.evaluate((tag) => {
+    const card = document.createElement(tag) as HTMLElement & {
+      setConfig: (config: { url: string }) => void
+    }
+    card.dataset.foldHost = 'true'
+    card.setConfig({ url: '/index.html' })
+    document.body.append(card)
+  }, FOLD_TEST_CARD_TAG)
+  const resumed = await waitForMountedApp(page)
+  expect(resumed.instanceId).toBe(retained.instanceId)
+  expect(resumed.listenerCount).toBe(retained.listenerCount - 1)
+  expect(resumed.timeOrigin).toBe(retained.timeOrigin)
+  await page.locator('[data-fold-host="true"]').evaluate((element) => element.remove())
+
+  await leaveLifecycleHost(page)
 })
 
 test('Fold layout host opens its own card and keeps the app frame on resize', async ({ page }) => {
@@ -294,7 +356,7 @@ test('Fold layout host opens its own card and keeps the app frame on resize', as
   expect(await frame.evaluate(() => performance.timeOrigin)).toBe(initialOrigin)
 })
 
-test('custom panel preserves one lifecycle across outer-frame replacements', async ({ page }) => {
+test('custom panel preserves one lifecycle across long same-route disconnects', async ({ page }) => {
   await openLifecycleHost(
     page,
     '/sfenton-react-panel?path=settings',
@@ -302,6 +364,8 @@ test('custom panel preserves one lifecycle across outer-frame replacements', asy
   )
   await page.waitForFunction((tag) => Boolean(customElements.get(tag)), SFENTON_REACT_PANEL_TAG)
 
+  const instanceIds = new Set<string>()
+  const timeOrigins = new Set<number>()
   let mountedListenerCount = 0
   for (let cycle = 0; cycle < 5; cycle += 1) {
     await page.evaluate(({ tag }) => {
@@ -320,14 +384,52 @@ test('custom panel preserves one lifecycle across outer-frame replacements', asy
     }, { tag: SFENTON_REACT_PANEL_TAG })
 
     const mounted = await waitForMountedApp(page)
+    instanceIds.add(mounted.instanceId)
+    timeOrigins.add(mounted.timeOrigin)
     mountedListenerCount ||= mounted.listenerCount
     expect(mounted.listenerCount).toBe(mountedListenerCount)
 
     await page.locator('[data-lifecycle-host="true"]').evaluate((element) => element.remove())
   }
 
+  expect(instanceIds.size).toBe(1)
+  expect(timeOrigins.size).toBe(1)
   await page.waitForTimeout(5_100)
-  await expectDisposed(page)
+  const retained = await page.evaluate(({ lifecycleProperty }) => {
+    const hostWindow = window as unknown as LifecycleHostWindow
+    const registration = hostWindow[lifecycleProperty]
+    return {
+      instanceId: registration?.instanceId ?? '',
+      listenerCount: hostWindow.__lifecycleHostAudit.activeRouteListeners.size,
+      timeOrigin: registration?.timeOrigin ?? 0,
+    }
+  }, { lifecycleProperty: REACT_DASHBOARD_LIFECYCLE_PROPERTY })
+  expect(instanceIds).toContain(retained.instanceId)
+  expect(timeOrigins).toContain(retained.timeOrigin)
+
+  await page.evaluate(({ tag }) => {
+    const panel = document.createElement(tag) as HTMLElement & {
+      panel: {
+        config: { app_url: string }
+        title: string
+      }
+    }
+    panel.dataset.lifecycleHost = 'true'
+    panel.panel = {
+      config: { app_url: '/index.html' },
+      title: 'Lifecycle panel',
+    }
+    document.body.append(panel)
+  }, { tag: SFENTON_REACT_PANEL_TAG })
+  const resumed = await waitForMountedApp(page)
+  expect(resumed).toMatchObject({
+    instanceId: retained.instanceId,
+    timeOrigin: retained.timeOrigin,
+  })
+  expect(resumed.listenerCount).toBe(retained.listenerCount - 1)
+  await page.locator('[data-lifecycle-host="true"]').evaluate((element) => element.remove())
+
+  await leaveLifecycleHost(page)
   const history = await page.evaluate(({ historyProperty }) => JSON.parse(
     (window as unknown as LifecycleHostWindow)[historyProperty] ?? '[]',
   ), { historyProperty: REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY })

@@ -104,7 +104,7 @@ describe('Sfenton React app card', () => {
   it.each([
     '/sfenton-react-dash/home',
     `/${FOLD_TEST_REACT_DASHBOARD_HOST}/home`,
-  ])('keeps the same app frame across an immediate Lovelace replacement on %s', (path) => {
+  ])('keeps the same app frame after a long same-route Lovelace detach on %s', (path) => {
     vi.useFakeTimers()
     window.history.replaceState({}, '', path)
     const firstCard = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
@@ -115,13 +115,59 @@ describe('Sfenton React app card', () => {
     setIframeDisposer(iframe, dispose)
 
     firstCard.remove()
-    const replacement = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
-    replacement.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
-    document.body.append(replacement)
-    vi.advanceTimersByTime(5_000)
+    vi.advanceTimersByTime(5_100)
 
     expect(persistentIframe()).toBe(iframe)
     expect(dispose).not.toHaveBeenCalled()
+
+    const replacement = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    replacement.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+    document.body.append(replacement)
+
+    expect(persistentIframe()).toBe(iframe)
+    expect(dispose).not.toHaveBeenCalled()
+  })
+
+  it('cancels delayed release when a replacement arrives at the grace boundary', () => {
+    vi.useFakeTimers()
+    window.history.replaceState({}, '', '/sfenton-react-dash/home')
+    const firstCard = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    firstCard.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+    document.body.append(firstCard)
+    const iframe = persistentIframe()
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    firstCard.remove()
+    vi.advanceTimersByTime(4_999)
+    const replacement = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    replacement.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+    document.body.append(replacement)
+    vi.advanceTimersByTime(1)
+
+    expect(persistentIframe()).toBe(iframe)
+    expect(dispose).not.toHaveBeenCalled()
+  })
+
+  it('disposes a retained iframe when the route changes after the grace period', () => {
+    vi.useFakeTimers()
+    window.history.replaceState({}, '', '/sfenton-react-dash/home')
+    const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+    card.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+    document.body.append(card)
+    const iframe = persistentIframe()
+    const dispose = vi.fn(() => true)
+    setIframeDisposer(iframe, dispose)
+
+    card.remove()
+    vi.advanceTimersByTime(5_100)
+    expect(persistentIframe()).toBe(iframe)
+
+    window.history.replaceState({}, '', '/another-dashboard/home')
+    window.dispatchEvent(new Event('location-changed'))
+
+    expect(dispose).toHaveBeenCalledWith('legacy-card-disconnected')
+    expect(iframe).not.toBeInTheDocument()
   })
 
   it('disposes the pilot iframe when its app source changes after replacement', () => {
