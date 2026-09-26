@@ -1,7 +1,7 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { access, readdir, realpath } from "node:fs/promises";
-import { isAbsolute } from "node:path";
+import { lstat, mkdir, readdir, realpath } from "node:fs/promises";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { joinSession } from "@github/copilot-sdk/extension";
 
 const MAX_OUTPUT_BYTES = 512 * 1024;
@@ -54,6 +54,61 @@ function requiredEnvironment(name) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing ${name}.`);
   return value;
+}
+
+function assertIgnoredWorkspacePath(workspace, path) {
+  const result = spawnSync("git", ["check-ignore", "--quiet", "--", path], {
+    cwd: workspace,
+    env: { PATH: process.env.PATH ?? "/usr/bin:/bin" },
+    stdio: "ignore",
+  });
+  if (result.error) throw result.error;
+  if (result.status === 1) {
+    throw new Error(`Worker mountpoint must be ignored by Git: ${path}`);
+  }
+  if (result.status !== 0) throw new Error(`Git ignore verification failed for ${path}`);
+}
+
+async function realWorkspaceMountSource(workspace, relativePath) {
+  const source = join(workspace, relativePath);
+  const entry = await lstat(source);
+  if (entry.isSymbolicLink() || await realpath(source) !== source) {
+    throw new Error(`Worker mount source is a symbolic link: ${relativePath}`);
+  }
+  return source;
+}
+
+async function ensureWorkspaceDirectory(workspace, relativePath, privateArtifact = false) {
+  const parts = relativePath.split("/");
+  if (parts.some((part) => !/^[a-zA-Z0-9._-]+$/.test(part) || part === "." || part === "..")) {
+    throw new Error("Worker mountpoint path is invalid.");
+  }
+  const destination = join(workspace, ...parts);
+  const scopedPath = relative(workspace, destination);
+  if (!scopedPath || scopedPath === ".." || scopedPath.startsWith(`..${sep}`) || isAbsolute(scopedPath)) {
+    throw new Error("Worker mountpoint escaped the assigned worktree.");
+  }
+  let current = workspace;
+  for (const [index, part] of parts.entries()) {
+    current = join(current, part);
+    let entry;
+    try {
+      entry = await lstat(current);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      await mkdir(current, { mode: 0o700 });
+      entry = await lstat(current);
+    }
+    if (!entry.isDirectory() || entry.isSymbolicLink() || await realpath(current) !== current) {
+      throw new Error(`Worker mountpoint is not a real directory: ${relativePath}`);
+    }
+    if (privateArtifact && (entry.uid !== process.getuid() ||
+      (entry.mode & 0o022) !== 0 ||
+      (index === parts.length - 1 && (entry.mode & 0o077) !== 0))) {
+      throw new Error(`Research artifact directory is not private: ${relativePath}`);
+    }
+  }
+  return destination;
 }
 
 async function removeContainer(name) {
@@ -145,30 +200,49 @@ async function runIsolated(command, timeoutSeconds) {
       resultType: "failure",
     };
   }
+  assertIgnoredWorkspacePath(workspace, ".cache/worker-mountpoint");
+  await ensureWorkspaceDirectory(workspace, ".cache");
+  await ensureWorkspaceDirectory(workspace, "node_modules/.vite-temp");
+  let researchArtifactMounts = [];
+  if (readOnly) {
+    const rawIssueNumber = requiredEnvironment("ADMIN_ISSUE_NUMBER");
+    const issueNumber = Number(rawIssueNumber);
+    if (!/^[1-9]\d*$/.test(rawIssueNumber) ||
+      !Number.isSafeInteger(issueNumber) ||
+      String(issueNumber) !== rawIssueNumber) {
+      throw new Error("Research artifact issue number is invalid.");
+    }
+    const relativePath = `artifacts/admin-issue-${issueNumber}/research`;
+    assertIgnoredWorkspacePath(workspace, `${relativePath}/worker-mountpoint.png`);
+    const source = await ensureWorkspaceDirectory(workspace, relativePath, true);
+    researchArtifactMounts = [
+      "--mount",
+      `type=bind,src=${source},dst=/workspace/${relativePath}`,
+    ];
+  }
   const readOnlyMounts = [];
   for (const relativePath of READ_ONLY_WORKSPACE_PATHS) {
     if (mutableWorkspacePaths.includes(relativePath)) continue;
-    const source = `${workspace}/${relativePath}`;
     try {
-      await access(source);
+      const source = await realWorkspaceMountSource(workspace, relativePath);
       readOnlyMounts.push(
         "--mount",
         `type=bind,src=${source},dst=/workspace/${relativePath},readonly`,
       );
-    } catch {
-      // Missing paths remain covered by the controller's post-run validation.
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
     }
   }
   const mutableMounts = [];
   for (const relativePath of mutableWorkspacePaths) {
-    const source = `${workspace}/${relativePath}`;
     try {
-      await access(source);
+      const source = await realWorkspaceMountSource(workspace, relativePath);
       mutableMounts.push(
         "--mount",
         `type=bind,src=${source},dst=/workspace/${relativePath}`,
       );
-    } catch {
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
       return {
         textResultForLlm: `Authorized mutable path is missing: ${relativePath}`,
         resultType: "failure",
@@ -208,6 +282,7 @@ async function runIsolated(command, timeoutSeconds) {
     ...maskedMounts,
     ...readOnlyMounts,
     ...mutableMounts,
+    ...researchArtifactMounts,
     "--mount",
     `type=bind,src=${gitCommonDirectory},dst=${gitCommonDirectory},readonly`,
     "--tmpfs",
@@ -285,7 +360,7 @@ await joinSession({
     {
       name: "admin_issue_workspace",
       description:
-        "Read, edit, and test the assigned repository worktree inside a networkless container. Only the worktree and its read-only Git metadata are mounted from the host.",
+        "Read and test the assigned repository in a networkless container. Research-only worktrees are read-only except for their private ignored research PNG directory; approved workers may edit their assigned worktree.",
       parameters: {
         type: "object",
         properties: {

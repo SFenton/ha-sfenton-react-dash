@@ -8,11 +8,13 @@
 // @covers package.json
 // @covers .gitignore
 
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -25,6 +27,7 @@ import {
 } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { deflateSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   AdminIssueDeploymentRunError,
@@ -56,10 +59,12 @@ import {
   buildInitialInput,
   buildWorkerPrompt,
   canonicalWorkerIssueBody,
+  changedFiles,
   classifyPullRequestHead,
   closeIssueWithReceipt,
   completeAdminTodoGuarded,
   collectVisualEvidenceReceipts,
+  collectResearchMockupReceipts,
   commitIsAncestor,
   controllerClosedIssueDisposition,
   createCommittedDiffReceipt,
@@ -71,6 +76,7 @@ import {
   focusedLayoutAcceptanceScenarios,
   focusedLayoutPlaywrightConfig,
   handleLateOwnerInput,
+  handleResearchOnlyQuestion,
   isolatedWorkerConfig,
   githubIssueInputFetchPlan,
   githubRepositoryFromRemote,
@@ -96,6 +102,7 @@ import {
   prepareGitHubMediaInput,
   prepareReopenedMedia,
   publishPullRequestIssueComment,
+  publishResearchMockups,
   pullRequestBodyWithVisualEvidence,
   pushCandidate,
   queueVerifiedLayoutEvidence,
@@ -233,6 +240,100 @@ function record(): AdminIssueRecord {
     updatedAt: '2026-09-20T12:00:00.000Z',
     workerRuns: 0,
   }
+}
+
+function mockupPng(red: number) {
+  const chunk = (name: string, data: Buffer) => {
+    const payload = Buffer.concat([Buffer.from(name), data])
+    let crc = 0xffffffff
+    for (const byte of payload) {
+      crc ^= byte
+      for (let bit = 0; bit < 8; bit += 1) {
+        crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0)
+      }
+    }
+    const length = Buffer.alloc(4)
+    const checksum = Buffer.alloc(4)
+    length.writeUInt32BE(data.length)
+    checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0)
+    return Buffer.concat([length, payload, checksum])
+  }
+  const header = Buffer.alloc(13)
+  header.writeUInt32BE(1, 0)
+  header.writeUInt32BE(1, 4)
+  header[8] = 8
+  header[9] = 2
+  return Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.from([0, red, 64, 128]))),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+function workerExtensionFixture() {
+  const root = mkdtempSync(join(homedir(), '.admin-issue-extension-test-'))
+  temporaryDirectories.push(root)
+  const extensionPath = join(root, 'worker-extension.mjs')
+  const packagePath = join(root, 'node_modules/@github/copilot-sdk')
+  const dockerBin = join(root, 'node_modules/.worker-test-bin')
+  const dockerArgsPath = join(root, 'node_modules/worker-docker-args.txt')
+  mkdirSync(join(root, 'src'), { mode: 0o700 })
+  mkdirSync(packagePath, { recursive: true })
+  mkdirSync(dockerBin, { recursive: true })
+  writeFileSync(join(root, '.gitignore'), '.cache/\nartifacts/\nnode_modules/\n.env.development\n')
+  writeFileSync(join(root, 'src/locked.txt'), 'immutable\n')
+  writeFileSync(join(root, '.env.development'), 'synthetic-test-only\n')
+  copyFileSync(
+    resolve(process.cwd(), 'ops/admin-issue-controller/worker-extension.mjs'),
+    extensionPath,
+  )
+  writeFileSync(join(packagePath, 'package.json'), JSON.stringify({
+    exports: { './extension': './extension.mjs' },
+    name: '@github/copilot-sdk',
+    type: 'module',
+  }))
+  writeFileSync(join(packagePath, 'extension.mjs'), [
+    'export async function joinSession({ tools }) {',
+    '  const result = await tools[0].handler({',
+    '    command: process.env.ADMIN_ISSUE_TEST_COMMAND ?? "printf worker-smoke-ok",',
+    '    timeout_seconds: 60,',
+    '  });',
+    '  process.stdout.write(JSON.stringify(result));',
+    '}',
+  ].join('\n'))
+  writeFileSync(join(dockerBin, 'docker'), [
+    '#!/bin/sh',
+    `printf '%s\\n' "$@" > "${dockerArgsPath}"`,
+    'printf "worker-smoke-ok\\n"',
+  ].join('\n'), { mode: 0o700 })
+  execFileSync('git', ['init', '--quiet'], { cwd: root })
+  execFileSync('git', ['add', '.gitignore', 'src/locked.txt', 'worker-extension.mjs'], {
+    cwd: root,
+  })
+  execFileSync('git', [
+    '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+    'commit', '--quiet', '-m', 'Temporary worker test fixture',
+  ], { cwd: root })
+  const run = (
+    overrides: Record<string, string> = {},
+    fakeDocker = true,
+  ) => spawnSync(process.execPath, [extensionPath], {
+    cwd: root,
+    encoding: 'utf8',
+    env: {
+      ADMIN_ISSUE_CONTAINER_UID: 'a'.repeat(64),
+      ADMIN_ISSUE_GIT_COMMON_DIR: join(root, '.git'),
+      ADMIN_ISSUE_NUMBER: '242',
+      ADMIN_ISSUE_READ_ONLY: '1',
+      ADMIN_ISSUE_WORKER_IMAGE: `sha256:${'b'.repeat(64)}`,
+      ADMIN_ISSUE_WORKSPACE: root,
+      PATH: `${fakeDocker ? `${dockerBin}:` : ''}${process.env.PATH ?? '/usr/bin:/bin'}`,
+      ...overrides,
+    },
+    timeout: 90_000,
+  })
+  return { dockerArgsPath, root, run }
 }
 
 function approvedDonetickIssue() {
@@ -3836,6 +3937,218 @@ describe('admin issue controller security configuration', () => {
     ).toThrow('artifacts/admin-issue-321')
   })
 
+  it('publishes exactly three research-only PNG mockups with pinned receipts and a clean outcome', async () => {
+    const worktreePath = mkdtempSync(join(homedir(), '.admin-issue-research-mockups-test-'))
+    temporaryDirectories.push(worktreePath)
+    const researchDirectory = join(worktreePath, 'artifacts/admin-issue-242/research')
+    mkdirSync(researchDirectory, { recursive: true, mode: 0o700 })
+    const names = ['separate-scopes', 'session-only', 'prewash-lockout']
+    const drafts = names.map((name, index) => {
+      writeFileSync(join(researchDirectory, `${name}.png`), mockupPng(30 + index * 80))
+      return {
+        alt: `Option ${index + 1}: ${name}`,
+        caption: `Mock evidence: option ${index + 1}, not an implemented control.`,
+        path: `artifacts/admin-issue-242/research/${name}.png`,
+      }
+    })
+    const issue = record()
+    issue.issueNumber = 242
+    issue.worktreePath = worktreePath
+    issue.processedRevision = issue.inputRevision
+    issue.receipts.researchOnlyScope = 'true'
+    const outcome = parseWorkerOutcome(JSON.stringify({
+      decision: 'needs_input',
+      iosFollowUp: { reason: '', required: false },
+      questions: [{
+        options: ['Separate scopes', 'Session only', 'Pre-wash lockout'],
+        question: 'Which control policy should a later implementation pursue?',
+        recommendation: 'Separate scopes',
+      }],
+      schemaVersion: 1,
+      summary: 'Three mockups compare the proposed controls without implementation.',
+      visualEvidence: drafts,
+    }))
+    if (outcome.decision !== 'needs_input') throw new Error('Expected mockup question')
+    expect(collectResearchMockupReceipts(issue, outcome.visualEvidence)).toHaveLength(3)
+    const state = baselineAdminIssueState([], issue.createdAt)
+    state.issues[issue.uid] = issue
+    const persist = vi.fn(() => assertAdminIssueControllerState(state))
+    const upload = vi.fn(async (_bytes: Buffer, name: string) => {
+      expect(issue.researchMockups?.images.find((image) => image.path.endsWith(name))
+        ?.uploadAttemptedAt).toBeDefined()
+      return `https://github.com/user-attachments/assets/${name.slice(0, -4)}`
+    })
+    const uploaded = await publishResearchMockups(issue, outcome, upload, persist)
+    expect(upload).toHaveBeenCalledTimes(3)
+    expect(persist).toHaveBeenCalledTimes(7)
+    expect(uploaded.map((image) => image.url)).toEqual(names.map((name) =>
+      `https://github.com/user-attachments/assets/${name}`))
+    const legacy = JSON.parse(JSON.stringify(state)) as { version: number }
+    legacy.version = 2
+    expect(() => migrateAdminIssueControllerState(legacy, issue.createdAt))
+      .toThrow('researchMockups requires v3')
+    const comment = formatQuestionsComment(issue.uid, issue.processedRevision, outcome, uploaded)
+    expect(comment).toContain('## Research mockups (mock only; no implementation)')
+    expect(comment).not.toContain('## Proposed fixed behavior')
+    expect(comment.match(/!\[Option \d:/g)).toHaveLength(3)
+    await publishResearchMockups(issue, outcome, upload, persist)
+    expect(upload).toHaveBeenCalledTimes(3)
+    expect(persist).toHaveBeenCalledTimes(7)
+    issue.inputRevision = 2
+    issue.processedRevision = 2
+    const reused = await publishResearchMockups(issue, outcome, upload, persist)
+    expect(reused.map((image) => image.url)).toEqual(uploaded.map((image) => image.url))
+    expect(upload).toHaveBeenCalledTimes(3)
+    expect(issue.researchMockups?.revision).toBe(2)
+    expect(() => assertResearchOnlyOutcome(issue, outcome, [])).not.toThrow()
+    expect(() => assertResearchOnlyOutcome(issue, outcome, ['src/pages/Changed.tsx']))
+      .toThrow('must leave its assigned worktree clean')
+    const implementationIssue = record()
+    implementationIssue.issueNumber = 242
+    implementationIssue.worktreePath = worktreePath
+    implementationIssue.processedRevision = implementationIssue.inputRevision
+    await expect(publishResearchMockups(implementationIssue, outcome, upload, persist))
+      .rejects.toThrow('Only research-only workers')
+    expect(upload).toHaveBeenCalledTimes(3)
+
+    expect(() => collectResearchMockupReceipts(issue, [
+      { ...drafts[0], path: 'artifacts/admin-issue-242/research/../escape.png' },
+    ])).toThrow('inside artifacts/admin-issue-242/research/')
+    expect(() => collectResearchMockupReceipts(issue, [
+      { ...drafts[0], path: drafts[0].path.replace('242', '243') },
+    ])).toThrow('inside artifacts/admin-issue-242/research/')
+    writeFileSync(join(worktreePath, 'outside.png'), mockupPng(120))
+    symlinkSync(join(worktreePath, 'outside.png'), join(researchDirectory, 'linked.png'))
+    expect(() => collectResearchMockupReceipts(issue, [
+      { ...drafts[0], path: 'artifacts/admin-issue-242/research/linked.png' },
+    ])).toThrow('private regular file')
+    writeFileSync(join(researchDirectory, 'duplicate.png'), mockupPng(30))
+    expect(() => collectResearchMockupReceipts(issue, [
+      drafts[0],
+      { ...drafts[0], path: 'artifacts/admin-issue-242/research/duplicate.png' },
+    ])).toThrow('duplicate images')
+    writeFileSync(join(researchDirectory, 'invalid.png'), 'not a PNG')
+    expect(() => collectResearchMockupReceipts(issue, [
+      { ...drafts[0], path: 'artifacts/admin-issue-242/research/invalid.png' },
+    ])).toThrow('valid PNG')
+    writeFileSync(join(researchDirectory, 'oversized.png'), mockupPng(100))
+    truncateSync(join(researchDirectory, 'oversized.png'), 10 * 1024 * 1024 + 1)
+    expect(() => collectResearchMockupReceipts(issue, [
+      { ...drafts[0], path: 'artifacts/admin-issue-242/research/oversized.png' },
+    ])).toThrow('image size limit')
+    writeFileSync(join(researchDirectory, `${names[0]}.png`), mockupPng(32))
+    expect(() => collectResearchMockupReceipts(issue, drafts, uploaded))
+      .toThrow('changed after its receipt')
+
+    const unknown = record()
+    unknown.issueNumber = 242
+    unknown.worktreePath = worktreePath
+    unknown.processedRevision = unknown.inputRevision
+    unknown.receipts.researchOnlyScope = 'true'
+    const failedUpload = vi.fn(async () => { throw new Error('Interrupted GitHub upload') })
+    await expect(publishResearchMockups(unknown, {
+      ...outcome, visualEvidence: [drafts[1]],
+    }, failedUpload, () => {})).rejects.toThrow('Interrupted GitHub upload')
+    expect(unknown.researchMockups?.images[0].uploadAttemptedAt).toBeDefined()
+    await expect(publishResearchMockups(unknown, {
+      ...outcome, visualEvidence: [drafts[1]],
+    }, failedUpload, () => {})).rejects.toThrow('upload outcome is unknown')
+    unknown.inputRevision = 2
+    unknown.processedRevision = 2
+    await expect(publishResearchMockups(unknown, {
+      ...outcome, visualEvidence: [drafts[1]],
+    }, failedUpload, () => {})).rejects.toThrow('upload outcome is unknown')
+    expect(failedUpload).toHaveBeenCalledTimes(1)
+    expect(() => beginAdminIssueGeneration(unknown, issue.createdAt))
+      .toThrow('upload outcome is unknown')
+    expect(() => assertAdminIssueControllerState({
+      ...state,
+      issues: { [issue.uid]: {
+        ...issue,
+        researchMockups: { ...issue.researchMockups, images: [{
+          ...uploaded[0],
+          path: 'artifacts/admin-issue-242/research/../escape.png',
+        }] },
+      } },
+    })).toThrow('private research directory')
+  })
+
+  it('blocks a dirty research worktree before uploading mockups or posting a decision', async () => {
+    const { root } = workerExtensionFixture()
+    rmSync(join(root, '.env.development'))
+    const researchDirectory = join(root, 'artifacts/admin-issue-242/research')
+    mkdirSync(researchDirectory, { recursive: true, mode: 0o700 })
+    const draft = {
+      alt: 'Separate control scopes',
+      caption: 'Mock evidence: separate room and dock controls.',
+      path: 'artifacts/admin-issue-242/research/separate-scopes.png',
+    }
+    writeFileSync(join(root, draft.path), mockupPng(42))
+    const issue = record()
+    issue.issueNumber = 242
+    issue.worktreePath = root
+    issue.receipts.researchOnlyScope = 'true'
+    issue.processedRevision = issue.inputRevision
+    issue.phase = 'researching'
+    const outcome = parseWorkerOutcome(JSON.stringify({
+      decision: 'needs_input',
+      iosFollowUp: { reason: '', required: false },
+      questions: [{
+        options: ['Separate scopes', 'Conservative session-only controls'],
+        question: 'Which control policy should be implemented later?',
+      }],
+      schemaVersion: 1,
+      summary: 'The requested mockups compare the proposed controls.',
+      visualEvidence: [draft],
+    }))
+    if (outcome.decision !== 'needs_input') throw new Error('Expected a research-only question')
+    expect(await changedFiles(root)).toEqual([])
+    const upload = vi.fn(async () => 'https://github.com/user-attachments/assets/separate-scopes')
+    const receiptPersist = vi.fn()
+    const publish = vi.fn(async () =>
+      await publishResearchMockups(issue, outcome, upload, receiptPersist))
+    const decisionComment = vi.fn(async (mockups: Awaited<ReturnType<typeof publish>>) => {
+      expect(formatQuestionsComment(issue.uid, issue.processedRevision, outcome, mockups))
+        .toContain('## Research mockups (mock only; no implementation)')
+    })
+    const block = vi.fn(async () => {})
+    const persist = vi.fn()
+    const effects = {
+      block,
+      changedFiles,
+      persist,
+      postDecision: decisionComment,
+      publishMockups: publish,
+    }
+
+    writeFileSync(join(root, 'src/locked.txt'), 'dirty tracked source\n')
+    expect(await changedFiles(root)).toContain('src/locked.txt')
+    await handleResearchOnlyQuestion(issue, outcome, effects)
+    expect(block).toHaveBeenCalledWith('Research-only issue must leave its assigned worktree clean')
+    expect(publish).not.toHaveBeenCalled()
+    expect(upload).not.toHaveBeenCalled()
+    expect(receiptPersist).not.toHaveBeenCalled()
+    expect(decisionComment).not.toHaveBeenCalled()
+    expect(issue.researchMockups).toBeUndefined()
+
+    writeFileSync(join(root, 'src/locked.txt'), 'immutable\n')
+    expect(await changedFiles(root)).toEqual([])
+    await handleResearchOnlyQuestion(issue, outcome, effects)
+    expect(publish).toHaveBeenCalledTimes(1)
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(decisionComment).toHaveBeenCalledTimes(1)
+    expect(issue.phase).toBe('awaiting-user')
+
+    issue.phase = 'researching'
+    issue.inputRevision += 1
+    publish.mockClear()
+    decisionComment.mockClear()
+    await handleResearchOnlyQuestion(issue, outcome, effects)
+    expect(issue.phase).toBe('queued')
+    expect(publish).not.toHaveBeenCalled()
+    expect(decisionComment).not.toHaveBeenCalled()
+  })
+
   it('requires published images in both the pull request and issue update', () => {
     const issue = record()
     authorizeRecord(issue)
@@ -4975,6 +5288,137 @@ describe('admin issue controller security configuration', () => {
     expect(service).toContain('ExecStart=%h/.local/bin/node')
   })
 
+  it('creates trusted cache and research mounts but rejects traversal, symlinks, and public artifacts', () => {
+    const { dockerArgsPath, root, run } = workerExtensionFixture()
+    expect(existsSync(join(root, '.cache'))).toBe(false)
+    const first = run()
+    expect(first.status).toBe(0)
+    expect(JSON.parse(first.stdout)).toEqual({
+      resultType: 'success',
+      textResultForLlm: 'worker-smoke-ok',
+    })
+    const research = join(root, 'artifacts/admin-issue-242/research')
+    expect(lstatSync(join(root, '.cache')).isDirectory()).toBe(true)
+    expect(lstatSync(join(root, 'node_modules/.vite-temp')).isDirectory()).toBe(true)
+    expect(lstatSync(research).mode & 0o777).toBe(0o700)
+    expect(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }))
+      .toBe('')
+    const args = readFileSync(dockerArgsPath, 'utf8').trim().split('\n')
+    expect(args).toContain('none')
+    expect(args).toContain('--read-only')
+    expect(args).toContain(`type=bind,src=${root},dst=/workspace,readonly`)
+    expect(args).toContain(
+      `type=bind,src=${research},dst=/workspace/artifacts/admin-issue-242/research`,
+    )
+    expect(args).toContain('type=bind,src=/dev/null,dst=/workspace/.env.development,readonly')
+    const uid = process.getuid?.()
+    const gid = process.getgid?.()
+    if (uid === undefined || gid === undefined) throw new Error('Linux worker IDs are required')
+    expect(args).toContain('/workspace/.cache:rw,nosuid,nodev,size=256m,uid=' +
+      `${uid},gid=${gid}`)
+    expect(args).toContain('/workspace/node_modules/.vite-temp:rw,nosuid,nodev,size=256m,uid=' +
+      `${uid},gid=${gid}`)
+    expect(args).not.toContain(`dst=/workspace/artifacts/admin-issue-242`)
+    const outside = mkdtempSync(join(homedir(), '.admin-issue-extension-outside-'))
+    temporaryDirectories.push(outside)
+    writeFileSync(join(outside, 'unchanged'), 'outside\n')
+    for (const path of [
+      '.cache',
+      'node_modules/.vite-temp',
+      'artifacts',
+      'artifacts/admin-issue-242',
+      'artifacts/admin-issue-242/research',
+    ]) {
+      const target = join(root, path)
+      rmSync(target, { force: true, recursive: true })
+      symlinkSync(outside, target)
+      const failure = run()
+      expect(failure.status).not.toBe(0)
+      expect(failure.stderr).toMatch(/not a real directory|must be ignored by Git|Git ignore verification failed/)
+      rmSync(target, { force: true })
+      expect(run().status).toBe(0)
+    }
+    for (const issueNumber of ['../242', '242/../../../tmp', '0', '0242']) {
+      const failure = run({ ADMIN_ISSUE_NUMBER: issueNumber })
+      expect(failure.status).not.toBe(0)
+      expect(failure.stderr).toContain('Research artifact issue number is invalid')
+    }
+    chmodSync(research, 0o755)
+    const publicArtifact = run()
+    expect(publicArtifact.status).not.toBe(0)
+    expect(publicArtifact.stderr).toContain('Research artifact directory is not private')
+    chmodSync(research, 0o700)
+    writeFileSync(join(root, '.gitignore'), '.cache/\nnode_modules/\n.env.development\n')
+    const notIgnored = run()
+    expect(notIgnored.status).not.toBe(0)
+    expect(notIgnored.stderr).toContain('must be ignored by Git')
+    writeFileSync(join(root, '.gitignore'), '.cache/\nartifacts/\nnode_modules/\n.env.development\n')
+    mkdirSync(join(root, 'scripts'))
+    const readOnlySource = join(root, 'scripts/admin-issue-controller.ts')
+    symlinkSync(join(outside, 'unchanged'), readOnlySource)
+    const unsafeRead = run()
+    expect(unsafeRead.status).not.toBe(0)
+    expect(unsafeRead.stderr).toContain('Worker mount source is a symbolic link')
+    rmSync(readOnlySource)
+    const mutableSource = join(root, 'scripts/layout')
+    symlinkSync(outside, mutableSource)
+    const unsafeWrite = run({
+      ADMIN_ISSUE_MUTABLE_PATHS: 'scripts/layout',
+      ADMIN_ISSUE_READ_ONLY: '0',
+    })
+    expect(unsafeWrite.status).not.toBe(0)
+    expect(unsafeWrite.stderr).toContain('Worker mount source is a symbolic link')
+    rmSync(mutableSource)
+    expect(readFileSync(join(outside, 'unchanged'), 'utf8')).toBe('outside\n')
+    const ordinary = run({ ADMIN_ISSUE_READ_ONLY: '0' })
+    expect(ordinary.status).toBe(0)
+    const ordinaryArgs = readFileSync(dockerArgsPath, 'utf8')
+    expect(ordinaryArgs).toContain(`type=bind,src=${root},dst=/workspace\n`)
+    expect(ordinaryArgs).not.toContain('dst=/workspace/artifacts/admin-issue-242/research')
+  })
+
+  it.skipIf(!process.env.ADMIN_ISSUE_DOCKER_SMOKE_IMAGE)(
+    'runs a read-only research PNG and tracked-write denial in the pinned networkless Docker image',
+    () => {
+      const { root, run } = workerExtensionFixture()
+      const png = mockupPng(70)
+      const command = [
+        'node -e',
+        JSON.stringify([
+          'const fs = require("node:fs");',
+          'const zlib = require("node:zlib");',
+          'const file = "artifacts/admin-issue-242/research/smoke.png";',
+          `fs.writeFileSync(file, Buffer.from("${png.toString('base64')}", "base64"));`,
+          'fs.writeFileSync(".cache/transient", "tmpfs only");',
+          'const image = fs.readFileSync(file);',
+          'if (image.readUInt32BE(16) !== 1 || image.readUInt32BE(20) !== 1) throw Error("Invalid PNG dimensions");',
+          'const raw = zlib.inflateSync(image.subarray(41, 41 + image.readUInt32BE(33)));',
+          'if (!raw.equals(Buffer.from([0, 70, 64, 128]))) throw Error("Invalid PNG pixel");',
+          'for (const path of ["src/locked.txt", "artifacts/outside.png"]) {',
+          '  try { fs.writeFileSync(path, "not allowed"); throw Error("Workspace was writable: " + path); }',
+          '  catch (error) { if (error.code !== "EACCES" && error.code !== "EROFS") throw error; }',
+          '}',
+          'process.stdout.write("research-png-verified");',
+        ].join(' ')),
+      ].join(' ')
+      const result = run({
+        ADMIN_ISSUE_TEST_COMMAND: command,
+        ADMIN_ISSUE_WORKER_IMAGE: process.env.ADMIN_ISSUE_DOCKER_SMOKE_IMAGE ?? '',
+      }, false)
+      expect(result.status).toBe(0)
+      expect(JSON.parse(result.stdout)).toEqual({
+        resultType: 'success',
+        textResultForLlm: 'research-png-verified',
+      })
+      expect(readFileSync(join(root, 'artifacts/admin-issue-242/research/smoke.png')))
+        .toEqual(png)
+      expect(existsSync(join(root, '.cache/transient'))).toBe(false)
+      expect(readFileSync(join(root, 'src/locked.txt'), 'utf8')).toBe('immutable\n')
+      expect(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }))
+        .toBe('')
+    },
+  )
+
   it('pins the worker model and excludes privileged built-in tools', () => {
     const controller = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
     expect(controller).toContain("'gpt-5.6-sol'")
@@ -5106,9 +5550,19 @@ describe('admin issue controller security configuration', () => {
       `${'Investigate the vacuum actions and dock clean interaction. '.repeat(6)}` +
       'I want you to research and propose what we should do next, but I don’t want you to actually go implement anything yet.'
     const issue = record()
+    issue.issueNumber = 242
+    issue.issueUrl = 'https://github.com/SFenton/ha-sfenton-react-dash/issues/242'
     issue.title = issueTitle(summary)
     issue.description = ''
     issue.inputs[0].body = ''
+    appendIssueInput(issue, {
+      body: 'Show me mockups of each example',
+      createdAt: '2026-09-25T05:40:08.000Z',
+      externalId: 'comment:242',
+      source: 'issue-comment',
+      sourceKey: 'comment:242',
+      sourceUpdatedAt: '2026-09-25T05:40:08.000Z',
+    })
     issue.receipts.researchOnlyScope = 'true'
     issue.worktreePath = '/private/issue-worktree'
     const config = { ownerId: 3988463, ownerLogin: 'SFenton' }
@@ -5133,6 +5587,10 @@ describe('admin issue controller security configuration', () => {
     const prompt = buildWorkerPrompt(issue, body)
     expect(prompt).toContain('research-only')
     expect(prompt).toContain('don’t want you to actually go implement anything yet')
+    expect(prompt).toContain('Show me mockups of each example')
+    expect(prompt).toContain('artifacts/admin-issue-242/research/')
+    expect(prompt).toContain('render exactly one distinct PNG for each requested alternative')
+    expect(prompt).toContain('needs_input.visualEvidence')
     expect(prompt).not.toContain('Otherwise implement the complete fix')
     expect(workerHassPermissionArgs('hass', true)).toContain('hass(ha_get_state)')
     expect(workerHassPermissionArgs('hass', true)).toContain('hass(ha_get_history)')
