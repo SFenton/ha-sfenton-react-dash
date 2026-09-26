@@ -1702,6 +1702,7 @@ export function beginAdminIssueGeneration(record: AdminIssueRecord, updatedAt: s
     'iosVerifiedAt',
     'issueClosedAt',
     'issueCloseAttemptAt',
+    'layoutIncidentCoverageSha256',
     'layoutValidatedAt',
     'mergedAt',
     'prCommentPendingAt',

@@ -1,6 +1,7 @@
 import { strToU8, zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import {
+  assertLayoutIncidentCoverage,
   assertFailedDeploymentRun,
   assertFailedLayoutRun,
   assertSuccessfulDeploymentRun,
@@ -10,10 +11,12 @@ import {
   failedLayoutJob,
   layoutArtifact,
   layoutFailureReference,
+  layoutIncidentRequirements,
   summarizeFailedLayoutJobLog,
   summarizeFailedLayoutPlanJobLog,
   summarizeLayoutArtifactZip,
   summarizeLayoutPlanArtifactZip,
+  summarizeSuccessfulLayoutArtifactZip,
   type EvidenceWorkflowArtifact,
   type EvidenceWorkflowJob,
   type EvidenceWorkflowRun,
@@ -400,6 +403,142 @@ describe('sanitized layout diagnostic packet', () => {
     }))).toThrow('unsafe archive entry')
     expect(() => summarizeLayoutArtifactZip(new Uint8Array([0x50, 0x4b, 0, 0])))
       .toThrow('could not be read safely')
+  })
+})
+
+describe('coverage-bound layout incident completion', () => {
+  const successfulHead = 'b'.repeat(40)
+  const planId = 'c'.repeat(64)
+  const sourceDigest = 'd'.repeat(64)
+  const original = {
+    ...buildLayoutEvidencePacket(reference, run, job, artifact, failedLog, zip),
+    source: 'workflow-evidence',
+  }
+  const selected = [
+    { id: 'webkit-1', project: 'webkit', file: 'layout-acceptance.spec.ts' },
+    { id: 'mobile-1', project: 'mobile', file: 'layout-guards.spec.ts' },
+  ]
+  const successArchive = (
+    plannedCheckpoints = 5,
+    tests = selected,
+    mode = 'full-known-mock',
+    statuses = tests.map(() => 'passed'),
+    sourceHead = successfulHead,
+  ) => zipSync({
+    'plan.json': strToU8(JSON.stringify({
+      blockers: [],
+      id: planId,
+      mode,
+      obligations: Array.from({ length: plannedCheckpoints }, () => ({})),
+      source: { head: sourceHead },
+    })),
+    'run.json': strToU8(JSON.stringify({
+      planId,
+      runId: 'run-1',
+      source: { digest: sourceDigest, head: sourceHead },
+    })),
+    'automated-assessment.json': strToU8(JSON.stringify({
+      automatedPassed: true,
+      counts: {
+        attempts: tests.length,
+        executedCheckpoints: plannedCheckpoints,
+        failedCheckpoints: 0,
+        passedCheckpoints: plannedCheckpoints,
+        plannedCheckpoints,
+        selectedTests: tests.length,
+      },
+    })),
+    'execution.json': strToU8(JSON.stringify({
+      attempts: tests.map((test, index) => ({ testId: test.id, status: statuses[index] })),
+      complete: true,
+      errors: [],
+      planId,
+      runId: 'run-1',
+      selected: tests,
+      sourceDigest,
+      status: 'passed',
+    })),
+  })
+
+  it('uses only an unchanged host-signed original packet and passed matching browser specs', () => {
+    const requirements = layoutIncidentRequirements(original, reference, repository)
+    expect(requirements).toEqual({
+      plannedCheckpoints: 5,
+      failedSpecs: [{ browser: 'webkit', file: 'layout-acceptance.spec.ts' }],
+    })
+    const coverage = summarizeSuccessfulLayoutArtifactZip(
+      successArchive(), successfulHead,
+    )
+    expect(coverage).toMatchObject({
+      mode: 'full-known-mock',
+      plannedCheckpoints: 5,
+      passedSpecs: [
+        { browser: 'webkit', file: 'layout-acceptance.spec.ts' },
+        { browser: 'mobile', file: 'layout-guards.spec.ts' },
+      ],
+    })
+    expect(() => assertLayoutIncidentCoverage(requirements, coverage)).not.toThrow()
+    expect(() => layoutIncidentRequirements({
+      ...original,
+      body: original.body.replace('"plannedCheckpoints":5', '"plannedCheckpoints":0'),
+    }, reference, repository)).toThrow('fingerprint changed')
+    expect(() => layoutIncidentRequirements({
+      ...original, externalId: original.externalId.replace(':123:', ':124:'),
+    }, reference, repository)).toThrow('run binding')
+  })
+
+  it('rejects an accepted zero-checkpoint tooling run and an incomplete original-browser replay', () => {
+    const requirements = layoutIncidentRequirements(original, reference, repository)
+    const tooling = summarizeSuccessfulLayoutArtifactZip(
+      successArchive(0, [
+        { id: 'mobile-guard', project: 'mobile', file: 'layout-guards.spec.ts' },
+      ], 'tooling'),
+      successfulHead,
+    )
+    expect(() => assertLayoutIncidentCoverage(requirements, tooling))
+      .toThrow('original product checkpoints')
+    const wrongBrowser = summarizeSuccessfulLayoutArtifactZip(
+      successArchive(5, [
+        { id: 'mobile-guard', project: 'mobile', file: 'layout-guards.spec.ts' },
+      ]),
+      successfulHead,
+    )
+    expect(() => assertLayoutIncidentCoverage(requirements, wrongBrowser))
+      .toThrow('omitted the original failed browser spec')
+    const skipped = summarizeSuccessfulLayoutArtifactZip(
+      successArchive(5, selected, 'full-known-mock', ['skipped', 'passed']),
+      successfulHead,
+    )
+    expect(() => assertLayoutIncidentCoverage(requirements, skipped))
+      .toThrow('omitted the original failed browser spec')
+    const tooFew = summarizeSuccessfulLayoutArtifactZip(
+      successArchive(4), successfulHead,
+    )
+    expect(() => assertLayoutIncidentCoverage(requirements, tooFew))
+      .toThrow('original product checkpoints')
+  })
+
+  it('fails closed for wrong head, altered counts, missing entries and invalid execution', () => {
+    expect(() => summarizeSuccessfulLayoutArtifactZip(
+      successArchive(), 'e'.repeat(40),
+    )).toThrow('plan and execution disagree')
+    const noExecution = zipSync({
+      'plan.json': strToU8('{}'),
+      'run.json': strToU8('{}'),
+      'automated-assessment.json': strToU8('{}'),
+    })
+    expect(() => summarizeSuccessfulLayoutArtifactZip(noExecution, successfulHead))
+      .toThrow('lacks one exact plan or ledger')
+    expect(() => summarizeSuccessfulLayoutArtifactZip(
+      successArchive(5, selected, 'full-known-mock', ['passed', 'failed']),
+      successfulHead,
+    )).toThrow('invalid attempt')
+    expect(() => summarizeSuccessfulLayoutArtifactZip(
+      zipSync({
+        '../untrusted': strToU8('x'),
+        'plan.json': strToU8('{}'),
+      }), successfulHead,
+    )).toThrow('unsafe archive entry')
   })
 })
 

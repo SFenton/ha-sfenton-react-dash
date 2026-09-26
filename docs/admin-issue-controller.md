@@ -254,6 +254,15 @@ and checks the candidate commit and tree before and after each command. An
 ambiguous or missing changed owner fails closed; it is not a skipped test.
 This focused smoke runs no managed `layout:run` and cannot certify full
 layout acceptance: the post-merge master workflow still owns that evidence.
+For a GitHub-automation layout incident, a green workflow conclusion alone
+cannot complete the issue. The host validates the exact successful merge
+artifact against its original fingerprinted failure packet: planned/passed
+checkpoint counts and every originally failed browser/spec must be covered.
+A zero-checkpoint tooling run cannot stand in for prior WebKit failures; the
+controller blocks with the exact missing coverage instead of closing the
+incident. A separately authorized protected full-layout dispatch is
+diagnostic evidence, not a forged owner reply or an automatic exact-merge
+completion receipt.
 
 ## Independent intake and bounded workers
 

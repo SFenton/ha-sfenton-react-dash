@@ -118,6 +118,7 @@ import {
   WorkflowEvidenceError,
   assertFailedDeploymentRun,
   assertFailedLayoutRun,
+  assertLayoutIncidentCoverage,
   assertSuccessfulDeploymentRun,
   buildLayoutEvidencePacket,
   deploymentFailureReference,
@@ -125,6 +126,8 @@ import {
   failedLayoutJob,
   layoutArtifact,
   layoutFailureReference,
+  layoutIncidentRequirements,
+  summarizeSuccessfulLayoutArtifactZip,
   type DeploymentFailureReference,
   type EvidenceWorkflowArtifact,
   type EvidenceWorkflowJob,
@@ -6089,8 +6092,76 @@ export function assertSuccessfulLayoutWorkflowRun(
   }
 }
 
+async function verifyLayoutIncidentWorkflowCoverage(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+  run: WorkflowRun,
+) {
+  if (record.origin !== 'github-automation' || record.automationKind !== 'layout' ||
+    record.provenance.kind !== 'active' || !record.provenance.merge) {
+    throw new AdminIssueProvenanceError('Layout incident has no trusted automation merge')
+  }
+  const mergeSha = record.provenance.merge.mergeSha
+  assertSuccessfulLayoutWorkflowRun(run, mergeSha)
+  if (!Number.isSafeInteger(run.id) || run.id <= 0 ||
+    !Number.isSafeInteger(run.run_attempt) || run.run_attempt <= 0) {
+    throw new AdminIssueProvenanceError('Layout incident workflow run identity is invalid')
+  }
+  try {
+    const original = layoutFailureReference(record.description, config.repository)
+    const journaled = record.inputs.filter((input) => input.source === 'workflow-evidence')
+    if (journaled.length > 1) {
+      throw new AdminIssueProvenanceError('Layout incident has ambiguous original diagnostics')
+    }
+    const packet = journaled[0] ??
+      { ...await loadLayoutEvidencePacket(
+        config, await getIssue(config, record.issueNumber), original,
+      ), source: 'workflow-evidence' }
+    const requirements = layoutIncidentRequirements(packet, original, config.repository)
+    const metadata = await ghApi<EvidenceWorkflowRun>(
+      config, 'GET', `repos/${config.repository}/actions/runs/${run.id}`,
+    )
+    assertSuccessfulLayoutWorkflowRun(metadata, mergeSha)
+    if (metadata.id !== run.id || metadata.run_attempt !== run.run_attempt ||
+      metadata.html_url !== run.html_url ||
+      metadata.name !== 'Playwright' ||
+      metadata.path !== '.github/workflows/playwright.yml' ||
+      Number.isNaN(Date.parse(metadata.created_at))) {
+      throw new AdminIssueProvenanceError('Successful layout run metadata changed during coverage verification')
+    }
+    const response = await ghApi<{
+      total_count: number
+      artifacts: EvidenceWorkflowArtifact[]
+    }>(config, 'GET', `repos/${config.repository}/actions/runs/${run.id}/artifacts?per_page=100`)
+    if (!Array.isArray(response.artifacts) || !Number.isSafeInteger(response.total_count) ||
+      response.total_count !== response.artifacts.length) {
+      throw new AdminIssueProvenanceError('Successful layout artifact list is incomplete')
+    }
+    const artifact = layoutArtifact(response.artifacts, metadata, config.repositoryId)
+    const token = await runCommand('gh', ['auth', 'token'], {
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    })
+    const archive = await downloadActionsArtifact(
+      config.repository, artifact.id, token.stdout.trim(),
+    )
+    if (archive.byteLength !== artifact.size_in_bytes) {
+      throw new AdminIssueProvenanceError('Successful layout archive differs from GitHub metadata')
+    }
+    const coverage = summarizeSuccessfulLayoutArtifactZip(archive, mergeSha)
+    assertLayoutIncidentCoverage(requirements, coverage)
+    return coverage.archiveSha256
+  } catch (error) {
+    if (error instanceof WorkflowEvidenceError) {
+      throw new AdminIssueProvenanceError(`Layout incident coverage is unverified: ${error.message}`)
+    }
+    throw error
+  }
+}
+
 async function waitForLayoutWorkflow(
   config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
   mergeSha: string,
   refreshInputs: () => Promise<boolean>,
 ) {
@@ -6109,14 +6180,20 @@ async function waitForLayoutWorkflow(
     }
     assertSuccessfulLayoutWorkflowRun(run, mergeSha)
     if (!(await refreshInputs())) return undefined
-    return run
+    const coverageSha256 = await verifyLayoutIncidentWorkflowCoverage(config, record, run)
+    if (!(await refreshInputs())) return undefined
+    return { run, coverageSha256 }
   }
   throw new AdminIssueProvenanceError(
     `Post-merge layout workflow did not finish within ${LAYOUT_WORKFLOW_TIMEOUT_MINUTES} minutes`,
   )
 }
 
-function bindVerifiedLayoutWorkflow(record: AdminIssueRecord, run: WorkflowRun) {
+function bindVerifiedLayoutWorkflow(
+  record: AdminIssueRecord,
+  run: WorkflowRun,
+  coverageSha256: string,
+) {
   if (record.provenance.kind !== 'active' || !record.provenance.merge) {
     throw new AdminIssueProvenanceError(
       'Cannot bind layout validation without verified merge provenance',
@@ -6124,6 +6201,9 @@ function bindVerifiedLayoutWorkflow(record: AdminIssueRecord, run: WorkflowRun) 
   }
   const mergeSha = record.provenance.merge.mergeSha
   assertSuccessfulLayoutWorkflowRun(run, mergeSha)
+  if (!/^[a-f0-9]{64}$/.test(coverageSha256)) {
+    throw new AdminIssueProvenanceError('Layout incident coverage digest is invalid')
+  }
   const observedAt = now()
   delete record.provenance.deployment
   record.provenance.layoutValidation = {
@@ -6139,6 +6219,7 @@ function bindVerifiedLayoutWorkflow(record: AdminIssueRecord, run: WorkflowRun) 
     workflowUrl: run.html_url,
   }
   record.receipts.layoutValidatedAt = observedAt
+  record.receipts.layoutIncidentCoverageSha256 = coverageSha256
 }
 
 async function loadBoundLayoutWorkflow(
@@ -6161,7 +6242,11 @@ async function loadBoundLayoutWorkflow(
       'Bound post-merge layout workflow no longer matches its verified receipt',
     )
   }
-  return run
+  const coverageSha256 = await verifyLayoutIncidentWorkflowCoverage(config, record, run)
+  if (record.receipts.layoutIncidentCoverageSha256 !== coverageSha256) {
+    throw new AdminIssueProvenanceError('Bound layout incident coverage digest no longer matches')
+  }
+  return { run, coverageSha256 }
 }
 
 export async function commitIsAncestor(
@@ -8280,19 +8365,20 @@ async function processRecord(
             return mergedReleaseWaitStillCurrent(record, generation, mergeSha)
           }
           if (record.automationKind === 'layout') {
-            const run = record.provenance.layoutValidation
+            const result = record.provenance.layoutValidation
               ? await loadBoundLayoutWorkflow(config, record)
               : await waitForLayoutWorkflow(
                   config,
+                  record,
                   mergeSha,
                   refreshMergedInputs,
                 )
-            if (!run) return
+            if (!result) return
             if (!record.provenance.layoutValidation) {
-              bindVerifiedLayoutWorkflow(record, run)
+              bindVerifiedLayoutWorkflow(record, result.run, result.coverageSha256)
               writeState(config, state)
             }
-            await finalizeLayoutIssue(config, state, record, run, reconcileInputs)
+            await finalizeLayoutIssue(config, state, record, result.run, reconcileInputs)
             return
           }
           const deployment = record.provenance.deployment
