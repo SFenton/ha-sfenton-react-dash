@@ -15,6 +15,8 @@ const require = createRequire(import.meta.url)
 const playwrightCli = require.resolve('@playwright/test/cli')
 const viteCli = resolve(dirname(require.resolve('vite/package.json')), 'bin/vite.js')
 
+export const DEFAULT_EXECUTION_SHARD_SIZE = 128
+
 export function safeEnvironment(root: string, directory: string): NodeJS.ProcessEnv {
   const scratch = resolve(directory, 'scratch')
   mkdirSync(scratch, { recursive: true })
@@ -144,6 +146,14 @@ export function layoutWorkerCount(value = process.env.LAYOUT_WORKERS) {
   return Number(value)
 }
 
+export function layoutShardSize(value = process.env.LAYOUT_SHARD_SIZE) {
+  if (value === undefined) return DEFAULT_EXECUTION_SHARD_SIZE
+  if (!/^[1-9]\d*$/.test(value) || Number(value) > DEFAULT_EXECUTION_SHARD_SIZE) {
+    throw new Error(`LAYOUT_SHARD_SIZE must be an integer from 1 to ${DEFAULT_EXECUTION_SHARD_SIZE}`)
+  }
+  return Number(value)
+}
+
 export function isBaselineBuildInput(file: string) {
   return file.startsWith('src/')
     || file.startsWith('public/')
@@ -155,9 +165,20 @@ export function executionWorkerCount(contexts: LayoutPlan['contexts']) {
   return contexts.includes('touch-webkit') ? 1 : 2
 }
 
-export interface ExecutionBatch {
-  id: 'non-webkit' | 'webkit'
+export interface ExecutionGroup {
+  id: string
   tests: CollectedTest[]
+}
+
+export interface ExecutionBatch extends ExecutionGroup {
+  id: 'non-webkit' | 'webkit'
+  workers: number
+}
+
+export interface ExecutionShard extends ExecutionGroup {
+  batchId: ExecutionBatch['id']
+  index: number
+  total: number
   workers: number
 }
 
@@ -181,10 +202,66 @@ export function executionBatches(selection: CollectedTest[], workerLimit = layou
   return batches
 }
 
+export function executionShards(batch: ExecutionBatch, maximumTests = layoutShardSize()): ExecutionShard[] {
+  if (!Number.isInteger(maximumTests) || maximumTests < 1 || maximumTests > DEFAULT_EXECUTION_SHARD_SIZE) {
+    throw new Error(`Layout execution shard size must be an integer from 1 to ${DEFAULT_EXECUTION_SHARD_SIZE}`)
+  }
+  if (!batch.tests.length) throw new Error(`Layout execution batch is empty: ${batch.id}`)
+
+  const fileGroups: CollectedTest[][] = []
+  const seenFiles = new Set<string>()
+  for (const test of batch.tests) {
+    const key = JSON.stringify([test.project, test.file])
+    const current = fileGroups.at(-1)
+    if (current && current[0].project === test.project && current[0].file === test.file) {
+      current.push(test)
+      continue
+    }
+    if (seenFiles.has(key)) throw new Error(`Layout selection is not contiguous for ${test.project}/${test.file}`)
+    seenFiles.add(key)
+    fileGroups.push([test])
+  }
+
+  const selections: CollectedTest[][] = []
+  let current: CollectedTest[] = []
+  for (const group of fileGroups) {
+    if (group.length > maximumTests) {
+      throw new Error(`Layout spec exceeds the ${maximumTests}-test shard limit: ${group[0].project}/${group[0].file}`)
+    }
+    if (current.length && current.length + group.length > maximumTests) {
+      selections.push(current)
+      current = []
+    }
+    current.push(...group)
+  }
+  if (current.length) selections.push(current)
+
+  const total = selections.length
+  const width = String(total).length
+  const shards = selections.map((tests, index) => ({
+    id: `${batch.id}-${String(index + 1).padStart(width, '0')}-of-${total}`,
+    batchId: batch.id,
+    index,
+    total,
+    tests,
+    workers: batch.workers,
+  }))
+  assertExactSelection(batch.tests, shards.flatMap((shard) => shard.tests))
+  return shards
+}
+
+export function playwrightExecutionArgs(testListPath: string, workers: number, output: string) {
+  if (!Number.isInteger(workers) || workers < 1) throw new Error('Layout execution workers must be a positive integer')
+  return [
+    'test', '--test-list', testListPath, '--forbid-only',
+    `--workers=${workers}`, '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', output,
+  ]
+}
+
 export function mergeExecutionLedgers(
   run: Pick<RunIdentity, 'runId' | 'planId' | 'source'>,
   selection: CollectedTest[],
-  results: Array<{ batch: ExecutionBatch; ledger: ExecutionLedger }>,
+  results: Array<{ batch: ExecutionGroup; ledger: ExecutionLedger }>,
 ): ExecutionLedger {
   if (!results.length) throw new Error('No execution batch evidence to merge')
   assertExactSelection(selection, results.flatMap(({ ledger }) => ledger.selected))
@@ -303,8 +380,12 @@ export async function runPlan(root: string, input: string, review = false) {
     writeJson(resolve(directory, 'run.json'), run)
     writeJson(resolve(directory, 'selection.json'), selection)
     writeFileSync(resolve(directory, 'selected-tests.txt'), testList(selection))
-    const batches = executionBatches(selection)
-    writeJson(resolve(directory, 'execution-batches.json'), batches.map((batch) => ({
+    const shardSize = layoutShardSize()
+    const batches = executionBatches(selection).map((batch) => ({
+      batch,
+      shards: executionShards(batch, shardSize),
+    }))
+    writeJson(resolve(directory, 'execution-batches.json'), batches.map(({ batch, shards }) => ({
       id: batch.id,
       tests: batch.tests.length,
       workers: batch.workers,
@@ -312,31 +393,55 @@ export async function runPlan(root: string, input: string, review = false) {
       ledger: `execution-${batch.id}.json`,
       log: `execution-${batch.id}.log`,
       output: `playwright/${batch.id}`,
+      maximumTestsPerShard: shardSize,
+      shards: shards.map((shard) => ({
+        id: shard.id,
+        tests: shard.tests.length,
+        workers: shard.workers,
+        testList: `selected-tests-${shard.id}.txt`,
+        ledger: `execution-${shard.id}.json`,
+        log: `execution-${shard.id}.log`,
+        output: `playwright/${batch.id}/${shard.id}`,
+      })),
     })))
     const results: Array<{ batch: ExecutionBatch; ledger: ExecutionLedger }> = []
     const executionErrors: string[] = []
-    for (const batch of batches) {
-      const selectedTests = resolve(directory, `selected-tests-${batch.id}.txt`)
-      const executionLog = resolve(directory, `execution-${batch.id}.log`)
-      const currentLedger = resolve(directory, 'execution.json')
-      writeFileSync(selectedTests, testList(batch.tests))
-      rmSync(currentLedger, { force: true })
-      console.log(`Running ${batch.id} layout evidence: ${batch.tests.length} test${batch.tests.length === 1 ? '' : 's'} with ${batch.workers} worker${batch.workers === 1 ? '' : 's'}.`)
-      try {
-        await command(root, [playwrightCli, 'test', '--test-list', selectedTests, '--forbid-only',
-          `--workers=${batch.workers}`, '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', resolve(directory, 'playwright', batch.id)],
-        childEnv, executionLog, true)
-      } catch (error) { executionErrors.push(`${batch.id}: ${String(error)}`) }
-      if (!existsSync(currentLedger)) throw new Error(`Execution batch produced no ledger: ${batch.id}; inspect ${executionLog}`)
-      const ledger = readJson<ExecutionLedger>(currentLedger)
-      assertExactSelection(batch.tests, ledger.selected)
+    for (const { batch, shards } of batches) {
+      writeFileSync(resolve(directory, `selected-tests-${batch.id}.txt`), testList(batch.tests))
+      const shardResults: Array<{ batch: ExecutionShard; ledger: ExecutionLedger }> = []
+      for (const shard of shards) {
+        const selectedTests = resolve(directory, `selected-tests-${shard.id}.txt`)
+        const executionLog = resolve(directory, `execution-${shard.id}.log`)
+        const currentLedger = resolve(directory, 'execution.json')
+        writeFileSync(selectedTests, testList(shard.tests))
+        rmSync(currentLedger, { force: true })
+        console.log(`Running ${shard.id} layout evidence: ${shard.tests.length} test${shard.tests.length === 1 ? '' : 's'} with ${shard.workers} worker${shard.workers === 1 ? '' : 's'}.`)
+        try {
+          await command(root, [playwrightCli, ...playwrightExecutionArgs(
+            selectedTests,
+            shard.workers,
+            resolve(directory, 'playwright', batch.id, shard.id),
+          )], childEnv, executionLog, true)
+        } catch (error) { executionErrors.push(`${shard.id}: ${String(error)}`) }
+        if (!existsSync(currentLedger)) throw new Error(`Execution shard produced no ledger: ${shard.id}; inspect ${executionLog}`)
+        const ledger = readJson<ExecutionLedger>(currentLedger)
+        assertExactSelection(shard.tests, ledger.selected)
+        writeJson(resolve(directory, `execution-${shard.id}.json`), ledger)
+        shardResults.push({ batch: shard, ledger })
+        console.log(`Recorded ${shard.id} layout evidence: ${ledger.attempts.length} attempts, status ${ledger.status}.`)
+      }
+      const ledger = mergeExecutionLedgers(run, batch.tests, shardResults)
       writeJson(resolve(directory, `execution-${batch.id}.json`), ledger)
+      writeFileSync(resolve(directory, `execution-${batch.id}.log`), shards.map((shard) => {
+        const log = resolve(directory, `execution-${shard.id}.log`)
+        return `===== ${shard.id} (${shard.tests.length} tests, ${shard.workers} worker${shard.workers === 1 ? '' : 's'}) =====\n${readFileSync(log, 'utf8')}`
+      }).join('\n'))
       results.push({ batch, ledger })
-      console.log(`Recorded ${batch.id} layout evidence: ${ledger.attempts.length} attempts, status ${ledger.status}.`)
+      console.log(`Recorded ${batch.id} aggregate layout evidence: ${ledger.attempts.length} attempts across ${shards.length} shard${shards.length === 1 ? '' : 's'}, status ${ledger.status}.`)
     }
     const ledger = mergeExecutionLedgers(run, selection, results)
     writeJson(resolve(directory, 'execution.json'), ledger)
-    writeFileSync(resolve(directory, 'execution.log'), batches.map((batch) => {
+    writeFileSync(resolve(directory, 'execution.log'), batches.map(({ batch }) => {
       const log = resolve(directory, `execution-${batch.id}.log`)
       return `===== ${batch.id} (${batch.tests.length} tests, ${batch.workers} worker${batch.workers === 1 ? '' : 's'}) =====\n${readFileSync(log, 'utf8')}`
     }).join('\n'))
@@ -351,7 +456,7 @@ export async function runPlan(root: string, input: string, review = false) {
     writeJson(resolve(directory, 'manual.json'), manual)
     await verifyServedBuild(run.candidate)
     if (snapshot(root, plan.source.base).digest !== plan.source.digest) throw new Error('Source changed during execution; evidence is historical, not current')
-    if (executionErrors.length) throw new Error(`Execution batches failed:\n${executionErrors.join('\n')}`)
+    if (executionErrors.length) throw new Error(`Execution shards failed:\n${executionErrors.join('\n')}`)
     if (!automatedPassed) throw new Error(`Runtime evidence assessment failed; inspect ${directory}/automated-assessment.json before manual review`)
     console.log(`Selected ${selection.length} tests; recorded ${ledger.attempts.length} attempts (${ledger.attempts.filter((attempt) => attempt.status === 'passed').length} passed, ${ledger.attempts.filter((attempt) => attempt.status === 'skipped').length} skipped). ${manualReviewMessage(worklist.length, directory)}`)
   } finally {

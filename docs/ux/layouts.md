@@ -28,8 +28,12 @@ evidence, not release gates.
 4. Run `npm run layout:run -- --plan artifacts/layout/<run-id>/plan.json`.
    This owns fresh mock builds and strict loopback previews; it does not authorize HA.
    Non-WebKit evidence keeps the bounded two-worker policy while WPE WebKit runs
-   separately with one worker. Both batches retain exact selection, logs and ledgers,
-   then merge into one fail-closed evidence record while progress remains visible.
+   separately with one worker. Each exact engine selection runs in sequential shards
+   of at most 128 tests without splitting a project/spec file, so every shard gets a
+   fresh Playwright process. A project/spec file above the active cap fails closed.
+   Shard ledgers merge into the existing engine artifacts, then into one fail-closed
+   evidence record. `LAYOUT_SHARD_SIZE` may lower the cap for focused validation when
+   every selected project/spec file fits.
 5. Inspect the generated `manual-worklist.json` AND perform its listed browser
    interactions. View the unnormalized images with an image-capable tool. Record
    observations in `manual.json`; capture alone is not inspection.
