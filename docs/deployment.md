@@ -28,9 +28,9 @@ isolation boundary, protected-merge flow, and deployment-receipt verification.
 The workflow separates build and deployment:
 
 - GitHub-hosted `Build dashboard artifact` checks out the exact push SHA,
-  receives no Home Assistant or SSH credential, and never receives
-  `VITE_HA_TOKEN`. Its dormant `VITE_HOME_MCP_ENABLED=false` environment
-  guard does not enable frontend chat.
+  receives no Home Assistant or SSH credential, and never receives `VITE_HA_TOKEN`.
+  Its dormant `VITE_HOME_MCP_ENABLED=false` environment guard does not enable
+  frontend chat.
 - `Deploy dashboard` uses a unique per-run label and a one-job JIT runner.
   The runner is absent until the host controller validates the exact workflow,
   event, branch, SHA, job, workflow digest, and local runner-image digest.
