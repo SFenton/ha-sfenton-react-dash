@@ -44,8 +44,12 @@ import {
   assertResolvedWithoutPullRequestSnapshot,
   assertSuccessfulRequiredChecksForHead,
   assertIssueCommentBodyContainsVisualEvidence,
+  assertInstalledResearchMountRetryController,
   assertFreshFinalizationInputs,
   assertNoNewInputsBeforeClose,
+  assertProtectedResearchMountRepair,
+  assertResearchMountRetryObservation,
+  assertResearchMountRetryRecord,
   assertResearchOnlyOutcome,
   assertWorkerHostConfigurationSafe,
   assertWorkerClaimCanStart,
@@ -91,6 +95,7 @@ import {
   mediaSourceExternalId,
   mergedReleaseWaitStillCurrent,
   markFrontendOnlyRecoveryObserved,
+  parseResearchMountRetryArgs,
   prepareCommittedCandidate,
   prepareCopilotHome,
   prepareGitHubMediaInput,
@@ -98,6 +103,7 @@ import {
   publishPullRequestIssueComment,
   pullRequestBodyWithVisualEvidence,
   pushCandidate,
+  queueHostResearchMountRetry,
   queueVerifiedLayoutEvidence,
   queueReopenedMediaInputs,
   reconcileClosedIssueRecord,
@@ -122,6 +128,7 @@ import {
   updateWorkflowDigestConfig,
   validationCommands,
   workerMutableInfrastructurePaths,
+  withControllerLock,
   workflowDigestRotationRequired,
 } from './admin-issue-controller'
 import {
@@ -233,6 +240,216 @@ function record(): AdminIssueRecord {
     updatedAt: '2026-09-20T12:00:00.000Z',
     workerRuns: 0,
   }
+}
+
+async function researchMountRetryFixture() {
+  const root = mkdtempSync(join(homedir(), '.admin-issue-host-retry-test-'))
+  temporaryDirectories.push(root)
+  const worktreeRoot = join(root, 'worktrees')
+  const worktreePath = join(worktreeRoot, 'issue-242-g1')
+  const branch = 'copilot/admin-todo-242-g1-fixture'
+  mkdirSync(worktreePath, { recursive: true })
+  const git = (...args: string[]) =>
+    execFileSync('git', args, { cwd: worktreePath, encoding: 'utf8' }).trim()
+  git('init', '--quiet', `--initial-branch=${branch}`)
+  git('config', 'user.name', 'Host retry test fixture')
+  git('config', 'user.email', 'host-retry@example.invalid')
+  mkdirSync(join(worktreePath, 'src'))
+  writeFileSync(join(worktreePath, 'src/locked.ts'), 'export const unchanged = true\n')
+  git('add', 'src/locked.ts')
+  git('commit', '--quiet', '-m', 'Temporary base for retry tests')
+  const preparedBaseSha = git('rev-parse', 'HEAD')
+  const hash = (value: string) => createHash('sha256').update(value).digest('hex')
+  const uid = '9ec721c0-b834-11f1-9e46-525400aeeeef'
+  const summary = "Research music room vacuum dock controls. I don't want you to actually go implement anything yet"
+  const ownerBody = 'Show me mockups of each example'
+  const ownerUpdatedAt = '2026-09-25T05:40:08Z'
+  const fingerprint = todoFingerprint(summary, '')
+  const issue = record()
+  issue.uid = uid
+  issue.issueNumber = 242
+  issue.issueUrl = 'https://github.com/SFenton/ha-sfenton-react-dash/issues/242'
+  issue.createdAt = '2026-09-24T23:00:00Z'
+  issue.title = issueTitle(summary)
+  issue.description = ''
+  issue.taskFingerprint = fingerprint
+  issue.sessionName = sessionNameForIssue(issue.issueNumber, uid)
+  issue.branch = branch
+  issue.worktreePath = worktreePath
+  issue.provenance = {
+    kind: 'active',
+    epoch: 'host-retry-fixture',
+    generation: 1,
+    preparedBaseSha,
+    resyncAttempts: 0,
+    revision: 0,
+  }
+  const reportBody = issueBody({ description: '', summary, uid })
+  issue.issueBodySha256 = hash(reportBody)
+  issue.inputs = [
+    {
+      body: '',
+      createdAt: issue.createdAt,
+      externalId: `todo:${fingerprint}`,
+      processedAt: '2026-09-24T23:35:04Z',
+      revision: 1,
+      source: 'todo-created',
+    },
+    {
+      body: ownerBody,
+      bodySha256: hash(ownerBody),
+      createdAt: ownerUpdatedAt,
+      externalId: mediaSourceExternalId('comment', 101, ownerUpdatedAt, ownerBody),
+      processedAt: '2026-09-25T05:46:11Z',
+      revision: 2,
+      source: 'issue-comment',
+      sourceKey: 'comment:101',
+      sourceUpdatedAt: ownerUpdatedAt,
+    },
+  ]
+  issue.inputRevision = 2
+  issue.processedRevision = 2
+  issue.phase = 'blocked'
+  issue.workerRuns = 2
+  issue.commentCursor = 102
+  issue.receipts = {
+    githubIssueCreatedAt: issue.createdAt,
+    researchOnlyScope: 'true',
+    sessionCreatedAt: issue.createdAt,
+    lastWorkerRunAt: '2026-09-25T05:46:11Z',
+  }
+  const blocked = parseWorkerOutcome(JSON.stringify({
+    decision: 'blocked',
+    iosFollowUp: { reason: '', required: false },
+    questions: [],
+    reason: 'Artifact generation, pinned-copy validation, and pixel inspection are blocked because ' +
+      '`admin_issue_workspace` cannot start its container: Docker cannot create the ' +
+      '`/workspace/.cache` mountpoint on the read-only root filesystem. ' +
+      'No alternative filesystem or rendering tool is authorized.',
+    schemaVersion: 1,
+    summary: 'The three requested mockups cannot be generated while Docker fails to start.',
+    visualEvidence: [],
+  }))
+  if (blocked.decision !== 'blocked') throw new Error('Expected blocked worker fixture')
+  issue.lastOutcome = blocked
+  const question = parseWorkerOutcome(JSON.stringify({
+    decision: 'needs_input',
+    iosFollowUp: { reason: '', required: false },
+    questions: [{
+      options: [
+        'Separate scopes: one control for room and one for dock',
+        'Conservative session-only controls: cancel only the session',
+        'Pre-wash lockout: no stop until movement',
+      ],
+      question: 'Which control policy should a later implementation pursue?',
+      recommendation: 'Separate scopes',
+    }],
+    schemaVersion: 1,
+    summary: 'Three alternatives were proposed for review.',
+    visualEvidence: [],
+  }))
+  if (question.decision !== 'needs_input') throw new Error('Expected prior question fixture')
+  const ownerUser = { id: 3988463, login: 'SFenton' }
+  const comments: Parameters<typeof assertResearchMountRetryObservation>[3]['comments'] = [
+    {
+      author_association: 'OWNER',
+      body: formatQuestionsComment(uid, 1, question),
+      created_at: '2026-09-24T23:35:04Z',
+      id: 100,
+      updated_at: '2026-09-24T23:35:04Z',
+      user: ownerUser,
+    },
+    {
+      author_association: 'OWNER',
+      body: ownerBody,
+      created_at: ownerUpdatedAt,
+      id: 101,
+      updated_at: ownerUpdatedAt,
+      user: ownerUser,
+    },
+    {
+      author_association: 'OWNER',
+      body: formatBlockedComment(uid, 2, blocked),
+      created_at: '2026-09-25T05:46:11Z',
+      id: 102,
+      updated_at: '2026-09-25T05:46:11Z',
+      user: ownerUser,
+    },
+  ]
+  const config = {
+    ownerId: ownerUser.id,
+    ownerLogin: ownerUser.login,
+    repository: 'SFenton/ha-sfenton-react-dash',
+    requiredCheckAppId: 15368,
+    requiredChecks: ['Playwright gate'],
+    stateDirectory: join(root, 'state'),
+    workerExtensionPath: join(root, 'installed', 'worker-extension.mjs'),
+    worktreeRoot,
+  }
+  const observation: Parameters<typeof assertResearchMountRetryObservation>[3] = {
+    issue: {
+      author_association: 'OWNER',
+      body: reportBody,
+      created_at: issue.createdAt,
+      html_url: issue.issueUrl,
+      number: issue.issueNumber,
+      state: 'open',
+      title: issue.title,
+      updated_at: comments[2].updated_at ?? '',
+      user: ownerUser,
+    },
+    comments,
+    todoItems: [{ description: '', status: 'needs_action', summary, uid }],
+    worktree: await readWorktreeSnapshot(worktreePath),
+    changed: [],
+    remoteBranch: '',
+  }
+  const repaired = [
+    'assertIgnoredWorkspacePath(workspace, ".cache/worker-mountpoint")',
+    'await ensureWorkspaceDirectory(workspace, ".cache")',
+    'const relativePath = `artifacts/admin-issue-${issueNumber}/research`',
+    '...researchArtifactMounts',
+  ].join('\n')
+  const pr: Parameters<typeof assertProtectedResearchMountRepair>[1] = {
+    base: { ref: 'master', repo: { full_name: config.repository } },
+    head: {
+      ref: 'copilot/issue-242-research-artifacts-release-20260926',
+      repo: { full_name: config.repository },
+      sha: 'b'.repeat(40),
+    },
+    body: 'Enable safe research mockups',
+    draft: false,
+    html_url: `https://github.com/${config.repository}/pull/270`,
+    merge_commit_sha: 'c'.repeat(40),
+    merged_at: '2026-09-26T09:00:00Z',
+    number: 270,
+    state: 'closed',
+    user: ownerUser,
+  }
+  const checks: Parameters<typeof assertProtectedResearchMountRepair>[2] = [{
+    app: { id: config.requiredCheckAppId },
+    completed_at: '2026-09-26T08:59:00Z',
+    conclusion: 'success',
+    details_url: null,
+    id: 9001,
+    name: 'Playwright gate',
+    status: 'completed',
+  }]
+  const repairEvidence: Parameters<typeof assertProtectedResearchMountRepair>[3] = {
+    headExtension: repaired,
+    installedExtension: repaired,
+    masterExtension: repaired,
+    masterSha: 'd'.repeat(40),
+    mergeIsAncestor: true,
+    mergeParents: ['a'.repeat(40), pr.head.sha],
+    mergedExtension: repaired,
+    priorExtension: 'legacy read-only mount without a precreated .cache',
+  }
+  const proof = assertProtectedResearchMountRepair(config, pr, checks, repairEvidence)
+  const state = controllerState(issue)
+  state.activeUid = undefined
+  assertAdminIssueControllerState(state)
+  return { config, issue, observation, proof, pr, checks, repairEvidence, root, state, worktreePath }
 }
 
 function approvedDonetickIssue() {
@@ -3554,6 +3771,395 @@ describe('admin issue controller security configuration', () => {
         { reason: 'The worker incorrectly classified the change as invisible.', required: false },
       ),
     ).toBe(true)
+  })
+
+  describe('locked host retry of the #242 research mount failure', () => {
+    it('requires the exact manual arguments and installed controller path', async () => {
+      const { config, root } = await researchMountRetryFixture()
+      const uid = '9ec721c0-b834-11f1-9e46-525400aeeeef'
+      expect(parseResearchMountRetryArgs(['--issue', '242', '--uid', uid]))
+        .toEqual({ issueNumber: 242, uid })
+      for (const args of [
+        ['--issue', '240', '--uid', uid],
+        ['--issue', '242', '--uid', 'other-uid'],
+        ['--issue', '0242', '--uid', uid],
+        ['--issue', '242', '--uid', uid, '--force'],
+        [],
+      ]) {
+        expect(() => parseResearchMountRetryArgs(args)).toThrow('requires --issue 242 --uid')
+      }
+      const installed = join(root, 'installed')
+      mkdirSync(installed)
+      const controller = join(installed, 'controller.mjs')
+      writeFileSync(controller, 'export {}\n', { mode: 0o600 })
+      writeFileSync(config.workerExtensionPath, 'export {}\n', { mode: 0o600 })
+      expect(() => assertInstalledResearchMountRetryController(config, controller)).not.toThrow()
+      expect(() => assertInstalledResearchMountRetryController(config, join(root, 'scripts/controller.ts')))
+        .toThrow('must use the installed controller')
+      chmodSync(controller, 0o644)
+      expect(() => assertInstalledResearchMountRetryController(config, controller))
+        .toThrow('must not be readable by group')
+    })
+
+    it('requires #270 merged with pinned checks and an identical installed repaired extension', async () => {
+      const { config, pr, checks, repairEvidence, proof } = await researchMountRetryFixture()
+      expect(proof).toMatchObject({
+        checkRunIds: [9001],
+        extensionSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        headSha: pr.head.sha,
+        mergeSha: pr.merge_commit_sha,
+        repairPrNumber: 270,
+      })
+      const verify = (
+        candidate = pr,
+        runs = checks,
+        evidence = repairEvidence,
+      ) => assertProtectedResearchMountRepair(config, candidate, runs, evidence)
+      expect(() => verify({ ...pr, state: 'open', merged_at: null }))
+        .toThrow('not the protected owner merge')
+      expect(() => verify({ ...pr, user: { id: 1, login: 'not-SFenton' } }))
+        .toThrow('not the protected owner merge')
+      expect(() => verify({
+        ...pr, base: { ...pr.base, repo: { full_name: 'other/repository' } },
+      })).toThrow('not the protected owner merge')
+      expect(() => verify(pr, [{ ...checks[0], conclusion: 'failure' }]))
+        .toThrow('required successful checks')
+      expect(() => verify(pr, [{ ...checks[0], app: { id: 1 } }]))
+        .toThrow('required successful checks')
+      expect(() => verify(pr, checks, { ...repairEvidence, mergeIsAncestor: false }))
+        .toThrow('not a normal ancestor')
+      expect(() => verify(pr, checks, {
+        ...repairEvidence, mergeParents: ['a'.repeat(40), 'f'.repeat(40)],
+      })).toThrow('not a normal ancestor')
+      expect(() => verify(pr, checks, {
+        ...repairEvidence, installedExtension: repairEvidence.priorExtension,
+      })).toThrow('does not match the protected repair')
+      expect(() => verify(pr, checks, {
+        ...repairEvidence, masterExtension: repairEvidence.priorExtension,
+      })).toThrow('does not match the protected repair')
+      expect(() => verify(pr, checks, {
+        ...repairEvidence, headExtension: repairEvidence.priorExtension,
+      })).toThrow('does not match the protected repair')
+    })
+
+    it('records one locked host receipt and replays only the existing owner revision', async () => {
+      const fixture = await researchMountRetryFixture()
+      const { config, issue, observation, proof, state, root } = fixture
+      const priorInputs = JSON.stringify(issue.inputs)
+      const priorOutcome = JSON.stringify(issue.lastOutcome)
+      const observe = vi.fn(async () => structuredClone(observation))
+      const verifyRepair = vi.fn(async () => proof)
+      const persist = vi.fn(() => {
+        assertAdminIssueControllerState(state)
+        writeFileSync(join(config.stateDirectory, 'state.json'), JSON.stringify(state), { mode: 0o600 })
+      })
+      const effects = {
+        observe,
+        verifyRepair,
+        persist,
+        timestamp: () => '2026-09-26T09:10:00.000Z',
+      }
+      expect(assertResearchMountRetryRecord(config, state, 242, issue.uid).receiptKey)
+        .toBe('researchMountRetry:g1')
+      const result = await withControllerLock(config, async () => {
+        expect(existsSync(join(config.stateDirectory, 'controller.lock'))).toBe(true)
+        await expect(withControllerLock(config, async () => {})).rejects.toThrow('already held')
+        return await queueHostResearchMountRetry(config, state, 242, issue.uid, effects)
+      })
+      expect(existsSync(join(config.stateDirectory, 'controller.lock'))).toBe(false)
+      expect(observe).toHaveBeenCalledTimes(2)
+      expect(verifyRepair).toHaveBeenCalledTimes(1)
+      expect(persist).toHaveBeenCalledTimes(1)
+      expect(result.receiptKey).toBe('researchMountRetry:g1')
+      expect(result.receipt).toMatchObject({
+        event: 'host-retry-research-mount',
+        generation: 1,
+        inputRevision: 2,
+        processedRevisionBefore: 2,
+        processedRevisionAfter: 1,
+        replayedOwnerRevision: 2,
+        ownerCommentId: 101,
+        ownerBodySha256: createHash('sha256')
+          .update('Show me mockups of each example').digest('hex'),
+        mergeSha: proof.mergeSha,
+        extensionSha256: proof.extensionSha256,
+      })
+      expect(JSON.parse(issue.receipts[result.receiptKey])).toEqual(result.receipt)
+      expect(issue.phase).toBe('queued')
+      expect(issue.generation).toBe(1)
+      expect(issue.inputRevision).toBe(2)
+      expect(issue.processedRevision).toBe(1)
+      expect(issue.receipts.researchOnlyScope).toBe('true')
+      expect(researchOnlyRequested(issue, observation.issue.body ?? '')).toBe(true)
+      expect(issue.pr).toBeUndefined()
+      expect(JSON.stringify(issue.inputs)).toBe(priorInputs)
+      expect(JSON.stringify(issue.lastOutcome)).toBe(priorOutcome)
+      expect(pendingIssueWorkers(state, { has: () => false })).toContain(issue)
+      expect(buildWorkerPrompt(workerInputSnapshot(issue), observation.issue.body ?? ''))
+        .toContain('Show me mockups of each example')
+      const persisted = JSON.parse(readFileSync(join(root, 'state/state.json'), 'utf8'))
+      expect(persisted.issues[issue.uid].processedRevision).toBe(1)
+      expect(statSync(join(root, 'state/state.json')).mode & 0o777).toBe(0o600)
+      await expect(withControllerLock(config, async () =>
+        await queueHostResearchMountRetry(config, state, 242, issue.uid, effects)))
+        .rejects.toThrow('already attempted for this generation')
+      expect(persist).toHaveBeenCalledTimes(1)
+    })
+
+    it('refuses wrong identity, state, prior retry, or untrusted research provenance without writing', async () => {
+      const fixture = await researchMountRetryFixture()
+      const { config, observation, proof } = fixture
+      const reject = async (
+        mutate: (state: AdminIssueControllerState) => void,
+        reason: string,
+      ) => {
+        const state = structuredClone(fixture.state)
+        mutate(state)
+        const before = JSON.stringify(state)
+        const persist = vi.fn()
+        await expect(queueHostResearchMountRetry(config, state, 242, fixture.issue.uid, {
+          observe: async () => observation,
+          verifyRepair: async () => proof,
+          persist,
+          timestamp: () => '2026-09-26T09:10:00.000Z',
+        })).rejects.toThrow(reason)
+        expect(JSON.stringify(state)).toBe(before)
+        expect(persist).not.toHaveBeenCalled()
+      }
+      await expect(queueHostResearchMountRetry(config, structuredClone(fixture.state),
+        240, fixture.issue.uid, {
+          observe: async () => observation,
+          verifyRepair: async () => proof,
+          persist: () => { throw new Error('Unexpected state write') },
+          timestamp: () => '2026-09-26T09:10:00.000Z',
+        })).rejects.toThrow('exact #242 Admin UID')
+    await expect(queueHostResearchMountRetry(config, structuredClone(fixture.state),
+        242, 'different-owner-uid', {
+          observe: async () => observation,
+          verifyRepair: async () => proof,
+          persist: () => { throw new Error('Unexpected state write') },
+          timestamp: () => '2026-09-26T09:10:00.000Z',
+        })).rejects.toThrow('exact #242 Admin UID')
+      await reject((state) => { state.activeUid = fixture.issue.uid }, 'claim-free')
+      await reject((state) => {
+        state.issues[fixture.issue.uid].workerClaim = {
+          generation: 1, id: 'already-running', inputRevision: 2, startedAt: fixture.issue.createdAt,
+        }
+      }, 'claim-free')
+      await reject((state) => { state.issues[fixture.issue.uid].phase = 'awaiting-user' }, 'not solely')
+      await reject((state) => { state.issues[fixture.issue.uid].receipts.researchOnlyScope = 'false' }, 'not solely')
+      await reject((state) => {
+        const outcome = state.issues[fixture.issue.uid].lastOutcome
+        if (outcome?.decision !== 'blocked') throw new Error('Expected blocked outcome')
+        outcome.reason = 'An unrelated Home Assistant service is unavailable.'
+      }, 'not solely')
+      await reject((state) => {
+        state.issues[fixture.issue.uid].pr = {
+          number: 300, url: 'https://github.com/SFenton/ha-sfenton-react-dash/pull/300',
+        }
+      }, 'not solely')
+      await reject((state) => {
+        const provenance = state.issues[fixture.issue.uid].provenance
+        if (provenance.kind !== 'active') throw new Error('Expected active provenance')
+        Object.assign(provenance, { candidate: { headSha: 'b'.repeat(40) } })
+      }, 'not solely')
+      await reject((state) => {
+        const provenance = state.issues[fixture.issue.uid].provenance
+        if (provenance.kind !== 'active') throw new Error('Expected active provenance')
+        Object.assign(provenance, { merge: { mergeSha: 'c'.repeat(40) } })
+      }, 'not solely')
+      await reject((state) => {
+        state.issues[fixture.issue.uid].releaseClaim = {
+          generation: 1, id: 'already-releasing', inputRevision: 2, startedAt: fixture.issue.createdAt,
+        }
+      }, 'claim-free')
+      await reject((state) => {
+        state.issues[fixture.issue.uid].receipts['researchMountRetry:g1'] = '{}'
+      }, 'already attempted')
+      await reject((state) => {
+        state.issues[fixture.issue.uid].receipts['researchMountRetry:g2'] = '{}'
+      }, 'not solely')
+      await reject((state) => {
+        state.issues[fixture.issue.uid].receipts.workerRetryAfter = '2026-09-26T09:20:00Z'
+      }, 'not solely')
+      await reject((state) => {
+        state.issues[fixture.issue.uid].inputRevision = 3
+      }, 'unchanged processed owner request')
+      await reject((state) => {
+        Object.assign(state.issues[fixture.issue.uid], {
+          researchMockups: { images: [{ uploadAttemptedAt: fixture.issue.createdAt }] },
+        })
+      }, 'not solely')
+      await reject((state) => {
+        state.pendingUploads = { [todoIntakeKey(fixture.issue.uid)]: [{
+          id: 'unresolved',
+          localPath: '/private/test-only-unresolved.png',
+          mediaType: 'image/png',
+          name: 'unresolved.png',
+          sha256: 'f'.repeat(64),
+          sizeBytes: 1,
+          startedAt: fixture.issue.createdAt,
+          status: 'uploading',
+        }] }
+      }, 'unresolved Admin To-Do intake')
+    })
+
+    it('refuses drifted GitHub inputs, HA source, and worker tree before any journal write', async () => {
+      const fixture = await researchMountRetryFixture()
+      const { config, proof } = fixture
+      const reject = async (
+        mutate: (observation: typeof fixture.observation) => void,
+        reason: string,
+      ) => {
+        const state = structuredClone(fixture.state)
+        const observation = structuredClone(fixture.observation)
+        mutate(observation)
+        const before = JSON.stringify(state)
+        const persist = vi.fn()
+        await expect(queueHostResearchMountRetry(config, state, 242, fixture.issue.uid, {
+          observe: async () => observation,
+          verifyRepair: async () => proof,
+          persist,
+          timestamp: () => '2026-09-26T09:10:00.000Z',
+        })).rejects.toThrow(reason)
+        expect(JSON.stringify(state)).toBe(before)
+        expect(persist).not.toHaveBeenCalled()
+      }
+      await reject((observed) => { observed.issue.state = 'closed' }, 'bound, open GitHub issue')
+      await reject((observed) => {
+        observed.issue.body = `${observed.issue.body ?? ''}\nEdited by owner`
+      }, 'body changed since intake')
+      await reject((observed) => {
+        observed.issue.user = { id: 1, login: 'SFenton' }
+      }, 'lost its owner or UID')
+      await reject((observed) => {
+        observed.comments.push({
+          ...observed.comments[1],
+          body: 'I changed my mind',
+          id: 103,
+          updated_at: '2026-09-26T09:00:00Z',
+        })
+      }, 'comment cursor is stale')
+      await reject((observed) => { observed.comments[1].body = 'Approve implementation' },
+        'owner comment is not the unchanged')
+      await reject((observed) => {
+        observed.comments[1].updated_at = '2026-09-26T09:00:00Z'
+      }, 'owner comment is not the unchanged')
+      await reject((observed) => {
+        observed.comments[0].body = observed.comments[0].body?.replace('Pre-wash lockout:', 'Different policy:') ?? ''
+      }, 'original three-option question')
+      await reject((observed) => {
+        observed.comments[2].body = [
+          CONTROLLER_COMMENT_MARKER,
+          controllerReceiptMarker(fixture.issue.uid, 'blocked-r2'),
+          'An unrelated failure',
+        ].join('\n')
+      }, 'original three-option question')
+      await reject((observed) => { observed.todoItems[0].summary = 'Edited after the owner request' },
+        'Admin To-Do source changed')
+      await reject((observed) => { observed.todoItems[0].status = 'completed' },
+        'Admin To-Do source changed')
+      await reject((observed) => { observed.todoItems = [] },
+        'Admin To-Do source changed')
+      await reject((observed) => { observed.worktree.branch = 'unexpected-branch' },
+        'not the clean prepared base')
+      await reject((observed) => { observed.worktree.status = '1 .M N... src/locked.ts' },
+        'not the clean prepared base')
+      await reject((observed) => { observed.changed.push('src/locked.ts') },
+        'not the clean prepared base')
+      await reject((observed) => {
+        observed.remoteBranch = 'published-head refs/heads/copilot/admin-todo-242-g1-fixture'
+      }, 'not the clean prepared base')
+
+      writeFileSync(join(fixture.worktreePath, 'src/locked.ts'), 'export const changed = true\n')
+      const dirty = structuredClone(fixture.observation)
+      dirty.worktree = await readWorktreeSnapshot(fixture.worktreePath)
+      dirty.changed = ['src/locked.ts']
+      const state = structuredClone(fixture.state)
+      const before = JSON.stringify(state)
+      const persist = vi.fn()
+      await expect(queueHostResearchMountRetry(config, state, 242, fixture.issue.uid, {
+        observe: async () => dirty,
+        verifyRepair: async () => proof,
+        persist,
+        timestamp: () => '2026-09-26T09:10:00.000Z',
+      })).rejects.toThrow('not the clean prepared base')
+      expect(JSON.stringify(state)).toBe(before)
+      expect(persist).not.toHaveBeenCalled()
+    })
+
+    it('refuses a second live observation that drifts while the protected merge is checked', async () => {
+      const fixture = await researchMountRetryFixture()
+      const state = structuredClone(fixture.state)
+      const later = structuredClone(fixture.observation)
+      later.issue.updated_at = '2026-09-26T09:01:00Z'
+      const observe = vi.fn()
+        .mockResolvedValueOnce(fixture.observation)
+        .mockResolvedValueOnce(later)
+      const persist = vi.fn()
+      const before = JSON.stringify(state)
+      await expect(queueHostResearchMountRetry(
+        fixture.config, state, 242, fixture.issue.uid, {
+          observe,
+          verifyRepair: async () => fixture.proof,
+          persist,
+          timestamp: () => '2026-09-26T09:10:00.000Z',
+        },
+      )).rejects.toThrow('input changed during protected repair verification')
+      expect(observe).toHaveBeenCalledTimes(2)
+      expect(JSON.stringify(state)).toBe(before)
+      expect(persist).not.toHaveBeenCalled()
+      await expect(queueHostResearchMountRetry(
+        fixture.config, state, 242, fixture.issue.uid, {
+          observe: async () => fixture.observation,
+          verifyRepair: async () => { throw new Error('PR #270 still running CI') },
+          persist,
+          timestamp: () => '2026-09-26T09:10:00.000Z',
+        },
+      )).rejects.toThrow('PR #270 still running CI')
+      expect(JSON.stringify(state)).toBe(before)
+      expect(persist).not.toHaveBeenCalled()
+
+      const swappedState = structuredClone(fixture.state)
+      const swappedPersist = vi.fn()
+      await expect(queueHostResearchMountRetry(
+        fixture.config, swappedState, 242, fixture.issue.uid, {
+          observe: async () => fixture.observation,
+          verifyRepair: async () => {
+            const record = swappedState.issues[fixture.issue.uid]
+            record.inputs[1] = { ...record.inputs[1] }
+            return fixture.proof
+          },
+          persist: swappedPersist,
+          timestamp: () => '2026-09-26T09:10:00.000Z',
+        },
+      )).rejects.toThrow('input changed during protected repair verification')
+      expect(swappedPersist).not.toHaveBeenCalled()
+    })
+
+    it('refuses an edited original report even when intake advanced only the issue-body hash', async () => {
+      const fixture = await researchMountRetryFixture()
+      const state = structuredClone(fixture.state)
+      const observed = structuredClone(fixture.observation)
+      observed.issue.body = observed.issue.body?.replace(
+        "I don't want you to actually go implement anything yet",
+        'I authorize implementation now',
+      ) ?? ''
+      state.issues[fixture.issue.uid].issueBodySha256 =
+        createHash('sha256').update(observed.issue.body).digest('hex')
+      const before = JSON.stringify(state)
+      const persist = vi.fn()
+      await expect(queueHostResearchMountRetry(
+        fixture.config, state, 242, fixture.issue.uid, {
+          observe: async () => observed,
+          verifyRepair: async () => fixture.proof,
+          persist,
+          timestamp: () => '2026-09-26T09:10:00.000Z',
+        },
+      )).rejects.toThrow('GitHub issue body changed since intake')
+      expect(JSON.stringify(state)).toBe(before)
+      expect(persist).not.toHaveBeenCalled()
+    })
   })
 
   it('authorizes iOS follow-up only for explicit browser-specific issue evidence', () => {

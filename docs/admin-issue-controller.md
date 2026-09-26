@@ -583,6 +583,51 @@ node "$HOME/.local/share/admin-issue-controller/controller.mjs" \
   "$HOME/.config/admin-issue-controller/controller.json"
 ```
 
+### One-time host retry of the #242 research mount failure
+
+The existing owner comment asking for all three mockups is already a real,
+processed issue input. Installing the repaired worker extension does not
+requeue that blocked input, and an operational retry must not impersonate the
+owner or invent another comment, input revision, or worker result.
+For this exact request, the checked host command supersedes provisional
+guidance to solicit a second owner comment after installation; do not
+close/reopen the issue or post a surrogate owner reply.
+
+Only after PR #270 and this controller command are protected-merged and the
+matching bundle **and** repaired extension are installed, use a separately
+authorized, claim-free service handoff. Stop the installed user service and
+back up its matching controller, extension, private configuration, and journal
+before installing. While it remains stopped, from the configured repository
+checkout run exactly:
+
+```bash
+node "$HOME/.local/share/admin-issue-controller/controller.mjs" \
+  retry-research-mount \
+  "$HOME/.config/admin-issue-controller/controller.json" \
+  --issue 242 --uid 9ec721c0-b834-11f1-9e46-525400aeeeef
+```
+
+This manual command holds the normal exclusive controller lock. It verifies
+the exact open, owner-bound issue, unchanged mockup request and prior
+three-option question, HA Admin To-Do fingerprint and status, blocked
+research-only outcome, clean assigned worktree, absence of PR/candidate/merge,
+published worker branch, claims and ambiguous uploads, and no new inputs. It
+requires PR #270's exact owner-authored normal merge, successful pinned-app
+protected checks, current
+`origin/master` ancestry, and an installed extension byte-identical to the
+reviewed PR head, merge, and current master. Two matching read-only input
+snapshots bracket this proof. Failure leaves the issue and journal unchanged.
+
+On success it writes one `researchMountRetry:g<generation>` host receipt,
+rewinds only the processed cursor from revision 2 to 1, and queues the same
+generation to replay the *existing* owner comment. The owner input, original
+worker outcome, research-only scope, and prior processing timestamp remain
+intact; the command posts no GitHub comment and performs no HA mutation or
+worker launch. A second invocation for the same generation fails. Verify the
+receipt, then resume only the authorized installed controller and confirm its
+research-only worker processes the original request; do not run a second
+controller or edit the journal by hand.
+
 State is an atomic, strictly validated version-3 `0600` JSON journal under
 `~/.local/state/admin-issue-controller`. Worker JSON event logs are retained in
 its `worker-logs` child directory. Stable issue, comment, branch, session, PR,
