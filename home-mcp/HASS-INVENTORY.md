@@ -23,13 +23,13 @@
 
 ## Home MCP capability progress
 
-| Done | Capability | Coverage | Grounding / corpus |
+| Done | Capability | Coverage | Verification |
 |---|---|---|---|
-| [x] | Household lights | Room groups and named fixtures; compound on/off; exact and relative brightness; configured RGB/white-temperature color; room and configured-fixture whole-home reads; state, last-off history, cautious cause evidence, and Presence-Based Lighting status; embedded clarification/continuation controls with one-send persistence; sanitized serial conversation-learning queue with routing provenance, frozen replays, and guarded patch releases | `corpus/GEMINI-LIGHTS-GROUNDING.md`; deterministic 10k-utterance-per-family generator; `improvement/` |
+| [x] | Household lights | Structured room, group, and fixture controls; compound on/off; exact and relative brightness; configured RGB/white-temperature color; whole-home reads; state, last-off history, cautious cause evidence, and Presence-Based Lighting status | `light-skill.test.ts`; `app.test.ts` |
 | [ ] | Contact sensors | Not planned yet | — |
 
-A capability check means the initial end-to-end MCP, chat-control, context,
-corpus, and focused-test path exists. Individual device/integration boxes below
+A capability check means the typed MCP, state/service action, and focused-test
+path exists. Individual device/integration boxes below
 remain open until their complete family-specific behavior has been reviewed.
 
 ## Installed apps / add-ons
