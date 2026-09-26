@@ -65,8 +65,10 @@ async function close(dialog: Locator) {
   const node = await dialog.elementHandle()
   if (!node) throw new Error('Cannot close a missing modal')
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
-  expect(await node.getAttribute('data-state')).toBe('closed')
-  expect(await node.getAttribute('inert')).not.toBeNull()
+  await expect.poll(() => node.evaluate((element) => ({
+    state: element.getAttribute('data-state'),
+    inert: element.hasAttribute('inert'),
+  })), { timeout: 750, intervals: [16, 32, 64, 128] }).toEqual({ state: 'closed', inert: true })
   await expect(dialog).toHaveCount(0)
   await node.dispose()
 }
