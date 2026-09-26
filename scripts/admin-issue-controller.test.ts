@@ -2855,6 +2855,7 @@ describe('admin issue controller domain', () => {
     issue.receipts.awaitingIosVerificationAt = '2026-09-20T12:01:00.000Z'
     issue.receipts.checksPassedAt = '2026-09-20T12:01:00.000Z'
     issue.receipts.deployedAt = '2026-09-20T12:01:00.000Z'
+    issue.receipts.layoutIncidentCoverageSha256 = 'a'.repeat(64)
     issue.receipts.layoutValidatedAt = '2026-09-20T12:01:00.000Z'
     const sessionName = issue.sessionName
 
@@ -2874,6 +2875,7 @@ describe('admin issue controller domain', () => {
     expect(issue.receipts.awaitingIosVerificationAt).toBeUndefined()
     expect(issue.receipts.checksPassedAt).toBeUndefined()
     expect(issue.receipts.deployedAt).toBeUndefined()
+    expect(issue.receipts.layoutIncidentCoverageSha256).toBeUndefined()
     expect(issue.receipts.layoutValidatedAt).toBeUndefined()
   })
 
@@ -6069,8 +6071,16 @@ describe('admin issue controller security configuration', () => {
     expect(layoutWait).toContain(
       'assertSuccessfulLayoutWorkflowRun(run, mergeSha)\n    if (!(await refreshInputs())) return undefined',
     )
-    expect(controller).toContain('bindVerifiedLayoutWorkflow(record, run)')
-    expect(controller).toContain('finalizeLayoutIssue(config, state, record, run, reconcileInputs)')
+    expect(layoutWait).toContain(
+      'const coverageSha256 = await verifyLayoutIncidentWorkflowCoverage(config, record, run)',
+    )
+    expect(layoutWait).toContain(
+      'if (!(await refreshInputs())) return undefined\n    return { run, coverageSha256 }',
+    )
+    expect(controller).toContain('record.receipts.layoutIncidentCoverageSha256 = coverageSha256')
+    expect(controller).toContain('await verifyLayoutIncidentWorkflowCoverage(config, record, run)')
+    expect(controller).toContain('bindVerifiedLayoutWorkflow(record, result.run, result.coverageSha256)')
+    expect(controller).toContain('finalizeLayoutIssue(config, state, record, result.run, reconcileInputs)')
     expect(controller).toContain('await closeControllerIssue(config, state, record, reconcileInputs)')
     expect(controller).toContain('await assertFreshFinalizationInputs(record, reconcileInputs)')
     expect(controller).toContain('reauthorizePersistedIosFollowUpFromGitHub(config, record)')
