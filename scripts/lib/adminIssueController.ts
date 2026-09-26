@@ -308,6 +308,7 @@ export interface AdminIssueRecord {
   provenance: AdminIssueProvenance
   repairAttempts: number
   receipts: Record<string, string>
+  researchMockups?: AdminIssueResearchMockupsReceipt
   sessionId?: string
   sessionName: string
   taskFingerprint: string
@@ -372,6 +373,20 @@ export interface AdminIssueVisualEvidenceReceipt extends AdminIssueVisualEvidenc
   url?: string
 }
 
+export interface AdminIssueResearchMockupImageReceipt extends AdminIssueVisualEvidenceDraft {
+  mediaType: 'image/png'
+  sha256: string
+  sizeBytes: number
+  uploadAttemptedAt?: string
+  url?: string
+}
+
+export interface AdminIssueResearchMockupsReceipt {
+  generation: number
+  images: AdminIssueResearchMockupImageReceipt[]
+  revision: number
+}
+
 export type AdminIssueWorkerOutcome =
   | {
     decision: 'needs_input'
@@ -379,7 +394,7 @@ export type AdminIssueWorkerOutcome =
     questions: AdminIssueQuestion[]
     schemaVersion: 1
     summary: string
-    visualEvidence: []
+    visualEvidence: AdminIssueVisualEvidenceDraft[]
   }
   | {
     decision: 'resolved_without_pr'
@@ -1076,6 +1091,54 @@ function validateAdminIssueControllerState(value: unknown, version: 2 | 3) {
       Object.values(rawRecord.receipts).every((receipt) => typeof receipt === 'string'),
       `state.issues.${uid}.receipts must contain only strings`,
     )
+    if (rawRecord.researchMockups !== undefined) {
+      assert(version === 3, `state.issues.${uid}.researchMockups requires v3`)
+      const mockups = rawRecord.researchMockups
+      const field = `state.issues.${uid}.researchMockups`
+      assert(object(mockups), `${field} must be an object`)
+      assert(mockups.generation === rawRecord.generation, `${field}.generation does not match the issue`)
+      const revision = positiveInteger(mockups.revision, `${field}.revision`)
+      assert(revision <= Number(rawRecord.processedRevision), `${field}.revision exceeds processed input`)
+      assert(
+        Array.isArray(mockups.images) && mockups.images.length > 0 && mockups.images.length <= 4,
+        `${field}.images must contain one to four PNGs`,
+      )
+      const paths = new Set<string>()
+      const hashes = new Set<string>()
+      for (const [index, image] of mockups.images.entries()) {
+        const imageField = `${field}.images[${index}]`
+        assert(object(image), `${imageField} must be an object`)
+        const path = nonEmptyString(image.path, `${imageField}.path`)
+        const prefix = `artifacts/admin-issue-${rawRecord.issueNumber}/research/`
+        assert(
+          path.startsWith(prefix) &&
+          /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}\.png$/.test(path.slice(prefix.length)),
+          `${imageField}.path must be inside the private research directory`,
+        )
+        const alt = nonEmptyString(image.alt, `${imageField}.alt`)
+        const caption = nonEmptyString(image.caption, `${imageField}.caption`)
+        assert(alt.length <= 240, `${imageField}.alt is too long`)
+        assert(caption.length <= 1_000 && /\bmock\b/i.test(caption), `${imageField}.caption must label mock evidence`)
+        assert(image.mediaType === 'image/png', `${imageField}.mediaType must be image/png`)
+        const hash = sha256(image.sha256, `${imageField}.sha256`)
+        const sizeBytes = positiveInteger(image.sizeBytes, `${imageField}.sizeBytes`)
+        assert(sizeBytes <= 10 * 1024 * 1024, `${imageField}.sizeBytes exceeds the limit`)
+        assert(!paths.has(path) && !hashes.has(hash), `${field}.images contains duplicates`)
+        paths.add(path)
+        hashes.add(hash)
+        if (image.uploadAttemptedAt !== undefined) {
+          isoTimestamp(image.uploadAttemptedAt, `${imageField}.uploadAttemptedAt`)
+        }
+        if (image.url !== undefined) {
+          assert(
+            image.uploadAttemptedAt !== undefined &&
+            typeof image.url === 'string' &&
+            /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/.test(image.url),
+            `${imageField}.url is not a journaled GitHub user attachment`,
+          )
+        }
+      }
+    }
     if (rawRecord.pr !== undefined) {
       assert(object(rawRecord.pr), `state.issues.${uid}.pr must be an object`)
       positiveInteger(rawRecord.pr.number, `state.issues.${uid}.pr.number`)
@@ -1610,7 +1673,16 @@ export function clearTodoIntakeReceipts(state: AdminIssueControllerState, uid: s
   else if (pending) delete pending[key]
 }
 
+export function assertResearchMockupUploadsSettled(
+  record: Pick<AdminIssueRecord, 'researchMockups'>,
+) {
+  if (record.researchMockups?.images.some((image) => image.uploadAttemptedAt && !image.url)) {
+    throw new Error('Research mockup upload outcome is unknown; reconcile before starting a new generation')
+  }
+}
+
 export function beginAdminIssueGeneration(record: AdminIssueRecord, updatedAt: string) {
+  assertResearchMockupUploadsSettled(record)
   record.generation += 1
   record.branch = undefined
   record.worktreePath = undefined
@@ -1618,6 +1690,7 @@ export function beginAdminIssueGeneration(record: AdminIssueRecord, updatedAt: s
   record.deployment = undefined
   record.provenance = { kind: 'none' }
   record.lastOutcome = undefined
+  record.researchMockups = undefined
   record.repairAttempts = 0
   record.phase = 'queued'
   record.updatedAt = updatedAt
@@ -1704,7 +1777,6 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
 
   if (value.decision === 'needs_input') {
     const visualEvidence = visualEvidenceDrafts(value.visualEvidence)
-    assert(visualEvidence.length === 0, 'needs_input visualEvidence must be empty')
     assert(Array.isArray(value.questions) && value.questions.length > 0, 'needs_input requires questions')
     const questions = value.questions.map((entry, index) => {
       assert(object(entry), `questions[${index}] must be an object`)
@@ -1738,7 +1810,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
       summary: value.summary.trim(),
       questions,
       iosFollowUp: ios,
-      visualEvidence: [],
+      visualEvidence,
     }
   }
 
@@ -1913,8 +1985,9 @@ function visualEvidenceMarkdownText(value: string) {
     .trim()
 }
 
-export function formatVisualEvidenceMarkdown(
-  evidence: readonly AdminIssueVisualEvidenceReceipt[],
+function formatEvidenceMarkdown(
+  evidence: readonly (AdminIssueVisualEvidenceDraft & { url?: string })[],
+  heading: string,
 ) {
   if (evidence.length === 0) return ''
   const images = evidence.map((item) => {
@@ -1922,13 +1995,20 @@ export function formatVisualEvidenceMarkdown(
     const alt = visualEvidenceMarkdownText(item.alt).replace(/[\\[\]]/g, '\\$&')
     return `![${alt}](${item.url})\n\n_${visualEvidenceMarkdownText(item.caption)}_`
   })
-  return ['## Proposed fixed behavior', ...images].join('\n\n')
+  return [`## ${heading}`, ...images].join('\n\n')
+}
+
+export function formatVisualEvidenceMarkdown(
+  evidence: readonly AdminIssueVisualEvidenceReceipt[],
+) {
+  return formatEvidenceMarkdown(evidence, 'Proposed fixed behavior')
 }
 
 export function formatQuestionsComment(
   uid: string,
   revision: number,
   outcome: Extract<AdminIssueWorkerOutcome, { decision: 'needs_input' }>,
+  researchMockups: readonly AdminIssueResearchMockupImageReceipt[] = [],
 ) {
   const questions = outcome.questions.map((question, index) => {
     const options = question.options
@@ -1942,12 +2022,15 @@ export function formatQuestionsComment(
   const ios = outcome.iosFollowUp.required
     ? `\n\n> **iOS follow-up required:** ${outcome.iosFollowUp.reason}`
     : ''
+  const mockups = researchMockups.length > 0
+    ? `\n\n${formatEvidenceMarkdown(researchMockups, 'Research mockups (mock only; no implementation)')}`
+    : ''
   return `${CONTROLLER_COMMENT_MARKER}
 ${controllerReceiptMarker(uid, `questions-r${revision}`)}
 
 ## Decision needed
 
-${outcome.summary}
+${outcome.summary}${mockups}
 
 ${questions}${ios}
 
