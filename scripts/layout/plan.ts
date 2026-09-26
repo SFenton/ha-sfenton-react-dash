@@ -140,6 +140,15 @@ release. A failed run automatically files one deduplicated investigation issue
 for the merged commit; the run, artifact, and any manual review are follow-up
 evidence, not release gates.
 
+An incident repaired only in layout tooling may have a successful \`tooling\`
+run with zero product checkpoints; it does not resolve an earlier browser
+failure. An explicitly authorized replay on protected \`master\` can select
+the original ancestor independently of normal post-merge monitoring:
+\`gh workflow run playwright.yml --ref master -f layout_base_sha=<40-hex-ancestor>\`.
+Confirm the resulting plan includes the original failed contexts and actual
+checkpoints, then inspect the exact run artifact. The replay uses its own
+concurrency lane, never deploys, and does not automatically close an issue.
+
 1. Read the current UX contract. Do not redesign its geometry or HA behavior.
 2. Run \`npm run layout:plan -- --base <resolved-master-sha> --out artifacts/layout/<run-id>/plan.json\`.
 3. Review the plan's owners, states, contexts, exclusions and blockers. Unknown new
