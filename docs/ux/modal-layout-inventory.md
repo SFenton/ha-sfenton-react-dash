@@ -36,6 +36,12 @@ layout today. They remain inventory-tested in all required profiles:
 - Vacation confirmation
 - Sprinkler controller
 
+Bathroom Fan remains shared-generic: `e2e/bathroom-fans.spec.ts` verifies its
+off-state timer selector and disabled Set action in portrait, all three short
+landscape sizes, mirrored and zero-inset phone landscape, and a real fine-pointer
+desktop context. It also reaches the powered-on auto-disable choice and active
+timer Clear action through the shared modal body scroll without a second layout.
+
 ## Dedicated-content gaps
 
 These surfaces have stateful content that still relies too heavily on the
@@ -47,7 +53,6 @@ portrait, landscape, and short-landscape content obligations:
 | Scan/Add Item | Barcode camera, manual-name keyboard state, expiration camera/manual state, review form, processing, and success are not all walked by the complete modal inventory. |
 | Daily Summary | Its three tabs are exercised, but column behavior is distributed across child lists rather than declared as one modal content-layout contract. |
 | Sprinkler Controller | Detail/back states are shared-sheet pages without a named short-landscape content adaptation. |
-| Bathroom Fan | Controls rely on the generic stack with no named short-landscape arrangement. |
 | Bed Temperature Scope | Uses a custom portrait height but has no named short-landscape content arrangement. |
 | Vacation Confirmation | Date/error/confirmation structure has no named short-landscape arrangement. |
 
