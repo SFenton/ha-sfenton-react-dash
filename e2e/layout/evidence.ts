@@ -216,10 +216,10 @@ export async function actualCapabilities(page: AuditedDocument, browser: string,
 export async function modalFacts(
   dialog: Locator,
   expectedScrollMode: 'body' | 'panes' = 'body',
-  terminal: 'controls' | 'chat-content' | string = 'controls',
+  terminal = 'controls',
   readiness: ModalReadiness = 'tabs',
 ) {
-  const terminalKind = terminal === 'controls' || terminal === 'chat-content' ? terminal : 'read-only-content'
+  const terminalKind = terminal === 'controls' ? terminal : 'read-only-content'
   const readOnlyTerminal = terminalKind === 'read-only-content' ? terminal : undefined
   await waitForModalReady(dialog, undefined, readiness)
   await expect(dialog).toHaveAttribute('data-scroll-mode', expectedScrollMode)
@@ -243,15 +243,8 @@ export async function modalFacts(
         const rect = item.getBoundingClientRect()
         return rect.width > 0 && rect.height > 0 && !item.closest('[aria-hidden="true"]')
       })
-    const content = terminalKind === 'chat-content'
-      ? [...body.querySelectorAll<HTMLElement>('[data-chat-panel="true"], [data-chat-history="true"], [data-chat-settings="true"]')]
-      : []
     const readOnlyTargets = readOnlyTerminal ? [...body.querySelectorAll<HTMLElement>(readOnlyTerminal)] : []
     if (terminalKind === 'controls' && !terminals.length) throw new Error('Modal body requires terminal controls')
-    if (terminalKind === 'chat-content' && (content.length !== 1 || !content[0].textContent?.trim()
-      || content[0].getBoundingClientRect().height <= 0 || content[0].getBoundingClientRect().width <= 0
-      || getComputedStyle(content[0]).visibility !== 'visible' || Number(getComputedStyle(content[0]).opacity) <= 0
-      || content[0].closest('[aria-hidden="true"], [inert]'))) throw new Error('Chat body requires one real terminal content region')
     if (terminalKind === 'read-only-content') {
       if (terminals.length || readOnlyTargets.length !== 1) throw new Error('Declared read-only body requires one state terminal and no controls')
       const target = readOnlyTargets[0]
@@ -269,7 +262,7 @@ export async function modalFacts(
         throw new Error('Read-only terminal must be visible, named, noninteractive state content')
       }
     }
-    const targets = terminalKind === 'controls' ? terminals : terminalKind === 'chat-content' ? content : readOnlyTargets
+    const targets = terminalKind === 'controls' ? terminals : readOnlyTargets
     const terminalBottom = Math.max(...targets.map((item) => item.getBoundingClientRect().bottom))
     const terminalTargetGap = body.getBoundingClientRect().bottom - terminalBottom
     const terminalControlGap = terminals.length ? body.getBoundingClientRect().bottom - Math.max(...terminals.map((item) => item.getBoundingClientRect().bottom)) : null

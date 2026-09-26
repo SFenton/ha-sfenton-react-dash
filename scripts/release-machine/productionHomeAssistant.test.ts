@@ -180,20 +180,21 @@ describe('Home Assistant production metadata adapter', () => {
 
   it('captures, stages only authorized paths, and restores exact configuration files', async () => {
     const root = await mkdtemp(join(tmpdir(), 'release-ha-config-'))
-    const existingPath = RELEASE_CONFIGURATION_PATHS[0]
-    const newPath = RELEASE_CONFIGURATION_PATHS[1]
-    const remoteExisting = `/config/${existingPath}`
-    const remoteNew = `/config/${newPath}`
-    const fake = scp({ [remoteExisting]: 'before' })
+    expect(RELEASE_CONFIGURATION_PATHS).toEqual(['packages/sfenton_react_panel.yaml'])
+    const panelPath = RELEASE_CONFIGURATION_PATHS[0]
+    const remotePanel = `/config/${panelPath}`
+    const fake = scp({ [remotePanel]: 'before' })
+    const missing = scp()
     try {
       const capture = await captureReleaseConfiguration(fake, '/config')
       expect(
-        capture.find((file) => file.path === existingPath),
+        capture.find((file) => file.path === panelPath),
       ).toMatchObject({
         existed: true,
         contentBase64: Buffer.from('before').toString('base64'),
       })
-      expect(capture.find((file) => file.path === newPath)).toMatchObject({
+      const missingCapture = await captureReleaseConfiguration(missing, '/config')
+      expect(missingCapture.find((file) => file.path === panelPath)).toMatchObject({
         existed: false,
       })
 
@@ -201,21 +202,26 @@ describe('Home Assistant production metadata adapter', () => {
         recursive: true,
       })
       await writeFile(
-        join(root, 'home-assistant', existingPath),
+        join(root, 'home-assistant', panelPath),
         'after-existing',
       )
-      await writeFile(join(root, 'home-assistant', newPath), 'after-new')
       await expect(
-        stageReleaseConfiguration(fake, '/config', root, [
-          `home-assistant/${newPath}`,
-        ]),
+        stageReleaseConfiguration(fake, '/config', root, []),
+      ).resolves.toBe(0)
+      expect(fake.files.get(remotePanel)?.toString()).toBe('before')
+      await expect(
+        stageReleaseConfiguration(fake, '/config', root, [`home-assistant/${panelPath}`]),
       ).resolves.toBe(1)
-      expect(fake.files.get(remoteExisting)?.toString()).toBe('before')
-      expect(fake.files.get(remoteNew)?.toString()).toBe('after-new')
+      expect(fake.files.get(remotePanel)?.toString()).toBe('after-existing')
 
       await restoreReleaseConfiguration(fake, '/config', capture)
-      expect(fake.files.get(remoteExisting)?.toString()).toBe('before')
-      expect(fake.files.has(remoteNew)).toBe(false)
+      expect(fake.files.get(remotePanel)?.toString()).toBe('before')
+      await expect(
+        stageReleaseConfiguration(missing, '/config', root, [`home-assistant/${panelPath}`]),
+      ).resolves.toBe(1)
+      expect(missing.files.get(remotePanel)?.toString()).toBe('after-existing')
+      await restoreReleaseConfiguration(missing, '/config', missingCapture)
+      expect(missing.files.has(remotePanel)).toBe(false)
     } finally {
       await rm(root, { recursive: true, force: true })
     }

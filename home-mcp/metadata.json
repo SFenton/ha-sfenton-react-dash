@@ -1,23 +1,3 @@
 {
-  "serverVersion": "0.2.1",
-  "improvements": [
-    {
-      "version": "0.2.1",
-      "publishedAt": "2026-09-12T04:03:49.049Z",
-      "summary": [
-        "Answers whole-home light questions with only configured lights.",
-        "Clarifies unknown light locations instead of checking the whole home.",
-        "Keeps delegated chats from being treated as successful Home MCP answers."
-      ]
-    },
-    {
-      "version": "0.2.0",
-      "publishedAt": "2026-09-10T14:00:00.000Z",
-      "summary": [
-        "Learns from completed light conversations one at a time.",
-        "Keeps existing light requests working before publishing an improvement.",
-        "Reports the active chat model and recent improvements in Chat Settings."
-      ]
-    }
-  ]
+  "serverVersion": "0.2.2"
 }

@@ -13,7 +13,7 @@ This document tracks **content adaptation**, not outer-frame coverage.
 These families declare modal-specific landscape/tier structure or have
 state-specific executable layout contracts:
 
-- Quick Links, Chat, Rooms, and Security detail flows
+- Quick Links, Rooms, and Security detail flows
 - camera/media split views and media remotes
 - DoneTick create/edit task forms
 - inventory filter, details, and sorting flows

@@ -1,17 +1,12 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { createServer as createHttpsServer } from 'node:https'
-import { randomUUID } from 'node:crypto'
 import metadataJson from './metadata.json' with { type: 'json' }
-import { ConversationImprovementStore } from './improvement/store'
-import type { HomeMcpMetadata, ImprovementConversationTurn } from './improvement/types'
 import { createHassUserAuthenticator, HassAuthenticationError, type AuthenticatedHassUser } from './hass-auth'
-import { canonicalizeLightContext } from './light-context'
-import { HOUSE_LIGHT_ROOMS, RGB_COLORS, WHITE_COLORS, type HouseLightRoom } from './lights-config'
+import { HOUSE_LIGHT_ROOMS, type HouseLightRoom } from './lights-config'
 import {
-  HOME_CHAT_USER_LIMIT,
+  MAX_LIGHT_CONTROL_MESSAGE_LENGTH,
   buildLightPlan,
   formatNames,
-  parseLightUtterance,
   SINGLE_ROOM_DETAIL_RESPONSE,
   type LightAction,
   type LightOperation,
@@ -31,19 +26,13 @@ interface JsonRpcRequest {
 
 interface HomeMcpOptions {
   hassUrl: string
-  agentId?: string
   allowedOrigins?: string[]
-  chatModel?: string
   fetchImpl?: typeof fetch
-  improvementStore?: ConversationImprovementStore
   authenticateUser?: (token: string) => Promise<AuthenticatedHassUser>
   tls?: { cert: Buffer; key: Buffer }
 }
 
 interface ToolArguments {
-  text?: unknown
-  conversation_id?: unknown
-  context?: unknown
   entity_ids?: unknown
   hours?: unknown
   action?: unknown
@@ -57,16 +46,11 @@ interface ToolArguments {
   operations?: unknown
   history_before?: unknown
   target_state?: unknown
-  thread_id?: unknown
-  turn_id?: unknown
-  control_id?: unknown
-  conversation?: unknown
 }
 
-const metadata = metadataJson as HomeMcpMetadata
+const metadata = metadataJson
 const json = (value: unknown) => JSON.stringify(value)
 const isEntityId = (value: unknown): value is string => typeof value === 'string' && /^[a-z0-9_]+\.[a-z0-9_]+$/.test(value)
-const isIdentifier = (value: unknown): value is string => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value)
 
 function corsOrigin(request: IncomingMessage, allowedOrigins: ReadonlySet<string>) {
   const origin = request.headers.origin
@@ -566,57 +550,9 @@ function retryControls(results: Array<{ operation: LightOperation; failed: strin
     })
   if (!messages.length) return []
   const message = `${messages.join(' and ')}.`
-  return message.length <= HOME_CHAT_USER_LIMIT
+  return message.length <= MAX_LIGHT_CONTROL_MESSAGE_LENGTH
     ? [{ id: `retry-${Date.now()}`, kind: 'suggestions' as const, options: [{ label: 'Try Again', message }] }]
     : []
-}
-
-async function enrichColorPicker(fetchImpl: typeof fetch, hassUrl: string, token: string, plan: LightSkillResponse) {
-  const control = plan.controls.find((candidate) => candidate.kind === 'color-picker')
-  if (!control || !control.entityIds.length) return plan
-  const rooms = control.rooms.map(findExecutionLightRoom)
-  const allowedIds = new Set(rooms.flatMap((room) => room?.lights.map((light) => light.entityId) ?? []))
-  if (rooms.some((room) => !room) || control.room !== rooms[0]?.name || control.entityIds.some((id) => !allowedIds.has(id))) {
-    const text = 'That light request did not match the configured controls.'
-    return responseWithContext({ status: 'unsupported', text, controls: [], context: null })
-  }
-  const states = await readStates(fetchImpl, hassUrl, token, control.entityIds)
-  if (states.some((state) => !readableState(state))) {
-    const text = `I could not read the ${control.room} light color capabilities from Home Assistant.`
-    return responseWithContext({ status: 'answer', text, controls: [], context: plan.context })
-  }
-  const rgbSupported = states.every(supportsRgb)
-  const bounds = states.map(temperatureBounds)
-  const temperatureSupported = bounds.every((value) => value !== null)
-  if (!rgbSupported && !temperatureSupported) {
-    const text = `${control.room} lights do not share a supported color control.`
-    return responseWithContext({ status: 'unsupported', text, controls: [], context: plan.context })
-  }
-  control.supportsCustomRgb = rgbSupported
-  control.colorMode = rgbSupported ? 'rgb' : 'temperature'
-  if (temperatureSupported) {
-    control.minTemperatureKelvin = Math.max(...bounds.map((value) => value!.min))
-    control.maxTemperatureKelvin = Math.min(...bounds.map((value) => value!.max))
-    if (control.minTemperatureKelvin > control.maxTemperatureKelvin) {
-      const text = `${control.room} lights do not share a supported white-temperature range.`
-      return responseWithContext({ status: 'unsupported', text, controls: [], context: plan.context })
-    }
-  }
-  control.palette = [
-    ...(temperatureSupported
-      ? Object.entries(WHITE_COLORS)
-          .filter(([, kelvin]) => kelvin >= control.minTemperatureKelvin && kelvin <= control.maxTemperatureKelvin)
-          .map(([name]) => name)
-      : []),
-    ...(rgbSupported ? Object.keys(RGB_COLORS).filter((name) => !(name in WHITE_COLORS)) : []),
-  ]
-  if (rgbSupported) {
-    const rgb = states.map((state) => state.attributes?.rgb_color).find((value): value is [number, number, number] => Array.isArray(value) && value.length === 3 && value.every((channel) => typeof channel === 'number'))
-    if (rgb) control.currentRgb = [rgb[0], rgb[1], rgb[2]]
-  }
-  const kelvin = states.map((state) => state.attributes?.color_temp_kelvin).find((value): value is number => typeof value === 'number' && Number.isFinite(value))
-  if (kelvin) control.currentTemperatureKelvin = Math.max(control.minTemperatureKelvin, Math.min(control.maxTemperatureKelvin, Math.round(kelvin)))
-  return plan
 }
 
 async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token: string, plan: LightSkillResponse) {
@@ -868,136 +804,15 @@ async function executeLightPlan(fetchImpl: typeof fetch, hassUrl: string, token:
   return responseWithContext({ status: 'success', text, controls, context: plan.context, data: { successes } })
 }
 
-function assistantText(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const response = value as Record<string, unknown>
-  if (typeof response.text === 'string') return response.text
-  if (!response.response || typeof response.response !== 'object' || Array.isArray(response.response)) return null
-  const native = response.response as Record<string, unknown>
-  if (!native.speech || typeof native.speech !== 'object' || Array.isArray(native.speech)) return null
-  const speech = native.speech as Record<string, unknown>
-  if (!speech.plain || typeof speech.plain !== 'object' || Array.isArray(speech.plain)) return null
-  const plain = speech.plain as Record<string, unknown>
-  return typeof plain.speech === 'string' ? plain.speech : null
-}
-
-function turnOutcome(value: unknown): ImprovementConversationTurn['outcome'] {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'empty'
-  const response = value as Record<string, unknown>
-  if (response.status === 'failed' || response.status === 'partial') return 'failed'
-  if (response.response && typeof response.response === 'object' && !Array.isArray(response.response)
-    && (response.response as Record<string, unknown>).response_type === 'error') return 'error'
-  return assistantText(value) ? 'answer' : 'empty'
-}
-
 async function callTool(
   fetchImpl: typeof fetch,
   hassUrl: string,
   token: string,
-  agentId: string | undefined,
   name: unknown,
   args: ToolArguments,
-  improvementStore: ConversationImprovementStore,
-  chatModel: string,
-  user: AuthenticatedHassUser,
 ) {
-  const userScope = user.id
-  if (name === 'home_chat') {
-    if (typeof args.text !== 'string' || !args.text.trim()) throw new Error('home_chat requires non-empty text')
-    if (args.text.length > HOME_CHAT_USER_LIMIT) throw new Error(`home_chat text must be at most ${HOME_CHAT_USER_LIMIT} characters`)
-    if (args.conversation_id !== undefined && args.conversation_id !== null && typeof args.conversation_id !== 'string') {
-      throw new Error('home_chat conversation_id must be a string or null')
-    }
-    if (args.thread_id !== undefined && !isIdentifier(args.thread_id)) throw new Error('home_chat thread_id must be a valid identifier')
-    if (args.turn_id !== undefined && !isIdentifier(args.turn_id)) throw new Error('home_chat turn_id must be a valid identifier')
-    if (args.control_id !== undefined && !isIdentifier(args.control_id)) throw new Error('home_chat control_id must be a valid identifier')
-    let activity: Awaited<ReturnType<ConversationImprovementStore['beginConversationActivity']>> | null = null
-    if (args.thread_id) {
-      try {
-        activity = await improvementStore.beginConversationActivity(userScope, args.thread_id)
-      } catch (error) {
-        console.error('Home MCP could not initialize conversation improvement recording:', error instanceof Error ? error.message : error)
-      }
-    }
-    try {
-      const context = canonicalizeLightContext(args.context)
-      const invalidContext = args.context !== undefined && args.context !== null && !context
-      const lightPlan = invalidContext ? null : parseLightUtterance(args.text, context)
-      let result: unknown
-      let handledByHomeMcp = false
-      if (invalidContext) {
-        const text = 'The earlier light context is no longer valid. Name the light or room again.'
-        result = responseWithContext({ status: 'unsupported', text, controls: [], context: null })
-        handledByHomeMcp = true
-      } else if (lightPlan) {
-        const prepared = lightPlan.status === 'clarify' ? await enrichColorPicker(fetchImpl, hassUrl, token, lightPlan) : lightPlan
-        const executed = await executeLightPlan(fetchImpl, hassUrl, token, prepared)
-        result = { ...executed, conversation_id: args.conversation_id ?? `home-mcp-lights:${args.thread_id ?? randomUUID()}` }
-        handledByHomeMcp = true
-      } else if (args.control_id) {
-        const text = 'That follow-up is not a supported light request.'
-        result = responseWithContext({
-          status: 'unsupported',
-          text,
-          controls: [],
-          context,
-        })
-        handledByHomeMcp = true
-      } else {
-        const response = await hassRequest(fetchImpl, hassUrl, token, '/api/conversation/process', {
-          method: 'POST',
-          body: JSON.stringify({
-            text: args.text,
-            ...(agentId ? { agent_id: agentId } : {}),
-            ...(args.conversation_id ? { conversation_id: args.conversation_id } : {}),
-          }),
-        })
-        result = context && response && typeof response === 'object'
-          ? { ...(response as Record<string, unknown>), context }
-          : response
-      }
-      if (result && typeof result === 'object' && !Array.isArray(result)) {
-        result = { ...(result as Record<string, unknown>), handled_by_home_mcp: handledByHomeMcp }
-      }
-      if (activity) {
-        const resultContext = result && typeof result === 'object' && !Array.isArray(result)
-          ? canonicalizeLightContext((result as Record<string, unknown>).context) ?? context
-          : context
-        await activity.recordTurn({
-          id: args.turn_id ?? `turn-${Date.now()}`,
-          createdAt: Date.now(),
-          userText: args.text,
-          assistantText: assistantText(result),
-          outcome: turnOutcome(result),
-          parsedAsLights: Boolean(lightPlan) || invalidContext,
-          handledByHomeMcp,
-          contextBefore: context,
-          contextAfter: resultContext,
-        }).catch((error) => {
-          console.error('Home MCP could not record the conversation improvement turn:', error instanceof Error ? error.message : error)
-        })
-      }
-      return result
-    } finally {
-      activity?.release()
-    }
-  }
-
-  if (name === 'home_chat_end') {
-    if (!isIdentifier(args.thread_id)) throw new Error('home_chat_end requires a valid thread_id')
-    return improvementStore.queueConversation(userScope, args.thread_id, 'runtime')
-  }
-
-  if (name === 'home_chat_review') {
-    if (!user.isAdmin) throw new Error('home_chat_review requires a Home Assistant administrator')
-    if (!args.conversation || typeof args.conversation !== 'object' || Array.isArray(args.conversation)) {
-      throw new Error('home_chat_review requires a conversation object')
-    }
-    return improvementStore.reviewConversation(args.conversation, userScope)
-  }
-
   if (name === 'home_info') {
-    return improvementStore.info(chatModel)
+    return { mcpVersion: metadata.serverVersion, supportedTools: ['lights'] }
   }
 
   if (name === 'home_state') {
@@ -1079,44 +894,8 @@ const LIGHT_OPERATION_CONSTRAINTS = [
 
 const tools = [
   {
-    name: 'home_chat',
-    description: 'Ask the household Home Assistant conversation agent to query or control the home.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        text: { type: 'string', minLength: 1, maxLength: HOME_CHAT_USER_LIMIT },
-        conversation_id: { type: ['string', 'null'] },
-        context: { type: ['object', 'null'] },
-        thread_id: { type: 'string', pattern: '^[a-zA-Z0-9_-]{1,100}$' },
-        turn_id: { type: 'string', pattern: '^[a-zA-Z0-9_-]{1,100}$' },
-      },
-      required: ['text'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'home_chat_end',
-    description: 'Mark a completed dashboard chat for queued supported-tool improvement review.',
-    inputSchema: {
-      type: 'object',
-      properties: { thread_id: { type: 'string', pattern: '^[a-zA-Z0-9_-]{1,100}$' } },
-      required: ['thread_id'],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: 'home_chat_review',
-    description: 'Queue a retained dashboard chat for supported-tool improvement review.',
-    inputSchema: {
-      type: 'object',
-      properties: { conversation: { type: 'object' } },
-      required: ['conversation'],
-      additionalProperties: false,
-    },
-  },
-  {
     name: 'home_info',
-    description: 'Read the configured chat model, Home MCP version, improvement queue state, and recent published improvements.',
+    description: 'Read the Home MCP version and supported household capabilities.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -1193,10 +972,6 @@ async function handleRpc(
   fetchImpl: typeof fetch,
   hassUrl: string,
   token: string,
-  agentId: string | undefined,
-  improvementStore: ConversationImprovementStore,
-  chatModel: string,
-  user: AuthenticatedHassUser,
 ) {
   const id = request.id ?? null
   if (request.method === 'initialize') {
@@ -1210,7 +985,7 @@ async function handleRpc(
     return { jsonrpc: '2.0', id, error: { code: -32602, message: 'Tool arguments must be an object' } }
   }
   try {
-    const result = await callTool(fetchImpl, hassUrl, token, agentId, request.params?.name, args as ToolArguments, improvementStore, chatModel, user)
+    const result = await callTool(fetchImpl, hassUrl, token, request.params?.name, args as ToolArguments)
     return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result } }
   } catch (error) {
     return { jsonrpc: '2.0', id, error: { code: -32602, message: error instanceof Error ? error.message : 'Home MCP tool failed' } }
@@ -1221,8 +996,6 @@ export function createHomeMcpServer(options: HomeMcpOptions): Server {
   const hassUrl = options.hassUrl.replace(/\/$/, '')
   const allowedOrigins = new Set(options.allowedOrigins ?? [])
   const fetchImpl = options.fetchImpl ?? fetch
-  const improvementStore = options.improvementStore ?? new ConversationImprovementStore({ enabled: false })
-  const chatModel = options.chatModel ?? 'Gemini 3.1 Flash Lite'
   const authenticateUser = options.authenticateUser ?? createHassUserAuthenticator({ hassUrl })
 
   const handler = async (request: IncomingMessage, response: ServerResponse) => {
@@ -1249,9 +1022,9 @@ export function createHomeMcpServer(options: HomeMcpOptions): Server {
     if (!token) return send(response, 401, { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'Home Assistant authorization is required' } }, origin)
 
     try {
-      const user = await authenticateUser(token)
+      await authenticateUser(token)
       const rpc = await readBody(request)
-      send(response, 200, await handleRpc(rpc, fetchImpl, hassUrl, token, options.agentId, improvementStore, chatModel, user), origin)
+      send(response, 200, await handleRpc(rpc, fetchImpl, hassUrl, token), origin)
     } catch (error) {
       if (error instanceof HassAuthenticationError) {
         const status = error.kind === 'invalid' ? 401 : 502

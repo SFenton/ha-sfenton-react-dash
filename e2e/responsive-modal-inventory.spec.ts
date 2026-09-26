@@ -1,5 +1,6 @@
 // @covers src/components/hass/EditTodoItemSheet.tsx
 // @covers src/components/hass/EditTodoItemSheet.module.css
+// @covers src/components/shell/GlobalQuickLinksAction.tsx
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Locator, type Page } from './layout/fixture'
@@ -1330,9 +1331,10 @@ test.describe('complete ModalSheet inventory acceptance', () => {
 
       expect(Math.abs(metrics.dialogWidth - 393), `${tileCase.id} dialog width`).toBeLessThanOrEqual(1)
       expect(Math.abs(metrics.dialogHeight - 767), `${tileCase.id} dialog height`).toBeLessThanOrEqual(1)
-      expect(metrics.bodyPaddingBottom, `${tileCase.id} body bottom padding`).toBe(tileCase.id === 'rooms' ? '12px' : '58px')
+      expect(metrics.bodyPaddingBottom, `${tileCase.id} body bottom padding`).toBe('58px')
       if (tileCase.id === 'rooms') {
-        await expect(dialog.locator('[data-modal-sheet-navigation="true"]')).toHaveCSS('padding-bottom', '52px')
+        await expect(dialog.locator('[data-modal-sheet-navigation="true"]')).toHaveCount(0)
+        await expect(dialog.locator('[data-modal-sheet-footer="true"]')).toHaveCount(0)
       }
       expect(Math.abs(metrics.gridWidth - 359), `${tileCase.id} grid width`).toBeLessThanOrEqual(1)
       expect(Math.abs(metrics.bodyContentWidth - 359), `${tileCase.id} body content width`).toBeLessThanOrEqual(1)
