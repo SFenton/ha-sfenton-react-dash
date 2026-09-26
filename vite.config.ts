@@ -7,10 +7,6 @@ import { resolve } from 'node:path'
 const DEFAULT_DEV_HTTPS_CERT = '.certs/localhost.pem'
 const DEFAULT_DEV_HTTPS_KEY = '.certs/localhost-key.pem'
 
-export function configureHomeMcpProxy(proxy: { on: (event: 'proxyReq', listener: (request: { removeHeader: (name: string) => void }) => void) => void }) {
-  proxy.on('proxyReq', (proxyRequest) => proxyRequest.removeHeader('origin'))
-}
-
 function devHttpsOptions(mode: string, env: Record<string, string>): HttpsServerOptions | undefined {
   if (mode !== 'https' && env.VITE_DEV_HTTPS !== 'true') return undefined
 
@@ -48,7 +44,6 @@ export default defineConfig(({ mode }) => {
   const hassTarget = env.VITE_HA_URL || 'http://homeassistant.local:8123'
   const everShelfDevTarget = env.EVERSHELF_DEV_URL || 'http://127.0.0.1:8083'
   const https = devHttpsOptions(mode, env)
-  const homeMcpDevTarget = env.HOME_MCP_DEV_URL || 'http://127.0.0.1:8787'
 
   return {
     cacheDir: resolve(process.cwd(), '.cache/vite'),
@@ -81,13 +76,6 @@ export default defineConfig(({ mode }) => {
         ignored: ['**/artifacts/**'],
       },
       proxy: {
-        '/__home-mcp': {
-          target: homeMcpDevTarget,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path.replace(/^\/__home-mcp/, '/mcp'),
-          configure: configureHomeMcpProxy,
-        },
         '/__evershelf': {
           target: everShelfDevTarget,
           changeOrigin: true,

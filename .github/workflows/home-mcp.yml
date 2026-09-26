@@ -29,5 +29,3 @@ jobs:
       - run: npm run test:change-policy -- --base origin/${{ github.base_ref }}
       - run: npm run home-mcp:check
       - run: npm run test:run -- home-mcp
-      - run: npm run home-mcp:regressions:validate
-      - run: npm run home-mcp:corpus:lights:validate -- --utterances-per-family 10000

@@ -1,4 +1,3 @@
-import { CHAT_LAYOUT_STATES } from '../../src/test/fixtures/chat'
 
 export type ResponsiveCoverage = 'direct' | 'not-applicable' | 'owned'
 
@@ -13,12 +12,6 @@ export interface PlaywrightSpecCoverage {
 }
 
 export const PLAYWRIGHT_SPEC_COVERAGE = [
-  {
-    area: 'Global chat, same-user shared history, deliberate resume, pending state and composer geometry',
-    landscape: 'direct',
-    safeArea: 'direct',
-    spec: 'chat-ux.spec.ts',
-  },
   {
     area: 'Wake states, shared-frame geometry, scroll ownership, pending outcomes and source navigation',
     landscape: 'direct',
@@ -39,13 +32,6 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
     safeArea: 'owned',
     safeAreaOwner: 'wake-light-alarms.spec.ts',
     spec: 'wake-light-desktop-responsive.spec.ts',
-  },
-  {
-    area: 'App chat routing through the authenticated household Home MCP endpoint',
-    landscape: 'not-applicable',
-    note: 'Transport routing has no viewport or safe-area-specific behavior.',
-    safeArea: 'not-applicable',
-    spec: 'home-mcp.spec.ts',
   },
   {
     area: 'Contract-certified mock page, shell, modal, grid, form, remote, host and preload journeys',
@@ -345,7 +331,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'chat', 'camera', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source', 'solo-trip-settings', 'solo-trip-bed'] as const
+export const SCENARIO_IDS = ['quick-links', 'camera', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source', 'solo-trip-settings', 'solo-trip-bed'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -365,18 +351,9 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
 }> = {
   'quick-links': {
     family: 'modal', states: ['root', 'rooms', 'back'],
-    tabs: ['^Home Assistant$', '^Quick Links$'],
     owners: ['src/components/shell/GlobalQuickLinksAction', 'src/components/hass/QuickLinkTile', 'src/components/hass/RoomNavigationGrid'],
     legacy: ['responsive-modal-inventory.spec.ts', 'modal-rotation-regressions.spec.ts'],
     question: 'Are text-aware links and left-aligned room tracks readable, with real end clearance and unchanged return geometry?',
-  },
-  chat: {
-    family: 'modal', states: CHAT_LAYOUT_STATES,
-    tabs: ['^Home Assistant$', '^Quick Links$'],
-    readOnlyTerminals: { settings: '[data-chat-settings="true"]' },
-    owners: ['src/components/hass/chat/', 'src/components/hass/LightColorPicker', 'src/components/hass/lightColor', 'src/components/shell/GlobalQuickLinksAction', 'src/i18n/locales/en/modals/chat.json'],
-    legacy: ['chat-ux.spec.ts', 'modal-rotation-regressions.spec.ts'],
-    question: 'Are roles, genuine pending dots, 14-day history visibility, versioned Chat Settings, embedded room/color/brightness controls and same-sheet custom color details using the shared exterior-light picker clear, with resume warnings, errors, long messages, a usable composer above bottom tabs and one safe scroll owner?',
   },
   camera: {
     family: 'modal', states: ['loading', 'live'],
@@ -686,7 +663,7 @@ export const PARITY_SPEC = 'mobile-parity-all-routes.spec.ts'
 export const LAYOUT_UNIT_GATES = [
   'scripts/layout', 'scripts/e2e-coverage-check.test.ts', 'scripts/required-mobile-parity.test.ts',
   'src/components/shell/DashboardPreloadCache.test.tsx', 'src/test/mocks/hakitCoreState.test.ts',
-  'src/components/hass/chat', 'src/components/shell/GlobalChat.test.tsx', 'src/components/shell/GlobalQuickLinksAction.test.tsx',
+  'src/components/shell/GlobalQuickLinksAction.test.tsx',
 ] as const
 
 // Exact, existing engine restrictions; these remain skipped, never counted as passed.

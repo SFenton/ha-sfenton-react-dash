@@ -139,21 +139,18 @@ token, and report the expected MCP version. Stage and configuration-check the
 HA proxy before replacing React assets. If the proxy is new or changed, stop
 after staging and obtain the separately required HA restart approval. After
 the restart, verify an authenticated `/api/sfenton_home_mcp` `home_info` call.
-Only then build with `VITE_HOME_MCP_ENABLED=true` and deploy the dashboard
-assets. Never leave a build that defaults to a missing proxy in either host.
+The Home MCP proxy is retained for independent tools; the dashboard no longer
+uses frontend chat. Do not enable or restore browser chat through a build flag.
+Deploy dashboard assets only after any required proxy/runtime checks.
 The SSH deploy command exits with status 2 after successful config staging so
 automation cannot mistake the pre-restart phase for asset deployment.
 
-Chat history and the Home MCP proxy are separate HA runtime dependencies.
-Deploy the exact `home-assistant/custom_components/sfenton_react_chat/` files
-and `home-assistant/packages/sfenton_react_chat.yaml` following the component
-README. SSH deployment compares and backs up those files and validates after
-staging, with rollback on staging or validation failure; SMB requires the
-documented manual backup, copy, validation, and rollback steps. Changed
-component or package files require a separately approved HA restart. After a
-restart, verify the prior daily purge automation is absent. The manual purge
-service may remain registered, but do not invoke it during release verification
-without explicit deletion authorization.
+The retired chat-history component is not managed by the ongoing SSH deploy
+script. Its one-time removal requires an exact backup of the installed package
+and component outside active HA paths, a fresh configuration check, an approved
+HA restart, and proof its manual purge service is no longer registered. Never
+invoke that service or delete existing per-user histories as part of chat
+retirement. Follow `docs/deployment.md` for the staging and rollback boundary.
 
 Admin To-Do image filing is another restart-aware HA runtime dependency.
 Deploy the exact `home-assistant/custom_components/sfenton_admin_todo/` files
