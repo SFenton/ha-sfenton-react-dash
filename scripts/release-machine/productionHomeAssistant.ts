@@ -155,12 +155,6 @@ export async function restoreHomeAssistantProductionMetadata(
 
 export const RELEASE_CONFIGURATION_PATHS = [
   'packages/sfenton_react_panel.yaml',
-  'packages/sfenton_react_chat.yaml',
-  'custom_components/sfenton_react_chat/__init__.py',
-  'custom_components/sfenton_react_chat/manifest.json',
-  'custom_components/sfenton_react_chat/services.yaml',
-  'custom_components/sfenton_react_chat/retention.py',
-  'custom_components/sfenton_react_chat/README.md',
 ] as const
 export const RELEASE_REMOTE_FOLDER = 'ha-sfenton-react-dash'
 

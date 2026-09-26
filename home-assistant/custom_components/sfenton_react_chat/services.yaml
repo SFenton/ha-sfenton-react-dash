@@ -1,3 +1,0 @@
-purge_expired_history:
-  name: Purge expired history
-  description: Clear current-schema conversation payloads at least 14 days old for all Home Assistant users.

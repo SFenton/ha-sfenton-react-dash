@@ -2,6 +2,7 @@
 // @covers scripts/layout/review.ts
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
+import { requireScenarios, SURFACE_CONTRACTS } from '../../e2e/layout/contracts'
 import { hash, stableHash } from './shared'
 import {
   executionBatches,
@@ -17,6 +18,13 @@ import type { ChildProcess } from 'node:child_process'
 import type { CollectedTest, ExecutionLedger, RunIdentity } from '../../e2e/layout/types'
 
 describe('owned build verification', () => {
+  it('rejects retired chat layout review while retaining direct Quick Links coverage', () => {
+    expect(requireScenarios(['quick-links'])).toEqual(['quick-links'])
+    expect(() => requireScenarios(['chat'])).toThrow('Unknown layout scenario: chat')
+    expect(SURFACE_CONTRACTS['quick-links'].tabs).toBeUndefined()
+    expect(readFileSync('scripts/layout/review.ts', 'utf8')).not.toContain('openChatState')
+  })
+
   it('uses two layout workers by default and accepts an explicit positive override', () => {
     expect(layoutWorkerCount(undefined)).toBe(2)
     expect(layoutWorkerCount('1')).toBe(1)

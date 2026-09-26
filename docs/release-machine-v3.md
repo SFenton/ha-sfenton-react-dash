@@ -84,7 +84,7 @@ exist and pass fake-driver fault tests:
 2. Qualify the real Home Assistant/SSH adapter in an authorized non-production
    fixture, including crash injection at each asset rename and idempotent
    lease/staging finalization. It captures and restores assets,
-   wrapper/resource metadata, and the exact supported panel/chat configuration
+   wrapper/resource metadata and the exact supported panel configuration
    files with HA config checks.
 3. Add a separately authorized Home Assistant restart driver and post-restart
    verification before permitting configuration release scopes.

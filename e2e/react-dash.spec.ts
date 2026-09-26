@@ -1115,6 +1115,8 @@ test('Food quick link mirrors the All Food summary with the Kitchen Food orange'
   await page.goto('/at-a-glance/overview')
 
   const dialog = await openQuickLinksTab(page)
+  await expect(dialog.getByRole('tab')).toHaveCount(0)
+  await expect(dialog.locator('[data-modal-sheet-navigation], [data-chat-panel], [data-chat-composer]')).toHaveCount(0)
   const foodQuickLink = dialog.getByRole('button', { name: 'Food & Recipes 35 Items • 6 Expiring Soon' })
   await expect(foodQuickLink).toContainText('Food & Recipes')
   await expect(foodQuickLink).toContainText('35 Items • 6 Expiring Soon')

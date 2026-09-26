@@ -4,7 +4,10 @@ import { get as httpGet } from 'node:http'
 import { cp, lstat, mkdir, readFile, readlink, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { basename, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import type { HomeMcpMetadata } from './types'
+
+interface HomeMcpMetadata {
+  serverVersion: string
+}
 
 function run(command: string, args: string[], cwd: string) {
   return new Promise<void>((resolvePromise, reject) => {

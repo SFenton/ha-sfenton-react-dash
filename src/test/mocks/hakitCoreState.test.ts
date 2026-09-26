@@ -1,6 +1,6 @@
 import { mockCallServiceCalls, mockState, resetMockHass, setMockCallServiceOutcome, type MockHassDebugApi } from './hakitCoreState'
-import { mockChatServer } from './chatServer'
 
+// @covers src/test/mocks/chatServer.ts
 describe('helper service outcome fixtures', () => {
   beforeEach(resetMockHass)
   it('rejects helper calls as well as websocket calls without losing the intent log', async () => {
@@ -25,15 +25,10 @@ describe('helper service outcome fixtures', () => {
     const restored = await mockState.helpers.callService(request) as { response: { 'weather.pirate_weather': { forecast: unknown[] } } }
     expect(restored.response['weather.pirate_weather'].forecast).toHaveLength(7)
   })
-  it('repairs only the current mock account chat namespace without importing new product modules', () => {
-    const userId = mockState.user!.id
-    mockChatServer.seed(userId, { theme: 'retained', 'another-app.setting': true, 'react-dash.chat.v9.old': { version: 9 } })
-    mockChatServer.seed('another-user', { 'react-dash.chat.v1.other': { retained: true } })
-    const api = (window as unknown as { __mockHass: { chat: { replaceRecords: (records: Record<string, unknown>) => void } } }).__mockHass
-    api.chat.replaceRecords({ 'react-dash.chat.v1.repaired': { version: 1 } })
-    expect(mockChatServer.data(userId)).toEqual({
-      theme: 'retained', 'another-app.setting': true, 'react-dash.chat.v1.repaired': { version: 1 },
-    })
-    expect(mockChatServer.data('another-user')).toEqual({ 'react-dash.chat.v1.other': { retained: true } })
+  it('does not expose the removed chat transport through the dashboard mock', async () => {
+    expect((window as unknown as { __mockHass: MockHassDebugApi }).__mockHass).not.toHaveProperty('chat')
+    await expect(mockState.connection.subscribeMessage(() => undefined, {
+      type: 'frontend/subscribe_user_data',
+    })).rejects.toThrow('Unsupported mocked subscription')
   })
 })

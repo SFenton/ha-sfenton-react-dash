@@ -7,7 +7,7 @@ The production build currently ships to two Home Assistant sidebar hosts:
 - `/sfenton-react-dash/home` — the existing storage-mode Lovelace wrapper.
 - `/sfenton-react-panel` — an embedded `panel_custom` host that keeps the React iframe outside Lovelace card rebuilds.
 
-Both hosts use the same files under `/local/ha-sfenton-react-dash/`. Use `npm run deploy:both` for the SSH build/deploy/sync flow, or copy `dist/` over SMB and then run `npm run deploy:sync`. Include the chat history component/package installation below in either flow. Deployment sync also keeps the legacy `sfenton-react-app-card` resource on the repository-owned, versioned module instead of an out-of-band inline resource. The custom-panel registration is versioned in `home-assistant/packages/sfenton_react_panel.yaml`; changes to that package/bridge or the chat history component/package require an explicitly approved Home Assistant restart, unlike asset-only updates.
+Both hosts use the same files under `/local/ha-sfenton-react-dash/`. Use `npm run deploy:both` for the SSH build/deploy/sync flow, or copy `dist/` over SMB and then run `npm run deploy:sync`. Deployment sync also keeps the legacy `sfenton-react-app-card` resource on the repository-owned, versioned module instead of an out-of-band inline resource. The custom-panel registration is versioned in `home-assistant/packages/sfenton_react_panel.yaml`; changes to that package/bridge require an explicitly approved Home Assistant restart, unlike asset-only updates.
 
 Both iframe hosts keep the same app frame in the stable top document across an
 immediate Home Assistant host replacement. Source changes, route departure, or
@@ -39,29 +39,15 @@ PBL lease contract, Master Bedroom target evidence, service API, sensor schema,
 and local validation steps are documented in
 [`docs/wake-light-integration.md`](docs/wake-light-integration.md).
 
-### Home Assistant chat history
+### Retired dashboard Chat
 
-The dashboard hides conversations whose latest activity is older than 14 days,
-but keeps their records in each authenticated user's Home Assistant frontend
-store. The `sfenton_react_chat` package no longer schedules deletion. Its manual
-purge service remains available only for a separately authorized cleanup.
-
-For the preferred SMB flow, back up and copy
-`home-assistant/custom_components/sfenton_react_chat/` to
-`\\192.168.1.22\config\custom_components\sfenton_react_chat\`, and
-`home-assistant/packages/sfenton_react_chat.yaml` to
-`\\192.168.1.22\config\packages\sfenton_react_chat.yaml`. The SSH deployment
-script stages these files with backups alongside the panel. Configuration-check
-after staging; restore prior files on failure. When either chat component or
-package changes, restart HA only with explicit approval. After restart, verify
-the prior daily purge automation is absent. Never invoke the manual purge
-service during verification without explicit deletion authorization.
-
-**React assets, `deploy:sync`, and HMR do not remove a previously loaded purge
-automation.** Preserve both dashboard hosts and their existing deployment and
-cache-busting rules. See [Chat](docs/chat.md) and the
-[installation/rollback checklist](home-assistant/custom_components/sfenton_react_chat/README.md)
-for visibility, storage, and activation details.
+The global action opens Quick Links directly; the app no longer provides Chat
+or submits conversation feedback for automatic analysis. Home MCP's independent
+authenticated device tools remain available. Existing per-user Home Assistant
+frontend-history records are not erased by this code removal. Retiring the
+loaded chat-history component requires a backed-up configuration change and
+Home Assistant restart; see [deployment](docs/deployment.md) for the exact
+one-time staging, verification, and rollback steps.
 
 ## UX review and governance
 

@@ -8,8 +8,8 @@ export function globalQuickLinksAction(scope: QuickLinksScope) {
 
 export async function selectQuickLinksTab(scope: QuickLinksScope, activation: 'pointer' | 'keyboard' = 'pointer') {
   const tabs = scope.getByRole('tab', { name: 'Quick Links', exact: true })
-  const currentHost = await scope.locator('button[aria-label="Open Chat and Quick Links"]').count() > 0
-  if (currentHost) {
+  const legacyHost = await scope.locator('button[aria-label="Open Chat and Quick Links"]').count() > 0
+  if (legacyHost) {
     await expect(tabs).toBeVisible()
     if (activation === 'keyboard') {
       await tabs.focus()
@@ -18,6 +18,7 @@ export async function selectQuickLinksTab(scope: QuickLinksScope, activation: 'p
     await expect(tabs).toHaveAttribute('aria-selected', 'true')
   }
   const dialog = scope.getByRole('dialog', { name: 'Quick Links', exact: true })
+  if (!legacyHost) await expect(dialog.getByRole('tab')).toHaveCount(0)
   await expect(dialog.getByRole('group', { name: 'Quick Links', exact: true })).toBeVisible()
   return dialog
 }
