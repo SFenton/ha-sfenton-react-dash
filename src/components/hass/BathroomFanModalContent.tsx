@@ -2,18 +2,15 @@ import { useEffect, useState } from 'react'
 import { useEntity } from '@hakit/core'
 import type { BathroomFanConfig } from '../../constants/bathroomFans'
 import { BATHROOM_FAN_COPY_KEYS, BATHROOM_FAN_COPY_NAMESPACE, useCopy } from '../../i18n'
-import { cardColorCss, colorFromHumidity, colorFromRgba, colorFromTemperature } from '../cards/climateColor'
-import { DynamicGrid } from '../core/DynamicGrid'
 import { GlassTile } from '../core/GlassTile'
 import { MaterialIcon } from '../core/Icon'
 import { ModalSheet, type ModalCenteredGeometry } from '../core/ModalSheet'
 import { SelectActionField } from '../core/SelectActionField'
 import { SectionHeader } from '../core/SectionHeader'
-import { StatusPill } from '../core/StatusPill'
 import { TimerRow } from '../core/TimerRow'
 import { formatTimerRemaining } from '../core/timerFormatting'
 import type { ControlSemantics } from '../core/controlSemantics'
-import { asEntityName, isOccupancyActive } from './entityState'
+import { asEntityName } from './entityState'
 import { BATHROOM_FAN_DEFAULT_TIMER_MINUTES } from './bathroomFanState'
 import { type BathroomFanCommandController, useSharedBathroomFanCommand } from './bathroomFanCommandContext'
 import { useBathroomFanCommand } from './useBathroomFanCommand'
@@ -36,15 +33,9 @@ interface BathroomFanModalContentProps {
 interface BathroomFanModalViewProps {
   autoUnlock: boolean
   autoUnlockAvailable: boolean
-  humidity: string
-  humidityAvailable: boolean
-  humidityColor?: string
   lockAvailable: boolean
   locked: boolean
   minutes: number
-  occupancy: string
-  occupancyActive: boolean
-  occupancyAvailable: boolean
   onAutoUnlockChange: (enabled: boolean) => void
   onCancelTimer: () => void
   onLockChange: (locked: boolean) => void
@@ -54,42 +45,12 @@ interface BathroomFanModalViewProps {
   powerAvailable: boolean
   powerOn: boolean
   remainingSeconds: number | null
-  temperatureAvailable: boolean
-  temperatureColor?: string
-  temperatureRange: string
   timerAvailable: boolean
   timerPending: boolean
 }
 
 function entityAvailable(entity: ReturnType<typeof useEntity>) {
   return Boolean(entity && entity.state !== 'unavailable' && entity.state !== 'unknown')
-}
-
-function humidityReading(entity: ReturnType<typeof useEntity>, unavailable: string) {
-  if (!entityAvailable(entity)) return unavailable
-  const value = Number(entity?.state)
-  return Number.isFinite(value) ? `${Math.round(value)}%` : unavailable
-}
-
-function numericState(entity: ReturnType<typeof useEntity>) {
-  if (!entityAvailable(entity)) return null
-  const value = Number(entity?.state)
-  return Number.isFinite(value) ? value : null
-}
-
-function occupancyState(entity: ReturnType<typeof useEntity>, occupied: string, clear: string, unavailable: string) {
-  if (!entityAvailable(entity)) return unavailable
-  return isOccupancyActive(entity) ? occupied : clear
-}
-
-function temperatureRangeValue(value: string) {
-  const matches = [...value.matchAll(/-?\d+(?:\.\d+)?/g)].map((match) => Number(match[0])).filter(Number.isFinite)
-  if (matches.length === 0) return null
-  return matches.reduce((sum, current) => sum + current, 0) / matches.length
-}
-
-function textState(entity: ReturnType<typeof useEntity>, unavailable: string) {
-  return entityAvailable(entity) ? entity?.state ?? unavailable : unavailable
 }
 
 function timerDeadlineMs(entity: ReturnType<typeof useEntity>) {
@@ -121,15 +82,9 @@ function useBathroomFanTimerRemaining(deadlineEntity: ReturnType<typeof useEntit
 function BathroomFanModalView({
   autoUnlock,
   autoUnlockAvailable,
-  humidity,
-  humidityAvailable,
-  humidityColor,
   lockAvailable,
   locked,
   minutes,
-  occupancy,
-  occupancyActive,
-  occupancyAvailable,
   onAutoUnlockChange,
   onCancelTimer,
   onLockChange,
@@ -139,9 +94,6 @@ function BathroomFanModalView({
   powerAvailable,
   powerOn,
   remainingSeconds,
-  temperatureAvailable,
-  temperatureColor,
-  temperatureRange,
   timerAvailable,
   timerPending,
 }: BathroomFanModalViewProps) {
@@ -168,32 +120,6 @@ function BathroomFanModalView({
 
   return (
     <div className={styles.root} data-bathroom-fan-modal-content="true">
-      <DynamicGrid columns={2} gap={8} itemSizing="uniform">
-        <StatusPill
-          grouped
-          icon={occupancyActive ? 'mdi:motion-sensor' : 'mdi:motion-sensor-off'}
-          label={copy(BATHROOM_FAN_COPY_KEYS.roomOccupancy)}
-          tone={!occupancyAvailable ? 'unavailable' : occupancyActive ? 'ok' : 'neutral'}
-          value={occupancy}
-        />
-        <StatusPill
-          backgroundColor={temperatureColor}
-          grouped
-          icon="mdi:thermometer"
-          label={copy(BATHROOM_FAN_COPY_KEYS.roomTemperatureRange)}
-          tone={temperatureAvailable ? 'neutral' : 'unavailable'}
-          value={temperatureRange}
-        />
-        <StatusPill
-          backgroundColor={humidityColor}
-          grouped
-          icon="mdi:water-percent"
-          label={copy(BATHROOM_FAN_COPY_KEYS.humidity)}
-          tone={humidityAvailable ? 'neutral' : 'unavailable'}
-          value={humidity}
-        />
-      </DynamicGrid>
-
       <div className={styles.toggleGrid}>
         <GlassTile
           compact
@@ -219,67 +145,58 @@ function BathroomFanModalView({
         />
       </div>
 
-      {(powerOn || timerPending) && (
-        <section aria-label={timerLabel} className={styles.timerSection}>
-          <SectionHeader className={styles.timerHeader} title={timerLabel} />
-            {powerOn && !timerPending && (
-              <SelectActionField
-                actionDisabled={!timerAvailable}
-                actionLabel={copy(BATHROOM_FAN_COPY_KEYS.set)}
-                hideLabel
-                label={copy(BATHROOM_FAN_COPY_KEYS.timer)}
-                onAction={onSetTimer}
-                onChange={(value) => onMinutesChange(Number(value))}
-                options={timerOptions}
-                value={String(minutes)}
-              />
-            )}
-            {timerPending && (
-              <TimerRow
-                ariaLabel={copy(BATHROOM_FAN_COPY_KEYS.timerRowLabel, { label: timerLabel, value: timerValue })}
-                clearDisabled={!timerAvailable}
-                clearLabel={copy(BATHROOM_FAN_COPY_KEYS.clear)}
-                onClear={onCancelTimer}
-                value={timerValue}
-              />
-            )}
-            {locked && (
-              <button
-                aria-checked={autoUnlockSemantics.checked}
-                aria-label={copy(BATHROOM_FAN_COPY_KEYS.autoDisableLock)}
-                className={styles.autoUnlock}
-                data-action-kind={autoUnlockSemantics.kind}
-                data-checked={autoUnlock ? 'true' : 'false'}
-                disabled={!autoUnlockAvailable}
-                onClick={() => onAutoUnlockChange(!autoUnlock)}
-                role="checkbox"
-                type="button"
-              >
-                <MaterialIcon name={autoUnlock ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={30} />
-                <span>{copy(BATHROOM_FAN_COPY_KEYS.autoDisableLock)}</span>
-              </button>
-            )}
-        </section>
-      )}
-
+      <section aria-label={timerLabel} className={styles.timerSection}>
+        <SectionHeader className={styles.timerHeader} title={timerLabel} />
+        {!timerPending && (
+          <SelectActionField
+            actionDisabled={!powerAvailable || !powerOn || !timerAvailable}
+            actionLabel={copy(BATHROOM_FAN_COPY_KEYS.set)}
+            hideLabel
+            label={copy(BATHROOM_FAN_COPY_KEYS.timer)}
+            onAction={onSetTimer}
+            onChange={(value) => onMinutesChange(Number(value))}
+            options={timerOptions}
+            value={String(minutes)}
+          />
+        )}
+        {timerPending && (
+          <TimerRow
+            ariaLabel={copy(BATHROOM_FAN_COPY_KEYS.timerRowLabel, { label: timerLabel, value: timerValue })}
+            clearDisabled={!timerAvailable}
+            clearLabel={copy(BATHROOM_FAN_COPY_KEYS.clear)}
+            onClear={onCancelTimer}
+            value={timerValue}
+          />
+        )}
+        {locked && (powerOn || timerPending) && (
+          <button
+            aria-checked={autoUnlockSemantics.checked}
+            aria-label={copy(BATHROOM_FAN_COPY_KEYS.autoDisableLock)}
+            className={styles.autoUnlock}
+            data-action-kind={autoUnlockSemantics.kind}
+            data-checked={autoUnlock ? 'true' : 'false'}
+            disabled={!autoUnlockAvailable}
+            onClick={() => onAutoUnlockChange(!autoUnlock)}
+            role="checkbox"
+            type="button"
+          >
+            <MaterialIcon name={autoUnlock ? 'mdi:checkbox-marked-outline' : 'mdi:checkbox-blank-outline'} size={30} />
+            <span>{copy(BATHROOM_FAN_COPY_KEYS.autoDisableLock)}</span>
+          </button>
+        )}
+      </section>
     </div>
   )
 }
 
 function BathroomFanModalPreloadContent() {
-  const copy = useCopy(BATHROOM_FAN_COPY_NAMESPACE)
   return (
     <BathroomFanModalView
       autoUnlock={false}
       autoUnlockAvailable={false}
-      humidity={copy(BATHROOM_FAN_COPY_KEYS.states.unavailable)}
-      humidityAvailable={false}
       lockAvailable={false}
       locked={false}
       minutes={BATHROOM_FAN_DEFAULT_TIMER_MINUTES}
-      occupancy={copy(BATHROOM_FAN_COPY_KEYS.states.unavailable)}
-      occupancyActive={false}
-      occupancyAvailable={false}
       onAutoUnlockChange={NOOP}
       onCancelTimer={NOOP}
       onLockChange={NOOP}
@@ -289,8 +206,6 @@ function BathroomFanModalPreloadContent() {
       powerAvailable={false}
       powerOn={false}
       remainingSeconds={null}
-      temperatureAvailable={false}
-      temperatureRange={copy(BATHROOM_FAN_COPY_KEYS.states.unavailable)}
       timerAvailable={false}
       timerPending={false}
     />
@@ -298,11 +213,6 @@ function BathroomFanModalPreloadContent() {
 }
 
 function BathroomFanModalControllerContent({ config, fan, runtimeActive }: { config: BathroomFanConfig; fan: BathroomFanCommandController; runtimeActive: boolean }) {
-  const copy = useCopy(BATHROOM_FAN_COPY_NAMESPACE)
-  const occupancyEntity = useEntity(asEntityName(config.occupancyEntityId), { returnNullIfNotFound: true })
-  const temperatureRangeEntity = useEntity(asEntityName(config.temperatureRangeEntityId), { returnNullIfNotFound: true })
-  const temperatureColorEntity = useEntity(asEntityName(config.temperatureColorEntityId), { returnNullIfNotFound: true })
-  const humidityEntity = useEntity(asEntityName(config.humidityEntityId), { returnNullIfNotFound: true })
   const deadlineEntity = useEntity(asEntityName(config.deadlineEntityId), { returnNullIfNotFound: true })
   const [minutes, setMinutes] = useState<number>(BATHROOM_FAN_DEFAULT_TIMER_MINUTES)
   const remainingSeconds = useBathroomFanTimerRemaining(deadlineEntity, fan.timerPending, runtimeActive)
@@ -313,16 +223,6 @@ function BathroomFanModalControllerContent({ config, fan, runtimeActive }: { con
   }
   const inactiveAutoUnlockEnabled = inactiveAutoUnlock.key === autoUnlockChoiceKey ? inactiveAutoUnlock.enabled : fan.locked
   const displayedAutoUnlock = fan.timerPending ? fan.autoUnlock : inactiveAutoUnlockEnabled
-  const occupancyAvailable = entityAvailable(occupancyEntity)
-  const occupancyActive = occupancyAvailable && isOccupancyActive(occupancyEntity)
-  const temperatureRange = textState(temperatureRangeEntity, copy(BATHROOM_FAN_COPY_KEYS.states.unavailable))
-  const temperatureAvailable = entityAvailable(temperatureRangeEntity)
-  const temperatureColor = temperatureAvailable
-    ? cardColorCss(colorFromRgba(temperatureColorEntity?.state) ?? colorFromTemperature(temperatureRangeValue(temperatureRange)))
-    : undefined
-  const humidityValue = numericState(humidityEntity)
-  const humidityAvailable = humidityValue !== null
-  const humidityColor = cardColorCss(colorFromHumidity(humidityValue))
 
   const handleAutoUnlockChange = (enabled: boolean) => {
     if (fan.timerPending) fan.setTimerAutoUnlock(enabled)
@@ -333,20 +233,9 @@ function BathroomFanModalControllerContent({ config, fan, runtimeActive }: { con
     <BathroomFanModalView
       autoUnlock={displayedAutoUnlock}
       autoUnlockAvailable={fan.timerPending ? fan.autoUnlockAvailable : true}
-      humidity={humidityReading(humidityEntity, copy(BATHROOM_FAN_COPY_KEYS.states.unavailable))}
-      humidityAvailable={humidityAvailable}
-      humidityColor={humidityColor}
       lockAvailable={fan.lockAvailable}
       locked={fan.locked}
       minutes={minutes}
-      occupancy={occupancyState(
-        occupancyEntity,
-        copy(BATHROOM_FAN_COPY_KEYS.states.occupied),
-        copy(BATHROOM_FAN_COPY_KEYS.states.clear),
-        copy(BATHROOM_FAN_COPY_KEYS.states.unavailable),
-      )}
-      occupancyActive={occupancyActive}
-      occupancyAvailable={occupancyAvailable}
       onAutoUnlockChange={handleAutoUnlockChange}
       onCancelTimer={fan.cancelTimer}
       onLockChange={fan.setLocked}
@@ -356,9 +245,6 @@ function BathroomFanModalControllerContent({ config, fan, runtimeActive }: { con
       powerAvailable={fan.powerAvailable}
       powerOn={fan.powerOn}
       remainingSeconds={remainingSeconds}
-      temperatureAvailable={temperatureAvailable}
-      temperatureColor={temperatureColor}
-      temperatureRange={temperatureRange}
       timerAvailable={fan.timerAvailable}
       timerPending={fan.timerPending}
     />
