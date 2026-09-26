@@ -1129,8 +1129,13 @@ async function assertMountedClose(dialog: Locator) {
   const node = await dialog.elementHandle()
   if (!node) throw new Error('Cannot close a missing modal')
   await dialog.getByRole('button', { exact: true, name: 'Close' }).click()
-  expect(await node.getAttribute('data-state')).toBe('closed')
-  expect(await node.getAttribute('data-closing')).toBe('true')
+  await expect.poll(() => node.evaluate((element) => ({
+    state: element.getAttribute('data-state'),
+    closing: element.getAttribute('data-closing'),
+    inert: element.hasAttribute('inert'),
+  })), { timeout: 750, intervals: [16, 32, 64, 128] }).toEqual({
+    state: 'closed', closing: 'true', inert: true,
+  })
   const exitDurations = await node.evaluate((element) => element.getAnimations({ subtree: true })
     .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
     .map((animation) => Number(animation.effect?.getComputedTiming().endTime ?? 0)))
