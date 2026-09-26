@@ -157,7 +157,7 @@ describe('Home Assistant production metadata adapter', () => {
       'utf8',
     )
     expect(panelPackage).toContain(
-      'module_url: /local/ha-sfenton-react-dash/sfenton-react-panel.js?v=5',
+      'module_url: /local/ha-sfenton-react-dash/sfenton-react-panel.js?v=6',
     )
   })
 
