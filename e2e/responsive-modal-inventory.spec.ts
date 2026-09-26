@@ -439,7 +439,19 @@ const MODAL_CASES: ModalCase[] = [
     expectedScrollMode: 'body',
     expectedSize: 'compact',
     id: 'bathroom-fan',
-    open: (page) => openButtonModal(page, 'guest-bathroom', 'Fan Off', 'Guest Bathroom Fan'),
+    open: async page => {
+      await gotoRoute(page, 'guest-bathroom')
+      await setMockStates(page, {
+        'input_boolean.guest_bathroom_fan_automation_lock': 'on',
+        'switch.guest_bathroom_fan_switch_top': 'on',
+      })
+      await clearMockCalls(page)
+      await page.getByRole('button', { name: 'Fan On' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Guest Bathroom Fan' })
+      await expect(dialog).toBeVisible()
+      await waitForDialogSettled(dialog)
+      return dialog
+    },
     physicalCallsite: 'src/components/hass/BathroomFanModalContent.tsx:BathroomFanModal',
   },
   {
