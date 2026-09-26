@@ -5979,7 +5979,10 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(window.location.hash).toBe('#fan-guest-bathroom')
     expect(screen.getByRole('heading', { name: 'Guest Bathroom Fan' })).toBeInTheDocument()
-    expect(within(dialog).getByText('Room occupancy')).toBeInTheDocument()
+    expect(within(dialog).queryByText('Room occupancy')).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { name: 'Timer' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('combobox', { name: 'Timer' })).toHaveValue('30')
+    expect(within(dialog).getByRole('button', { name: 'Set' })).toBeDisabled()
     expect(dialog.querySelector('[data-modal-sheet-footer="true"]')).toBeNull()
     expect(mockCallServiceCalls).toEqual([])
 
