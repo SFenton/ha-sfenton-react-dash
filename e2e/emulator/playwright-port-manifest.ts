@@ -12,7 +12,6 @@ export const EMULATOR_PORT_DISPOSITIONS = [
   { spec: 'admin-relay-warning.spec.ts', status: 'retained-browser-only', coverage: [], reason: 'State and copy semantics do not depend on physical fold geometry.' },
   { spec: 'bathroom-fans.spec.ts', status: 'ported', coverage: ['all-routes-fold-cycle', 'button-modal-fold-cycle'] },
   { spec: 'battery-title-desktop-responsive.spec.ts', status: 'retained-browser-only', coverage: [], reason: 'Fine-pointer desktop geometry is outside the Fold 8 hardware envelope.' },
-  { spec: 'chat-ux.spec.ts', status: 'retained-browser-only', coverage: [], reason: 'Mock chat transport, account storage isolation, DOM geometry, and synthetic keyboard instrumentation require the controlled browser runner.' },
   { spec: 'desktop-responsive.spec.ts', status: 'retained-browser-only', coverage: [], reason: 'Desktop rail and fine-pointer behavior require a desktop viewport.' },
   { spec: 'feedback-regressions.spec.ts', status: 'ported', coverage: ['all-routes-fold-cycle', 'hash-modal-fold-cycle'] },
   { spec: 'garage-doors.spec.ts', status: 'ported', coverage: ['all-routes-fold-cycle'] },

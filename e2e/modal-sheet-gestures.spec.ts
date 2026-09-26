@@ -620,8 +620,8 @@ test.describe('mobile ModalSheet gestures', () => {
     const quickLinksBox = await quickLinks.boundingBox()
     if (!quickLinksBox) throw new Error('Quick Links opener was not measurable during modal exit')
     await page.mouse.click(quickLinksBox.x + quickLinksBox.width / 2, quickLinksBox.y + quickLinksBox.height / 2)
-    const quickLinksTab = page.getByRole('tab', { name: 'Quick Links', exact: true })
-    await expect.poll(() => quickLinksTab.evaluate((element) => {
+    const roomsTile = page.getByRole('dialog', { name: 'Quick Links' }).getByRole('button', { name: 'Rooms' })
+    await expect.poll(() => roomsTile.evaluate((element) => {
       const rect = element.getBoundingClientRect()
       const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
       return hit === element || element.contains(hit)

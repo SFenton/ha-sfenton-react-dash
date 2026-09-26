@@ -28,8 +28,9 @@ isolation boundary, protected-merge flow, and deployment-receipt verification.
 The workflow separates build and deployment:
 
 - GitHub-hosted `Build dashboard artifact` checks out the exact push SHA,
-  receives no Home Assistant or SSH credential, forces
-  `VITE_HOME_MCP_ENABLED=false`, and never receives `VITE_HA_TOKEN`.
+  receives no Home Assistant or SSH credential, and never receives
+  `VITE_HA_TOKEN`. Its dormant `VITE_HOME_MCP_ENABLED=false` environment
+  guard does not enable frontend chat.
 - `Deploy dashboard` uses a unique per-run label and a one-job JIT runner.
   The runner is absent until the host controller validates the exact workflow,
   event, branch, SHA, job, workflow digest, and local runner-image digest.
@@ -175,3 +176,43 @@ recovery.
 An incomplete rollback deliberately leaves the remote lease, journal, and
 backup in place. Do not delete them blindly; inspect the failed run and recover
 the captured prior state before allowing another production deployment.
+
+## One-time retirement of dashboard Chat
+
+The app no longer opens Chat or sends conversation feedback. Home MCP continues
+to serve authenticated `home_info`, `home_state`, `home_history`, and
+`home_lights`; the HA proxy and both dashboard hosts remain maintained.
+Production `sfenton_react_chat.purge_expired_history` remains registered until
+Home Assistant restarts even if the repository files have been removed.
+Do **not** invoke that service or clear user frontend-history records.
+
+1. Stop and disable only `home-mcp-improver.path` and
+   `home-mcp-improver.timer` after confirming no worker job is in flight.
+   Preserve the existing improvement queue and its data directory as private
+   evidence; do not publish a queued patch or erase the queue to make the
+   worker appear idle. Build the exact merged Home MCP source, publish it with
+   the pinned TLS material, then verify an authenticated `home_info` response
+   with the expected version and no `home_chat` tool.
+2. Capture the **installed** `packages/sfenton_react_chat.yaml` and the exact
+   files beneath `custom_components/sfenton_react_chat/` into a private,
+   mode-`0700` backup **outside** `packages/` and `custom_components/`.
+   Inspect unknown files or references rather than deleting them by wildcard.
+   Remove only the confirmed chat package/component files from active HA
+   configuration. `scripts/deploy.ts` intentionally does not stage or delete
+   them; merely shipping new assets cannot unload the Python service.
+3. Stage the reviewed panel package with its new module URL and any other
+   separately approved HA runtime changes. Run HA configuration validation.
+   If invalid, restore the exact captured files and prior package immediately,
+   recheck configuration, and stop before restarting or replacing dashboard
+   assets. A backup does not make an invalid restart safe.
+4. Restart HA once with explicit approval and verify it is responsive, the
+   `sfenton_react_chat.purge_expired_history` service is absent, and the
+   authenticated Home MCP proxy still reaches the TLS-pinned server. A
+   restored/unavailable registry entry for an old daily purge automation does
+   not prove that the automation is running; inspect it separately. Existing
+   per-user frontend storage is left untouched.
+5. Build from the exact protected merged `master`, then publish the same
+   `dist/` to the raw app, legacy wrapper, and embedded panel; update the
+   wrapper URL to the merge SHA and verify both hosts, panel bridge cache
+   version, and authenticated `home_info`. Retain the private rollback backup
+   until the release and host checks are complete.

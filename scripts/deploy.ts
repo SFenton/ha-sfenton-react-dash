@@ -21,7 +21,6 @@ const REMOTE_FOLDER_NAME = process.env.VITE_FOLDER_NAME
 const LOCAL_DIRECTORY = './dist'
 const PANEL_PACKAGE_PATH = resolve('home-assistant/packages/sfenton_react_panel.yaml')
 const SOLO_TRIP_PACKAGE_PATH = resolve('home-assistant/packages/solo_trip.yaml')
-const CHAT_COMPONENT_FILES = ['__init__.py', 'manifest.json', 'services.yaml', 'retention.py', 'README.md']
 const ADMIN_TODO_PATHS = [
   'packages/sfenton_admin_todo.yaml',
   'custom_components/sfenton_admin_todo/__init__.py',
@@ -103,12 +102,7 @@ async function deploy() {
     const currentSoloTripPackage = await readRemoteFile(client, `${configRoot}/packages/solo_trip.yaml`)
     const packageChanged = !currentPackage?.equals(packageContent)
     const soloTripPackageChanged = !currentSoloTripPackage?.equals(soloTripPackageContent)
-    const chatPaths = [
-      'packages/sfenton_react_chat.yaml',
-      ...CHAT_COMPONENT_FILES.map((file) => `custom_components/sfenton_react_chat/${file}`),
-    ]
     const managedPaths = [
-      ...chatPaths,
       ...ADMIN_TODO_PATHS,
       ...HOME_MCP_PROXY_PATHS,
       ...SOLO_TRIP_NATIVE_PATHS,
@@ -122,7 +116,6 @@ async function deploy() {
       const previous = await readRemoteFile(client, `${configRoot}/${path}`)
       if (!previous?.equals(content)) changedConfig.push({ path: `${configRoot}/${path}`, content, previous })
     }
-    const chatChanged = changedConfig.some((file) => chatPaths.some((path) => file.path.endsWith(`/${path}`)))
     const adminTodoChanged = changedConfig.some((file) => ADMIN_TODO_PATHS.some((path) => file.path.endsWith(`/${path}`)))
     const homeMcpProxyChanged = changedConfig.some((file) => HOME_MCP_PROXY_PATHS.some((path) => file.path.endsWith(`/${path}`)))
     const soloTripNativeChanged = changedConfig.some((file) => SOLO_TRIP_NATIVE_PATHS.some((path) => file.path.endsWith(`/${path}`)))
@@ -130,7 +123,6 @@ async function deploy() {
     if (changedConfig.length) {
       await client.mkdir(`${configRoot}/packages`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/custom_templates`, undefined, { recursive: true })
-      await client.mkdir(`${configRoot}/custom_components/sfenton_react_chat`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/custom_components/sfenton_admin_todo`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/custom_components/sfenton_home_mcp_proxy`, undefined, { recursive: true })
       await client.mkdir(`${configRoot}/solo_trip`, undefined, { recursive: true })
@@ -155,7 +147,6 @@ async function deploy() {
       }
       console.info(chalk.green('\nHome Assistant package/component files were staged and configuration-checked.'))
       if (packageChanged) console.info(chalk.yellow('Restart Home Assistant with approval before deploying the React assets.'))
-      if (chatChanged) console.info(chalk.yellow('Restart Home Assistant with approval, then verify the prior daily chat purge automation is absent.'))
       if (adminTodoChanged) console.info(chalk.yellow('Restart Home Assistant with approval, then verify authenticated Admin To-Do image filing before deploying the React assets.'))
       if (homeMcpProxyChanged) console.info(chalk.yellow('Restart Home Assistant with approval, then verify /api/sfenton_home_mcp before enabling Home MCP in the production build.'))
       if (soloTripNativeChanged) console.info(chalk.yellow('Restart Home Assistant with approval only after the native Solo Trip package, broker retention, live bindings, and exact restore gates are reviewed.'))
@@ -183,7 +174,7 @@ async function deploy() {
     console.info(chalk.blue(new URL('/sfenton-react-dash/home', HA_URL).href))
     console.info(chalk.blue(new URL('/sfenton-react-panel', HA_URL).href))
     console.info(chalk.blue(`Legacy wrapper URL: ${syncResult.legacyDashboardUrl}`))
-    console.info(chalk.yellow('Chat history, Home MCP proxy, and native Solo Trip package files already match the validated Home Assistant configuration.'))
+    console.info(chalk.yellow('Home MCP proxy and native Solo Trip package files already match the validated Home Assistant configuration.'))
   } finally {
     client.close()
   }

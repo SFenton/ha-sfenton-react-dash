@@ -7,6 +7,8 @@
 // @covers docs/ux/validation-matrix.md
 // @covers scripts/layout/plan.ts
 // @covers vitest.config.ts
+// @covers playwright.config.ts
+// @covers package.json
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
@@ -41,6 +43,13 @@ type PackageJson = {
 }
 
 describe('dashboard Playwright workflow policy', () => {
+  it('does not schedule the retired chat spec in responsive or browser projects', () => {
+    const packageJson = readJson<PackageJson>('package.json')
+    const playwrightConfig = read('playwright.config.ts')
+    expect(packageJson.scripts['test:e2e:responsive']).not.toContain('chat-ux.spec.ts')
+    expect(playwrightConfig).not.toContain('chat-ux')
+  })
+
   it('queues exact master layout evidence instead of cancelling older merge runs', () => {
     const workflow = read('.github/workflows/playwright.yml')
     expect(workflow).toContain('group: playwright-${{ github.workflow }}-${{ github.ref }}')

@@ -11,7 +11,7 @@ import { ROOM_PAGE_CONFIGS } from '../src/constants/roomPages'
 import { MEDIA_REMOTE_CONFIGS } from '../src/constants/mediaRemotes'
 import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../src/constants/sprinklers'
 import { installSafeAreaInsets, setSafeAreaInsets } from './safe-area'
-import { globalQuickLinksAction, openQuickLinksTab, quickLinksLayout } from './quick-links'
+import { openQuickLinksTab, quickLinksLayout } from './quick-links'
 
 const PORTRAIT = { width: 393, height: 852, insets: { top: 59, right: 0, bottom: 34, left: 0 } }
 const LANDSCAPES = [
@@ -475,7 +475,7 @@ test('responsive typography disables orientation inflation but retains browser z
 test.describe('touch keyboard viewport', () => {
   test.use({ hasTouch: true, isMobile: true })
 
-  test('portrait form and chat sheets keep their surface anchored while controls rise above the keyboard', async ({ page }) => {
+  test('portrait form sheet keeps its surface anchored while controls rise above the keyboard', async ({ page }) => {
     await page.setViewportSize(PORTRAIT)
     await installSafeAreaInsets(page, PORTRAIT.insets)
     await page.addInitScript(({ width, height }) => {
@@ -496,8 +496,7 @@ test.describe('touch keyboard viewport', () => {
     })
     await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'))).toBe('332px')
     await expect.poll(() => formDialog.locator('[data-modal-sheet-content-layout="true"]').evaluate((element) => getComputedStyle(element).paddingBottom)).toBe('332px')
-    const formBox = await outerBox(formDialog)
-    expectBox(formBox, { x: 0, y: 85.203125, width: 393, height: 766.796875 }, 'keyboard-backed portrait form')
+    expectBox(await outerBox(formDialog), { x: 0, y: 85.203125, width: 393, height: 766.796875 }, 'keyboard-backed portrait form')
     const formFooter = await formDialog.locator('[data-modal-sheet-footer="true"]').boundingBox()
     expect(formFooter!.y + formFooter!.height).toBeLessThanOrEqual(520)
     const formFooterContent = await formDialog.locator('[data-modal-sheet-footer="true"] > *').boundingBox()
@@ -510,32 +509,6 @@ test.describe('touch keyboard viewport', () => {
     await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'))).toBe('0px')
     expectBox(await outerBox(formDialog), { x: 0, y: 85.203125, width: 393, height: 766.796875 }, 'restored portrait form')
     await close(formDialog)
-
-    await page.goto('/index.html?path=overview')
-    await globalQuickLinksAction(page).click()
-    const chatDialog = page.getByRole('dialog', { name: 'Home Assistant', exact: true })
-    await chatDialog.getByRole('textbox', { name: 'Chat Message' }).focus()
-    await page.evaluate(() => {
-      Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 520 })
-      window.visualViewport!.dispatchEvent(new Event('resize'))
-    })
-    await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dashboard-keyboard-overlay-inset'))).toBe('332px')
-    await expect.poll(() => chatDialog.locator('[data-modal-sheet-content-layout="true"]').evaluate((element) => getComputedStyle(element).paddingBottom)).toBe('332px')
-    expectBox(await outerBox(chatDialog), formBox, 'matching keyboard-backed portrait chat frame')
-    const composer = await chatDialog.locator('[data-chat-composer="true"]').boundingBox()
-    expect(composer!.y + composer!.height).toBeLessThanOrEqual(520)
-    const chatNavigationContent = await chatDialog.locator('[data-modal-sheet-navigation="true"] > *').boundingBox()
-    expect(Math.abs(520 - (chatNavigationContent!.y + chatNavigationContent!.height) - 8)).toBeLessThanOrEqual(1)
-    const closingNode = await chatDialog.elementHandle()
-    await chatDialog.getByRole('button', { name: 'Close', exact: true }).click()
-    await page.evaluate(() => {
-      Object.defineProperty(window.visualViewport, 'height', { configurable: true, value: 852 })
-      window.visualViewport!.dispatchEvent(new Event('resize'))
-    })
-    expect(await closingNode!.getAttribute('data-state')).toBe('closed')
-    expect(await closingNode!.evaluate((element) => element.style.getPropertyValue('--modal-keyboard-inset'))).toBe('332px')
-    await expect(chatDialog).toHaveCount(0, { timeout: 700 })
-    await closingNode!.dispose()
   })
 
   test('portrait sheets do not double-apply the inset when dynamic viewport units already contract', async ({ page }) => {

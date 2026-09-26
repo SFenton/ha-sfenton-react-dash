@@ -10,12 +10,7 @@ services:
       HOME_MCP_HOST: 0.0.0.0
       HOME_MCP_PORT: 8787
       HOME_MCP_HA_URL: ${HOME_MCP_HA_URL:-https://homeassistant.sfenton-server.com}
-      HOME_MCP_AGENT_ID: ${HOME_MCP_AGENT_ID:-conversation.google_ai_conversation}
-      HOME_MCP_CHAT_MODEL: ${HOME_MCP_CHAT_MODEL:-Gemini 3.1 Flash Lite}
       HOME_MCP_ALLOWED_ORIGINS: ${HOME_MCP_ALLOWED_ORIGINS:-}
-      HOME_MCP_IMPROVEMENT_ENABLED: "false"
-      HOME_MCP_AUTO_PUBLISH: "false"
-      HOME_MCP_IMPROVEMENT_QUIET_MS: ${HOME_MCP_IMPROVEMENT_QUIET_MS:-300000}
     ports:
       - "127.0.0.1:8787:8787"
     init: true

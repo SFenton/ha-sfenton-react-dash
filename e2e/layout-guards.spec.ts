@@ -214,36 +214,6 @@ test('intrinsic-end audit rejects consumed padding despite a correct computed pa
   expect(Math.abs(facts.terminalGap - 10)).toBeLessThanOrEqual(1)
 })
 
-test('reading-only Chat terminals require an explicit real content region and retain the strict end-inset audit', async ({ page }) => {
-  await page.setContent(`<div role="dialog" data-state="open" data-modal-presentation="sheet"
-    data-modal-geometry-intent="reading-guard" data-scroll-mode="body">
-    <button aria-label="Close">Close</button>
-    <div data-modal-sheet-body style="height:150px;padding-bottom:10px;overflow-y:auto">
-      <div data-modal-content-measure style="height:100%;overflow:visible">
-        <div data-chat-panel="true" style="height:300px">Actual transcript content</div>
-      </div>
-    </div>
-  </div>`)
-  const dialog = page.getByRole('dialog')
-  await expect(modalFacts(dialog)).rejects.toThrow('Modal body requires terminal controls')
-  await expect(modalFacts(dialog, 'body', 'chat-content')).rejects.toThrow(/Intrinsic body measure/)
-  await dialog.locator('[data-modal-content-measure]').evaluate((element) => { (element as HTMLElement).style.height = 'auto' })
-  const facts = await modalFacts(dialog, 'body', 'chat-content')
-  expect(facts.terminalControlCount).toBe(0)
-  expect(facts.terminalControlGap).toBeNull()
-  expect(facts.terminalContentCount).toBe(1)
-  expect(Math.abs(facts.terminalTargetGap - 10)).toBeLessThanOrEqual(1)
-  await dialog.locator('[data-chat-panel]').evaluate((element) => { (element as HTMLElement).style.opacity = '0' })
-  await expect(modalFacts(dialog, 'body', 'chat-content')).rejects.toThrow('Chat body requires one real terminal content region')
-  await dialog.locator('[data-chat-panel]').evaluate((element) => { (element as HTMLElement).style.opacity = '1'; element.setAttribute('aria-hidden', 'true') })
-  await expect(modalFacts(dialog, 'body', 'chat-content')).rejects.toThrow('Chat body requires one real terminal content region')
-  await dialog.locator('[data-chat-panel]').evaluate((element) => { element.removeAttribute('aria-hidden') })
-  await dialog.locator('[data-chat-panel]').evaluate((element) => { element.textContent = '' })
-  await expect(modalFacts(dialog, 'body', 'chat-content')).rejects.toThrow('Chat body requires one real terminal content region')
-  await dialog.locator('[data-chat-panel]').evaluate((element) => { element.removeAttribute('data-chat-panel') })
-  await expect(modalFacts(dialog, 'body', 'chat-content')).rejects.toThrow('Chat body requires one real terminal content region')
-})
-
 for (const presentation of ['sheet', 'landscape-dialog'] as const) {
   guardedTest(`preferred pane mode still requires actual ${presentation} body end clearance`, async ({ page }) => {
     await page.setViewportSize(presentation === 'sheet' ? { width: 393, height: 852 } : { width: 852, height: 393 })
