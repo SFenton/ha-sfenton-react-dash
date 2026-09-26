@@ -14,8 +14,8 @@ const mobileTestIgnore = managedRun
   ? /(?:^|[/\\])(?:(?:adaptive-navigation|battery-title-desktop-responsive|desktop-responsive|home-route-hydration-desktop|modal-sheet-webkit)\.spec\.ts$|emulator[/\\])/
   : /(?:^|[/\\])(?:(?:adaptive-navigation|battery-title-desktop-responsive|desktop-responsive|home-route-hydration-desktop|layout-acceptance|modal-sheet-webkit)\.spec\.ts$|emulator[/\\])/
 const desktopTestMatch = managedRun
-  ? /(?:adaptive-navigation|chat-ux|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes)|layout-acceptance)\.spec\.ts/
-  : /(?:adaptive-navigation|chat-ux|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes))\.spec\.ts/
+  ? /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes)|layout-acceptance)\.spec\.ts/
+  : /(?:adaptive-navigation|desktop-responsive|home-route-hydration-desktop|modal-backdrop-bands|modal-rotation-regressions|weather-(?:scenes|atmosphere-scenes))\.spec\.ts/
 const managedOrigin = managedRun
   ? (JSON.parse(readFileSync(resolve(managedRun, 'run.json'), 'utf8')) as { candidate: { origin: string } }).candidate.origin
   : undefined
@@ -99,8 +99,8 @@ export default defineConfig({
       ? [{
           name: 'webkit',
           testMatch: managedRun
-            ? /(?:chat-ux|iframe-lifecycle|wake-light-alarms|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit))|layout-acceptance)\.spec\.ts/
-            : /(?:chat-ux|iframe-lifecycle|wake-light-alarms|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit)))\.spec\.ts/,
+            ? /(?:iframe-lifecycle|wake-light-alarms|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit))|layout-acceptance)\.spec\.ts/
+            : /(?:iframe-lifecycle|wake-light-alarms|weather-(?:data|scenes|atmosphere-scenes)|modal-(?:backdrop-bands|rotation-regressions|sheet-(?:lifecycle|performance|webkit)))\.spec\.ts/,
           use: {
             ...devices['iPhone 13'],
             browserName: 'webkit' as const,

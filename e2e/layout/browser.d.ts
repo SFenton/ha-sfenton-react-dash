@@ -1,20 +1,6 @@
 export interface LayoutMockController {
   calls: Record<string, unknown>[]
   clearWeatherForecasts: () => void
-  chat: {
-    messages: Record<string, unknown>[]
-    seed: (records: Record<string, unknown>) => void
-    replaceRecords: (records: Record<string, unknown>) => void
-    setAgents: (agents: { id: string; name: string }[]) => void
-    setAgentsAvailable: (available: boolean) => void
-    setLoadFailure: (failed: boolean) => void
-    setLoading: () => void
-    setResultWriteFailure: (failed: boolean) => void
-    setWriteFailure: (failed: boolean) => void
-    setPending: () => void
-    setReply: (text: string) => void
-    subscriptions: () => number
-  }
   reset: () => void
   setEntityState: (entityId: string, state: string) => void
   setTodoItems: (entityId: string, items: { status: string; summary: string; uid: string }[]) => void

@@ -4,10 +4,9 @@ import { SHOW_OUTDOOR_FAUCETS_ENTITY_ID } from '../../constants/sprinklers'
 import { mockCallServiceCalls, mockEntities, resetMockHass } from '../../test/mocks/hakitCoreState'
 import { GlobalQuickLinksAction } from './GlobalQuickLinksAction'
 
-async function openQuickLinks(trigger = screen.getByRole('button', { name: 'Open Chat and Quick Links' })) {
+// @covers src/components/hass/chat/ChatComposer.tsx
+async function openQuickLinks(trigger = screen.getByRole('button', { name: 'Quick Links' })) {
   fireEvent.click(trigger)
-  const dialog = await screen.findByRole('dialog', { name: 'Home Assistant' })
-  fireEvent.click(within(dialog).getByRole('tab', { name: 'Quick Links' }))
   return screen.findByRole('dialog', { name: 'Quick Links' })
 }
 
@@ -53,17 +52,20 @@ describe('GlobalQuickLinksAction', () => {
     const navigate = vi.fn()
     render(<GlobalQuickLinksAction onNavigate={navigate} />)
 
-    const trigger = screen.getByRole('button', { name: 'Open Chat and Quick Links' })
+    const trigger = screen.getByRole('button', { name: 'Quick Links' })
     expect(trigger).toHaveTextContent('')
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('data-action-kind', 'modal')
     expect(trigger).toHaveAttribute('data-modal-opener-exception', 'floating-action')
-    expect(trigger).toHaveAttribute('title', 'Open Chat and Quick Links')
+    expect(trigger).toHaveAttribute('title', 'Quick Links')
     expect(screen.queryByRole('button', { name: 'Vacuums' })).not.toBeInTheDocument()
 
     const dialog = await openQuickLinks(trigger)
     const grid = within(dialog).getByRole('group', { name: 'Quick Links' })
+    expect(within(dialog).queryByRole('tab')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('textbox')).not.toBeInTheDocument()
+    expect(dialog.querySelector('[data-modal-sheet-navigation]')).not.toBeInTheDocument()
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
     expect(grid).toHaveAttribute('data-dynamic-grid', 'true')
     expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')

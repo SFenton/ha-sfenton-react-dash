@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["app.ts", "server.ts", "light-skill.ts", "lights-config.ts", "corpus/**/*.ts", "improvement/**/*.ts"]
+  "include": ["app.ts", "server.ts", "light-skill.ts", "lights-config.ts", "improvement/publish.ts"]
 }

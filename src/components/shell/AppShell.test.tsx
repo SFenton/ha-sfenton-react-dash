@@ -17,7 +17,7 @@ describe('AppShell', () => {
     )
 
     const dock = document.querySelector('[data-floating-action-dock="true"]') as HTMLElement
-    expect(within(dock).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Open Chat and Quick Links'])
+    expect(within(dock).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Quick Links'])
   })
 
   it('keeps page actions before the global Quick Links action', () => {
@@ -33,7 +33,7 @@ describe('AppShell', () => {
 
     const dock = document.querySelector('[data-floating-action-dock="true"]') as HTMLElement
     expect(within(dock).getAllByRole('button').map((button) => button.textContent)).toEqual(['Page action', ''])
-    expect(within(dock).getAllByRole('button').at(-1)).toHaveAccessibleName('Open Chat and Quick Links')
+    expect(within(dock).getAllByRole('button').at(-1)).toHaveAccessibleName('Quick Links')
   })
 
   it('suppresses the floating action dock with the rest of the chrome', () => {
@@ -44,7 +44,7 @@ describe('AppShell', () => {
     )
 
     expect(document.querySelector('[data-floating-action-dock="true"]')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Open Chat and Quick Links' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Quick Links' })).not.toBeInTheDocument()
   })
 
   it('mounts both CSS-adaptive navigation surfaces without a resize gap', () => {

@@ -775,9 +775,8 @@ describe('DashboardViewPage', () => {
     render(<DashboardViewPage activePath="master-bedroom" onNavigate={navigate} path="master-bedroom" />)
 
     const floatingDock = document.querySelector('[data-floating-action-dock="true"]') as HTMLElement
-    expect(within(floatingDock).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Open Chat and Quick Links'])
-    fireEvent.click(screen.getByRole('button', { name: 'Open Chat and Quick Links' }))
-    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Home Assistant' })).getByRole('tab', { name: 'Quick Links' }))
+    expect(within(floatingDock).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Quick Links'])
+    fireEvent.click(screen.getByRole('button', { name: 'Quick Links' }))
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Quick Links' })).getByRole('button', { name: 'Rooms' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Rooms' })
@@ -7361,7 +7360,7 @@ describe('DashboardViewPage', () => {
     expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Scan Item' }))
     expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Sort' }))
     expect(floatingDock).toContainElement(screen.getByRole('button', { name: 'Filter' }))
-    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Search inventory', 'Sort', 'Filter', 'Scan Item', 'Open Chat and Quick Links'])
+    expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Search inventory', 'Sort', 'Filter', 'Scan Item', 'Quick Links'])
     expect(within(floatingDock as HTMLElement).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Search', '', '', '', ''])
     expect(screen.queryByLabelText('Fridge inventory controls')).not.toBeInTheDocument()
 

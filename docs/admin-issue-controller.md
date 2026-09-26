@@ -32,8 +32,17 @@ secret handling.
 The worker's only repository tool remains `admin_issue_workspace`, implemented
 by the project asset in `ops/admin-issue-controller/worker-extension.mjs`.
 Each repository command runs in Docker with no network, a read-only root filesystem, dropped capabilities,
-`no-new-privileges`, resource limits, a writable issue worktree, and read-only
-Git metadata. The extension accepts only an immutable Docker image ID.
+`no-new-privileges`, resource limits, and read-only Git metadata. Approved
+implementation workers receive a writable issue worktree; research-only
+workers receive a read-only worktree with only their private, ignored
+`artifacts/admin-issue-<number>/research/` directory writable for requested
+PNG mockups. The extension accepts only an immutable Docker image ID.
+Before Docker starts, the host extension verifies that the nested `.cache`
+mountpoint and research artifact path are ignored by Git and creates the
+mountpoint directories itself. It rejects symlinks, traversal, untrusted issue
+numbers, and non-private research directories. Docker does not need to create
+directories underneath the read-only workspace or its read-only `node_modules`
+mount.
 The controller rejects changes outside the auto-deployed dashboard surfaces:
 `src/`, `public/`, `e2e/`, and the root `index.html`.
 Trusted deployment-failure issues have a separate narrow exception for
@@ -101,11 +110,22 @@ independent Opus confirmation when the guarded evidence reader is unavailable.
 6. Gather available repository and live Home Assistant evidence, then post a
    structured question only when a consequential decision still remains.
    Explicit "research and propose, do not implement yet" instructions remain
-   research-only: Docker mounts the assigned worktree read-only, Copilot
-   permission grants only dedicated HASS read tools, and the host requires a
-   clean worktree with a `needs_input` or `blocked` response. It cannot propose
-   a PR, close the issue, or mutate HA through the allowed tool set. A later
-   trusted owner approval is required to lift that issue-specific restriction.
+   research-only: Docker mounts the assigned worktree read-only except for
+   its private ignored PNG directory, Copilot permission grants only dedicated
+   HASS read tools, and the host requires a Git-clean worktree with a
+   `needs_input` or `blocked` response. When the owner asks for mockups, the
+   worker renders and inspects one PNG per requested alternative there, then
+   returns their paths in `needs_input.visualEvidence`. The host validates the
+   issue-scoped paths, real files, PNG bytes, size, uniqueness, and mock
+   captions. It blocks a dirty worktree before any mockup upload or decision
+   comment, then rechecks cleanliness before posting. It journals per-revision
+   hashes and upload attempts before attaching the images to the same
+   decision comment. Unknown upload outcomes
+   block rather than silently reuploading. These are research mockups, not
+   proposed fixed behavior or proof of implementation. The worker cannot
+   propose a PR, close the issue, or mutate HA through the allowed tool set.
+   A later trusted owner approval is required to lift that issue-specific
+   restriction.
    Direct implementation approval remains valid; short replies such as
    `Approve`, `Yes, please`, or `Go ahead`, as well as an exact full approval
    option copied from the question, count when the controller binds
@@ -655,3 +675,13 @@ Do not delete or edit the journal while the service runs. If intervention is
 required, stop the service first and retain the journal and worker logs for
 diagnosis. The `status` command intentionally refuses to migrate older
 state outside the controller lock.
+
+Installing the corrected controller and extension does not itself requeue a
+research-only issue that was already blocked. For #242, use the guarded,
+one-time `retry-research-mount` command above only after both protected merges
+and the exact controller/extension installation; it replays the existing
+owner request without creating another comment or input. Other blocked
+research issues still require a genuine owner follow-up. Never forge an owner
+comment or edit journal revisions by hand. Verify that #242's next
+`needs_input` comment embeds three distinct mock-labeled PNGs, leaves the Git
+worktree clean, and keeps its Admin To-Do item open.
