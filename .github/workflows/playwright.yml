@@ -4,12 +4,18 @@ on:
   pull_request:
   push:
     branches: [master]
+  workflow_dispatch:
+    inputs:
+      layout_base_sha:
+        description: Ancestor commit to compare for a protected layout-incident replay
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: playwright-${{ github.workflow }}-${{ github.ref }}
+  group: playwright-${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && '-replay' || '' }}
   cancel-in-progress: false
   queue: max
 
@@ -35,7 +41,7 @@ jobs:
 
   layout:
     name: Automated layout
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -52,13 +58,26 @@ jobs:
         env:
           PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BASE_SHA: ${{ github.event.before }}
+          REPLAY_BASE_SHA: ${{ inputs.layout_base_sha }}
         run: |
-          base="$PULL_REQUEST_BASE_SHA"
-          if [[ -z "$base" ]]; then
-            base="$PUSH_BASE_SHA"
-          fi
-          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
-            base="$(git rev-parse HEAD^)"
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF" != "refs/heads/master" || ! "$REPLAY_BASE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+              echo "::error::Protected layout replay requires master and a lowercase 40-character ancestor SHA."
+              exit 1
+            fi
+            base="$REPLAY_BASE_SHA"
+            if ! git merge-base --is-ancestor "$base" "$GITHUB_SHA"; then
+              echo "::error::Layout replay base is not an ancestor of protected master."
+              exit 1
+            fi
+          else
+            base="$PULL_REQUEST_BASE_SHA"
+            if [[ -z "$base" ]]; then
+              base="$PUSH_BASE_SHA"
+            fi
+            if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+              base="$(git rev-parse HEAD^)"
+            fi
           fi
           git cat-file -e "${base}^{commit}"
           echo "sha=$base" >> "$GITHUB_OUTPUT"
@@ -92,7 +111,7 @@ jobs:
 
   layout-failure:
     name: Report automated layout failure
-    if: ${{ always() && needs.layout.result == 'failure' }}
+    if: ${{ always() && github.event_name == 'push' && needs.layout.result == 'failure' }}
     needs: layout
     runs-on: ubuntu-latest
     permissions:
@@ -227,7 +246,7 @@ jobs:
             echo "::error::Dashboard CI did not pass (quality: $QUALITY_RESULT, layout: $LAYOUT_RESULT, Playwright: $TEST_RESULT)."
             exit 1
           fi
-          if [[ "$EVENT_NAME" == "push" && "$LAYOUT_RESULT" != "success" ]]; then
-            echo "::error::Post-merge dashboard CI did not pass automated layout (layout: $LAYOUT_RESULT)."
+          if [[ "$EVENT_NAME" != "pull_request" && "$LAYOUT_RESULT" != "success" ]]; then
+            echo "::error::Protected dashboard layout evidence did not pass (layout: $LAYOUT_RESULT)."
             exit 1
           fi

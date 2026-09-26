@@ -57,18 +57,26 @@ describe('dashboard Playwright workflow policy', () => {
     expect(workflow).toContain('queue: max')
   })
 
-  it('runs automated layout only after pushes to protected master', () => {
+  it('runs automated layout on protected master pushes and explicit ancestor-bound replays, never PRs', () => {
     const workflow = read('.github/workflows/playwright.yml')
     const layoutPlan = read('scripts/layout/plan.ts')
 
     expect(workflow).toContain('pull_request:')
     expect(workflow).toContain('push:')
     expect(workflow).toContain('branches: [master]')
-    expect(workflow).toContain("if: github.event_name == 'push' && github.ref == 'refs/heads/master'")
+    expect(workflow).toContain('workflow_dispatch:')
+    expect(workflow).toContain('layout_base_sha:')
+    expect(workflow).toContain("group: playwright-${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && '-replay' || '' }}")
+    expect(workflow).toContain("if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')")
+    expect(workflow).toContain('REPLAY_BASE_SHA: ${{ inputs.layout_base_sha }}')
+    expect(workflow).toContain('[[ "$GITHUB_REF" != "refs/heads/master" || ! "$REPLAY_BASE_SHA" =~ ^[a-f0-9]{40}$ ]]')
+    expect(workflow).toContain('git merge-base --is-ancestor "$base" "$GITHUB_SHA"')
     expect(workflow).toContain('permissions:')
     expect(workflow).toContain('contents: read')
     expect(layoutPlan).toContain('After merge, the protected \\`master\\` workflow')
     expect(layoutPlan).toContain('Pull requests retain the quality and full')
+    expect(layoutPlan).toContain('gh workflow run playwright.yml --ref master')
+    expect(read('docs/ux/layouts.md')).toContain('gh workflow run playwright.yml --ref master')
   })
 
   it('aggregates PR quality and full Playwright without requiring skipped layout', () => {
@@ -90,7 +98,7 @@ describe('dashboard Playwright workflow policy', () => {
     expect(workflow).toContain('LAYOUT_RESULT: ${{ needs.layout.result }}')
     expect(workflow).toContain('TEST_RESULT: ${{ needs.test.result }}')
     expect(workflow).toContain('if [[ "$QUALITY_RESULT" != "success" || "$TEST_RESULT" != "success" ]]')
-    expect(workflow).toContain('if [[ "$EVENT_NAME" == "push" && "$LAYOUT_RESULT" != "success" ]]')
+    expect(workflow).toContain('if [[ "$EVENT_NAME" != "pull_request" && "$LAYOUT_RESULT" != "success" ]]')
     expect(workflow).toContain('Dashboard CI did not pass')
 
     expect(packageJson.scripts.check).toBe(
@@ -106,7 +114,7 @@ describe('dashboard Playwright workflow policy', () => {
     const workflow = read('.github/workflows/playwright.yml')
 
     expect(workflow).toContain('name: Report automated layout failure')
-    expect(workflow).toContain("if: ${{ always() && needs.layout.result == 'failure' }}")
+    expect(workflow).toContain("if: ${{ always() && github.event_name == 'push' && needs.layout.result == 'failure' }}")
     expect(workflow).toContain('needs: layout')
     expect(workflow).toContain('issues: write')
     expect(workflow).toContain('GH_TOKEN: ${{ github.token }}')

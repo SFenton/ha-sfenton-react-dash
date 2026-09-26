@@ -35,6 +35,15 @@ claimed complete, inspect the matching Action artifact and exercise an owned
 preview of the exact head. A `non-layout` classification or zero-item manual
 worklist requires no human layout review.
 
+For a prior failed layout incident, a tooling-only follow-up with zero product
+checkpoints is not evidence of repair. An owner-authorized `workflow_dispatch`
+on protected `master` may replay against an exact ancestor with
+`gh workflow run playwright.yml --ref master -f layout_base_sha=<40-hex-ancestor>`.
+Verify that its plan selects the originally failing Chromium and WebKit
+surfaces, inspect the run's ledgers and images, and keep manual judgments
+separate. Replay failures do not auto-file a second issue for the new commit;
+the original incident remains open until genuinely validated.
+
 Use normal elapsed clocks for transition readiness. Missing selected panels,
 outgoing content, merely reachable servers, empty route filters and screenshots
 that were never viewed must not produce acceptance. Artifacts must be reachable
