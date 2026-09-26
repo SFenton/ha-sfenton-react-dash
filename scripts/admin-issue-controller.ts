@@ -266,6 +266,25 @@ type ActionableTodoItem = HassTodoItem & {
 
 const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
+const RESEARCH_MOUNT_RETRY_TARGET = {
+  issueNumber: 242,
+  uid: '9ec721c0-b834-11f1-9e46-525400aeeeef',
+  request: 'Show me mockups of each example',
+  repairPrNumber: 270,
+  repairBranch: 'copilot/issue-242-research-artifacts-release-20260926',
+  failureReason: 'Artifact generation, pinned-copy validation, and pixel inspection are blocked because ' +
+    '`admin_issue_workspace` cannot start its container: Docker cannot create the ' +
+    '`/workspace/.cache` mountpoint on the read-only root filesystem. ' +
+    'No alternative filesystem or rendering tool is authorized.',
+} as const
+const RESEARCH_MOUNT_RETRY_RECEIPT_PREFIX = 'researchMountRetry:g'
+const RESEARCH_MOUNT_RETRY_RECEIPTS = new Set([
+  'githubIssueCreatedAt',
+  'researchOnlyScope',
+  'sessionCreatedAt',
+  'lastWorkerRunAt',
+])
+const GIT_SHA_PATTERN = /^[a-f0-9]{40}$/
 const RESEARCH_ONLY_HASS_READ_TOOLS = [
   'ha_config_get_automation',
   'ha_config_get_dashboard',
@@ -1064,8 +1083,8 @@ function writeState(config: AdminIssueControllerConfig, state: AdminIssueControl
   chmodSync(path, 0o600)
 }
 
-async function withControllerLock<T>(
-  config: AdminIssueControllerConfig,
+export async function withControllerLock<T>(
+  config: Pick<AdminIssueControllerConfig, 'stateDirectory'>,
   callback: () => Promise<T>,
 ): Promise<T> {
   mkdirSync(config.stateDirectory, { mode: 0o700, recursive: true })
@@ -8681,6 +8700,426 @@ async function runParallelSupervisor(
   }
 }
 
+interface ResearchMountRetryObservation {
+  issue: GitHubIssue
+  comments: GitHubIssueComment[]
+  todoItems: HassTodoItem[]
+  worktree: Awaited<ReturnType<typeof readWorktreeSnapshot>>
+  changed: string[]
+  remoteBranch: string
+}
+
+export interface ResearchMountRepairProof {
+  repairPrNumber: 270
+  headSha: string
+  mergeSha: string
+  masterSha: string
+  extensionSha256: string
+  checkRunIds: number[]
+}
+
+export function parseResearchMountRetryArgs(args: string[]) {
+  if (args.length !== 4 || args[0] !== '--issue' || args[1] !== '242' ||
+    args[2] !== '--uid' || args[3] !== RESEARCH_MOUNT_RETRY_TARGET.uid) {
+    throw new Error(
+      `retry-research-mount requires --issue 242 --uid ${RESEARCH_MOUNT_RETRY_TARGET.uid}`,
+    )
+  }
+  return { issueNumber: RESEARCH_MOUNT_RETRY_TARGET.issueNumber, uid: RESEARCH_MOUNT_RETRY_TARGET.uid }
+}
+
+export function assertInstalledResearchMountRetryController(
+  config: Pick<AdminIssueControllerConfig, 'workerExtensionPath'>,
+  executablePath: string,
+) {
+  const expected = join(dirname(config.workerExtensionPath), 'controller.mjs')
+  if (!executablePath || resolve(executablePath) !== expected) {
+    throw new AdminIssueProvenanceError('Research mount retry must use the installed controller beside its worker extension')
+  }
+  assertPrivateRegularFile(executablePath, 'installed controller')
+  if (realpathSync(executablePath) !== expected) {
+    throw new AdminIssueProvenanceError('Installed research mount retry controller is not a real file')
+  }
+}
+
+export function assertProtectedResearchMountRepair(
+  config: Pick<AdminIssueControllerConfig,
+    'ownerId' | 'ownerLogin' | 'repository' | 'requiredCheckAppId' | 'requiredChecks'>,
+  pr: GitHubPullRequest,
+  checks: readonly CheckRun[],
+  evidence: {
+    masterSha: string
+    mergeParents: string[]
+    mergeIsAncestor: boolean
+    priorExtension: string
+    headExtension: string
+    mergedExtension: string
+    masterExtension: string
+    installedExtension: string
+  },
+): ResearchMountRepairProof {
+  if (pr.number !== RESEARCH_MOUNT_RETRY_TARGET.repairPrNumber ||
+    pr.html_url !== `https://github.com/${config.repository}/pull/${pr.number}` ||
+    pr.user?.id !== config.ownerId || pr.user.login !== config.ownerLogin ||
+    pr.base.ref !== 'master' || pr.base.repo?.full_name !== config.repository ||
+    pr.head.ref !== RESEARCH_MOUNT_RETRY_TARGET.repairBranch ||
+    pr.head.repo?.full_name !== config.repository ||
+    pr.draft || pr.state !== 'closed' || !pr.merged_at ||
+    !pr.merge_commit_sha || !GIT_SHA_PATTERN.test(pr.merge_commit_sha) ||
+    !GIT_SHA_PATTERN.test(pr.head.sha)) {
+    throw new AdminIssueProvenanceError('Research mount repair PR #270 is not the protected owner merge')
+  }
+  const acceptedChecks = assertSuccessfulRequiredChecksForHead(
+    config.requiredChecks, config.requiredCheckAppId, pr.head.sha, checks,
+  )
+  if (!GIT_SHA_PATTERN.test(evidence.masterSha) || !evidence.mergeIsAncestor ||
+    evidence.mergeParents.length !== 2 ||
+    !GIT_SHA_PATTERN.test(evidence.mergeParents[0]) ||
+    evidence.mergeParents[1] !== pr.head.sha) {
+    throw new AdminIssueProvenanceError('Research mount repair merge is not a normal ancestor of current master')
+  }
+  const repaired = evidence.headExtension
+  if (!repaired.includes('assertIgnoredWorkspacePath(workspace, ".cache/worker-mountpoint")') ||
+    !repaired.includes('await ensureWorkspaceDirectory(workspace, ".cache")') ||
+    !repaired.includes('artifacts/admin-issue-${issueNumber}/research') ||
+    !repaired.includes('...researchArtifactMounts') ||
+    evidence.priorExtension === repaired ||
+    repaired !== evidence.mergedExtension ||
+    repaired !== evidence.masterExtension ||
+    repaired !== evidence.installedExtension) {
+    throw new AdminIssueProvenanceError('Installed research worker extension does not match the protected repair')
+  }
+  return {
+    repairPrNumber: 270,
+    headSha: pr.head.sha,
+    mergeSha: pr.merge_commit_sha,
+    masterSha: evidence.masterSha,
+    extensionSha256: createHash('sha256').update(repaired).digest('hex'),
+    checkRunIds: acceptedChecks.map((check) => check.id),
+  }
+}
+
+async function verifyProtectedResearchMountRepair(
+  config: AdminIssueControllerConfig,
+): Promise<ResearchMountRepairProof> {
+  const pr = await ghApi<GitHubPullRequest>(
+    config, 'GET', `repos/${config.repository}/pulls/270`,
+  )
+  if (pr.state !== 'closed' || !pr.merged_at || !pr.merge_commit_sha ||
+    !GIT_SHA_PATTERN.test(pr.merge_commit_sha) ||
+    !GIT_SHA_PATTERN.test(pr.head.sha)) {
+    throw new AdminIssueProvenanceError('Research mount repair PR #270 has not merged')
+  }
+  const checks = await verifySuccessfulRequiredChecksForHead(config, pr.head.sha)
+  const masterSha = await fetchCurrentMaster(config)
+  const mergeIsAncestor = await commitIsAncestor(config.repositoryPath, pr.merge_commit_sha, masterSha)
+  if (!mergeIsAncestor) {
+    throw new AdminIssueProvenanceError('Research mount repair is not on current origin/master')
+  }
+  const mergeParents = (
+    await runCommand('git', ['show', '-s', '--format=%P', pr.merge_commit_sha], {
+      cwd: config.repositoryPath, timeoutMs: 30_000,
+    })
+  ).stdout.trim().split(/\s+/)
+  if (mergeParents.length !== 2 || mergeParents.some((sha) => !GIT_SHA_PATTERN.test(sha))) {
+    throw new AdminIssueProvenanceError('Research mount repair has no normal two-parent merge')
+  }
+  const extensionPath = 'ops/admin-issue-controller/worker-extension.mjs'
+  const readRevision = async (revision: string) => (
+    await runCommand('git', ['show', `${revision}:${extensionPath}`], {
+      cwd: config.repositoryPath, timeoutMs: 30_000, maxOutputBytes: 1024 * 1024,
+    })
+  ).stdout
+  const [priorExtension, headExtension, mergedExtension, masterExtension] = await Promise.all([
+    readRevision(mergeParents[0]),
+    readRevision(pr.head.sha),
+    readRevision(pr.merge_commit_sha),
+    readRevision(masterSha),
+  ])
+  assertPrivateRegularFile(config.workerExtensionPath, 'installed worker extension')
+  return assertProtectedResearchMountRepair(config, pr, checks, {
+    headExtension,
+    installedExtension: readFileSync(config.workerExtensionPath, 'utf8'),
+    masterExtension,
+    masterSha,
+    mergeIsAncestor,
+    mergeParents,
+    mergedExtension,
+    priorExtension,
+  })
+}
+
+export function assertResearchMountRetryRecord(
+  config: Pick<AdminIssueControllerConfig, 'worktreeRoot'>,
+  state: AdminIssueControllerState,
+  issueNumber: number,
+  uid: string,
+) {
+  if (issueNumber !== RESEARCH_MOUNT_RETRY_TARGET.issueNumber ||
+    uid !== RESEARCH_MOUNT_RETRY_TARGET.uid) {
+    throw new AdminIssueProvenanceError('Research mount retry is scoped only to the exact #242 Admin UID')
+  }
+  if (state.activeUid || Object.values(state.issues).some((entry) =>
+    entry.workerClaim || entry.releaseClaim)) {
+    throw new AdminIssueProvenanceError('Research mount retry requires a claim-free stopped controller')
+  }
+  const record = state.issues[uid]
+  if (!record || record.uid !== uid || record.issueNumber !== issueNumber ||
+    Object.values(state.issues).filter((entry) => entry.issueNumber === issueNumber).length !== 1 ||
+    state.ignoredUids.includes(uid) || record.origin || record.automationKind) {
+    throw new AdminIssueProvenanceError('Research mount retry lost its unique Admin issue binding')
+  }
+  const intakeKey = todoIntakeKey(uid)
+  if (state.pendingUploads?.[intakeKey]?.length || state.intakeFailures?.[intakeKey]) {
+    throw new AdminIssueProvenanceError('Research mount retry has unresolved Admin To-Do intake')
+  }
+  const receiptKey = `${RESEARCH_MOUNT_RETRY_RECEIPT_PREFIX}${record.generation}`
+  if (Object.hasOwn(record.receipts, receiptKey)) {
+    throw new AdminIssueProvenanceError('Research mount retry already attempted for this generation')
+  }
+  const unexpectedReceipts = Object.keys(record.receipts).filter((key) => {
+    if (RESEARCH_MOUNT_RETRY_RECEIPTS.has(key)) return false
+    const prior = key.match(/^researchMountRetry:g([1-9]\d*)$/)
+    return !prior || Number(prior[1]) >= record.generation
+  })
+  if (unexpectedReceipts.length > 0 ||
+    record.receipts.researchOnlyScope !== 'true' ||
+    record.phase !== 'blocked' || record.repairAttempts !== 0 ||
+    record.workerRuns < 2 || !record.receipts.sessionCreatedAt ||
+    !record.receipts.lastWorkerRunAt ||
+    record.lastOutcome?.decision !== 'blocked' ||
+    record.lastOutcome.reason !== RESEARCH_MOUNT_RETRY_TARGET.failureReason ||
+    record.lastOutcome.iosFollowUp.required ||
+    record.pr || record.deployment ||
+    record.provenance.kind !== 'active' ||
+    record.provenance.generation !== record.generation ||
+    record.provenance.candidate || record.provenance.merge ||
+    record.provenance.deployment || record.provenance.layoutValidation ||
+    record.provenance.transition || record.provenance.quarantine ||
+    record.provenance.resyncAttempts !== 0 ||
+    ('researchMockups' in record && record.researchMockups !== undefined)) {
+    throw new AdminIssueProvenanceError('Research mount retry is not solely the blocked read-only mount failure')
+  }
+  const [original, request] = record.inputs
+  if (record.inputs.length !== 2 || record.inputRevision !== 2 || record.processedRevision !== 2 ||
+    original?.revision !== 1 || original.source !== 'todo-created' ||
+    request?.revision !== 2 || request.source !== 'issue-comment' ||
+    request.body !== RESEARCH_MOUNT_RETRY_TARGET.request ||
+    !original.processedAt || !request.processedAt ||
+    original.externalId !== `todo:${record.taskFingerprint}` ||
+    (request.attachments?.length ?? 0) > 0 ||
+    (request.mediaFindings?.length ?? 0) > 0) {
+    throw new AdminIssueProvenanceError('Research mount retry has no unchanged processed owner request')
+  }
+  if (!record.branch || !record.worktreePath ||
+    realpathSync(config.worktreeRoot) !== resolve(config.worktreeRoot) ||
+    record.worktreePath !== join(config.worktreeRoot, `issue-${issueNumber}-g${record.generation}`)) {
+    throw new AdminIssueProvenanceError('Research mount retry worktree is outside its assigned generation')
+  }
+  const worktree = lstatSync(record.worktreePath)
+  if (!worktree.isDirectory() || worktree.isSymbolicLink() ||
+    realpathSync(record.worktreePath) !== record.worktreePath) {
+    throw new AdminIssueProvenanceError('Research mount retry worktree is not a real directory')
+  }
+  return { record, request, receiptKey }
+}
+
+export function assertResearchMountRetryObservation(
+  config: Pick<AdminIssueControllerConfig, 'ownerId' | 'ownerLogin' | 'repository'>,
+  record: AdminIssueRecord,
+  request: AdminIssueInput,
+  observation: ResearchMountRetryObservation,
+) {
+  const issue = observation.issue
+  const body = canonicalWorkerIssueBody(config, record, issue)
+  if (issue.pull_request || issue.title !== record.title ||
+    (body.match(/<!-- admin-todo-uid:/g) ?? []).length !== 1 ||
+    !body.replaceAll('’', "'").includes("I don't want you to actually go implement anything yet") ||
+    !researchOnlyRequested(record, body) ||
+    issueBodyMediaPlan(record, issue.number, body, config.repository).bodySha256 !==
+      record.issueBodySha256) {
+    throw new AdminIssueProvenanceError('Research mount retry GitHub issue body changed since intake')
+  }
+  const comments = [...observation.comments].sort((left, right) => left.id - right.id)
+  if (comments.length < 3 || comments.some((entry, index) =>
+    !Number.isSafeInteger(entry.id) || entry.id <= 0 ||
+    (index > 0 && entry.id === comments[index - 1].id)) ||
+    comments.at(-1)?.id !== record.commentCursor) {
+    throw new AdminIssueProvenanceError('Research mount retry GitHub comment cursor is stale or ambiguous')
+  }
+  const commentId = Number(request.sourceKey?.match(/^comment:(\d+)$/)?.[1])
+  const owner = comments.find((entry) => entry.id === commentId)
+  const trusted = comments.filter((entry) =>
+    isTrustedIssueComment(entry, config.ownerId, config.ownerLogin))
+  const ownerBody = owner?.body ?? ''
+  const ownerUpdatedAt = owner?.updated_at ?? owner?.created_at
+  const ownerBodySha256 = createHash('sha256').update(ownerBody).digest('hex')
+  if (!Number.isSafeInteger(commentId) || !owner ||
+    trusted.length !== 1 || trusted[0].id !== commentId ||
+    ownerBody !== RESEARCH_MOUNT_RETRY_TARGET.request ||
+    ownerBody !== request.body || !ownerUpdatedAt ||
+    ownerUpdatedAt !== request.sourceUpdatedAt ||
+    ownerBodySha256 !== request.bodySha256 ||
+    request.externalId !== mediaSourceExternalId('comment', commentId, ownerUpdatedAt, ownerBody) ||
+    mediaInputRequired(record, `comment:${commentId}`, ownerBody,
+      discoverEmbeddedGitHubMedia(ownerBody, config.repository))) {
+    throw new AdminIssueProvenanceError('Research mount retry owner comment is not the unchanged journaled request')
+  }
+  const questionMarker = controllerReceiptMarker(record.uid, 'questions-r1')
+  const question = comments.filter((entry) => entry.body?.includes(questionMarker))
+  const blockedMarker = controllerReceiptMarker(record.uid, 'blocked-r2')
+  const blocked = comments.filter((entry) => entry.body?.includes(blockedMarker))
+  if (question.length !== 1 || blocked.length !== 1 ||
+    question[0].id >= commentId || blocked[0].id <= commentId ||
+    question[0].user?.id !== config.ownerId ||
+    blocked[0].user?.id !== config.ownerId ||
+    question[0].author_association !== 'OWNER' ||
+    blocked[0].author_association !== 'OWNER' ||
+    !question[0].body?.includes(CONTROLLER_COMMENT_MARKER) ||
+    !['Separate scopes:', 'Conservative session-only controls:', 'Pre-wash lockout:']
+      .every((choice) => question[0].body?.includes(choice)) ||
+    !owner.created_at || !Number.isFinite(Date.parse(owner.created_at)) ||
+    !Number.isFinite(Date.parse(question[0].updated_at ?? question[0].created_at ?? '')) ||
+    Date.parse(question[0].updated_at ?? question[0].created_at ?? '') >
+      Date.parse(owner.created_at) ||
+    record.lastOutcome?.decision !== 'blocked' ||
+    blocked[0].body !== formatBlockedComment(record.uid, 2, record.lastOutcome)) {
+    throw new AdminIssueProvenanceError('Research mount retry lost the original three-option question or blocked receipt')
+  }
+  const matchingTodo = observation.todoItems.filter((item) => item.uid === record.uid)
+  const todo = matchingTodo[0]
+  if (matchingTodo.length !== 1 || !todo || todo.status !== 'needs_action' ||
+    todo.completed || !todo.summary?.trim() ||
+    todoFingerprint(todo.summary, todo.description ?? '') !== record.taskFingerprint ||
+    issueTitle(todo.summary) !== record.title) {
+    throw new AdminIssueProvenanceError('Research mount retry Admin To-Do source changed or completed')
+  }
+  if (body !== issueBody({ description: record.description, summary: todo.summary, uid: record.uid })) {
+    throw new AdminIssueProvenanceError('Research mount retry original issue body no longer matches its Admin To-Do')
+  }
+  const worktree = observation.worktree
+  if (record.provenance.kind !== 'active' ||
+    worktree.branch !== record.branch ||
+    worktree.headSha !== record.provenance.preparedBaseSha ||
+    !GIT_SHA_PATTERN.test(worktree.treeSha) ||
+    worktree.status !== '' || worktree.gitOperations.length > 0 ||
+    observation.changed.length > 0 || observation.remoteBranch !== '') {
+    throw new AdminIssueProvenanceError('Research mount retry assigned worktree is not the clean prepared base')
+  }
+  return createHash('sha256').update(JSON.stringify({
+    issue: {
+      number: issue.number,
+      updatedAt: issue.updated_at,
+      title: issue.title,
+      bodySha256: record.issueBodySha256,
+    },
+    comments: comments.map((comment) => ({
+      id: comment.id,
+      updatedAt: comment.updated_at,
+      createdAt: comment.created_at,
+      authorId: comment.user?.id,
+      association: comment.author_association,
+      sha256: createHash('sha256').update(comment.body ?? '').digest('hex'),
+    })),
+    todo: { uid: todo.uid, status: todo.status, fingerprint: record.taskFingerprint },
+    worktree: {
+      branch: worktree.branch,
+      headSha: worktree.headSha,
+      treeSha: worktree.treeSha,
+      remoteBranch: observation.remoteBranch,
+    },
+  })).digest('hex')
+}
+
+async function observeResearchMountRetry(
+  config: AdminIssueControllerConfig,
+  client: HassAdminTodoClient,
+  record: AdminIssueRecord,
+): Promise<ResearchMountRetryObservation> {
+  if (!record.worktreePath || !record.branch) {
+    throw new AdminIssueProvenanceError('Research mount retry worktree or branch is missing')
+  }
+  const [issue, comments, todoItems, worktree, changed, remoteBranch] = await Promise.all([
+    getIssue(config, record.issueNumber),
+    listIssueComments(config, record.issueNumber),
+    client.getItems(config.todoEntityId),
+    readWorktreeSnapshot(record.worktreePath),
+    changedFiles(record.worktreePath),
+    runCommand('git', ['ls-remote', '--heads', 'origin', record.branch], {
+      cwd: record.worktreePath, timeoutMs: 30_000,
+    }),
+  ])
+  return { issue, comments, todoItems, worktree, changed, remoteBranch: remoteBranch.stdout.trim() }
+}
+
+export async function queueHostResearchMountRetry(
+  config: Pick<AdminIssueControllerConfig, 'ownerId' | 'ownerLogin' | 'repository' | 'worktreeRoot'>,
+  state: AdminIssueControllerState,
+  issueNumber: number,
+  uid: string,
+  effects: {
+    observe: (record: AdminIssueRecord) => Promise<ResearchMountRetryObservation>
+    verifyRepair: () => Promise<ResearchMountRepairProof>
+    persist: () => void
+    timestamp: () => string
+  },
+) {
+  const { record, request, receiptKey } = assertResearchMountRetryRecord(config, state, issueNumber, uid)
+  const initial = assertResearchMountRetryObservation(
+    config, record, request, await effects.observe(record),
+  )
+  const proof = await effects.verifyRepair()
+  if (proof.repairPrNumber !== 270 ||
+    !GIT_SHA_PATTERN.test(proof.headSha) ||
+    !GIT_SHA_PATTERN.test(proof.mergeSha) ||
+    !GIT_SHA_PATTERN.test(proof.masterSha) ||
+    !/^[a-f0-9]{64}$/.test(proof.extensionSha256) ||
+    proof.checkRunIds.length < 1 ||
+    proof.checkRunIds.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+    throw new AdminIssueProvenanceError('Research mount retry has no verified protected repair receipt')
+  }
+  const final = assertResearchMountRetryObservation(
+    config, record, request, await effects.observe(record),
+  )
+  const current = assertResearchMountRetryRecord(config, state, issueNumber, uid)
+  if (initial !== final || current.record !== record || current.request !== request) {
+    throw new AdminIssueProvenanceError('Research mount retry input changed during protected repair verification')
+  }
+  const ownerCommentId = Number(request.sourceKey?.match(/^comment:(\d+)$/)?.[1])
+  if (!Number.isSafeInteger(ownerCommentId) || ownerCommentId <= 0 ||
+    record.provenance.kind !== 'active') {
+    throw new AdminIssueProvenanceError('Research mount retry lost its owner or worktree receipt binding')
+  }
+  const attemptedAt = effects.timestamp()
+  if (!Number.isFinite(Date.parse(attemptedAt))) {
+    throw new AdminIssueProvenanceError('Research mount retry timestamp is invalid')
+  }
+  const receipt = {
+    event: 'host-retry-research-mount' as const,
+    issueNumber,
+    uid,
+    generation: record.generation,
+    inputRevision: record.inputRevision,
+    processedRevisionBefore: record.processedRevision,
+    processedRevisionAfter: request.revision - 1,
+    replayedOwnerRevision: request.revision,
+    ownerCommentId,
+    ownerBodySha256: createHash('sha256').update(request.body).digest('hex'),
+    blockedReasonSha256: createHash('sha256').update(RESEARCH_MOUNT_RETRY_TARGET.failureReason).digest('hex'),
+    inputSnapshotSha256: final,
+    worktreeHeadSha: record.provenance.preparedBaseSha,
+    ...proof,
+    attemptedAt,
+  }
+  record.receipts[receiptKey] = JSON.stringify(receipt)
+  // Replay the existing trusted owner comment; do not create an input or rewrite its first processing receipt.
+  record.processedRevision = receipt.processedRevisionAfter
+  record.phase = 'queued'
+  record.updatedAt = attemptedAt
+  effects.persist()
+  return { receiptKey, receipt }
+}
+
 async function main() {
   loadControllerEnvironment()
   const [command = 'once', configArgument = 'ops/admin-issue-controller/controller.json'] =
@@ -8698,11 +9137,32 @@ async function main() {
     })
     return
   }
+  if (command === 'retry-research-mount') {
+    const { issueNumber, uid } = parseResearchMountRetryArgs(process.argv.slice(4))
+    assertInstalledResearchMountRetryController(config, process.argv[1] ?? '')
+    await withControllerLock(config, async () => {
+      await verifyRepositoryIdentity(config)
+      const state = loadAdminIssueControllerState(config)
+      const result = await queueHostResearchMountRetry(config, state, issueNumber, uid, {
+        observe: async (record) => await observeResearchMountRetry(config, client, record),
+        verifyRepair: async () => await verifyProtectedResearchMountRepair(config),
+        persist: () => writeState(config, state),
+        timestamp: now,
+      })
+      process.stdout.write(
+        `Requeued issue #${issueNumber} generation ${result.receipt.generation} from its original owner request; ` +
+        `host receipt ${result.receiptKey}, protected merge ${result.receipt.mergeSha}.\n`,
+      )
+    })
+    return
+  }
   if (command === 'once') {
     await withControllerLock(config, async () => runOnce(config, client))
     return
   }
-  if (command !== 'run') throw new Error(`Unknown command ${command}; expected baseline, once, run, or status`)
+  if (command !== 'run') {
+    throw new Error(`Unknown command ${command}; expected baseline, once, retry-research-mount, run, or status`)
+  }
 
   while (true) {
     try {
