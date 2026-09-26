@@ -5,12 +5,16 @@ import { readFileSync } from 'node:fs'
 import { requireScenarios, SURFACE_CONTRACTS } from '../../e2e/layout/contracts'
 import { hash, stableHash } from './shared'
 import {
+  DEFAULT_EXECUTION_SHARD_SIZE,
   executionBatches,
+  executionShards,
   executionWorkerCount,
   isBaselineBuildInput,
+  layoutShardSize,
   layoutWorkerCount,
   manualReviewMessage,
   mergeExecutionLedgers,
+  playwrightExecutionArgs,
   stopOwnedProcess,
   verifyServedBuild,
 } from './run'
@@ -69,6 +73,107 @@ describe('owned build verification', () => {
       { id: 'webkit', workers: 1 },
     ])
     expect(() => executionBatches([])).toThrow(/No required tests selected/)
+  })
+  it('splits each engine selection into deterministic bounded process shards without splitting spec files', () => {
+    const tests = (project: string, groupSizes: number[]) => groupSizes.flatMap((count, group) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `${project}-${group}-${index}`,
+        project,
+        file: `${project}-${group}.spec.ts`,
+        titlePath: [`${project} ${group} ${index}`],
+      })))
+    const batches = executionBatches([
+      ...tests('mobile', [80, 46, 86, 70, 57, 75, 50, 65, 56, 60, 41]),
+      ...tests('webkit', [70, 53, 12]),
+    ])
+    const nonWebkit = executionShards(batches[0])
+    const webkit = executionShards(batches[1])
+
+    expect(DEFAULT_EXECUTION_SHARD_SIZE).toBe(128)
+    expect(layoutShardSize(undefined)).toBe(128)
+    expect(layoutShardSize('32')).toBe(32)
+    expect(() => layoutShardSize('0')).toThrow(/1 to 128/)
+    expect(() => layoutShardSize('1.5')).toThrow(/1 to 128/)
+    expect(() => layoutShardSize('many')).toThrow(/1 to 128/)
+    expect(() => layoutShardSize('129')).toThrow(/1 to 128/)
+    expect(nonWebkit.map((shard) => ({ id: shard.id, tests: shard.tests.length, workers: shard.workers }))).toEqual([
+      { id: 'non-webkit-1-of-6', tests: 126, workers: 2 },
+      { id: 'non-webkit-2-of-6', tests: 86, workers: 2 },
+      { id: 'non-webkit-3-of-6', tests: 127, workers: 2 },
+      { id: 'non-webkit-4-of-6', tests: 125, workers: 2 },
+      { id: 'non-webkit-5-of-6', tests: 121, workers: 2 },
+      { id: 'non-webkit-6-of-6', tests: 101, workers: 2 },
+    ])
+    expect(webkit.map((shard) => ({ id: shard.id, tests: shard.tests.length, workers: shard.workers }))).toEqual([
+      { id: 'webkit-1-of-2', tests: 123, workers: 1 },
+      { id: 'webkit-2-of-2', tests: 12, workers: 1 },
+    ])
+    expect(nonWebkit.flatMap((shard) => shard.tests)).toEqual(batches[0].tests)
+    expect(webkit.flatMap((shard) => shard.tests)).toEqual(batches[1].tests)
+    for (const shardSet of [nonWebkit, webkit]) {
+      const shardByFile = new Map<string, string>()
+      for (const shard of shardSet) {
+        for (const test of shard.tests) {
+          const key = `${test.project}/${test.file}`
+          expect(shardByFile.get(key) ?? shard.id).toBe(shard.id)
+          shardByFile.set(key, shard.id)
+        }
+      }
+    }
+    expect(() => executionShards(batches[0], 0)).toThrow(/1 to 128/)
+    expect(() => executionShards({ id: 'webkit', tests: [], workers: 1 })).toThrow(/empty/)
+    expect(() => executionShards({ id: 'webkit', workers: 1, tests: tests('webkit', [3]) }, 2)).toThrow(/exceeds/)
+    const repeated = tests('mobile', [1, 1])
+    expect(() => executionShards({
+      id: 'non-webkit', workers: 2,
+      tests: [repeated[0], repeated[1], { ...repeated[0], id: 'mobile-return' }],
+    }, 3)).toThrow(/not contiguous/)
+  })
+  it('keeps each shard fail-closed without retries or worker drift', () => {
+    expect(playwrightExecutionArgs('/tmp/selection.txt', 2, '/tmp/output')).toEqual([
+      'test', '--test-list', '/tmp/selection.txt', '--forbid-only',
+      '--workers=2', '--retries=0', '--reporter=./e2e/layout/reporter.ts,list', '--output', '/tmp/output',
+    ])
+    expect(() => playwrightExecutionArgs('/tmp/selection.txt', 0, '/tmp/output')).toThrow(/positive integer/)
+  })
+  it('merges shard ledgers back into the unchanged engine-level evidence shape', () => {
+    const source = { base: 'base', head: 'head', files: {}, digest: 'source' }
+    const run = { runId: 'run', planId: 'plan', source } as Pick<RunIdentity, 'runId' | 'planId' | 'source'>
+    const selection: CollectedTest[] = Array.from({ length: 5 }, (_, index) => ({
+      id: `mobile-${index}`,
+      project: 'mobile',
+      file: `mobile-${Math.floor(index / 2)}.spec.ts`,
+      titlePath: [`mobile ${index}`],
+    }))
+    const batch = executionBatches(selection)[0]
+    const shards = executionShards(batch, 2)
+    const results = shards.map((shard) => ({
+      batch: shard,
+      ledger: {
+        version: 1 as const,
+        runId: run.runId,
+        planId: run.planId,
+        sourceDigest: source.digest,
+        selected: shard.tests,
+        attempts: shard.tests.map((test, workerIndex) => ({
+          testId: test.id,
+          expectedStatus: 'passed',
+          status: 'passed',
+          retry: 0,
+          workerIndex,
+          annotations: [],
+          checkpoints: [],
+        })),
+        errors: [],
+        status: 'passed',
+        complete: true,
+      },
+    }))
+
+    const aggregate = mergeExecutionLedgers(run, batch.tests, results)
+    expect(aggregate.selected).toEqual(batch.tests)
+    expect(aggregate.attempts.map((attempt) => attempt.testId)).toEqual(selection.map((test) => test.id))
+    expect(aggregate).toMatchObject({ complete: true, errors: [], status: 'passed' })
   })
   it('merges disjoint batch ledgers without weakening identity or failure evidence', () => {
     const source = { base: 'base', head: 'head', files: {}, digest: 'source' }
