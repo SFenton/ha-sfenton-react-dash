@@ -764,9 +764,11 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByRole('heading', { name: 'Kitchen: Lights' })).not.toBeInTheDocument()
     expect(within(dialog).queryByText('Kitchen Lights: Off')).not.toBeInTheDocument()
     expect(within(dialog).getByText('Kitchen Lights controls and status details')).toBeInTheDocument()
-    const toggle = screen.getByRole('button', { name: 'Toggle Kitchen lights' })
-    expect(toggle).toBeInTheDocument()
-    expect(toggle.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb-multiple-off'))
+    const slider = within(dialog).getByRole('slider', { name: 'Kitchen Lights' })
+    expect(slider).toHaveAttribute('aria-valuenow', '0')
+    expect(slider.closest('[data-group-slider]')).toHaveAttribute('data-group-slider', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Toggle Kitchen Lights' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(dialog).queryByRole('button', { name: 'Toggle Kitchen lights' })).not.toBeInTheDocument()
     expect(within(dialog).queryByText('Rooms')).not.toBeInTheDocument()
   })
 
@@ -1465,15 +1467,18 @@ describe('DashboardViewPage', () => {
     }
   })
 
-  it('uses a singular active bulb icon for single-light room toggles', async () => {
+  it('uses the single light card without a redundant separator toggle', async () => {
     mockEntities['light.gym_light'] = entity('light.gym_light', 'on')
     render(<DashboardViewPage activePath="gym" onNavigate={() => undefined} path="gym" />)
 
     fireEvent.click(screen.getByRole('button', { name: /Light/i }))
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument()
-    const toggle = screen.getByRole('button', { name: 'Toggle Gym lights' })
-    expect(toggle.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb'))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).queryByRole('button', { name: 'Toggle Gym lights' })).not.toBeInTheDocument()
+    const light = within(dialog).getByRole('group', { name: 'Gym Light' })
+    expect(light).toHaveAttribute('data-separator', 'false')
+    expect(light.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:lightbulb'))
+    expect(within(light).getByRole('button', { name: 'Toggle Gym Light' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('opens Living Room climate, occupancy, and air quality popups from header chips', async () => {
