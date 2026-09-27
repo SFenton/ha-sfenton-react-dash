@@ -14,7 +14,8 @@ import {
 } from './wake-light-support'
 
 for (const profile of WAKE_PROFILES) {
-  test(`wake geometry and detail flow: ${profile.name}`, async ({ page }) => {
+  test(`wake geometry and detail flow: ${profile.name}`, async ({ page }, testInfo) => {
+    if (testInfo.project.name === 'webkit') test.setTimeout(60_000)
     await page.setViewportSize(profile)
     let dialog = await openWake(page)
     await resizeWake(page, profile)

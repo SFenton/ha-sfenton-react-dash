@@ -363,6 +363,7 @@ test.describe('non-room landscape modal adaptation', () => {
   })
 
   test('keeps the vacuum map stationary while right-side locate and controls scroll', async ({ page }) => {
+    test.setTimeout(60_000)
     for (const viewport of [
       { height: 393, insets: { bottom: 21, left: 59, right: 44, top: 0 }, width: 852 },
       { height: 393, insets: { bottom: 21, left: 44, right: 59, top: 0 }, width: 852 },

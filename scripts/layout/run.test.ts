@@ -105,9 +105,12 @@ describe('owned build verification', () => {
       { id: 'non-webkit-6-of-6', tests: 101, workers: 2 },
     ])
     expect(webkit.map((shard) => ({ id: shard.id, tests: shard.tests.length, workers: shard.workers }))).toEqual([
-      { id: 'webkit-1-of-2', tests: 123, workers: 1 },
-      { id: 'webkit-2-of-2', tests: 12, workers: 1 },
+      { id: 'webkit-1-of-3', tests: 70, workers: 1 },
+      { id: 'webkit-2-of-3', tests: 53, workers: 1 },
+      { id: 'webkit-3-of-3', tests: 12, workers: 1 },
     ])
+    expect(webkit.every((shard) =>
+      new Set(shard.tests.map((test) => `${test.project}/${test.file}`)).size === 1)).toBe(true)
     expect(nonWebkit.flatMap((shard) => shard.tests)).toEqual(batches[0].tests)
     expect(webkit.flatMap((shard) => shard.tests)).toEqual(batches[1].tests)
     for (const shardSet of [nonWebkit, webkit]) {

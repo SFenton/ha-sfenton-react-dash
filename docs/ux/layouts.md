@@ -37,9 +37,10 @@ concurrency lane, never deploys, and does not automatically close an issue.
 4. Run `npm run layout:run -- --plan artifacts/layout/<run-id>/plan.json`.
    This owns fresh mock builds and strict loopback previews; it does not authorize HA.
    Non-WebKit evidence keeps the bounded two-worker policy while WPE WebKit runs
-   separately with one worker. Each exact engine selection runs in sequential shards
-   of at most 128 tests without splitting a project/spec file, so every shard gets a
-   fresh Playwright process. A project/spec file above the active cap fails closed.
+   separately with one worker. Non-WebKit selections use sequential shards of at
+   most 128 tests; WPE WebKit starts one fresh process per project/spec file
+   rather than carrying frame timing across prior specs. No project/spec file
+   is split, and any file above the active cap fails closed.
    Shard ledgers merge into the existing engine artifacts, then into one fail-closed
    evidence record. `LAYOUT_SHARD_SIZE` may lower the cap for focused validation when
    every selected project/spec file fits.

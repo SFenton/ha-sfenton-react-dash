@@ -228,7 +228,7 @@ export function executionShards(batch: ExecutionBatch, maximumTests = layoutShar
     if (group.length > maximumTests) {
       throw new Error(`Layout spec exceeds the ${maximumTests}-test shard limit: ${group[0].project}/${group[0].file}`)
     }
-    if (current.length && current.length + group.length > maximumTests) {
+    if (current.length && (batch.id === 'webkit' || current.length + group.length > maximumTests)) {
       selections.push(current)
       current = []
     }
