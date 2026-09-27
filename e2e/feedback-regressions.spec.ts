@@ -15,6 +15,7 @@
 // @covers src/test/mocks/hakitCoreState.ts
 // @covers src/pages/AtAGlancePage.tsx
 // @covers src/pages/AtAGlancePage.module.css
+// @covers src/components/hass/LightBrightnessCard.module.css
 import { expect, test, type Locator, type Page } from './layout/fixture'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -1383,6 +1384,251 @@ test('room overview modals keep portrait padding and centered dialog grids', asy
       expect(geometry.horizontalCenterDelta, `${modalCase.sectionLabel} horizontal centering`).toBeLessThanOrEqual(1)
     }
   }
+})
+
+const ROOM_LIGHT_PROFILES = [
+  ...MOBILE_GEOMETRY_PROFILES.filter((profile) => [
+    'island-phone-portrait',
+    'island-phone-landscape-left',
+    'island-phone-landscape-right',
+    'rectangular-phone-landscape',
+    'small-rectangular-landscape',
+  ].includes(profile.name)),
+  { name: 'intermediate-landscape', viewport: { width: 734, height: 343 }, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+  { name: 'desktop', viewport: DESKTOP, insets: { top: 0, right: 0, bottom: 0, left: 0 } },
+]
+
+async function expectInlineRoomLightSeparator(dialog: Locator, roomName: string) {
+  const header = dialog.locator('[data-group-slider="true"]')
+  await expect(header.getByRole('slider', { name: roomName })).toBeVisible()
+  const geometry = await header.evaluate((element) => {
+    const title = element.querySelector<HTMLElement>('h3')!
+    const titleBlock = title.closest<HTMLElement>('[class*="roomLightTitleBlock"]') ?? title
+    const subtitle = titleBlock.querySelector<HTMLElement>('p')
+    const line = element.querySelector<HTMLElement>('span[aria-hidden="true"][class*="roomLightSeparator"]')
+    const card = element.querySelector<HTMLElement>('[data-separator="true"]')!
+    const separatorBlock = card.closest<HTMLElement>('[class*="roomLightSeparatorBlock"]')!
+    const status = card.querySelector<HTMLElement>('[class*="subtitle"]')!
+    const icon = card.querySelector<SVGElement>('span[class*="icon"] svg')!
+    const power = card.querySelector<HTMLButtonElement>('button')!
+    const labelBox = titleBlock.getBoundingClientRect()
+    const lineBox = line?.getBoundingClientRect()
+    const cardBox = card.getBoundingClientRect()
+    const separatorBox = separatorBlock.getBoundingClientRect()
+    const powerBox = power.getBoundingClientRect()
+    const powerStyle = getComputedStyle(power)
+    const paintedPowerRightGap = cardBox.right - powerBox.right + Number.parseFloat(powerStyle.paddingRight)
+    const paintedPowerTopGap = powerBox.top - cardBox.top + Number.parseFloat(powerStyle.paddingTop)
+    const paintedPowerBottomGap = cardBox.bottom - powerBox.bottom + Number.parseFloat(powerStyle.paddingBottom)
+    const center = (box: DOMRect) => box.top + box.height / 2
+    return {
+      headerOverflow: element.scrollWidth - element.clientWidth,
+      headerHeight: element.getBoundingClientRect().height,
+      rowHeight: Math.max(labelBox.height, cardBox.height),
+      titleClipped: title.scrollWidth > title.clientWidth + 1,
+      subtitleClipped: Boolean(subtitle && subtitle.scrollWidth > subtitle.clientWidth + 1),
+      statusClipped: status.scrollWidth > status.clientWidth + 1,
+      lineWidth: lineBox?.width ?? 0,
+      separatorWidth: separatorBox.width,
+      sliderCardWidth: cardBox.width,
+      labelRuleWidth: lineBox ? lineBox.right - separatorBox.left : 0,
+      rightGap: separatorBox.right - cardBox.right,
+      iconInset: icon.getBoundingClientRect().left - cardBox.left,
+      paintedPowerRightGap,
+      paintedPowerTopGap,
+      paintedPowerBottomGap,
+      titleToSliderCenter: Math.abs(center(labelBox) - center(cardBox)),
+      lineToSliderCenter: lineBox ? Math.abs(center(lineBox) - center(cardBox)) : null,
+      inlineOrder: Boolean(lineBox && labelBox.right <= lineBox.left + 1 && lineBox.right <= cardBox.left + 1),
+    }
+  })
+  expect(geometry.lineWidth, `${roomName}: keep the separator rule`).toBeGreaterThanOrEqual(24)
+  expect(geometry.sliderCardWidth, `${roomName}: slider reaches its 66% allotment`).toBeGreaterThanOrEqual(geometry.separatorWidth * 0.66 - 9)
+  expect(geometry.sliderCardWidth, `${roomName}: slider never exceeds 66%`).toBeLessThanOrEqual(geometry.separatorWidth * 0.66 + 1)
+  expect(geometry.labelRuleWidth, `${roomName}: label and rule reserve at least 34%`).toBeGreaterThanOrEqual(geometry.separatorWidth * 0.34 - 1)
+  expect(Math.abs(geometry.rightGap), `${roomName}: slider ends at the separator edge`).toBeLessThanOrEqual(1)
+  expect(geometry.iconInset, `${roomName}: bulb has breathing room at the left`).toBeGreaterThanOrEqual(12)
+  expect(Math.abs(geometry.paintedPowerRightGap - geometry.paintedPowerTopGap), `${roomName}: power disc right/top inset matches`).toBeLessThanOrEqual(1)
+  expect(Math.abs(geometry.paintedPowerRightGap - geometry.paintedPowerBottomGap), `${roomName}: power disc right/bottom inset matches`).toBeLessThanOrEqual(1)
+  expect(geometry.inlineOrder, `${roomName}: title, line and slider stay in one row`).toBe(true)
+  expect(geometry.titleToSliderCenter, `${roomName}: title/status and slider centers align`).toBeLessThanOrEqual(1)
+  expect(geometry.lineToSliderCenter, `${roomName}: line and slider centers align`).toBeLessThanOrEqual(1)
+  expect(geometry.headerHeight - Math.max(52, geometry.rowHeight), `${roomName}: no wrapped second control row`).toBeLessThanOrEqual(10)
+  expect(geometry.headerOverflow, `${roomName}: header stays within its modal`).toBeLessThanOrEqual(1)
+  expect(geometry.titleClipped, `${roomName}: title stays readable`).toBe(false)
+  expect(geometry.subtitleClipped, `${roomName}: subtitle stays readable`).toBe(false)
+  expect(geometry.statusClipped, `${roomName}: slider status stays readable`).toBe(false)
+}
+
+test('room light separators adjust the whole group and leave single-light power in the light card', async ({ page }, testInfo) => {
+  test.setTimeout(90_000)
+  const portrait = MOBILE_GEOMETRY_PROFILES.find((profile) => profile.name === 'island-phone-portrait')!
+
+  await page.setViewportSize(portrait.viewport)
+  await installSafeAreaInsets(page, portrait.insets)
+  await page.goto('/index.html?path=guest-room#lights-guest-room')
+  await page.evaluate(() => {
+    if (!window.__mockHass) throw new Error('Mock Home Assistant is required')
+    window.__mockHass.setEntityAttribute('light.guest_room', 'brightness', 128)
+    window.__mockHass.calls.splice(0)
+  })
+  const dialog = page.getByRole('dialog', { name: 'Guest Room Lights' })
+  const slider = dialog.getByRole('slider', { name: 'Guest Room Lights' })
+  await expect(slider).toHaveAttribute('aria-valuenow', '50')
+  await expect(dialog.locator('[class*="headingGroup"]').getByRole('button', { name: 'Back', exact: true })).toHaveCount(0)
+  await expect(dialog.getByRole('group', { name: 'TV Light' })).toBeVisible()
+
+  for (const profile of ROOM_LIGHT_PROFILES) {
+    await page.setViewportSize(profile.viewport)
+    await setSafeAreaInsets(page, profile.insets)
+    await expect(slider).toBeVisible()
+    await page.screenshot({ path: testInfo.outputPath(`guest-room-${profile.name}.png`) })
+    await expectInlineRoomLightSeparator(dialog, 'Guest Room Lights')
+    const geometry = await slider.evaluate((target) => {
+      const card = target.closest<HTMLElement>('[data-separator="true"]')!
+      const header = card.closest<HTMLElement>('[data-group-slider="true"]')!
+      const popup = card.closest<HTMLElement>('[role="dialog"]')!
+      const cardBox = card.getBoundingClientRect()
+      const popupBox = popup.getBoundingClientRect()
+      const sliderBox = target.getBoundingClientRect()
+      const powerBox = card.querySelector('button')!.getBoundingClientRect()
+      const heading = header.querySelector<HTMLElement>('h3')
+      return {
+        cardHeight: cardBox.height,
+        headerOverflow: header.scrollWidth - header.clientWidth,
+        headingClipped: Boolean(heading && heading.scrollWidth > heading.clientWidth + 1),
+        insidePopup: cardBox.left >= popupBox.left && cardBox.right <= popupBox.right,
+        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        powerHeight: powerBox.height,
+        powerWidth: powerBox.width,
+        sliderHeight: sliderBox.height,
+        sliderWidth: sliderBox.width,
+      }
+    })
+    expect(geometry, profile.name).toMatchObject({
+      headerOverflow: 0,
+      headingClipped: false,
+      insidePopup: true,
+      pageOverflow: 0,
+    })
+    expect(geometry.cardHeight, profile.name).toBeGreaterThanOrEqual(44)
+    expect(geometry.powerHeight, profile.name).toBeGreaterThanOrEqual(44)
+    expect(geometry.powerWidth, profile.name).toBeGreaterThanOrEqual(44)
+    expect(geometry.sliderHeight, profile.name).toBeGreaterThanOrEqual(44)
+    expect(geometry.sliderWidth, profile.name).toBeGreaterThanOrEqual(100)
+  }
+
+  await page.setViewportSize(portrait.viewport)
+  await setSafeAreaInsets(page, portrait.insets)
+  await waitForModalReady(dialog)
+  await slider.press('ArrowRight')
+  await expect(slider).toHaveAttribute('aria-valuenow', '55')
+  await expect.poll(() => page.evaluate(() => (window.__mockHass?.calls ?? []).filter((call) => call.domain === 'light' || call.domain === 'homeassistant'))).toEqual([
+    { domain: 'light', service: 'turn_on', target: 'light.guest_room', serviceData: { brightness_pct: 55 } },
+  ])
+
+  await page.evaluate(() => window.__mockHass?.calls.splice(0))
+  await slider.scrollIntoViewIfNeeded()
+  const box = await slider.boundingBox()
+  expect(box).not.toBeNull()
+  const start = { x: box!.x + box!.width * 0.2, y: box!.y + box!.height / 2 }
+  await expect.poll(() => page.evaluate(({ x, y }) => (
+    document.elementFromPoint(x, y)?.closest('[role="slider"]')?.getAttribute('aria-label')
+  ), start)).toBe('Guest Room Lights')
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  await page.mouse.move(box!.x + box!.width * 0.75, box!.y + box!.height / 2, { steps: 5 })
+  await page.mouse.up()
+  await expect.poll(() => page.evaluate(() => (window.__mockHass?.calls ?? []).filter((call) => call.domain === 'light'))).toEqual([
+    { domain: 'light', service: 'turn_on', target: 'light.guest_room', serviceData: { brightness_pct: 75 } },
+  ])
+  await dialog.getByRole('button', { name: 'Toggle Guest Room Lights' }).click()
+  await expect.poll(() => page.evaluate(() => (window.__mockHass?.calls ?? []).filter((call) => call.domain === 'light' || call.domain === 'homeassistant'))).toEqual([
+    { domain: 'light', service: 'turn_on', target: 'light.guest_room', serviceData: { brightness_pct: 75 } },
+    { domain: 'homeassistant', service: 'toggle', target: 'light.guest_room' },
+  ])
+
+  await page.goto('/index.html?path=overview#lights-overview')
+  const homeLights = page.getByRole('dialog')
+  await homeLights.getByRole('button', { name: 'Open Master Bedroom Closet Light' }).click()
+  await expect(homeLights).toHaveAccessibleName('Master Bedroom Closet Light')
+  const singleHeader = homeLights.locator('[data-group-slider="false"]')
+  await expect(singleHeader.locator('[role="slider"]')).toHaveCount(0)
+  await expect(singleHeader.getByRole('heading', { name: 'Light', level: 3 })).toBeVisible()
+  await expect(singleHeader.locator('span[aria-hidden="true"][class*="roomLightSeparator"]')).toBeVisible()
+  await expect(singleHeader.getByRole('button')).toHaveCount(0)
+  await expect(homeLights.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
+  await expect(homeLights.getByRole('button', { name: 'Toggle Closet Light' })).toHaveCount(1)
+  await expect(homeLights.getByRole('button', { name: 'Toggle Closet Light' })).toBeEnabled()
+  await page.screenshot({ path: testInfo.outputPath('single-light-portrait.png') })
+})
+
+test('Home Lights detail keeps its group slider beside the room title, state and separator rule', async ({ page }, testInfo) => {
+  test.setTimeout(90_000)
+  const portrait = MOBILE_GEOMETRY_PROFILES.find((profile) => profile.name === 'island-phone-portrait')!
+  await page.setViewportSize(portrait.viewport)
+  await installSafeAreaInsets(page, portrait.insets)
+  await page.goto('/index.html?path=overview#lights-overview')
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toHaveAccessibleName(/^Lights \(/)
+  await dialog.getByRole('button', { name: 'Open Guest Room Lights' }).click()
+  await page.evaluate(() => {
+    if (!window.__mockHass) throw new Error('Mock Home Assistant is required')
+    window.__mockHass.setEntityAttribute('light.guest_room', 'brightness', 128)
+    window.__mockHass.calls.splice(0)
+  })
+  const header = dialog.locator('[data-group-slider="true"]')
+  await expect(dialog).toHaveAccessibleName('Guest Room Lights')
+  const modalHeader = dialog.locator('[class*="headingGroup"]')
+  await expect(modalHeader.getByRole('heading', { name: 'Guest Room Lights', level: 2 })).toBeVisible()
+  await expect(modalHeader.getByText('1 On', { exact: true })).toBeVisible()
+  await expect(modalHeader.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
+  await expect(header.getByRole('heading', { name: 'Lights', level: 3 })).toBeVisible()
+  await expect(header.getByText('1 On', { exact: true })).toHaveCount(0)
+  await expect(header.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0)
+
+  for (const profile of ROOM_LIGHT_PROFILES) {
+    await page.setViewportSize(profile.viewport)
+    await setSafeAreaInsets(page, profile.insets)
+    await waitForModalReady(dialog)
+    await page.screenshot({ path: testInfo.outputPath(`home-room-lights-${profile.name}.png`) })
+    await expectInlineRoomLightSeparator(dialog, 'Guest Room Lights')
+  }
+
+  await page.setViewportSize(portrait.viewport)
+  await setSafeAreaInsets(page, portrait.insets)
+  await dialog.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(dialog).toHaveAccessibleName(/^Lights \(/)
+  await dialog.getByRole('button', { name: 'Open Master Bedroom Lights' }).click()
+  await expect(dialog).toHaveAccessibleName('Master Bedroom Lights')
+  await expect(dialog.getByRole('heading', { level: 2, name: 'Master Bedroom Lights' })).toBeVisible()
+  await expect.poll(() => dialog.locator('[data-modal-sheet-body="true"]').evaluate((body) => body.scrollTop)).toBe(0)
+  await page.screenshot({ path: testInfo.outputPath('home-master-bedroom-inline-portrait.png') })
+  await expectInlineRoomLightSeparator(dialog, 'Master Bedroom Lights')
+
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(dialog).toHaveAttribute('data-state', 'closed')
+  await expect(dialog).toHaveAccessibleName('Master Bedroom Lights')
+  await expect(dialog).toHaveCount(0)
+  await page.getByRole('button', { name: /^Lights / }).click()
+  const reopened = page.getByRole('dialog')
+  await expect(reopened).toHaveAccessibleName(/^Lights \(/)
+  await expect(reopened.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0)
+
+  const body = reopened.locator('[data-modal-sheet-body="true"]')
+  await body.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  const lastRoomOpener = reopened.getByRole('button', { name: 'Open Driveway Light' })
+  await lastRoomOpener.scrollIntoViewIfNeeded()
+  await lastRoomOpener.focus()
+  const overviewScroll = await body.evaluate((element) => element.scrollTop)
+  expect(overviewScroll).toBeGreaterThan(0)
+  await lastRoomOpener.click()
+  await expect(reopened).toHaveAccessibleName('Driveway Light')
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBe(0)
+  await reopened.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect.poll(() => body.evaluate((element, previousScroll) => Math.abs(element.scrollTop - previousScroll), overviewScroll)).toBeLessThanOrEqual(1)
+  await expect(lastRoomOpener).toBeFocused()
+  await page.screenshot({ path: testInfo.outputPath('home-lights-restored-overview.png') })
 })
 
 test('Lights room cards pass wheel scrolling to the modal body', async ({ page }) => {

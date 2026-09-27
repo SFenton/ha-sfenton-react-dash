@@ -56,8 +56,12 @@
   outline: none;
 }
 
-.details:focus-visible {
+.details:focus-visible,
+.sliderTarget:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.58);
+}
+
+.details:focus-visible {
   outline-offset: -4px;
 }
 
@@ -67,6 +71,62 @@
 
 .card[data-active='false'] .fill {
   display: none;
+}
+
+.card[data-separator='true'] {
+  width: calc(66% - 8px);
+  min-width: min(152px, calc(66% - 8px));
+  max-width: calc(66% - 8px);
+  min-height: 44px;
+  height: 44px;
+  flex: 0 0 calc(66% - 8px);
+  gap: 4px;
+  border-radius: 22px;
+  padding: 0 0 0 12px;
+}
+
+.card[data-separator='true'] .icon {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.card[data-separator='true'] .copy {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.card[data-separator='true'] .subtitle {
+  font-size: 0.72rem;
+}
+
+.card[data-separator='true'] .power {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 7px;
+  background-clip: content-box;
+}
+
+.sliderTarget {
+  position: absolute;
+  inset: 0 44px 0 0;
+  z-index: 1;
+  border-radius: inherit;
+  cursor: ew-resize;
+}
+
+.sliderTarget:focus {
+  outline: none;
+}
+
+.sliderTarget:focus-visible {
+  outline-offset: -2px;
+}
+
+.card[data-disabled='true'] .sliderTarget {
+  cursor: default;
 }
 
 .icon,

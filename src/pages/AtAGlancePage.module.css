@@ -403,6 +403,21 @@
   min-height: 40px;
 }
 
+.roomLightHeader[data-group-slider='true'] {
+  gap: 8px;
+}
+
+.roomLightHeader[data-group-slider='true'] .roomLightTitleBlock h3 {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.roomLightHeader[data-group-slider='true'] .roomLightSeparatorBlock {
+  min-width: 184px;
+  gap: 8px;
+}
+
 .lightBackButton,
 .roomLightToggle {
   flex: 0 0 auto;

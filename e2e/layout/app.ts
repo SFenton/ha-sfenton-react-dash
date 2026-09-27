@@ -63,10 +63,13 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
   })
 
+  const homeLightDetail = scenario === 'light-room' && (state === 'single-light' || state === 'home-group')
   const route = isWakeScenario(scenario) || (scenario === 'solo-trip-bed' && !state?.startsWith('editor'))
     ? 'master-bedroom'
     : scenario === 'solo-trip-settings' || (scenario === 'solo-trip-bed' && state?.startsWith('editor'))
       ? 'solo-trip'
+      : scenario === 'light-room'
+        ? homeLightDetail ? 'overview' : 'guest-room'
       : scenario === 'filters' || scenario === 'recipe-grocery'
         ? 'recipes'
         : scenario === 'form' || scenario === 'admin-todo-edit'
@@ -78,8 +81,32 @@ export async function openSurface(page: Page, scenario: ScenarioId, state?: stri
               : 'overview'
   const recipeDelay = scenario === 'recipe-grocery' ? `&__mockRecipeGroceryDelayMs=${state === 'loading' ? 60000 : 300}` : ''
   const cameraDelay = scenario === 'camera' && state === 'loading' ? '&__mockCameraDelayMs=60000' : ''
-  await page.goto(`/index.html?path=${route}${recipeDelay}${cameraDelay}${scenario === 'summary' ? '&user=stephen#daily-report' : ''}`)
-  await waitForRoute(page, route, scenario === 'summary')
+  const lightHash = scenario === 'light-room' ? (homeLightDetail ? '#lights-overview' : '#lights-guest-room') : ''
+  await page.goto(`/index.html?path=${route}${recipeDelay}${cameraDelay}${scenario === 'summary' ? '&user=stephen#daily-report' : lightHash}`)
+  await waitForRoute(page, route, scenario === 'summary' || scenario === 'light-room')
+  if (scenario === 'light-room') {
+    if (!['group-on', 'group-off', 'group-unavailable', 'home-group', 'single-light'].includes(state ?? '')) throw new Error(`Unknown room-light state: ${state}`)
+    const dialog = page.getByRole('dialog')
+    await waitForModalReady(dialog)
+    if (homeLightDetail) {
+      await dialog.getByRole('button', { name: state === 'single-light' ? 'Open Master Bedroom Closet Light' : 'Open Guest Room Lights' }).click()
+    }
+    if (state !== 'single-light') {
+      await page.evaluate((roomState) => {
+        const api = window.__mockHass
+        if (!api) throw new Error('Mock Home Assistant is required')
+        const active = roomState === 'group-on' || roomState === 'home-group'
+        api.setEntityState('light.guest_room', active ? 'on' : roomState === 'group-off' ? 'off' : 'unavailable')
+        api.setEntityAttribute('light.guest_room', 'brightness', 128)
+        api.setEntityState('light.guest_room_tv_light', active ? 'on' : 'off')
+        api.setEntityState('light.guest_room_bed_light', 'off')
+        api.calls.splice(0)
+      }, state)
+    }
+    await waitForModalReady(dialog)
+    await dialog.evaluate((element) => { element.setAttribute('data-layout-mounted', 'original') })
+    return dialog
+  }
   if (scenario === 'solo-trip-settings') {
     const fixtureState = state === 'active-home-viewer' || state === 'active-unknown-viewer'
       ? 'active'
