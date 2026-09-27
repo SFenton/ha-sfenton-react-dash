@@ -1149,13 +1149,17 @@ test('humidifier centered panes reset to the top on tab changes', async ({ page 
     const pane = dialog.locator('[data-scroll-region="humidifier-panel"]')
     await dialog.getByRole('tab', { name: 'Info' }).click()
     await expect(dialog.getByRole('tabpanel', { name: 'Info' })).toBeVisible()
+    await waitForModalReady(dialog)
+    await expect(pane).toHaveCSS('overflow-y', 'auto')
     await pane.evaluate((element) => {
       element.style.height = '120px'
       element.style.maxHeight = '120px'
-      element.scrollTop = element.scrollHeight
     })
+    await expect.poll(() => pane.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(1)
+    await pane.evaluate((element) => { element.scrollTop = element.scrollHeight })
     await expect.poll(() => pane.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
     await dialog.getByRole('tab', { name: 'Controls' }).click()
+    await waitForModalReady(dialog)
     await expect.poll(() => pane.evaluate((element) => element.scrollTop)).toBe(0)
     await pane.evaluate((element) => {
       element.style.removeProperty('height')

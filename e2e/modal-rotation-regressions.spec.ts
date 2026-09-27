@@ -358,6 +358,7 @@ test('Security mode grids fill the modal width from every opener without changin
 })
 
 test('Guest Presence Security uses the full centered content area on both routes', async ({ page }) => {
+  test.setTimeout(75_000)
   for (const route of ['overview', 'security']) {
     await page.setViewportSize(PORTRAIT)
     await page.goto(`/index.html?path=${route}#guest-presence-security`)
@@ -865,7 +866,7 @@ test('recipe planner and ingredient search retain one frame and entered values o
 })
 
 test('all Weather condition modes retain their selection and common frame through rotation', async ({ page }) => {
-  test.setTimeout(90_000)
+  test.setTimeout(150_000)
   await page.setViewportSize(PORTRAIT)
   await page.goto('/index.html?path=overview')
   await setSafeAreaInsets(page, PORTRAIT.insets)

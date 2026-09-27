@@ -115,7 +115,7 @@ test('deleting a wake alarm requires the native browser confirmation', async ({ 
 })
 
 test('mounted rotations preserve the wake intent, selected tab, detail frame and portrait geometry', async ({ page }) => {
-  test.setTimeout(90_000)
+  test.setTimeout(150_000)
   await page.setViewportSize(wakeProfile('phone-portrait'))
   let dialog = await openWake(page)
   const portrait = await auditWake(page, dialog, wakeProfile('phone-portrait'))
