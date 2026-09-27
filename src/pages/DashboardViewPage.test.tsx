@@ -7150,6 +7150,7 @@ describe('DashboardViewPage', () => {
     expect(screen.queryByText('Individual pantry items')).not.toBeInTheDocument()
     const cannedBeansBatch = `expiring ${testDisplayDateValue(testAddDays(testTodayDate(), 3))}`
     const cannedBeansLaterBatch = `expiring ${testDisplayDateValue(testAddDays(testTodayDate(), 200))}`
+    const updatedExpiryDate = testDateInputValue(testAddDays(testTodayDate(), 4))
     expect(screen.getByRole('spinbutton', { name: `Quantity for Canned Beans ${cannedBeansLaterBatch}` })).toHaveTextContent('3')
     const expirationInput = screen.getByLabelText(`Expiration date for Canned Beans ${cannedBeansBatch}`)
     expect(expirationInput).toHaveAttribute('type', 'date')
@@ -7172,7 +7173,7 @@ describe('DashboardViewPage', () => {
     batchDeleteConfirm.mockRestore()
     batchDeletePrompt.mockRestore()
 
-    fireEvent.change(expirationInput, { target: { value: '2026-09-30' } })
+    fireEvent.change(expirationInput, { target: { value: updatedExpiryDate } })
     expect(screen.getByRole('button', { name: `Save Canned Beans ${cannedBeansBatch}` })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument()
     await act(async () => {
@@ -7184,12 +7185,12 @@ describe('DashboardViewPage', () => {
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       service: 'update_inventory_item',
-      serviceData: { expiry_date: '2026-09-30', inventory_id: 102 },
+      serviceData: { expiry_date: updatedExpiryDate, inventory_id: 102 },
     })
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
       service: 'update_inventory_item',
-      serviceData: { expiry_date: '2026-09-30', inventory_id: 106 },
+      serviceData: { expiry_date: updatedExpiryDate, inventory_id: 106 },
     })
     expect(mockCallServiceCalls).toContainEqual({
       domain: 'evershelf',
