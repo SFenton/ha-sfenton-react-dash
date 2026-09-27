@@ -606,6 +606,10 @@ for (const scenario of SCENARIO_IDS) {
       ? environment.plan.obligations.filter((entry) => entry.scenario === scenario && entry.context === context)
       : obligationsFor([scenario], [context])
     expect(obligations.length, 'Required runtime loop is nonempty').toBeGreaterThan(0)
+    const checkpointBudget = scenario === 'recipe-grocery'
+      ? (context === 'touch-webkit' ? 18_000 : 6_000)
+      : scenario === 'weather' && context === 'touch-webkit' ? 12_000 : 0
+    if (checkpointBudget) test.setTimeout(Math.max(240_000, 60_000 + obligations.length * checkpointBudget))
     await page.setViewportSize(layoutProfile(journey(scenario, context)[0]).viewport)
     const capabilities = await actualCapabilities(page, browserName, browser.version(), isMobile, hasTouch)
     if (scenario === 'wake-room') {

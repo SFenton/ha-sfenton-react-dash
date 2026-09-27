@@ -44,6 +44,13 @@ surfaces, inspect the run's ledgers and images, and keep manual judgments
 separate. Replay failures do not auto-file a second issue for the new commit;
 the original incident remains open until genuinely validated.
 
+Managed state/profile loops must run every selected checkpoint, even when the
+recorded CI journey needs a budget proportional to its declared obligations.
+WPE WebKit uses a fresh process per spec so later modal frame sampling does
+not inherit a prior spec's browser lifetime; this does not waive the actual
+animation, geometry, or interaction assertions. Timeouts remain failures,
+never successful or skipped layout evidence.
+
 Use normal elapsed clocks for transition readiness. Missing selected panels,
 outgoing content, merely reachable servers, empty route filters and screenshots
 that were never viewed must not produce acceptance. Artifacts must be reachable
