@@ -93,6 +93,19 @@ async function screenshotDifference(page: Page, first: Buffer, second: Buffer) {
   })
 }
 
+async function stableWeatherScreenshot(page: Page, mode: string, timestamp: number) {
+  let previous = await page.screenshot({ animations: 'allow' })
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await page.evaluate(() => new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    }))
+    const current = await page.screenshot({ animations: 'allow' })
+    if ((await screenshotDifference(page, previous, current)).maxDelta <= 1) return current
+    previous = current
+  }
+  throw new Error(`Weather ${mode} did not produce two stable frames at ${timestamp}ms`)
+}
+
 test('weather atmosphere preserves the original continuous animation and close lifecycle', async ({ page }) => {
   await page.setViewportSize({ height: 852, width: 393 })
   await page.goto('/index.html?path=overview')
@@ -200,7 +213,8 @@ test('half-occluded weather panels keep the atmosphere visually continuous', asy
   expect(Math.max(...excesses)).toBeLessThanOrEqual(2)
 })
 
-test('opaque mobile Weather sheets blur only exposed backdrop bands without changing pixels', async ({ page }) => {
+test('opaque mobile Weather sheets blur only exposed backdrop bands without changing pixels', async ({ page }, testInfo) => {
+  testInfo.setTimeout(90_000)
   await page.setViewportSize({ height: 852, width: 393 })
   await page.goto('/index.html?path=overview')
   await setWeatherCondition(page, 'rainy')
@@ -219,20 +233,43 @@ test('opaque mobile Weather sheets blur only exposed backdrop bands without chan
 
   const atmosphere = dialog.locator('[data-weather-scene="rain"]')
   for (const timestamp of [0, 400, 800, 1_200]) {
-    await atmosphere.evaluate((element, currentTime) => {
-      element.getAnimations({ subtree: true }).forEach((animation) => {
-        animation.currentTime = currentTime
+    const pinned = await atmosphere.evaluate((element, currentTime) => {
+      const animations = element.getAnimations({ subtree: true })
+      animations.forEach((animation) => {
         animation.pause()
+        animation.currentTime = currentTime
       })
+      return {
+        count: animations.length,
+        paused: animations.every((animation) => animation.playState === 'paused' && animation.currentTime === currentTime),
+      }
     }, timestamp)
-    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
-    const optimized = await page.screenshot({ animations: 'allow' })
+    expect(pinned).toEqual({ count: 35, paused: true })
+    await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
+    await expect(overlay).toHaveCSS('backdrop-filter', 'none')
+    const optimized = await stableWeatherScreenshot(page, 'exposed bands', timestamp)
+    await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
+
+    // Keep the auto-band observer ineligible throughout the full-blur capture.
+    await dialog.evaluate((element) => element.setAttribute('data-centered-layout', 'true'))
     await overlay.evaluate((element) => element.removeAttribute('data-exposed-backdrop-bands'))
-    const baseline = await page.screenshot({ animations: 'allow' })
+    await expect(overlay).not.toHaveAttribute('data-exposed-backdrop-bands')
+    await expect(overlay.locator('[data-modal-backdrop-band="top"]')).toHaveCSS('visibility', 'hidden')
+    await expect(overlay).toHaveCSS('backdrop-filter', 'blur(10px)')
+    const baseline = await stableWeatherScreenshot(page, 'full backdrop', timestamp)
+    await expect(overlay).not.toHaveAttribute('data-exposed-backdrop-bands')
     const difference = await screenshotDifference(page, optimized, baseline)
+    if (difference.maxDelta > 1 || difference.differentPixelRatio > 0.0015) {
+      await testInfo.attach(`weather-bands-${timestamp}ms`, { body: optimized, contentType: 'image/png' })
+      await testInfo.attach(`weather-full-${timestamp}ms`, { body: baseline, contentType: 'image/png' })
+      await testInfo.attach(`weather-parity-${timestamp}ms`, {
+        body: JSON.stringify(difference), contentType: 'application/json',
+      })
+    }
     expect(difference.maxDelta).toBeLessThanOrEqual(1)
     expect(difference.differentPixelRatio).toBeLessThanOrEqual(0.0015)
-    await overlay.evaluate((element) => element.setAttribute('data-exposed-backdrop-bands', 'true'))
+    await dialog.evaluate((element) => element.setAttribute('data-centered-layout', 'false'))
+    await expect(overlay).toHaveAttribute('data-exposed-backdrop-bands', 'true')
   }
 
   await page.setViewportSize({ height: 1180, width: 820 })

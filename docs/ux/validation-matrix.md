@@ -363,8 +363,11 @@ GTK WebKit builds in the review environment do not pass that control, so their
 geometry/lifecycle results are not Safari rendered-pixel proof. The real-pixel
 test runs on Chromium and supported Safari/WebKit renderers; this limitation
 blocks a production visual-parity claim, not investigation in the isolated
-preview. Compare actual `auto` and `full` policies for performance, including
-trusted input, and do not substitute nested-card-blur measurements for it.
+preview. Weather parity pins its scene animations at each sample, holds the
+full-blur eligibility fallback through compositor-stable captures, and retains
+strict per-channel and changed-pixel thresholds. Compare actual `auto` and
+`full` policies for performance, including trusted input, and do not substitute
+nested-card-blur measurements for it.
 Trusted-input uptime must distinguish held-pointer time from resting time:
 bands remain disabled throughout a press and should be active for at least
 90% of resting frames. Gross uptime reflects input duty cycle, not energy savings.
