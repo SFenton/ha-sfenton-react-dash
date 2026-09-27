@@ -1,3 +1,4 @@
+// @covers e2e/modal-sheet-lifecycle.ts
 import { expect, test, type CDPSession, type Page } from './layout/fixture'
 import {
   assertAnimatedDesktopModalOpen,
@@ -166,16 +167,31 @@ test.describe('thermostat modal close lifecycle', () => {
 test.describe('direct hash-open thermostat modal lifecycle', () => {
   test.use({ viewport: { height: 852, width: 393 } })
 
-  test('animates when the modal is already requested during initial page load', async ({ page }) => {
+  test('animates when the modal is already requested during initial page load', async ({ page }, testInfo) => {
     await installModalLifecycleProbe(page, { autoStart: true })
     await page.goto(THERMOSTAT_PATH)
     await expect(page.getByRole('dialog', { name: THERMOSTAT_TITLE })).toBeVisible()
     await waitForModalOpenSettled(page)
 
     const trace = await readModalLifecycleProbe(page)
+    await testInfo.attach('modal-lifecycle.json', {
+      body: Buffer.from(JSON.stringify(trace)),
+      contentType: 'application/json',
+    })
     expect(trace.historyPushCount).toBe(0)
     expect(trace.historyReplaceCount).toBe(0)
     assertAnimatedModalOpen(trace)
+    if (testInfo.project.name === 'webkit') {
+      const withoutRegistry = {
+        ...trace,
+        frames: trace.frames.map((frame) => ({ ...frame, animations: [] })),
+      }
+      assertAnimatedModalOpen(withoutRegistry)
+      expect(() => assertAnimatedModalOpen({
+        ...withoutRegistry,
+        events: withoutRegistry.events.filter((event) => !event.type.startsWith('transition')),
+      })).toThrow('transition was not observed')
+    }
   })
 })
 

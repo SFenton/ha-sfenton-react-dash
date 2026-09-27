@@ -48,8 +48,11 @@ Managed state/profile loops must run every selected checkpoint, even when the
 recorded CI journey needs a budget proportional to its declared obligations.
 WPE WebKit uses a fresh process per spec so later modal frame sampling does
 not inherit a prior spec's browser lifetime; this does not waive the actual
-animation, geometry, or interaction assertions. Timeouts remain failures,
-never successful or skipped layout evidence.
+animation, geometry, or interaction assertions. When WPE exposes no Web
+Animations API entries, a paired, elapsed transform transition event plus
+measured offscreen/settled frames can establish modal lifecycle without
+claiming Safari pixel parity. Missing animation and transition evidence still
+fails. Timeouts remain failures, never successful or skipped layout evidence.
 
 Use normal elapsed clocks for transition readiness. Missing selected panels,
 outgoing content, merely reachable servers, empty route filters and screenshots

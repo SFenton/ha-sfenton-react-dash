@@ -52,6 +52,8 @@ export interface ModalLifecycleEvent {
   pointerType: string | null
   target: string
   time: number
+  transitionElapsedSeconds?: number
+  transitionProperty?: string
   type: string
 }
 
@@ -128,6 +130,9 @@ export async function installModalLifecycleProbe(page: Page, options: { autoStar
     const recordEvent = (event: Event, phase: ModalLifecycleEvent['phase']) => {
       if (!active) return
       const point = eventPoint(event)
+      const transition = 'propertyName' in event && 'elapsedTime' in event &&
+        typeof event.propertyName === 'string' && typeof event.elapsedTime === 'number'
+        ? { propertyName: event.propertyName, elapsedTime: event.elapsedTime } : null
       events.push({
         cancelable: event.cancelable,
         clientX: point.clientX,
@@ -138,6 +143,10 @@ export async function installModalLifecycleProbe(page: Page, options: { autoStar
         pointerType: event instanceof PointerEvent ? event.pointerType : event.type.startsWith('touch') ? 'touch' : null,
         target: describe(event.target),
         time: elapsed(event.timeStamp > 0 ? event.timeStamp : performance.now()),
+        ...(transition ? {
+          transitionElapsedSeconds: transition.elapsedTime,
+          transitionProperty: transition.propertyName,
+        } : {}),
         type: event.type,
       })
     }
@@ -147,6 +156,15 @@ export async function installModalLifecycleProbe(page: Page, options: { autoStar
         recordEvent(event, 'capture')
         queueMicrotask(() => recordEvent(event, 'after'))
       }, { capture: true, passive: true })
+    }
+    for (const type of ['transitionrun', 'transitionstart', 'transitionend']) {
+      document.addEventListener(type, (event) => {
+        if ('propertyName' in event && typeof event.propertyName === 'string' &&
+          event.target === document.querySelector('[data-surface="hass-popup"]') &&
+          /^(?:-webkit-)?transform$/.test(event.propertyName)) {
+          recordEvent(event, 'capture')
+        }
+      }, { capture: true })
     }
 
     const originalPushState = history.pushState.bind(history)
@@ -345,7 +363,16 @@ export function assertAnimatedModalOpen(trace: ModalLifecycleTrace) {
   const nodeIds = new Set(openFrames.map((frame) => frame.nodeId))
   if (nodeIds.size !== 1) throw new Error(`Modal node identity changed during open: ${[...nodeIds].join(', ')}`)
   if (!openFrames.some((frame) => frame.starting)) throw new Error('Modal never entered an opening starting style')
-  if (!openFrames.some((frame) => frame.animations.length > 0)) throw new Error('Modal opening transition was not exposed as an animation')
+  const transformStarts = trace.events.filter((event) =>
+    (event.type === 'transitionrun' || event.type === 'transitionstart') &&
+    /^(?:-webkit-)?transform$/.test(event.transitionProperty ?? ''))
+  const completedTransform = transformStarts.some((start) => trace.events.some((event) =>
+    event.type === 'transitionend' && event.target === start.target &&
+    event.transitionProperty === start.transitionProperty &&
+    (event.transitionElapsedSeconds ?? 0) >= 0.45 && event.time >= start.time))
+  if (!openFrames.some((frame) => frame.animations.length > 0) && !completedTransform) {
+    throw new Error('Modal opening transition was not observed as an animation or completed transform transition')
+  }
   if (!openFrames.some((frame) => (frame.overlayOpacity ?? 1) < 0.5)) throw new Error('Modal overlay never started transparent')
   if (!openFrames.some((frame) => (frame.translateY ?? 0) > 100)) {
     throw new Error(`Modal first open never started offscreen: ${JSON.stringify(openFrames.map((frame) => ({
