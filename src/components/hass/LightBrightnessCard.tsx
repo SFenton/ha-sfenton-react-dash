@@ -1,8 +1,10 @@
 import { useEntity, useHass } from '@hakit/core'
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { MaterialIcon } from '../core/Icon'
 import { SurfaceAccessory } from '../core/SurfaceAccessory'
+import type { ControlSemantics } from '../core/controlSemantics'
 import { useOptimisticState } from '../../hooks/useOptimisticState'
+import { formatNumber } from '../../i18n'
 import { asEntityName, formatCompactEntityState, isActiveState, titleCaseState } from './entityState'
 import styles from './LightBrightnessCard.module.css'
 
@@ -36,11 +38,12 @@ interface LightBrightnessCardProps {
   entityId: string
   title: string
   tapAction?: LightTapAction
+  separator?: boolean
   showStatus?: boolean
   onMoreInfo?: (entityId: string, title: string) => void
 }
 
-export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', showStatus = false, onMoreInfo }: LightBrightnessCardProps) {
+export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', separator = false, showStatus = false, onMoreInfo }: LightBrightnessCardProps) {
   const callService = useHass((state) => state.helpers.callService)
   const entity = useEntity(asEntityName(entityId), { returnNullIfNotFound: true })
   const disabled = !entity || entity.state === 'unknown' || entity.state === 'unavailable'
@@ -50,12 +53,18 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
   const [optimisticPct, commitPct] = useOptimisticState(liveDisplayPct)
   const [dragPct, setDragPct] = useState<number | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
+  const sliderRef = useRef<HTMLDivElement | null>(null)
   const pointerStart = useRef<{ x: number; y: number; pointerId: number } | null>(null)
   const dragging = useRef(false)
   const suppressDetailsClick = useRef(false)
   const displayPct = dragPct ?? optimisticPct
   const isOn = displayPct > 0
-  const icon = isOn ? 'mdi:lightbulb' : 'mdi:lightbulb-off'
+  const valueSemantics: ControlSemantics = { kind: 'value', text: formatNumber(Math.round(displayPct) / 100, { style: 'percent' }) }
+  const sliderSemantics: ControlSemantics = { kind: 'command' }
+  const powerSemantics: ControlSemantics = { kind: 'toggle', checked: isOn }
+  const icon = separator
+    ? (isOn ? 'mdi:lightbulb-multiple' : 'mdi:lightbulb-multiple-off')
+    : (isOn ? 'mdi:lightbulb' : 'mdi:lightbulb-off')
   const fillColor = readFillColor(entity?.attributes?.rgb_color)
   const disabledStatus = disabled ? (entity ? titleCaseState(entity.state) : formatCompactEntityState(null)) : undefined
   const setBrightness = (pct: number) => {
@@ -69,7 +78,7 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
     callService({ domain: 'light', service: 'turn_on', target: entityId, serviceData: { brightness_pct: value } })
   }
   const pctFromClientX = (clientX: number) => {
-    const rect = cardRef.current?.getBoundingClientRect()
+    const rect = (separator ? sliderRef.current : cardRef.current)?.getBoundingClientRect()
     if (!rect || rect.width === 0) return 0
     return clampPct(((clientX - rect.left) / rect.width) * 100)
   }
@@ -84,6 +93,7 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
     const start = pointerStart.current
     if (!start || start.pointerId !== event.pointerId) return
     if (!dragging.current && Math.abs(event.clientX - start.x) < DRAG_THRESHOLD_PX) return
+    if (!dragging.current && Math.abs(event.clientY - start.y) > Math.abs(event.clientX - start.x)) return
     if (!dragging.current) {
       dragging.current = true
       suppressDetailsClick.current = true
@@ -116,7 +126,8 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
       }, 0)
       return
     }
-    if (tapAction !== 'more-info') toggle()
+    if (separator) setBrightness(pctFromClientX(event.clientX))
+    else if (tapAction !== 'more-info') toggle()
   }
   const handlePointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
     const start = pointerStart.current
@@ -139,7 +150,33 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
   const toggle = () => {
     if (disabled) return
     if (isOn) commitPct(0)
+    else if (separator) commitPct(entityPct || 100)
     callService({ domain: 'homeassistant', service: 'toggle', target: entityId })
+  }
+
+  const handleSliderKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (disabled) return
+    let nextPct: number
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowUp':
+        nextPct = clampPct(displayPct + 5)
+        break
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        nextPct = clampPct(displayPct - 5)
+        break
+      case 'Home':
+        nextPct = 0
+        break
+      case 'End':
+        nextPct = 100
+        break
+      default:
+        return
+    }
+    event.preventDefault()
+    if (nextPct !== displayPct) setBrightness(nextPct)
   }
 
   const togglePower = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -159,10 +196,11 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
   return (
     <div
       aria-label={title}
-      className={styles.card} data-action-kind="value"
+      className={styles.card} data-action-kind={valueSemantics.kind}
       data-active={isOn}
       data-base-ui-swipe-ignore="true" data-disabled={disabled}
       data-dragging={dragPct !== null}
+      data-separator={separator}
       onPointerCancel={handlePointerCancel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -172,18 +210,34 @@ export function LightBrightnessCard({ entityId, title, tapAction = 'toggle', sho
       style={{ '--fill-color': fillColor, '--fill-pct': `${displayPct}%`, cursor: disabled && tapAction !== 'more-info' ? 'default' : undefined } as React.CSSProperties}
     >
       <span aria-hidden="true" className={styles.fill} />
+      {separator && (
+        <div
+          aria-disabled={disabled}
+          aria-label={title}
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={Math.round(displayPct)}
+          aria-valuetext={valueSemantics.text}
+          className={styles.sliderTarget}
+          data-action-kind={sliderSemantics.kind}
+          onKeyDown={handleSliderKeyDown}
+          ref={sliderRef}
+          role="slider"
+          tabIndex={disabled ? -1 : 0}
+        />
+      )}
       {tapAction === 'more-info' && (
         <button aria-label={`Open ${title} details`} className={styles.details} data-action-kind="modal" onClick={openMoreInfo} type="button" />
       )}
       <span aria-hidden="true" className={styles.icon}>
-        <MaterialIcon name={icon} size={22} />
+        <MaterialIcon name={icon} size={separator ? 18 : 22} />
       </span>
       <span className={styles.copy} data-dynamic-grid-label-container="true">
-        <span className={styles.title} data-dynamic-grid-label="true">{title}</span>
-        {disabledStatus ? <span className={styles.subtitle} data-dynamic-grid-label="true">{disabledStatus}</span> : showStatus && isOn ? <span className={styles.subtitle} data-dynamic-grid-label="true">{`${Math.floor(displayPct)}%`}</span> : null}
+        {!separator && <span className={styles.title} data-dynamic-grid-label="true">{title}</span>}
+        {disabledStatus ? <span className={styles.subtitle} data-dynamic-grid-label="true">{disabledStatus}</span> : showStatus && (isOn || separator) ? <span className={styles.subtitle} data-dynamic-grid-label="true">{`${Math.floor(displayPct)}%`}</span> : null}
       </span>
       {tapAction === 'more-info' && <SurfaceAccessory className={styles.disclosure} semantics={{ kind: 'modal' }} size="compact" />}
-      <button aria-label={`Toggle ${title}`} aria-pressed={isOn} className={styles.power} data-action-kind="toggle" disabled={disabled} onClick={togglePower} onPointerDown={handlePower} type="button">
+      <button aria-label={`Toggle ${title}`} aria-pressed={powerSemantics.checked} className={styles.power} data-action-kind={powerSemantics.kind} disabled={disabled} onClick={togglePower} onPointerDown={handlePower} type="button">
         <MaterialIcon name="mdi:power" size={18} />
       </button>
     </div>

@@ -42,6 +42,7 @@ import {
 import { CHORE_QUICK_LINKS, SETTINGS_PAGE_ITEMS, type ChoreQuickLinkConfig, type SettingsLinkConfig } from '../constants/portedDashboard'
 import { choreQuickLinkCounts, choreQuickLinkSubtitle, groceryCountSubtitle } from '../constants/choreQuickLinkCounts'
 import { useHashModal } from '../hooks/useHashModal'
+import { useModalDetailPageScroll } from '../hooks/useModalDetailPageScroll'
 import { markDeferredRouteHydrated, useDeferredRouteHydration, type DeferredRouteHydrationPhase } from '../hooks/useDeferredRouteHydration'
 import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet'
 import { modalSquareGridCenteredGeometry, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../components/core/modalSquareGrid'
@@ -457,6 +458,7 @@ interface GroupedRoomOverviewProps {
   gridClassName: string
   inactiveGroups: EntityGroupConfig[]
   inactiveTitle: string
+  markDetailTriggers?: boolean
   overviewGridRef?: (node: HTMLElement | null) => void
   overviewGridStyle?: ModalSquareGridStyle
   renderCard: (group: EntityGroupConfig) => ReactNode
@@ -479,7 +481,7 @@ function groupedRoomGridStyle(overviewGridStyle: ModalSquareGridStyle | undefine
   }
 }
 
-function GroupedRoomOverview({ activeGroups, activeTitle, cardShellClassName, gridClassName, inactiveGroups, inactiveTitle, overviewGridRef, overviewGridStyle, renderCard }: GroupedRoomOverviewProps) {
+function GroupedRoomOverview({ activeGroups, activeTitle, cardShellClassName, gridClassName, inactiveGroups, inactiveTitle, markDetailTriggers = false, overviewGridRef, overviewGridStyle, renderCard }: GroupedRoomOverviewProps) {
   const sections = [
     ...(activeGroups.length > 0 ? [{ groups: activeGroups, title: activeTitle }] : []),
     ...(inactiveGroups.length > 0 ? [{ groups: inactiveGroups, title: inactiveTitle }] : []),
@@ -492,7 +494,7 @@ function GroupedRoomOverview({ activeGroups, activeTitle, cardShellClassName, gr
           <RoomSectionHeader title={section.title} />
           <div className={gridClassName} ref={sectionIndex === 0 ? overviewGridRef : undefined} style={groupedRoomGridStyle(overviewGridStyle, section.groups.length)}>
             {section.groups.map((group) => (
-              <div className={cardShellClassName} key={group.title}>
+              <div className={cardShellClassName} data-modal-detail-trigger={markDetailTriggers ? group.title : undefined} key={group.title}>
                 {renderCard(group)}
               </div>
             ))}
@@ -526,8 +528,10 @@ function roomLightToggleIcon(group: EntityGroupConfig, active: boolean) {
   return active ? 'mdi:lightbulb' : 'mdi:lightbulb-off'
 }
 
-function RoomLightDetailHeader({ group, hideTitleBlock = false, onBack, onToggle }: { group: EntityGroupConfig; hideTitleBlock?: boolean; onBack?: () => void; onToggle: (entityId: string) => void }) {
+function RoomLightDetailHeader({ detailAutofocus = false, group, hideTitleBlock = false, onBack, onToggle }: { detailAutofocus?: boolean; group: EntityGroupConfig; hideTitleBlock?: boolean; onBack?: () => void; onToggle: (entityId: string) => void }) {
   const groupToggleEntityId = group.toggleEntityId
+  const roomSliderEntityId = group.items.length > 1 && groupToggleEntityId?.startsWith('light.') ? groupToggleEntityId : null
+  const fallbackToggleEntityId = group.items.length > 1 && !roomSliderEntityId ? groupToggleEntityId : null
   const toggleActive = useHass((state) => lightGroupActive(group, state.entities))
   const toggleIcon = roomLightToggleIcon(group, toggleActive)
   const groupState = useHass((state) => lightGroupSubtitle(group, state.entities))
@@ -535,7 +539,7 @@ function RoomLightDetailHeader({ group, hideTitleBlock = false, onBack, onToggle
   const separatorLabel = group.items.length === 1 ? 'Light' : 'Lights'
 
   return (
-    <div className={styles.roomLightHeader} data-title-hidden={hideTitleBlock}>
+    <div className={styles.roomLightHeader} data-group-slider={Boolean(roomSliderEntityId)} data-title-hidden={hideTitleBlock}>
       {onBack && (
         <button aria-label="Back to room lights" className={styles.lightBackButton} onClick={onBack} type="button">
           <MaterialIcon name="mdi:chevron-left" size={22} />
@@ -543,18 +547,19 @@ function RoomLightDetailHeader({ group, hideTitleBlock = false, onBack, onToggle
       )}
       {!hideTitleBlock && (
         <div className={styles.roomLightTitleBlock}>
-          <h3>{roomTitle} Lights</h3>
+          <h3>{group.title}</h3>
           <p>{groupState}</p>
         </div>
       )}
-      {groupToggleEntityId && (
+      {(groupToggleEntityId || hideTitleBlock) && (
         <div className={styles.roomLightSeparatorBlock}>
-          {hideTitleBlock && <h3 className={styles.lightSectionLabel}>{separatorLabel}</h3>}
+          {hideTitleBlock && <h3 className={styles.lightSectionLabel} data-modal-detail-autofocus={detailAutofocus ? 'true' : undefined} tabIndex={detailAutofocus ? -1 : undefined}>{separatorLabel}</h3>}
           <Separator className={styles.roomLightSeparator} />
+          {roomSliderEntityId && <LightBrightnessCard entityId={roomSliderEntityId} separator showStatus title={group.title} />}
         </div>
       )}
-      {groupToggleEntityId && (
-        <button aria-label={`Toggle ${roomTitle} lights`} className={styles.roomLightToggle} data-active={toggleActive} onClick={() => onToggle(groupToggleEntityId)} type="button">
+      {fallbackToggleEntityId && (
+        <button aria-label={`Toggle ${roomTitle} lights`} className={styles.roomLightToggle} data-active={toggleActive} onClick={() => onToggle(fallbackToggleEntityId)} type="button">
           <MaterialIcon name={toggleIcon} size={22} />
         </button>
       )}
@@ -587,18 +592,23 @@ function RoomLightDetailCards({ group, onToggle }: { group: EntityGroupConfig; o
   )
 }
 
-interface LightsSheetProps {
+type LightsSheetProps = {
   directGroup?: EntityGroupConfig
   hideDirectTitle?: boolean
   overviewGridRef?: (node: HTMLElement | null) => void
   overviewGridStyle?: ModalSquareGridStyle
-}
+} & (
+  | { selectedGroup: EntityGroupConfig | null; onSelectGroup: (group: EntityGroupConfig) => void }
+  | { selectedGroup?: never; onSelectGroup?: never }
+)
 
-export function LightsSheet({ directGroup, hideDirectTitle = false, overviewGridRef, overviewGridStyle }: LightsSheetProps = {}) {
+export function LightsSheet({ directGroup, hideDirectTitle = false, onSelectGroup, overviewGridRef, overviewGridStyle, selectedGroup: controlledGroup }: LightsSheetProps = {}) {
   const callService = useHass((state) => state.helpers.callService)
-  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
+  const [localSelectedGroup, setLocalSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
+  const controlled = controlledGroup !== undefined
+  const selectedGroup = controlled ? controlledGroup : localSelectedGroup
   const roomGroups = ROOM_LIGHT_GROUPS
   const entities = useHass((state) => state.entities)
   const groupedRoomGroups = splitRoomGroupsByState(roomGroups, entities, lightGroupActive)
@@ -618,19 +628,26 @@ export function LightsSheet({ directGroup, hideDirectTitle = false, overviewGrid
   }
 
   const selectGroup = (group: EntityGroupConfig) => {
-    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, setSelectedGroup)
+    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, (nextGroup) => {
+      if (controlled) {
+        if (!onSelectGroup) throw new Error('Controlled LightsSheet requires a selection handler')
+        onSelectGroup(nextGroup)
+      } else {
+        setLocalSelectedGroup(nextGroup)
+      }
+    })
   }
 
   const showRoomOverview = () => {
     if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
     transitionTimer.current = null
     setRoomCardsExiting(false)
-    setSelectedGroup(null)
+    setLocalSelectedGroup(null)
   }
 
   return (
     <div className={styles.lightsSheet} data-square-overview="false">
-      {selectedGroup && <RoomLightDetailHeader group={selectedGroup} hideTitleBlock={directMode && hideDirectTitle} onBack={directMode ? undefined : showRoomOverview} onToggle={toggleEntity} />}
+      {selectedGroup && <RoomLightDetailHeader detailAutofocus={controlled} group={selectedGroup} hideTitleBlock={controlled || (directMode && hideDirectTitle)} onBack={directMode || controlled ? undefined : showRoomOverview} onToggle={toggleEntity} />}
       <div className={styles.lightContent}>
         {selectedGroup ? (
           <RoomLightDetailCards group={selectedGroup} onToggle={toggleEntity} />
@@ -643,6 +660,7 @@ export function LightsSheet({ directGroup, hideDirectTitle = false, overviewGrid
               gridClassName={lightGridClassName}
               inactiveGroups={groupedRoomGroups.inactive}
               inactiveTitle="Lights Off"
+              markDetailTriggers={controlled}
               overviewGridRef={overviewGridRef}
               overviewGridStyle={overviewGridStyle}
               renderCard={(group) => <RoomLightOverviewCard group={group} onSelect={selectGroup} />}
@@ -1086,19 +1104,27 @@ function modalSquareGridCount(hash: string) {
 function SheetContent({
   closeHash,
   hash,
+  onSelectLightGroup,
   overviewGridRef,
   overviewGridStyle,
   onNavigate,
   preload = false,
+  selectedLightGroup,
 }: {
   closeHash: () => void
   hash: string
+  onSelectLightGroup?: (group: EntityGroupConfig) => void
   overviewGridRef?: (node: HTMLElement | null) => void
   overviewGridStyle?: ModalSquareGridStyle
   onNavigate: (path: string) => void
   preload?: boolean
+  selectedLightGroup?: EntityGroupConfig | null
 }) {
   if (hash === '#lights-overview') {
+    if (onSelectLightGroup) {
+      if (selectedLightGroup === undefined) throw new Error('Home Lights selection is not configured')
+      return <LightsSheet onSelectGroup={onSelectLightGroup} overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} selectedGroup={selectedLightGroup} />
+    }
     return <LightsSheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
@@ -1143,6 +1169,10 @@ interface AtAGlancePageProps {
 
 export function AtAGlancePage({ activePath = 'overview', deferRouteContent = false, loadingPhase: routeLoadingPhase, onHydrationPhaseChange, onNavigate = () => undefined, preload = false, preloadHash, preloadHashes = [], routeTransitionState = 'idle', withShell = true }: AtAGlancePageProps) {
   const { hash, openHash, closeHash } = useHashModal({ disabled: preload })
+  const [lightDetail, setLightDetail] = useState<{ hash: string; group: EntityGroupConfig | null }>(() => ({ hash, group: null }))
+  if (lightDetail.hash !== hash) setLightDetail({ hash, group: null })
+  const selectedLightGroup = lightDetail.hash === hash ? lightDetail.group : null
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(selectedLightGroup?.title ?? 'overview')
   const { hydrateHeavyContent, loadingPhase: homeHydrationPhase, showContent } = useDeferredRouteHydration({
     cacheKey: 'home',
     enabled: deferRouteContent,
@@ -1150,6 +1180,9 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   })
   const activeRoomLightCount = useHass((state) =>
     ROOM_LIGHT_ENTITY_IDS.reduce((count, entityId) => count + (isActiveState(state.entities[entityId] ?? null) ? 1 : 0), 0),
+  )
+  const selectedLightSubtitle = useHass((state) =>
+    selectedLightGroup ? lightGroupSubtitle(selectedLightGroup, state.entities) : undefined,
   )
   const openContactSensorCount = useHass((state) =>
     ROOM_CONTACT_ENTITY_IDS.reduce((count, entityId) => count + (isContactOpen(state.entities[entityId]) ? 1 : 0), 0),
@@ -1166,7 +1199,8 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   const [overviewGridRef, overviewGridLayout] = useModalSquareGridLayout(squareGridModalOpen, squareGridModalCount)
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
   const contactStatusSubtitle = contactSensorStatusSubtitle(openContactSensorCount)
-  const modalTitle = contentHash === '#lights-overview' ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(contentHash)
+  const lightsOpen = contentHash === '#lights-overview'
+  const modalTitle = lightsOpen ? selectedLightGroup?.title ?? lightsSheetTitle(activeRoomLightCount) : sheetTitle(contentHash)
   const squareGridStyle = modalSquareGridStyle(overviewGridLayout)
   const centeredGeometry = homeCenteredGeometry(contentHash, squareGridModalCount)
   const sheetSize: ModalSheetSize = CAMERA_ITEMS.some((camera) => camera.hash === contentHash)
@@ -1176,7 +1210,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
       : squareGridModalOpen
         ? 'media'
         : 'standard'
-  const sheetSubtitle = contentHash === '#security-system' ? securitySystemSubtitle : undefined
+  const sheetSubtitle = lightsOpen && selectedLightGroup ? selectedLightSubtitle : contentHash === '#security-system' ? securitySystemSubtitle : undefined
   const preloadModalHashes = useMemo(() => [...new Set(preloadHashes.filter((targetHash) => targetHash !== contentHash))], [contentHash, preloadHashes])
   const homeLoadingPhase: DashboardPageLoadingPhase | undefined = showContent ? undefined : homeHydrationPhase === 'loading-exiting' ? 'exiting' : 'loading'
   const activeLoadingPhase = routeLoadingPhase ?? homeLoadingPhase
@@ -1187,6 +1221,25 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   useEffect(() => {
     if (preload) markDeferredRouteHydrated('home')
   }, [preload])
+
+  const openHomeHash = (nextHash: string) => {
+    if (nextHash === '#lights-overview') {
+      resetDetailPageScroll()
+      setLightDetail({ hash: nextHash, group: null })
+    }
+    openHash(nextHash)
+  }
+
+  const selectLightGroup = (group: EntityGroupConfig) => {
+    if (selectedLightGroup === null) resetDetailPageScroll()
+    enterDetailPage(group.title)
+    setLightDetail({ hash, group })
+  }
+
+  const showAllLights = () => {
+    leaveDetailPage()
+    setLightDetail({ hash, group: null })
+  }
 
   const page = (
     <>
@@ -1199,7 +1252,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
         headerQuickLinks={
           <StatusRail
             chips={OVERVIEW_STATUS_CHIPS}
-            onOpenHash={openHash}
+            onOpenHash={openHomeHash}
             subtitleByHash={{ '#aqi-overview': airQualityStatusSubtitle, '#contact-sensors-overview': contactStatusSubtitle, '#lights-overview': lightStatusSubtitle }}
           />
         }
@@ -1224,8 +1277,22 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
         )}
       </Page>
 
-      <ModalSheet centeredGeometry={centeredGeometry} contentWidth={contentHash === '#security-system' || contentHash === GUEST_PRESENCE_SECURITY_HASH ? 'full' : 'readable'} landscapeDensity={squareGridModalOpen ? 'regular' : 'compact'} open={hash !== ''} size={sheetSize} subtitle={sheetSubtitle} title={modalTitle} onClose={closeHash}>
-        <SheetContent closeHash={closeHash} hash={contentHash} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} />
+      <ModalSheet
+        bodyElementRef={lightsOpen ? bodyElementRef : undefined}
+        centeredGeometry={centeredGeometry}
+        contentWidth={contentHash === '#security-system' || contentHash === GUEST_PRESENCE_SECURITY_HASH ? 'full' : 'readable'}
+        landscapeDensity={squareGridModalOpen ? 'regular' : 'compact'}
+        onBack={lightsOpen && selectedLightGroup ? showAllLights : undefined}
+        onClose={closeHash}
+        onCloseComplete={resetDetailPageScroll}
+        open={hash !== ''}
+        retainLatestOnControlledClose={lightsOpen}
+        scrollResetKey={lightsOpen ? selectedLightGroup?.title ?? 'overview' : undefined}
+        size={sheetSize}
+        subtitle={sheetSubtitle}
+        title={modalTitle}
+      >
+        <SheetContent closeHash={closeHash} hash={contentHash} onSelectLightGroup={selectLightGroup} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} selectedLightGroup={selectedLightGroup} />
       </ModalSheet>
       {preloadModalHashes.map((preloadTargetHash) => (
         <div data-preload-modal={`overview${preloadTargetHash}`} key={`overview-preload-${preloadTargetHash}`}>

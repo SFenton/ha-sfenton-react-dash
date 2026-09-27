@@ -104,6 +104,137 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     scenario === 'vacuum' ? 'vacuum-tabs' : 'tabs',
   )
   await expect(dialog).toHaveAttribute('data-layout-mounted', 'original')
+  if (scenario === 'light-room') {
+    const header = dialog.locator('[data-group-slider]')
+    const multi = state !== 'single-light'
+    await expect(header).toHaveAttribute('data-group-slider', String(multi))
+    if (multi) {
+      const homeGroup = state === 'home-group'
+      const slider = dialog.getByRole('slider', { name: 'Guest Room Lights' })
+      const power = dialog.getByRole('button', { name: 'Toggle Guest Room Lights' })
+      const expectedValue = state === 'group-on' || homeGroup ? '50' : '0'
+      await expect(slider).toHaveAttribute('aria-valuenow', expectedValue)
+      await expect(slider).toHaveAttribute('aria-disabled', String(state === 'group-unavailable'))
+      await expect(power).toHaveAttribute('aria-pressed', String(state === 'group-on' || homeGroup))
+      if (state === 'group-unavailable') await expect(power).toBeDisabled()
+      else await expect(power).toBeEnabled()
+      await expect(header.getByRole('heading', { name: 'Lights', level: 3 })).toBeVisible()
+      if (homeGroup) {
+        const modalHeader = dialog.locator('[class*="headingGroup"]')
+        await expect(dialog).toHaveAccessibleName('Guest Room Lights')
+        await expect(modalHeader.getByRole('heading', { level: 2, name: 'Guest Room Lights' })).toBeVisible()
+        await expect(modalHeader.getByText('1 On', { exact: true })).toBeVisible()
+        await expect(modalHeader.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
+        await expect(header.getByText('1 On', { exact: true })).toHaveCount(0)
+        await expect(header.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0)
+      }
+      const geometry = await slider.evaluate((target) => {
+        const card = target.closest<HTMLElement>('[data-separator="true"]')!
+        const header = card.closest<HTMLElement>('[data-group-slider="true"]')!
+        const popup = card.closest<HTMLElement>('[role="dialog"]')!
+        const cardBox = card.getBoundingClientRect()
+        const separatorBox = card.closest<HTMLElement>('[class*="roomLightSeparatorBlock"]')!.getBoundingClientRect()
+        const popupBox = popup.getBoundingClientRect()
+        const sliderBox = target.getBoundingClientRect()
+        const power = card.querySelector<HTMLButtonElement>('button')!
+        const powerBox = power.getBoundingClientRect()
+        const powerStyle = getComputedStyle(power)
+        const icon = card.querySelector<SVGElement>('span[class*="icon"] svg')!
+        const heading = header.querySelector<HTMLElement>('h3')!
+        const titleBlock = heading.closest<HTMLElement>('[class*="roomLightTitleBlock"]') ?? heading
+        const subtitle = titleBlock.querySelector<HTMLElement>('p')
+        const line = header.querySelector<HTMLElement>('span[aria-hidden="true"][class*="roomLightSeparator"]')!
+        const status = card.querySelector<HTMLElement>('[class*="subtitle"]')!
+        const titleBox = titleBlock.getBoundingClientRect()
+        const lineBox = line.getBoundingClientRect()
+        const center = (box: DOMRect) => box.top + box.height / 2
+        return {
+          cardHeight: cardBox.height,
+          headingClipped: heading.scrollWidth > heading.clientWidth + 1,
+          subtitleClipped: Boolean(subtitle && subtitle.scrollWidth > subtitle.clientWidth + 1),
+          statusClipped: status.scrollWidth > status.clientWidth + 1,
+          headerHeight: header.getBoundingClientRect().height,
+          headerOverflow: header.scrollWidth - header.clientWidth,
+          insidePopup: cardBox.left >= popupBox.left && cardBox.right <= popupBox.right,
+          inlineOrder: titleBox.right <= lineBox.left + 1 && lineBox.right <= cardBox.left + 1,
+          separatorWidth: separatorBox.width,
+          sliderCardWidth: cardBox.width,
+          labelRuleWidth: lineBox.right - separatorBox.left,
+          rightGap: separatorBox.right - cardBox.right,
+          iconInset: icon.getBoundingClientRect().left - cardBox.left,
+          paintedPowerRightGap: cardBox.right - powerBox.right + Number.parseFloat(powerStyle.paddingRight),
+          paintedPowerTopGap: powerBox.top - cardBox.top + Number.parseFloat(powerStyle.paddingTop),
+          paintedPowerBottomGap: cardBox.bottom - powerBox.bottom + Number.parseFloat(powerStyle.paddingBottom),
+          lineWidth: lineBox.width,
+          lineToSliderCenter: Math.abs(center(lineBox) - center(cardBox)),
+          titleToSliderCenter: Math.abs(center(titleBox) - center(cardBox)),
+          rowHeight: Math.max(titleBox.height, cardBox.height),
+          powerHeight: powerBox.height,
+          powerWidth: powerBox.width,
+          sliderHeight: sliderBox.height,
+          sliderWidth: sliderBox.width,
+        }
+      })
+      expect(geometry.headingClipped).toBe(false)
+      expect(geometry.subtitleClipped).toBe(false)
+      expect(geometry.statusClipped).toBe(false)
+      expect(geometry.headerOverflow).toBeLessThanOrEqual(1)
+      expect(geometry.insidePopup).toBe(true)
+      expect(geometry.inlineOrder).toBe(true)
+      expect(geometry.sliderCardWidth).toBeGreaterThanOrEqual(geometry.separatorWidth * 0.66 - 9)
+      expect(geometry.sliderCardWidth).toBeLessThanOrEqual(geometry.separatorWidth * 0.66 + 1)
+      expect(geometry.labelRuleWidth).toBeGreaterThanOrEqual(geometry.separatorWidth * 0.34 - 1)
+      expect(Math.abs(geometry.rightGap)).toBeLessThanOrEqual(1)
+      expect(geometry.iconInset).toBeGreaterThanOrEqual(12)
+      expect(Math.abs(geometry.paintedPowerRightGap - geometry.paintedPowerTopGap)).toBeLessThanOrEqual(1)
+      expect(Math.abs(geometry.paintedPowerRightGap - geometry.paintedPowerBottomGap)).toBeLessThanOrEqual(1)
+      expect(geometry.lineWidth).toBeGreaterThanOrEqual(24)
+      expect(geometry.titleToSliderCenter).toBeLessThanOrEqual(1)
+      expect(geometry.lineToSliderCenter).toBeLessThanOrEqual(1)
+      expect(geometry.headerHeight - Math.max(52, geometry.rowHeight)).toBeLessThanOrEqual(10)
+      expect(geometry.cardHeight).toBeGreaterThanOrEqual(44)
+      expect(geometry.powerHeight).toBeGreaterThanOrEqual(44)
+      expect(geometry.powerWidth).toBeGreaterThanOrEqual(44)
+      expect(geometry.sliderHeight).toBeGreaterThanOrEqual(44)
+      expect(geometry.sliderWidth).toBeGreaterThanOrEqual(100)
+      facts.lightRoom = {
+        group: 'light.guest_room',
+        value: Number(expectedValue),
+        unavailable: state === 'group-unavailable',
+        bodyTitle: 'Lights',
+        modalTitle: 'Guest Room Lights',
+        modalSubtitle: homeGroup ? '1 On' : null,
+        backAtModalHeader: homeGroup,
+        ...geometry,
+      }
+    } else {
+      const modalHeader = dialog.locator('[class*="headingGroup"]')
+      await expect(dialog).toHaveAccessibleName('Master Bedroom Closet Light')
+      await expect(modalHeader.getByText('Off', { exact: true })).toBeVisible()
+      await expect(modalHeader.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
+      await expect(header.getByRole('heading', { level: 3, name: 'Light' })).toBeVisible()
+      await expect(header.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0)
+      await expect(dialog.getByRole('slider')).toHaveCount(0)
+      await expect(header.getByRole('button', { name: /Toggle/ })).toHaveCount(0)
+      const rule = header.locator('span[aria-hidden="true"][class*="roomLightSeparator"]')
+      await expect(rule).toBeVisible()
+      expect((await rule.boundingBox())!.width).toBeGreaterThanOrEqual(24)
+      const light = dialog.getByRole('group', { name: 'Closet Light' })
+      await expect(light.getByRole('button', { name: 'Toggle Closet Light' })).toBeEnabled()
+      facts.lightRoom = {
+        singleControl: 'light.master_bedroom_closet_light',
+        separatorPowerButtons: 0,
+        ruleWidth: (await rule.boundingBox())!.width,
+        bodyTitle: 'Light',
+        modalTitle: 'Master Bedroom Closet Light',
+        modalSubtitle: 'Off',
+        backAtModalHeader: true,
+      }
+    }
+    await expect.poll(() => page.evaluate(() => (window.__mockHass?.calls ?? []).filter((call) => (
+      call.domain === 'light' || call.domain === 'homeassistant'
+    )))).toEqual([])
+  }
   if (scenario === 'solo-trip-bed') {
     if (state.startsWith('editor')) {
       const travelerChoices = dialog.getByRole('group', { name: "Who's Traveling?" }).getByRole('button')
@@ -683,6 +814,28 @@ for (const scenario of SCENARIO_IDS) {
           await page.getByRole('button', { name: 'Go back' }).click()
           await waitForRoute(page, 'overview')
         }
+      }
+      return
+    }
+    if (scenario === 'light-room') {
+      for (const state of SURFACE_CONTRACTS[scenario].states) {
+        const dialog = await openSurface(page, scenario, state)
+        let firstFrame: Record<string, number> | undefined
+        const selected = obligations.filter((entry) => entry.state === state)
+        for (const obligation of selected) {
+          await applyProfile(page, obligation.profile)
+          const facts = await stateFacts(page, dialog, scenario, state)
+          const frame = facts.frame as Record<string, number>
+          if (obligation.step === 0) firstFrame = frame
+          const profiles = journey(scenario, context)
+          if (obligation.step === profiles.length - 1 && profiles[0] === profiles.at(-1)) {
+            for (const key of ['x', 'y', 'width', 'height'] as const) {
+              expect(Math.abs(firstFrame![key] - frame[key]), 'Mounted room-light modal return geometry').toBeLessThanOrEqual(1)
+            }
+          }
+          await checkpoint(page, page, testInfo, obligation, capabilities, facts)
+        }
+        await closeMounted(dialog)
       }
       return
     }

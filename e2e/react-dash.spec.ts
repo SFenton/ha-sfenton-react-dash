@@ -2823,9 +2823,14 @@ test.describe('desktop modal layout', () => {
     await page.mouse.move(clickX, clickY + 4)
     await page.mouse.up()
     await expect(dialog).toBeVisible()
-    await expect(dialog.getByRole('heading', { name: 'Living Room Lights' })).toBeVisible()
+    const modalHeading = dialog.locator('[class*="headingGroup"]')
+    await expect(modalHeading.getByRole('heading', { level: 2, name: 'Living Room Lights' })).toBeVisible()
+    await expect(modalHeading.getByText('2 On', { exact: true })).toBeVisible()
+    await expect(modalHeading.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
     await expect(dialog.getByRole('group', { name: 'Front Left' })).toHaveAttribute('data-action-kind', 'value')
-    await expect(dialog.getByRole('button', { name: 'Back to room lights' })).toBeVisible()
+    const separator = dialog.locator('[data-group-slider="true"]')
+    await expect(separator.getByRole('heading', { level: 3, name: 'Lights' })).toBeVisible()
+    await expect(separator.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0)
   })
 
   test('security system uses the shared desktop frame and full-width controls', async ({ page }) => {

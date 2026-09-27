@@ -3,7 +3,7 @@ import { AtAGlancePage, LightsSheet } from './AtAGlancePage'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
-import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass, setMockDailyWeatherForecast, setMockEntityAttribute, setMockHourlyWeatherForecast } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass, setMockDailyWeatherForecast, setMockEntityAttribute, setMockEntityState, setMockHourlyWeatherForecast } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { WEATHER_FORECAST_TTL_MS } from '../components/hass/useWeatherForecasts'
@@ -72,6 +72,111 @@ describe('AtAGlancePage', () => {
 
     expect(screen.queryByRole('group', { name: 'Entryway Light' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Entryway Light Off' })).toBeInTheDocument()
+  })
+
+  it('controls multi-light rooms through one Home Assistant light group from the separator', () => {
+    const guestRoom = LIGHT_GROUPS.find((group) => group.title === 'Guest Room Lights')!
+    mockEntities['light.guest_room'] = entity('light.guest_room', 'on', { brightness: 128 })
+    render(<LightsSheet directGroup={guestRoom} hideDirectTitle />)
+
+    const slider = screen.getByRole('slider', { name: 'Guest Room Lights' })
+    const header = slider.closest('[data-group-slider="true"]')!
+    expect(header.querySelector('span[aria-hidden="true"][class*="roomLightSeparator"]')).toBeInTheDocument()
+    expect(within(header as HTMLElement).getByRole('heading', { name: 'Lights' })).toBeInTheDocument()
+    expect(slider).toHaveAttribute('aria-valuenow', '50')
+    expect(screen.getByRole('button', { name: 'Toggle Guest Room Lights' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: 'Toggle Guest Room lights' })).not.toBeInTheDocument()
+
+    fireEvent.keyDown(slider, { key: 'ArrowRight' })
+    expect(slider).toHaveAttribute('aria-valuenow', '55')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'light', service: 'turn_on', target: 'light.guest_room', serviceData: { brightness_pct: 55 } },
+    ])
+
+    fireEvent.keyDown(slider, { key: 'Home' })
+    expect(slider).toHaveAttribute('aria-valuenow', '0')
+    expect(mockCallServiceCalls.at(-1)).toEqual({ domain: 'light', service: 'turn_off', target: 'light.guest_room' })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle Guest Room Lights' }))
+    expect(mockCallServiceCalls.at(-1)).toEqual({ domain: 'homeassistant', service: 'toggle', target: 'light.guest_room' })
+    expect(mockCallServiceCalls).toHaveLength(3)
+  })
+
+  it('provides group sliders in every multi-light room and no separator power in single-light rooms', () => {
+    for (const group of LIGHT_GROUPS.filter((candidate) => candidate.items.length > 1)) {
+      mockEntities[group.toggleEntityId!] = entity(group.toggleEntityId!, 'on', { brightness: 128 })
+      const view = render(<LightsSheet directGroup={group} hideDirectTitle />)
+      expect(screen.getByRole('slider', { name: group.title })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: `Toggle ${group.title}` })).toBeInTheDocument()
+      view.unmount()
+    }
+
+    for (const group of LIGHT_GROUPS.filter((candidate) => candidate.items.length === 1)) {
+      const view = render(<LightsSheet directGroup={group} hideDirectTitle />)
+      const header = view.container.querySelector('[data-group-slider="false"]')!
+      expect(header.querySelectorAll('button')).toHaveLength(0)
+      expect(header.querySelector('[role="slider"]')).not.toBeInTheDocument()
+      expect(header.querySelector('span[aria-hidden="true"][class*="roomLightSeparator"]')).toBeInTheDocument()
+      expect(screen.getByText(group.items[0].title)).toBeInTheDocument()
+      view.unmount()
+    }
+  })
+
+  it('keeps standalone light detail controls together when no modal host owns its title', () => {
+    mockEntities['light.guest_room'] = entity('light.guest_room', 'on', { brightness: 128 })
+    render(<LightsSheet />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Guest Room Lights' }))
+    const header = screen.getByRole('slider', { name: 'Guest Room Lights' }).closest('[data-group-slider="true"]')!
+    expect(within(header as HTMLElement).getByRole('heading', { name: 'Guest Room Lights' })).toBeInTheDocument()
+    expect(within(header as HTMLElement).getByText('1 On')).toBeInTheDocument()
+    expect(header.querySelector('span[aria-hidden="true"][class*="roomLightSeparator"]')).toBeInTheDocument()
+    expect(within(header as HTMLElement).getByRole('button', { name: 'Back to room lights' })).toBeInTheDocument()
+  })
+
+  it('moves Home light room identity and Back into the existing modal header', async () => {
+    mockEntities['light.guest_room'] = entity('light.guest_room', 'on', { brightness: 128 })
+    render(<AtAGlancePage />)
+    fireEvent.click(screen.getByRole('button', { name: /^Lights / }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveAccessibleName(/^Lights \(/)
+    const opener = within(dialog).getByRole('button', { name: 'Open Guest Room Lights' })
+    opener.focus()
+    fireEvent.click(opener)
+
+    expect(dialog).toHaveAccessibleName('Guest Room Lights')
+    const title = within(dialog).getByRole('heading', { level: 2, name: 'Guest Room Lights' })
+    const back = within(dialog).getByRole('button', { name: 'Back' })
+    expect(back.parentElement).toContainElement(title)
+    expect(title.parentElement).toHaveTextContent('1 On')
+    const separator = dialog.querySelector('[data-group-slider="true"]')!
+    expect(within(separator as HTMLElement).getByRole('heading', { name: 'Lights' })).toBeInTheDocument()
+    expect(within(separator as HTMLElement).queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    expect(within(separator as HTMLElement).getByRole('slider', { name: 'Guest Room Lights' })).toBeInTheDocument()
+    expect(mockCallServiceCalls.filter((call) => call.domain === 'light' || call.domain === 'homeassistant')).toEqual([])
+
+    act(() => setMockEntityState('light.guest_room_bed_light', 'on'))
+    expect(title.parentElement).toHaveTextContent('2 On')
+
+    fireEvent.click(back)
+    expect(dialog).toHaveAccessibleName(/^Lights \(/)
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Open Guest Room Lights' })).toHaveFocus())
+    expect(window.location.hash).toBe('#lights-overview')
+    expect(mockCallServiceCalls.filter((call) => call.domain === 'light' || call.domain === 'homeassistant')).toEqual([])
+  })
+
+  it('disables the group slider when the Home Assistant light group is unavailable', () => {
+    const guestRoom = LIGHT_GROUPS.find((group) => group.title === 'Guest Room Lights')!
+    mockEntities['light.guest_room'] = entity('light.guest_room', 'unavailable')
+    render(<LightsSheet directGroup={guestRoom} hideDirectTitle />)
+
+    const slider = screen.getByRole('slider', { name: 'Guest Room Lights' })
+    expect(slider).toHaveAttribute('aria-disabled', 'true')
+    expect(slider).toHaveAttribute('tabindex', '-1')
+    expect(screen.getByRole('button', { name: 'Toggle Guest Room Lights' })).toBeDisabled()
+    fireEvent.keyDown(slider, { key: 'End' })
+    expect(mockCallServiceCalls).toEqual([])
   })
 
   it('uses the shared disclosure affordance on the Home weather modal opener', async () => {
@@ -291,7 +396,10 @@ describe('AtAGlancePage', () => {
 
     fireEvent.click(closetCard)
 
-    expect(within(dialog).getByRole('heading', { name: 'Master Bedroom Closet Lights' })).toBeInTheDocument()
+    expect(dialog).toHaveAccessibleName('Master Bedroom Closet Light')
+    expect(within(dialog).getByRole('heading', { level: 2, name: 'Master Bedroom Closet Light' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('heading', { level: 3, name: 'Light' })).toBeInTheDocument()
     expect(within(dialog).getByRole('group', { name: 'Closet Light' })).toHaveAttribute('data-action-kind', 'value')
     expect(within(dialog).getByRole('button', { name: 'Toggle Closet Light' })).toBeInTheDocument()
   })

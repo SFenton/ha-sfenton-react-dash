@@ -711,6 +711,27 @@ const LANDSCAPE_INTENT_CASES: ModalCase[] = [
   },
   {
     expectedScrollMode: 'body',
+    expectedSize: 'media',
+    id: 'home-room-light-detail',
+    open: async (page) => {
+      const overview = await openHashModal(page, 'overview', '#lights-overview', /^Lights/)
+      await overview.getByRole('button', { name: 'Open Guest Room Lights' }).click()
+      const dialog = page.getByRole('dialog')
+      await waitForDialogSettled(dialog)
+      await expect(dialog).toHaveAccessibleName('Guest Room Lights')
+      return dialog
+    },
+    physicalCallsite: 'src/pages/AtAGlancePage.tsx:AtAGlancePage',
+  },
+  {
+    expectedScrollMode: 'body',
+    expectedSize: 'compact',
+    id: 'gym-single-light',
+    open: (page) => openHashModal(page, 'gym', '#lights-gym'),
+    physicalCallsite: 'src/pages/DashboardViewPage.tsx:RoomSourceModal',
+  },
+  {
+    expectedScrollMode: 'body',
     expectedSize: 'compact',
     id: 'master-bedroom-occupancy',
     open: (page) => openHashModal(page, 'master-bedroom', '#master-bedroom-occupancy'),
@@ -1186,7 +1207,7 @@ test.describe('complete ModalSheet inventory acceptance', () => {
       physicalCallsiteCounts: EXPECTED_PHYSICAL_MODAL_CALLSITES,
     })
     expect(MODAL_CASES).toHaveLength(36)
-    expect(LANDSCAPE_INTENT_CASES).toHaveLength(55)
+    expect(LANDSCAPE_INTENT_CASES).toHaveLength(57)
     expect([...new Set(MODAL_CASES.map((modalCase) => modalCase.physicalCallsite))].sort()).toEqual(
       Object.keys(EXPECTED_PHYSICAL_MODAL_CALLSITES).sort(),
     )

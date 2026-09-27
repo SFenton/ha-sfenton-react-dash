@@ -11100,7 +11100,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ecaa0a41e8b1eed6",
       "lines": [
-        411
+        412
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11335,7 +11335,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ca0d38c63a2797e0",
       "lines": [
-        1040
+        1058
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -11434,7 +11434,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "8685ce5204254271",
       "lines": [
-        491
+        493
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12231,7 +12231,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "40c9e0d8a261ada5",
       "lines": [
-        1063
+        1081
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12259,7 +12259,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "be34a68d8069ef7e",
       "lines": [
-        685
+        703
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12273,7 +12273,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "c2d3eda3f52dc143",
       "lines": [
-        934
+        952
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12287,7 +12287,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "42a63305dd94bb35",
       "lines": [
-        540
+        544
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12301,7 +12301,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "250af659602b406b",
       "lines": [
-        822
+        840
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12401,7 +12401,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "3f0e0c16b1c0d32b",
       "lines": [
-        783
+        801
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12415,7 +12415,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "3c988b23986cd995",
       "lines": [
-        1004
+        1022
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12739,7 +12739,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4acb84f8e4717e3a",
       "lines": [
-        638
+        655
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12921,7 +12921,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "527bc279f11dea12",
       "lines": [
-        890
+        908
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -12965,10 +12965,10 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "b312f15247196295",
       "lines": [
-        514,
-        665,
-        806,
-        917
+        516,
+        683,
+        824,
+        935
       ],
       "occurrences": 4,
       "origin": "legacy",
@@ -13016,7 +13016,7 @@
       "file": "src/components/hass/LightBrightnessCard.tsx",
       "id": "53ae57c0b633505f",
       "lines": [
-        176
+        230
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13393,7 +13393,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "b07b6f9376590923",
       "lines": [
-        434
+        435
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13639,7 +13639,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4c4fbf4b5fb12679",
       "lines": [
-        557
+        562
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -13655,7 +13655,7 @@
       "file": "src/components/hass/LightBrightnessCard.tsx",
       "id": "a327d820bda72be3",
       "lines": [
-        186
+        240
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14307,7 +14307,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "6aa44a5a725dd7ba",
       "lines": [
-        1041
+        1059
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -14610,7 +14610,7 @@
       "file": "src/components/hass/LightBrightnessCard.tsx",
       "id": "e849bd6f12691bf9",
       "lines": [
-        183
+        237
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15263,7 +15263,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "663538042e81e9dc",
       "lines": [
-        690
+        708
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -15319,7 +15319,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "cd8797635fd622b2",
       "lines": [
-        939
+        957
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16205,20 +16205,6 @@
       "words": 1
     },
     {
-      "characters": 6,
-      "context": "body-copy",
-      "file": "src/pages/AtAGlancePage.tsx",
-      "id": "8b6ee9f4ca1fb8f9",
-      "lines": [
-        546
-      ],
-      "occurrences": 1,
-      "origin": "legacy",
-      "placeholders": [],
-      "value": "Lights",
-      "words": 1
-    },
-    {
       "characters": 19,
       "context": "body-copy",
       "file": "src/components/hass/VacuumCard.tsx",
@@ -16450,7 +16436,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4872ad701daac4f6",
       "lines": [
-        827
+        845
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -16548,7 +16534,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ed5cbd7b05581652",
       "lines": [
-        384
+        385
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17357,7 +17343,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "f0c638fb56acc69e",
       "lines": [
-        719
+        737
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17371,7 +17357,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "49fe4bea1e56e161",
       "lines": [
-        719
+        737
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -17511,7 +17497,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "56a5667b44a308df",
       "lines": [
-        1128
+        1154
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20366,7 +20352,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "997357c49ac49200",
       "lines": [
-        243
+        244
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20380,7 +20366,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "63c80e407960ceed",
       "lines": [
-        235
+        236
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20396,7 +20382,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "25d4d194d402dd60",
       "lines": [
-        67
+        68
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -20424,7 +20410,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "646d51f94e0bd83a",
       "lines": [
-        206
+        207
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20438,7 +20424,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "0baff9c64f7af9c9",
       "lines": [
-        207
+        208
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20452,7 +20438,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "c6be39aa5d9aeb11",
       "lines": [
-        207
+        208
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -20543,7 +20529,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "2395383d8ccd13df",
       "lines": [
-        337
+        338
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20557,7 +20543,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "d31112e9f914507b",
       "lines": [
-        326
+        327
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20571,7 +20557,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "e1ddcfb579868c98",
       "lines": [
-        326
+        327
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20585,7 +20571,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "1bd8a523ca1d6b10",
       "lines": [
-        302
+        303
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20599,7 +20585,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "f59a4d04e23aab98",
       "lines": [
-        302
+        303
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20613,7 +20599,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4f7780484d680fc3",
       "lines": [
-        301
+        302
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20627,7 +20613,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "31afc4febd8d56c2",
       "lines": [
-        301
+        302
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20641,7 +20627,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "e245031d1b6b5d26",
       "lines": [
-        301
+        302
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20655,7 +20641,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4cfe01836cb3cbba",
       "lines": [
-        306
+        307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20669,7 +20655,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "9e44fa06ae60ab6e",
       "lines": [
-        309
+        310
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20685,7 +20671,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "5ca376c4d43100f1",
       "lines": [
-        307
+        308
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20699,7 +20685,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ba23d932329b85c3",
       "lines": [
-        308
+        309
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20713,7 +20699,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "8149977a2168a473",
       "lines": [
-        306
+        307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20727,7 +20713,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "9459397f42a3a8c8",
       "lines": [
-        306
+        307
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20741,7 +20727,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "2003961013d5ddd4",
       "lines": [
-        69
+        70
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -20769,7 +20755,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "8438343a46b5ba2d",
       "lines": [
-        297
+        298
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -20785,7 +20771,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "b0b056597c861e40",
       "lines": [
-        297
+        298
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22716,7 +22702,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "fd1fa12dd2a8b80d",
       "lines": [
-        131
+        132
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22732,7 +22718,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "a17681c208f4a2d5",
       "lines": [
-        130
+        131
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22746,7 +22732,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "2a745229a576535c",
       "lines": [
-        261
+        262
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22762,7 +22748,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "0f1fa7caac241c47",
       "lines": [
-        264
+        265
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22776,7 +22762,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "de78b9718103dc6b",
       "lines": [
-        261
+        262
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22818,7 +22804,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "69decc06994cc98a",
       "lines": [
-        126
+        127
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -22990,7 +22976,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "0693c6fb76f8b44a",
       "lines": [
-        227
+        228
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23004,7 +22990,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "add4d839e9861875",
       "lines": [
-        227
+        228
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23144,7 +23130,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "f03050dc188feb11",
       "lines": [
-        289
+        290
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23160,7 +23146,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "ecc0613961be67ba",
       "lines": [
-        284
+        285
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23174,7 +23160,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "4c2089379b81fdd6",
       "lines": [
-        284
+        285
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -23188,7 +23174,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "96e3a7d200dccc0f",
       "lines": [
-        68
+        69
       ],
       "occurrences": 2,
       "origin": "legacy",
@@ -23608,7 +23594,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "09687ad2ebef6f10",
       "lines": [
-        122
+        123
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -25904,7 +25890,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "786b7c1c444b5b8c",
       "lines": [
-        1208
+        1261
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27651,7 +27637,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "98b89c4aecd81289",
       "lines": [
-        1197
+        1250
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27807,7 +27793,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "bf6240e368e0bd57",
       "lines": [
-        1217
+        1270
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -29747,7 +29733,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "fa665436bf0ceab7",
       "lines": [
-        897
+        915
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32501,7 +32487,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "70093affdfed2e6d",
       "lines": [
-        645
+        662
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -32515,7 +32501,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "043d1ba541b29f71",
       "lines": [
-        641
+        658
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -33670,7 +33656,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "21cbc146742a623d",
       "lines": [
-        893
+        911
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -34609,7 +34595,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "1d25e3e5c49ce51b",
       "lines": [
-        450
+        451
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -36452,7 +36438,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "fc2fae585a5141c6",
       "lines": [
-        1160
+        1193
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38846,7 +38832,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "12e7fd220a8305c4",
       "lines": [
-        535
+        539
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -38860,7 +38846,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "7d924af527e49d84",
       "lines": [
-        535
+        539
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -39478,7 +39464,7 @@
       "file": "src/pages/AtAGlancePage.tsx",
       "id": "dcf8dbdbc3f234cd",
       "lines": [
-        358
+        359
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -40132,9 +40118,9 @@
   "summary": {
     "catalogRecords": 869,
     "documentRecords": 1,
-    "legacyOccurrences": 2457,
-    "legacyRecords": 2028,
-    "totalRecords": 2898
+    "legacyOccurrences": 2456,
+    "legacyRecords": 2027,
+    "totalRecords": 2897
   },
   "version": 1
 }

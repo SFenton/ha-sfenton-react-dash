@@ -331,7 +331,7 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
   },
 ] as const satisfies readonly PlaywrightSpecCoverage[]
 
-export const SCENARIO_IDS = ['quick-links', 'camera', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source', 'solo-trip-settings', 'solo-trip-bed'] as const
+export const SCENARIO_IDS = ['quick-links', 'camera', 'summary', 'filters', 'recipe-grocery', 'form', 'admin-todo-edit', 'remote', 'vacuum', 'weather', 'light-room', 'navigation', 'host', 'preload', 'wake-room', 'wake-light', 'wake-editor', 'wake-source', 'solo-trip-settings', 'solo-trip-bed'] as const
 export type ScenarioId = typeof SCENARIO_IDS[number]
 export type ContextId = 'touch-chromium' | 'fine-chromium' | 'touch-webkit'
 export const CONTEXTS: Record<ContextId, { browser: 'chromium' | 'webkit'; touch: boolean; project: string }> = {
@@ -423,6 +423,13 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     owners: ['src/components/hass/Weather', 'src/components/hass/weather', 'src/components/hass/precipitationTimeline', 'src/components/hass/useWeatherDayBriefing', 'src/components/hass/useWeatherForecasts', 'src/hooks/useForecastWindMotion', 'src/hooks/useHorizontalScrollControls', 'src/i18n/locales/en/modals/weather.json'],
     legacy: ['weather-scenes.spec.ts', 'weather-atmosphere-scenes.spec.ts', 'weather-carousel.spec.ts', 'weather-data.spec.ts', 'weather-motion.spec.ts', 'weather-modal-rendering.spec.ts'],
     question: 'Are forecast modes, stale/empty/error states, missing and long Pressure readings readable and reachable after rotation, with complete carousel pages centered and incomplete final pages aligned left, equal small-tile heights, no preview dropdown and unchanged return geometry?',
+  },
+  'light-room': {
+    family: 'modal',
+    states: ['group-on', 'group-off', 'group-unavailable', 'home-group', 'single-light'],
+    owners: ['src/pages/AtAGlancePage', 'src/components/hass/LightBrightnessCard', 'src/constants/atAGlance'],
+    legacy: ['feedback-regressions.spec.ts', 'responsive-modal-inventory.spec.ts'],
+    question: 'Does Home keep room title/status/Back in its modal header, reserve 34% for Light(s)/rule and up to 66% for the slider, with an inset bulb and evenly spaced power disc across all room states?',
   },
   navigation: {
     family: 'page-shell-grid', states: ['home', 'back-page'],
