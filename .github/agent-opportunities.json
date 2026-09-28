@@ -71,9 +71,7 @@
       "enabled": true,
       "evaluationStatus": "provisional-three-cases",
       "casePacketStatus": "provisional-three-cases",
-      "skills": [
-        "ha-budget-workflow"
-      ],
+      "skills": [],
       "team": {
         "id": "ha-react-focused-tests-team",
         "topology": "medium-owner-cheap-worker-medium-review",
@@ -609,9 +607,7 @@
       "enabled": true,
       "evaluationStatus": "provisional-three-cases",
       "casePacketStatus": "provisional-three-cases",
-      "skills": [
-        "ha-budget-workflow"
-      ],
+      "skills": [],
       "team": {
         "id": "ha-react-service-mappings-team",
         "topology": "medium-owner-only",
@@ -759,9 +755,7 @@
       "enabled": true,
       "evaluationStatus": "provisional-three-cases",
       "casePacketStatus": "provisional-three-cases",
-      "skills": [
-        "ha-budget-workflow"
-      ],
+      "skills": [],
       "team": {
         "id": "ha-react-scaffolds-team",
         "topology": "medium-owner-only",
@@ -880,9 +874,7 @@
       "enabled": true,
       "evaluationStatus": "provisional-three-cases",
       "casePacketStatus": "provisional-three-cases",
-      "skills": [
-        "ha-budget-workflow"
-      ],
+      "skills": [],
       "team": {
         "id": "ha-react-transforms-team",
         "topology": "medium-owner-only",
@@ -1003,7 +995,6 @@
       "evaluationStatus": "provisional-three-cases",
       "casePacketStatus": "provisional-three-cases",
       "skills": [
-        "ha-budget-workflow",
         "dashboard-ux-authoring"
       ],
       "team": {
