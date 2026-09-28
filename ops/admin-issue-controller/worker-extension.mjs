@@ -14,6 +14,7 @@ const ALLOWED_MUTABLE_WORKSPACE_PATHS = new Set([
   "docs/ux/layouts.md",
   "scripts/deploy-dashboard-ci.test.ts",
   "scripts/deploy-dashboard-ci.ts",
+  "scripts/i18n/generated/copy-inventory.json",
   "scripts/layout",
 ]);
 const READ_ONLY_WORKSPACE_PATHS = [

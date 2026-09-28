@@ -49,6 +49,11 @@ directories underneath the read-only workspace or its read-only `node_modules`
 mount.
 The controller rejects changes outside the auto-deployed dashboard surfaces:
 `src/`, `public/`, `e2e/`, and the root `index.html`.
+Every approved worker may also rewrite the generated
+`scripts/i18n/generated/copy-inventory.json` (via `npm run i18n:sync`) through
+an exact single-file writable mount, because any copy change must regenerate
+it. The rest of `scripts/i18n/`, including the legacy-copy baseline, stays
+read-only.
 Trusted deployment-failure issues have a separate narrow exception for
 `.github/workflows/deploy-dashboard.yml`,
 `scripts/deploy-dashboard-ci.ts`, and its directly owned test. Exact nested

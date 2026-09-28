@@ -5606,17 +5606,27 @@ describe('admin issue controller security configuration', () => {
   })
 
   it('allows only auto-deployed dashboard paths from workers', () => {
-    expect(workerMutableInfrastructurePaths()).toEqual([])
+    const inventory = 'scripts/i18n/generated/copy-inventory.json'
+    expect(workerMutableInfrastructurePaths()).toEqual([inventory])
     expect(workerMutableInfrastructurePaths({ automationKind: 'deployment' })).toEqual([
       '.github/workflows/deploy-dashboard.yml',
       'scripts/deploy-dashboard-ci.test.ts',
       'scripts/deploy-dashboard-ci.ts',
+      inventory,
     ])
     expect(workerMutableInfrastructurePaths({ automationKind: 'layout' })).toEqual([
       'docs/ux/layouts.md',
       'scripts/layout',
+      inventory,
     ])
     expect(() => assertWorkerChangesSafe('/tmp', ['src/App.tsx', 'e2e/app.spec.ts'])).not.toThrow()
+    expect(() => assertWorkerChangesSafe('/tmp', ['src/App.tsx', inventory])).not.toThrow()
+    expect(() =>
+      assertWorkerChangesSafe('/tmp', ['scripts/i18n/generated/legacy-copy-baseline.json']),
+    ).toThrow('protected path')
+    expect(() => assertWorkerChangesSafe('/tmp', ['scripts/i18n/inventory.ts'])).toThrow(
+      'protected path',
+    )
     expect(() => assertWorkerChangesSafe('/tmp', ['home-assistant/packages/example.yaml'])).toThrow(
       'outside the auto-deployed dashboard',
     )
@@ -5982,10 +5992,22 @@ describe('admin issue controller security configuration', () => {
     expect(unsafeWrite.stderr).toContain('Worker mount source is a symbolic link')
     rmSync(mutableSource)
     expect(readFileSync(join(outside, 'unchanged'), 'utf8')).toBe('outside\n')
-    const ordinary = run({ ADMIN_ISSUE_READ_ONLY: '0' })
+    mkdirSync(join(root, 'scripts/i18n/generated'), { recursive: true })
+    writeFileSync(join(root, 'scripts/i18n/generated/copy-inventory.json'), '{}\n')
+    const ordinary = run({
+      ADMIN_ISSUE_MUTABLE_PATHS: 'scripts/i18n/generated/copy-inventory.json',
+      ADMIN_ISSUE_READ_ONLY: '0',
+    })
     expect(ordinary.status).toBe(0)
     const ordinaryArgs = readFileSync(dockerArgsPath, 'utf8')
     expect(ordinaryArgs).toContain(`type=bind,src=${root},dst=/workspace\n`)
+    expect(ordinaryArgs).toContain(
+      `type=bind,src=${join(root, 'scripts/i18n')},dst=/workspace/scripts/i18n,readonly`,
+    )
+    expect(ordinaryArgs).toContain(
+      `type=bind,src=${join(root, 'scripts/i18n/generated/copy-inventory.json')},` +
+        'dst=/workspace/scripts/i18n/generated/copy-inventory.json\n',
+    )
     expect(ordinaryArgs).not.toContain('dst=/workspace/artifacts/admin-issue-242/research')
   })
 

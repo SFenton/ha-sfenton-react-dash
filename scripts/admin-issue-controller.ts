@@ -324,6 +324,11 @@ const LAYOUT_WORKFLOW = 'playwright.yml'
 const LAYOUT_WORKFLOW_TIMEOUT_MINUTES = 390
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
+// Generated from src/ by `npm run i18n:sync`; any worker that changes copy must
+// regenerate it. The legacy-copy baseline beside it stays protected.
+const GENERATED_WORKER_MUTABLE_PATHS = [
+  'scripts/i18n/generated/copy-inventory.json',
+] as const
 const DEPLOYMENT_WORKER_MUTABLE_PATHS = [
   '.github/workflows/deploy-dashboard.yml',
   'scripts/deploy-dashboard-ci.test.ts',
@@ -3008,6 +3013,9 @@ export function buildWorkerPrompt(
       : record.automationKind === 'layout'
         ? `This trusted layout-failure issue may modify only these layout infrastructure paths in addition to ordinary dashboard paths: ${LAYOUT_WORKER_MUTABLE_PATHS.join(', ')}. Keep every change scoped to layout planning, execution, evidence, verification, or directly owned regression coverage. Use changed tests and focused provenance-bound mixed-context runs for local acceptance. Do not make a full historical or full-known-mock layout replay a pre-PR gate; the protected post-merge Automated layout job owns exact full-corpus evidence.`
         : 'Do not modify Git metadata, the .github directory, controller infrastructure, dependency manifests or lockfiles, test-policy scripts, or build/test configuration. If the fix truly requires one of those protected surfaces, return needs_input and explain why.'
+  const generatedGuidance = researchOnly
+    ? ''
+    : 'When your change adds, removes, or moves user-facing copy, regenerate scripts/i18n/generated/copy-inventory.json with `npm run i18n:sync` (never `--refresh-baseline`) and confirm `npm run i18n:check` passes; that generated inventory is the only writable file under scripts/.'
   const issueScopeGuidance = researchOnly
     ? 'This issue is research-only until a later explicit owner approval. Do not edit tracked or unignored repository files, change Home Assistant state, or propose a pull request. Investigate and return needs_input with concrete follow-up options and a recommendation, or blocked with the exact missing evidence. Leave the Git worktree clean.'
     : 'Otherwise implement the complete fix in the assigned worktree, update the directly owned tests, run the relevant tests through admin_issue_workspace, iterate until they pass, and perform a meaningful code review.'
@@ -3037,7 +3045,7 @@ Manual iOS follow-up is exceptional. Set iosFollowUp.required only when the cano
 
 ${resolutionGuidance}
 
-${protectedSurfaceGuidance}
+${protectedSurfaceGuidance} ${generatedGuidance}
 
 Return a final response containing exactly one JSON object and no Markdown fence:
 {
@@ -3582,9 +3590,13 @@ export async function changedFiles(worktreePath: string) {
 export function workerMutableInfrastructurePaths(
   record?: Pick<AdminIssueRecord, 'automationKind'>,
 ) {
-  if (record?.automationKind === 'deployment') return [...DEPLOYMENT_WORKER_MUTABLE_PATHS]
-  if (record?.automationKind === 'layout') return [...LAYOUT_WORKER_MUTABLE_PATHS]
-  return []
+  if (record?.automationKind === 'deployment') {
+    return [...DEPLOYMENT_WORKER_MUTABLE_PATHS, ...GENERATED_WORKER_MUTABLE_PATHS]
+  }
+  if (record?.automationKind === 'layout') {
+    return [...LAYOUT_WORKER_MUTABLE_PATHS, ...GENERATED_WORKER_MUTABLE_PATHS]
+  }
+  return [...GENERATED_WORKER_MUTABLE_PATHS]
 }
 
 function workerCanModifyInfrastructurePath(
@@ -3628,7 +3640,7 @@ export function assertWorkerChangesSafe(
   record?: Pick<AdminIssueRecord, 'automationKind'>,
 ) {
   if (files.length === 0) throw new Error('Worker reported ready_for_pr but made no repository changes')
-  const mutableInfrastructurePaths = workerMutableInfrastructurePaths(record)
+  const infrastructureRepair = ['deployment', 'layout'].includes(record?.automationKind ?? '')
   assertProtectedPathsUntouched(files, record)
   for (const file of files) {
     const normalized = file.replaceAll('\\', '/')
@@ -3638,7 +3650,7 @@ export function assertWorkerChangesSafe(
       !workerCanModifyInfrastructurePath(normalized, record)
     ) {
       throw new Error(
-        mutableInfrastructurePaths.length > 0
+        infrastructureRepair
           ? `Worker changed a path outside its authorized repair scope: ${file}`
           : `Worker changed a path outside the auto-deployed dashboard: ${file}`,
       )
