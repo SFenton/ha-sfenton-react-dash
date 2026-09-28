@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useHass } from '@hakit/core'
 import type { CameraConfig } from '../../constants/atAGlance'
-import { RTC_PILOT_RESOURCE_PATH } from '../../constants/rtcPilot'
 import {
   publishCameraStreamMuteState,
   registerCameraStreamActionTarget,
 } from './cameraStreamActions'
-import type { CameraStreamStatus } from './cameraStreamStatus'
+import { CAMERA_STREAM_PHASE, type CameraStreamStatus } from './cameraStreamStatus'
+import { rtcCardResourceUrl } from './rtcCardResource'
 import styles from './HlsCamera.module.css'
 import rtcStyles from './RtcPilotCamera.module.css'
 
 const RTC_CARD_TAG = 'webrtc-camera-sfenton'
-const RTC_CHROME_STYLE_ID = 'sfenton-rtc-pilot-chrome'
+const RTC_CHROME_STYLE_ID = 'sfenton-rtc-chrome'
 const RTC_CARD_SETUP_RETRY_MS = 2_000
 const RTC_CARD_SETUP_MAX_RETRIES = 5
 
@@ -37,12 +37,18 @@ interface RtcPilotCameraProps {
   onStatusChange?: (status: CameraStreamStatus) => void
 }
 
+function importRtcCard(resource: string) {
+  // Mock builds have no Home Assistant host, so they register a local stand-in card.
+  if (import.meta.env.MODE === 'test') return import('./mockRtcCard')
+  return import(/* @vite-ignore */ resource)
+}
+
 function loadRtcCard() {
   if (customElements.get(RTC_CARD_TAG)) return Promise.resolve()
   if (!rtcModulePromise) {
-    const resource = resourceRetry === 0 ? RTC_PILOT_RESOURCE_PATH : `${RTC_PILOT_RESOURCE_PATH}&retry=${resourceRetry}`
+    const resource = rtcCardResourceUrl(resourceRetry)
     resourceRetry += 1
-    rtcModulePromise = import(/* @vite-ignore */ resource).then(() => {
+    rtcModulePromise = importRtcCard(resource).then(() => {
       if (!customElements.get(RTC_CARD_TAG)) throw new Error('The RTC camera module did not register its card.')
     }).catch((error: unknown) => {
       rtcModulePromise = null
@@ -252,7 +258,7 @@ export function RtcPilotCamera({
         window.removeEventListener('webrtc-audio-state', handleAudioState)
         cardRef.current = null
         host.replaceChildren()
-        console.error('Unable to start RTC camera pilot:', error)
+        console.error('Unable to start RTC camera:', error)
         report('error')
         if (recoverable && retryAttempts < RTC_CARD_SETUP_MAX_RETRIES) {
           const delay = Math.min(30_000, RTC_CARD_SETUP_RETRY_MS * 2 ** retryAttempts)
@@ -307,16 +313,14 @@ export function RtcPilotCamera({
     <div
       className={styles.frame}
       data-camera-transport="webrtc"
-      data-loaded={status === 'live' ? 'true' : 'false'}
+      data-loaded={status === CAMERA_STREAM_PHASE.LIVE ? 'true' : 'false'}
       data-fill={fill ? 'true' : 'false'}
       data-status={status}
       data-variant={variant}
       style={{ '--camera-min-height': `${minHeight}px` } as CSSProperties}
     >
       <div className={styles.host} ref={hostRef} />
-      {status === 'error' && errorLabel && <div className={styles.message}>{errorLabel}</div>}
+      {status === CAMERA_STREAM_PHASE.ERROR && errorLabel && <div className={styles.message}>{errorLabel}</div>}
     </div>
   )
 }
-
-export { RtcPilotCamera as HlsCamera }

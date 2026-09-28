@@ -747,7 +747,7 @@ test('camera modal media keeps its configured geometry while the stream hydrates
     const root = activeRoute(page, surface.route)
     await root.getByRole('button', { name: 'Open Front Door camera' }).click()
     const dialog = page.getByRole('dialog')
-    const frame = dialog.locator('[data-camera-transport="hls"][data-variant="modal"]')
+    const frame = dialog.locator('[data-camera-transport="webrtc"][data-variant="modal"]')
     const readGeometry = () => frame.evaluate((element) => {
       const dimensions = (rect: DOMRect) => ({
         height: Number(rect.height.toFixed(2)),
@@ -756,7 +756,7 @@ test('camera modal media keeps its configured geometry while the stream hydrates
       const focus = element.parentElement!.getBoundingClientRect()
       const cameraFrame = element.getBoundingClientRect()
       const host = element.firstElementChild!.getBoundingClientRect()
-      const video = element.querySelector('video')!.getBoundingClientRect()
+      const video = element.querySelector('webrtc-camera-sfenton')!.shadowRoot!.querySelector('video')!.getBoundingClientRect()
       return {
         focus: dimensions(focus),
         frame: dimensions(cameraFrame),
@@ -766,6 +766,7 @@ test('camera modal media keeps its configured geometry while the stream hydrates
     })
 
     await expect(frame).toHaveAttribute('data-fill', 'true')
+    await expect(frame.locator('webrtc-camera-sfenton')).toHaveAttribute('data-stream-status', 'connecting')
     await expect(frame).toHaveAttribute('data-loaded', 'false')
     const loadingGeometry = await readGeometry()
     expect(loadingGeometry.focus.width / loadingGeometry.focus.height).toBeCloseTo(4 / 3, 2)

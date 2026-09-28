@@ -207,7 +207,7 @@ Preferred layout:
 | `src/pages/` | Page-level views such as `AtAGlancePage`, `SecurityPage`, room pages, chores pages |
 | `src/pages/Page.tsx` | Shared page shell: scroll container, scroll restoration, loading/error spacing |
 | `src/components/core/` | Reusable dashboard primitives: cards, buttons, headers, modals, sliders, section headers |
-| `src/components/hass/` | HA entity-aware controls: light sliders, climate cards, alarm controls, todo controls, camera/HLS cards |
+| `src/components/hass/` | HA entity-aware controls: light sliders, climate cards, alarm controls, todo controls, RTC camera cards |
 | `src/components/shell/` | App shell, mobile header, bottom navigation, route chrome |
 | `src/constants/` | Reused route, entity, area, section, icon, timing, and animation constants |
 | `src/hooks/` | Reusable UI and Home Assistant hooks |
@@ -331,41 +331,39 @@ Assistant rebuild the Lovelace card or embedded custom panel after reconnect
 without remounting the React app. Source changes, route departure, and abandoned
 hosts still dispose the frame.
 
-## Cameras And HLS
+## Cameras And RTC
 
 Camera implementation must support real Home Assistant stream playback, not
 static placeholders.
 
-React camera surfaces request Home Assistant Core's `camera/stream` WebSocket
-command with `format: "hls"` through the shared HAKit connection. Use native
-HLS where the browser supports it and the direct `hls.js` light dependency
-elsewhere. The React adapter owns URL refresh, recovery, visibility cleanup,
-mute state, and snapshots. Keep this as the only browser camera transport: do
-not add a runtime transport selector, direct browser RTSP, direct Frigate
-go2rtc APIs, a parallel custom-card path, or a dependency on the
-`webrtc-camera-sfenton` integration. RTSP remains the server-side transport
-from Frigate to Home Assistant.
+Every dashboard build renders cameras with the pinned `webrtc-camera-sfenton`
+v3.10.3 card from the SFenton/WebRTC fork. The four frontend files
+(`webrtc-camera.js`, `stream-manager.js`, `video-rtc.js`, `digital-ptz.js`)
+are vendored verbatim in `public/rtc/` from
+`custom_components/webrtc/www` at SFenton/WebRTC `b6c37a0588`, and
+`src/components/hass/rtcCardAssets.test.ts` pins their SHA-256 digests. Vite
+copies them into each build, so the normal manifest-verified deployment
+publishes them to the `rtc/` folder beside each host's `index.html`; the React
+adapter resolves `rtc/webrtc-camera.js?v=v3.10.3` relative to its own chunk.
+The card signs the backend `/api/webrtc/ws` route through Home Assistant, so
+the SFenton/WebRTC integration must stay enabled. RTSP remains the server-side
+transport from Frigate to Home Assistant.
 
-The explicitly approved SFenton-RTC pilot is a **build-time-only exception** for
-the admin-only `/sfenton-react-fold-test/home` experiment. `vite build --mode
-rtc-pilot` replaces the camera adapter in that build with the
-`webrtc-camera-sfenton` v3.10.3 card, staged at
-`/local/ha-sfenton-react-dash-fold-test/rtc/`; that card signs the backend
-`/api/webrtc/ws` route through Home Assistant. The ordinary production build
-stays HLS and has no browser transport switch or fork frontend dependency.
-The fork's pilot frontend assets remain within the Fold test dashboard folder:
-do not replace the globally registered v3.10.1 card resource or copy a pilot
-build to `/sfenton-react-dash/home`, `/sfenton-react-panel`, or the existing
-iOS/Duo test hosts. A second, self-contained `fold-bridge` build of the
-existing card source registers only `sfenton-react-fold-app-card` and is served
-from the Fold asset folder. Its Lovelace resource is registered globally, but
-the unique tag is used only by the Fold dashboard; the existing global
-`sfenton-react-app-card` resource and both maintained hosts remain untouched.
-The Fold card preserves its own iframe during immediate replacement without
-changing source-change or route-departure disposal. A prior authorization
-created this particular test host and enabled the integration; that is not
-standing permission to redeploy, change other hosts, or enable it elsewhere.
-Every future live mutation needs its own explicit authorization and rollback.
+HLS is retired and is not kept as a fallback: do not reintroduce
+`camera/stream` HLS sessions, `hls.js`, a runtime transport selector, direct
+browser RTSP, or direct Frigate go2rtc APIs. Upgrading the card means
+re-vendoring all four files from a reviewed fork commit and updating the pinned
+digests, version constant, and this section together. Do not replace the
+globally registered v3.10.1 Lovelace card resource.
+
+The admin-only `/sfenton-react-fold-test/home` host keeps its separate
+`fold-bridge` card build (`sfenton-react-fold-app-card`) served from the Fold
+asset folder; its Lovelace resource is registered globally, but the unique tag
+is used only by the Fold dashboard. The Fold card preserves its own iframe
+during immediate replacement without changing source-change or route-departure
+disposal. Every live Home Assistant mutation outside the normal deployment
+(integration changes, resource registration, restarts) still needs its own
+explicit authorization and rollback.
 Pilot styling must size the RTC custom-element host and shadow video to the
 tile or fill-modal frame. Retain `cover` for tiles and `contain` for modals.
 Verify card/video geometry across loading, live, and unavailable states in
@@ -378,7 +376,7 @@ When implementing camera sections or modals:
 
 - Inspect the Home Assistant camera cards/modals first.
 - Identify stream entities, controls, aspect ratios, loading states, unavailable states, and modal behavior.
-- Use the authenticated HA-origin HLS URL returned for the configured camera entity and document any dependency or Home Assistant integration requirement in code comments or project docs.
+- Use the vendored RTC card with the configured camera stream and document any dependency or Home Assistant integration requirement in code comments or project docs.
 - Add Playwright coverage for opening camera views/modals and confirming a non-empty rendered stream container when feasible.
 
 ## Testing
@@ -399,7 +397,7 @@ Add tests as features are implemented.
   evaluates the actual Git change set and rejects implementation-only patches.
   Do not touch an unrelated test solely to make the gate pass.
 - Unit tests: component rendering, hooks, entity formatting, service-call behavior, modal open/close behavior, navigation state.
-- Playwright tests: page routing, bottom nav behavior, expected visible sections, modal open/close, core entity controls, HLS/camera containers.
+- Playwright tests: page routing, bottom nav behavior, expected visible sections, modal open/close, core entity controls, RTC camera containers.
 - UX completion requires the canonical responsive matrix in
   `docs/ux/validation-matrix.md`; mobile-only or resized-mobile desktop
   coverage is insufficient.

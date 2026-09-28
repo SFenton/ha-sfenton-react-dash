@@ -207,14 +207,15 @@ describe('AtAGlancePage', () => {
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-max-columns', '4')
   })
 
-  it('opens an HA HLS camera modal with working audio controls', async () => {
+  it('opens an RTC camera modal with working audio controls', async () => {
     render(<AtAGlancePage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Front Door camera' }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByRole('heading', { name: 'Front Door' })).toBeInTheDocument()
-    expect(dialog.querySelector('[data-camera-transport="hls"]')).toBeInTheDocument()
+    expect(dialog.querySelector('[data-camera-transport="webrtc"]')).toBeInTheDocument()
+    await waitFor(() => expect(dialog.querySelector('webrtc-camera-sfenton')).toBeInTheDocument())
     fireEvent.click(within(dialog).getByRole('button', { name: 'Muted' }))
     expect(within(dialog).getByRole('button', { name: 'Audio' })).toBeInTheDocument()
   })

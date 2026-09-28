@@ -69,7 +69,9 @@ The Galaxy Fold dimensions and state IDs remain documented defaults because they
 
 ## Isolated RTC pilot
 
-Production Home and the maintained React panel keep Home Assistant HLS. To
+Production Home and the maintained React panel now ship the same pinned v3.10.3
+card from `public/rtc/` (see the dashboard contract). The historical pilot steps
+below staged it for the Fold host before that promotion. To
 prepare a reproducible RTC candidate locally from the current dashboard
 worktree:
 
