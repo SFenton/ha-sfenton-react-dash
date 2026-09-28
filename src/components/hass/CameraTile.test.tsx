@@ -7,10 +7,10 @@ import { mockEntities, resetMockHass } from '../../test/mocks/hakitCoreState'
 
 const statusCallbacks: ((status: CameraStreamStatus) => void)[] = []
 
-vi.mock('./HlsCamera', () => ({
-  HlsCamera: ({ onStatusChange }: { onStatusChange?: (status: CameraStreamStatus) => void }) => {
+vi.mock('./RtcPilotCamera', () => ({
+  RtcPilotCamera: ({ onStatusChange }: { onStatusChange?: (status: CameraStreamStatus) => void }) => {
     if (onStatusChange && !statusCallbacks.includes(onStatusChange)) statusCallbacks.push(onStatusChange)
-    return <div data-testid="hls-camera" />
+    return <div data-testid="rtc-camera" />
   },
 }))
 
@@ -29,13 +29,13 @@ describe('CameraTile', () => {
     mockEntities['camera.garage_camera'].state = 'recording'
   })
 
-  it('keeps the native player mounted while an unavailable camera attempts recovery', () => {
+  it('keeps the RTC card mounted while an unavailable camera attempts recovery', () => {
     mockEntities['camera.garage_camera'].state = 'unavailable'
 
     render(<CameraTile camera={driveway} onOpen={() => undefined} />)
     emitStatus('live')
 
-    expect(screen.getByTestId('hls-camera')).toBeInTheDocument()
+    expect(screen.getByTestId('rtc-camera')).toBeInTheDocument()
     expect(screen.queryByText('Camera unavailable')).not.toBeInTheDocument()
   })
 
@@ -74,7 +74,7 @@ describe('CameraTile', () => {
   it('does not mount the stream before the tile is hydrated', () => {
     render(<CameraTile camera={driveway} live={false} onOpen={() => undefined} />)
 
-    expect(screen.queryByTestId('hls-camera')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('rtc-camera')).not.toBeInTheDocument()
     expect(screen.queryByText('Camera unavailable')).not.toBeInTheDocument()
   })
 })

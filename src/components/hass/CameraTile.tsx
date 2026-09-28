@@ -3,7 +3,7 @@ import { useEntity } from '@hakit/core'
 import type { CameraConfig } from '../../constants/atAGlance'
 import { MaterialIcon } from '../core/Icon'
 import { asEntityName, titleCaseState } from './entityState'
-import { HlsCamera } from './HlsCamera'
+import { RtcPilotCamera } from './RtcPilotCamera'
 import type { CameraStreamStatus } from './cameraStreamStatus'
 import styles from './CameraTile.module.css'
 
@@ -14,7 +14,7 @@ interface CameraTileProps {
 }
 
 // Transport status is authoritative while frames are playing. The entity state remains the
-// fallback label while the Home Assistant stream is loading or unavailable.
+// fallback label while the RTC stream is loading or unavailable.
 function tileStateLabel(entityState: string | undefined, streamStatus: CameraStreamStatus) {
   if (streamStatus === 'live') return 'Live'
   return titleCaseState(entityState)
@@ -34,7 +34,7 @@ export function CameraTile({ camera, live = true, onOpen }: CameraTileProps) {
       ) : (
         <>
           <div className={styles.camera}>
-            <HlsCamera camera={camera} minHeight={190} variant="tile" onStatusChange={handleStatusChange} />
+            <RtcPilotCamera camera={camera} minHeight={190} variant="tile" onStatusChange={handleStatusChange} />
           </div>
           {streamStatus === 'error' && <div className={`${styles.placeholder} ${styles.streamError}`}>Camera unavailable</div>}
         </>
