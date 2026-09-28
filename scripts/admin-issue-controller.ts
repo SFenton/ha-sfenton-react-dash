@@ -3069,7 +3069,7 @@ Return a final response containing exactly one JSON object and no Markdown fence
 
 For needs_input, provide at least one question. Only a research-only needs_input may include PNG visualEvidence, and only for requested mockups from its private research directory; otherwise leave visualEvidence empty. Only the single exact original layout CI evidence question may add "reason": "ci_evidence_unavailable" to its question; omit that field for every other question. For ready_for_pr, changeSummary and tests must be non-empty, review.approved must be true, pr title/body and visualChange must be present, and visualEvidence must follow the visual classification above. For resolved_without_pr, issueTitle, resolutionType, resolution, and verification must be present and the worktree must remain clean. For blocked, explain the blocker. Omit fields that do not apply.
 
-Always include schemaVersion, decision, summary, questions, visualEvidence, and iosFollowUp. Use empty questions and visualEvidence arrays when they do not apply. A ready_for_pr outcome is valid only when every listed test passed.
+Keep each visualEvidence alt at most 240 characters and each caption at most 1000 characters, and include at most four images; the host rejects longer values. Always include schemaVersion, decision, summary, questions, visualEvidence, and iosFollowUp. Use empty questions and visualEvidence arrays when they do not apply. A ready_for_pr outcome is valid only when every listed test passed.
 
 ${issueContext}`
 }
@@ -3681,9 +3681,19 @@ async function runWorkspaceContainer(
   command: string,
   timeoutMs: number,
   focusedLayoutConfigDirectory?: string,
+  writableGeneratedFiles: readonly string[] = [],
 ) {
   const gitCommonDirectory = await getGitCommonDirectory(worktreePath)
   const containerName = `admin-issue-validate-${process.pid}-${Date.now()}`
+  const writableMounts = writableGeneratedFiles.flatMap((path) => {
+    const source = join(worktreePath, path)
+    const entry = lstatSync(source)
+    if (!(GENERATED_WORKER_MUTABLE_PATHS as readonly string[]).includes(path) ||
+      !entry.isFile() || entry.isSymbolicLink()) {
+      throw new AdminIssueProvenanceError(`Refusing to mount a non-generated path writable: ${path}`)
+    }
+    return ['--mount', `type=bind,src=${source},dst=/workspace/${path}`]
+  })
   const uid = process.getuid?.() ?? 1000
   const gid = process.getgid?.() ?? 1000
   const maskedWorkspaceFiles = new Set<string>()
@@ -3742,6 +3752,7 @@ async function runWorkspaceContainer(
           : []),
         ...maskedMounts,
         ...readOnlyMounts,
+        ...writableMounts,
         '--mount',
         `type=bind,src=${gitCommonDirectory},dst=${gitCommonDirectory},readonly`,
         '--workdir',
@@ -4855,6 +4866,43 @@ export async function pushCandidate(
   recordPublishedHead(config, state, record, candidate, remoteAfter)
 }
 
+export function generatedOnlyConflict(unmergedPaths: readonly string[]) {
+  return unmergedPaths.length > 0 && unmergedPaths.every((path) =>
+    (GENERATED_WORKER_MUTABLE_PATHS as readonly string[]).includes(path))
+}
+
+// A base merge that conflicts only in generated files is resolved by taking the
+// target base's copy and regenerating it from the merged sources in the
+// networkless validation container. Returns true when the merge was committed,
+// or a diagnostic string when the ordinary conflict handling must take over.
+async function resolveGeneratedBaseSyncConflict(
+  config: AdminIssueControllerConfig,
+  worktreePath: string,
+): Promise<true | string> {
+  const unmerged = (
+    await runCommand('git', ['diff', '--name-only', '--diff-filter=U', '-z', '--'], {
+      allowFailure: true,
+      cwd: worktreePath,
+    })
+  ).stdout.split('\0').filter(Boolean).sort()
+  if (!generatedOnlyConflict(unmerged)) return ''
+  try {
+    await runCommand('git', ['checkout', '--theirs', '--', ...unmerged], { cwd: worktreePath })
+    await runWorkspaceContainer(
+      config, worktreePath, 'npm run i18n:sync', 10 * 60_000, undefined, unmerged,
+    )
+    await runCommand('git', ['add', '--', ...unmerged], { cwd: worktreePath })
+    await runCommand(
+      'git',
+      ['-c', 'core.hooksPath=/dev/null', 'commit', '--no-edit'],
+      { cwd: worktreePath, timeoutMs: 120_000 },
+    )
+    return true
+  } catch (error) {
+    return `Generated-file regeneration failed: ${error instanceof Error ? error.message : String(error)}`
+  }
+}
+
 async function handleBaseSyncConflict(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
@@ -5102,12 +5150,15 @@ export async function synchronizeCandidateBase(
       { allowFailure: true, cwd: record.worktreePath, timeoutMs: 5 * 60_000 },
     )
     if (merge.exitCode !== 0) {
-      await handleBaseSyncConflict(
-        config,
-        state,
-        record,
-        `${merge.stdout}\n${merge.stderr}`,
-      )
+      const regeneration = await resolveGeneratedBaseSyncConflict(config, record.worktreePath)
+      if (regeneration !== true) {
+        await handleBaseSyncConflict(
+          config,
+          state,
+          record,
+          `${merge.stdout}\n${merge.stderr}${regeneration ? `\n${regeneration}` : ''}`,
+        )
+      }
     }
     const created = await readWorktreeSnapshot(record.worktreePath)
     if (created.status || created.gitOperations.length > 0) {
