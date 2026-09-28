@@ -1,6 +1,8 @@
 // @covers src/components/core/ModalTabNav.tsx
 // @covers src/components/hass/VacuumCard.tsx
 // @covers src/constants/portedDashboard.ts
+// @covers src/i18n/index.ts
+// @covers src/i18n/locales/en/modals/vacuum.json
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -307,6 +309,55 @@ describe('VacuumRoomSourceModalContent', () => {
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'main_floor_vacuum_mop_dock_clean' },
     ])
+  })
+
+  it('offers one session cancel and disables Pause while the dock prepares mop pads for cleaning', () => {
+    setMainFloorRuntime({ state: 'cleaning', statusFlag: 'segment' })
+    setMainFloorDockStatus('cleaning')
+    renderMainFloorRoomSource()
+
+    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, auto-clean, actions, info' })
+    expect(within(controlsPane).getByRole('heading', { name: 'Cleaning' })).toBeInTheDocument()
+    expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeDisabled()
+    expect(within(controlsPane).getByText('Pause becomes available after the robot leaves the dock.')).toBeInTheDocument()
+    expect(within(controlsPane).queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument()
+    const cancelSession = within(controlsPane).getByRole('button', { name: 'Cancel Cleaning Session' })
+    expect(cancelSession).toBeEnabled()
+
+    fireEvent.click(within(controlsPane).getByRole('button', { name: 'Pause' }))
+    expect(mockCallServiceCalls).toEqual([])
+
+    fireEvent.click(cancelSession)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'vacuum', service: 'return_to_base', target: mainFloorVacuum.entityId },
+    ])
+  })
+
+  it('shows session mop-pad washing as read-only Actions status instead of a disabled dock stop', async () => {
+    setMainFloorRuntime({ state: 'cleaning', statusFlag: 'segment' })
+    setMainFloorDockStatus('cleaning')
+    renderMainFloorRoomSource()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Actions' }))
+    await waitFor(() => expect(selectedTab()).toHaveAttribute('aria-label', 'Actions'))
+
+    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, auto-clean, actions, info' })
+    expect(await within(controlsPane).findByRole('group', { name: 'Dock Status Washing Mop Pads' })).toBeInTheDocument()
+    expect(within(controlsPane).getByText('The dock is washing the mop pads for the current cleaning session. To stop, use Cancel Cleaning Session on the Controls tab.')).toBeInTheDocument()
+    expect(within(controlsPane).queryByRole('button', { name: 'Stop Dock Clean' })).not.toBeInTheDocument()
+    expect(within(controlsPane).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('restores Pause and Stop once the robot leaves the dock after mop-pad washing', () => {
+    setMainFloorRuntime({ state: 'cleaning', statusFlag: 'segment' })
+    setMainFloorDockStatus('idle')
+    renderMainFloorRoomSource()
+
+    const controlsPane = screen.getByRole('group', { name: /Main Floor controls/ })
+    expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeEnabled()
+    expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeEnabled()
+    expect(within(controlsPane).queryByRole('button', { name: 'Cancel Cleaning Session' })).not.toBeInTheDocument()
   })
 
   it('surfaces Stop Mop Drying only in minimal Actions and calls the existing stop service', async () => {

@@ -16,6 +16,14 @@
   "tile": {
     "subtitleWithBattery": "{{state}} • {{battery}}%"
   },
+  "dockPreparation": {
+    "cancelCleaningSession": "Cancel Cleaning Session",
+    "cancelCleaningSessionHelp": "Cancel this cleaning session before the robot leaves the dock.",
+    "dockStatus": "Dock Status",
+    "pauseUnavailableHelp": "Pause becomes available after the robot leaves the dock.",
+    "washingMopPads": "Washing Mop Pads",
+    "washingMopPadsHelp": "The dock is washing the mop pads for the current cleaning session. To stop, use Cancel Cleaning Session on the Controls tab."
+  },
   "status": {
     "unavailableHelp": "Home Assistant does not have a current status for the vacuum.",
     "unavailableLiveStatus": "{{status}}. Home Assistant does not have the vacuum's current status.",

@@ -325,6 +325,14 @@ export const BATHROOM_FAN_COPY_KEYS = {
 
 export const VACUUM_COPY_KEYS = {
   cleaned: 'cleaned',
+  dockPreparation: {
+    cancelCleaningSession: 'dockPreparation.cancelCleaningSession',
+    cancelCleaningSessionHelp: 'dockPreparation.cancelCleaningSessionHelp',
+    dockStatus: 'dockPreparation.dockStatus',
+    pauseUnavailableHelp: 'dockPreparation.pauseUnavailableHelp',
+    washingMopPads: 'dockPreparation.washingMopPads',
+    washingMopPadsHelp: 'dockPreparation.washingMopPadsHelp',
+  },
   issues: 'issues',
   layout: {
     roomSelector: 'layout.roomSelector',
