@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { CAMERA_ITEMS } from '../../constants/atAGlance'
 import { mockCallServiceCalls, resetMockHass } from '../../test/mocks/hakitCoreState'
 import { CameraModalContent } from './CameraModalContent'
@@ -10,10 +10,11 @@ describe('CameraModalContent', () => {
     resetMockHass()
   })
 
-  it('controls the active HLS player and delegates recording to Home Assistant', () => {
+  it('controls the active RTC card and delegates recording to Home Assistant', async () => {
     const view = render(<CameraModalContent camera={frontDoor} />)
 
-    expect(view.container.querySelector('[data-camera-transport="hls"]')).toBeInTheDocument()
+    expect(view.container.querySelector('[data-camera-transport="webrtc"]')).toBeInTheDocument()
+    await waitFor(() => expect(view.container.querySelector('webrtc-camera-sfenton')).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: 'Snapshot' }))
     fireEvent.click(screen.getByRole('button', { name: 'Muted' }))
     expect(screen.getByRole('button', { name: 'Audio' })).toBeInTheDocument()

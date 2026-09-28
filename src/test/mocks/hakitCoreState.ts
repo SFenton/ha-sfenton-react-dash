@@ -61,7 +61,6 @@ let recipeQueryFailureConfig: string | null | undefined
 const pendingWakeCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
 const pendingHouseholdAwayCommands: { request: Record<string, unknown>; resolve: (value: unknown) => void; reject: (reason: Error) => void }[] = []
 let mockWakeEpisodeSequence = 0
-let mockCameraSessionSequence = 0
 // Generic deferred queue for any domain/service held with a 'pending' outcome so a test can
 // deterministically hold a request (e.g. todo.remove_item) and resolve it on its own schedule,
 // unlike the permanently-hanging `new Promise(() => undefined)` used elsewhere for pending outcomes.
@@ -2074,9 +2073,6 @@ export const mockState: MockHassState = {
     removeEventListener: (name, listener) => { mockConnectionListeners.get(name)?.delete(listener) },
     subscribeMessage: () => Promise.reject(new Error('Unsupported mocked subscription')),
     sendMessagePromise: async <T,>(message: Record<string, unknown>) => {
-      if (message.type === 'camera/stream') {
-        return { url: `/api/hls/mock-camera-${++mockCameraSessionSequence}/master_playlist.m3u8` } as T
-      }
       if (message.type === 'schedule/list') return [cloneRecord(mockHumidifierSchedule)] as T
       if (message.type === 'schedule/update') {
         mockScheduleMessages.push(cloneRecord(message))

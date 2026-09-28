@@ -357,7 +357,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   camera: {
     family: 'modal', states: ['loading', 'live'],
-    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera', 'src/components/hass/RtcPilotCamera', 'src/components/hass/haHlsSession', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/constants/rtcPilot', 'src/hls-js-light.d.ts'],
+    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera', 'src/components/hass/RtcPilotCamera', 'src/components/hass/rtcCardResource', 'src/components/hass/mockRtcCard', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/constants/rtcPilot'],
     legacy: ['feedback-regressions.spec.ts', 'landscape-modal-adaptation.spec.ts'],
     question: 'Do the shared camera tiles and modal media preserve their geometry from loading to decoded live video? The RTC pilot transport and audible output require separate real-media evidence.',
   },

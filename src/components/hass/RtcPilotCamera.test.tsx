@@ -1,7 +1,6 @@
 // @covers src/constants/rtcPilot.ts
 import { act, render, waitFor } from '@testing-library/react'
 import { CAMERA_ITEMS } from '../../constants/atAGlance'
-import { RTC_PILOT_RESOURCE_PATH } from '../../constants/rtcPilot'
 import { resetMockHass, setMockConnectionStatus } from '../../test/mocks/hakitCoreState'
 import {
   getCameraStreamMuteState,
@@ -45,13 +44,7 @@ if (!customElements.get('webrtc-camera-sfenton')) {
 
 const driveway = CAMERA_ITEMS.find((camera) => camera.entityId === 'camera.garage_camera')!
 
-describe('RTC pilot camera', () => {
-  it('imports its card from the admin-only test asset folder', () => {
-    expect(RTC_PILOT_RESOURCE_PATH).toBe(
-      '/local/ha-sfenton-react-dash-fold-test/rtc/webrtc-camera.js?v=v3.10.3',
-    )
-  })
-
+describe('RTC camera', () => {
   beforeEach(() => {
     resetMockHass()
     setMockConnectionStatus('connected')
@@ -187,7 +180,7 @@ describe('RTC pilot camera', () => {
     await waitFor(() => expect(view.container.querySelector('[data-status="error"]')).toBeInTheDocument())
     expect(view.container.querySelector('webrtc-camera-sfenton')).not.toBeInTheDocument()
     expect(view.container).toHaveTextContent('Camera unavailable')
-    expect(errorLog).toHaveBeenCalledWith('Unable to start RTC camera pilot:', expect.any(Error))
+    expect(errorLog).toHaveBeenCalledWith('Unable to start RTC camera:', expect.any(Error))
     view.unmount()
     errorLog.mockRestore()
   })
@@ -220,7 +213,7 @@ describe('RTC pilot camera', () => {
     await waitFor(() => expect(view.container.querySelector('webrtc-camera-sfenton')).toBeInTheDocument(), {
       timeout: 3_500,
     })
-    expect(errorLog).toHaveBeenCalledWith('Unable to start RTC camera pilot:', expect.any(Error))
+    expect(errorLog).toHaveBeenCalledWith('Unable to start RTC camera:', expect.any(Error))
     view.unmount()
     errorLog.mockRestore()
   })
@@ -235,7 +228,7 @@ describe('RTC pilot camera', () => {
       setMockConnectionStatus('connected')
     })
     await waitFor(() => expect(view.container.querySelector('webrtc-camera-sfenton')).toBeInTheDocument())
-    expect(errorLog).toHaveBeenCalledWith('Unable to start RTC camera pilot:', expect.any(Error))
+    expect(errorLog).toHaveBeenCalledWith('Unable to start RTC camera:', expect.any(Error))
     view.unmount()
     errorLog.mockRestore()
   })

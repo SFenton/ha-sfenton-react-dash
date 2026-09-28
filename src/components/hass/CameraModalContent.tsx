@@ -10,7 +10,7 @@ import {
   toggleCameraStreamMuted,
 } from './cameraStreamActions'
 import { asEntityName } from './entityState'
-import { HlsCamera } from './HlsCamera'
+import { RtcPilotCamera } from './RtcPilotCamera'
 import { useCopy } from '../../i18n'
 import styles from './CameraModalContent.module.css'
 
@@ -58,7 +58,7 @@ export function CameraModalContent({ camera, live = true }: { camera: CameraConf
   return (
     <div className={styles.cameraSheet} data-modal-landscape-layout="media-split">
       <div className={styles.cameraFocus} style={{ '--camera-aspect-ratio': camera.aspectRatio } as CSSProperties}>
-        {live ? <HlsCamera camera={camera} controls errorLabel={copy('status.unavailable')} fill minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
+        {live ? <RtcPilotCamera camera={camera} controls errorLabel={copy('status.unavailable')} fill minHeight={310} variant="modal" /> : <div style={{ minHeight: 310 }} />}
       </div>
       <div className={styles.cameraControls} aria-label={copy('controls', { title: camera.title })} data-security-camera-controls="true">
         <ActionPill active={snapshotPulse} label={copy('actions.snapshot')} onClick={takeSnapshot} pulse={snapshotPulse}>
