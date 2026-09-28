@@ -624,6 +624,10 @@ function formatAreaLength(centimetres: number) {
   return `${Number.isInteger(metres) ? metres.toFixed(0) : metres.toFixed(2).replace(/0$/, '')} m`
 }
 
+function vacuumDockPreparationActive(vacuumState: string, dockState: string | undefined) {
+  return vacuumState === 'cleaning' && dockState === 'cleaning'
+}
+
 function dockStatusVisual(state: string | undefined): { icon: string; tone: VacuumVisualTone } {
   if (state === 'cleaning') return { icon: 'mdi:water', tone: 'active' }
   if (state === 'drying') return { icon: 'mdi:weather-windy', tone: 'active' }
@@ -1463,9 +1467,11 @@ function VacuumStateActions({
   optimisticState: OptimisticVacuumState
   vacuum: VacuumConfig
 }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const services = useHass((state) => state.services)
   const entities = useHass((state) => state.entities) as unknown as Record<string, EntityLike | undefined>
+  const dockStatus = useOptionalEntity(vacuum.dockControls?.dockStatusEntityId)
   const roomsSelected = orderedSelectedVacuumZones(vacuum.zones, entities, coordinator).length > 0
   const statusFlag = useEntity(asEntityName(vacuum.statusFlagEntityId), { returnNullIfNotFound: true })
   const error = useEntity(asEntityName(vacuum.errorEntityId), { returnNullIfNotFound: true })
@@ -1480,6 +1486,7 @@ function VacuumStateActions({
   const resumable = isResumable(liveStatusFlag)
   const cancelResumePending = resumable && !isResumable(displayStatusFlag)
   const lowBattery = error?.state === 'Low battery'
+  const dockPreparation = vacuumDockPreparationActive(state, dockStatus?.state)
   const resumeReady = resumable && (state === 'docked' || state === 'idle')
   const cancelResumeVisible = resumable && ['docked', 'error', 'idle', 'returning'].includes(state)
   const showCleaningSetup = runtimeMode === 'full'
@@ -1506,6 +1513,7 @@ function VacuumStateActions({
   }
   const dock = () => commitAndCall('returning', 'vacuum.return_to_base', vacuum.entityId)
   const stop = () => commitAndCall(liveState === 'error' ? 'idle' : 'returning', liveState === 'error' ? 'vacuum.stop' : 'vacuum.return_to_base', vacuum.entityId)
+  const cancelCleaningSession = () => commitAndCall('docked', 'vacuum.return_to_base', vacuum.entityId)
   const cancelResume = () => {
     commitDisplayStatusFlag('none')
     commitAndCall(state === 'docked' ? 'docked' : 'idle', 'vacuum.stop', vacuum.entityId)
@@ -1580,8 +1588,9 @@ function VacuumStateActions({
       {state === 'error' && !resumable && !lowBattery && <ActionButton description="Send the robot back to the dock." disabled={recoveryCommandsDisabled} icon="mdi:home" label="Dock" onClick={dock} />}
       {resumeReady && <ActionButton description="Continue the interrupted cleaning run." disabled={recoveryCommandsDisabled || cancelResumePending} icon="mdi:play" label="Resume" onClick={start} tone="primary" />}
       {cancelResumeVisible && <ActionButton description="Cancel the pending cleaning resume." disabled={recoveryCommandsDisabled || cancelResumePending} icon="mdi:stop" label="Cancel" onClick={cancelResume} tone="danger" />}
-      {state === 'cleaning' && <ActionButton description="Pause the current cleaning run." disabled={recoveryCommandsDisabled} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" />}
-      {state === 'cleaning' && <ActionButton description="Stop the current cleaning run." disabled={recoveryCommandsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
+      {state === 'cleaning' && <ActionButton description={dockPreparation ? copy(VACUUM_COPY_KEYS.dockPreparation.pauseUnavailableHelp) : 'Pause the current cleaning run.'} disabled={recoveryCommandsDisabled || dockPreparation} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" />}
+      {dockPreparation && <ActionButton description={copy(VACUUM_COPY_KEYS.dockPreparation.cancelCleaningSessionHelp)} disabled={recoveryCommandsDisabled} icon="mdi:stop" label={copy(VACUUM_COPY_KEYS.dockPreparation.cancelCleaningSession)} onClick={cancelCleaningSession} tone="danger" />}
+      {state === 'cleaning' && !dockPreparation && <ActionButton description="Stop the current cleaning run." disabled={recoveryCommandsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
       {state === 'paused' && <ActionButton description="Continue the paused cleaning run." disabled={recoveryCommandsDisabled} icon="mdi:play" label="Resume" onClick={start} tone="primary" />}
       {state === 'paused' && <ActionButton description="Stop the paused cleaning run." disabled={recoveryCommandsDisabled} icon="mdi:stop" label="Stop" onClick={stop} tone="danger" />}
       {state === 'returning' && <ActionButton description="Pause the return-to-dock action." disabled={recoveryCommandsDisabled || cancelResumePending} icon="mdi:pause" label="Pause" onClick={pause} tone="warning" />}
@@ -1603,6 +1612,7 @@ function VacuumDockControlsSection({
   optimisticState: OptimisticVacuumState
   vacuum: VacuumConfig
 }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const callService = useHass((state) => state.helpers.callService) as unknown as CallService
   const services = useHass((state) => state.services)
   const dockStatus = useOptionalEntity(vacuum.dockControls?.dockStatusEntityId)
@@ -1614,6 +1624,7 @@ function VacuumDockControlsSection({
   const mopAttached = mopAttachment?.state === 'on'
   const cleanActive = displayDockState === 'cleaning'
   const dryActive = displayDockState === 'drying'
+  const sessionMopWashActive = vacuumDockPreparationActive(state, displayDockState)
   const dockBridgeAvailable = hassServiceAvailable(services, 'valetudo_vacuum_coordinator.dock_action')
   const cleanScriptAvailable = Boolean(vacuum.dockControls && dockBridgeAvailable && hassServiceAvailable(services, vacuum.dockControls.cleanScript))
   const dryScriptAvailable = Boolean(vacuum.dockControls && dockBridgeAvailable && hassServiceAvailable(services, vacuum.dockControls.dryScript))
@@ -1651,7 +1662,12 @@ function VacuumDockControlsSection({
   return (
     <ControlSection title="Dock Controls">
       <div className={styles.dockActionGrid}>
-        {showCleanAction && vacuum.dockControls && (
+        {showCleanAction && vacuum.dockControls && sessionMopWashActive && (
+          <ControlItem description={copy(VACUUM_COPY_KEYS.dockPreparation.washingMopPadsHelp)}>
+            <InfoPill grouped icon="mdi:water" label={copy(VACUUM_COPY_KEYS.dockPreparation.dockStatus)} tone="active" value={copy(VACUUM_COPY_KEYS.dockPreparation.washingMopPads)} />
+          </ControlItem>
+        )}
+        {showCleanAction && vacuum.dockControls && !sessionMopWashActive && (
           <ActionButton
             description={cleanActive ? 'Finish the dock-cleaning phase and drain the wash tray into the dirty-water tank.' : 'Start the mop-dock cleaning phase. Use Stop Dock Clean when finished so the dock drains the wash tray.'}
             disabled={!cleanAllowed}
