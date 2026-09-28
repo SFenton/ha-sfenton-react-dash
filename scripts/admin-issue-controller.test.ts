@@ -138,6 +138,7 @@ import {
   updateWorkflowDigestConfig,
   validationCommands,
   workerMutableInfrastructurePaths,
+  generatedOnlyConflict,
   withControllerLock,
   workflowDigestRotationRequired,
 } from './admin-issue-controller'
@@ -5603,6 +5604,24 @@ describe('admin issue controller security configuration', () => {
         candidateHeadSha,
       ),
     ).toBeUndefined()
+  })
+
+  it('regenerates only base-sync conflicts confined to generated files', () => {
+    const inventory = 'scripts/i18n/generated/copy-inventory.json'
+    expect(generatedOnlyConflict([inventory])).toBe(true)
+    expect(generatedOnlyConflict([])).toBe(false)
+    expect(generatedOnlyConflict([inventory, 'src/App.tsx'])).toBe(false)
+    expect(generatedOnlyConflict(['scripts/i18n/generated/legacy-copy-baseline.json'])).toBe(false)
+    const controller = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
+    expect(controller).toContain("'npm run i18n:sync', 10 * 60_000, undefined, unmerged,")
+    expect(controller).toContain('const regeneration = await resolveGeneratedBaseSyncConflict(config, record.worktreePath)')
+  })
+
+  it('tells the worker the host limits on visual evidence text', () => {
+    const prompt = buildWorkerPrompt(record())
+    expect(prompt).toContain('alt at most 240 characters')
+    expect(prompt).toContain('caption at most 1000 characters')
+    expect(prompt).toContain('at most four images')
   })
 
   it('allows only auto-deployed dashboard paths from workers', () => {
