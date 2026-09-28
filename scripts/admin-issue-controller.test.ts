@@ -4,12 +4,11 @@
 // @covers ops/admin-issue-controller/worker-extension.mjs
 // @covers ops/admin-issue-controller/controller.json.example
 // @covers ops/admin-issue-controller/admin-issue-controller.service
-// @covers ops/admin-issue-controller/tandem-research/SKILL.md
 // @covers package.json
 // @covers .gitignore
 
 import { execFileSync, spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   chmodSync,
   copyFileSync,
@@ -59,7 +58,10 @@ import {
   assertWorkerChangesSafe,
   assertPullRequestBinding,
   assertPullRequestContainsVisualEvidence,
-  buildCopilotWorkerArgs,
+  buildClaudeWorkerArgs,
+  buildWorkerMcpConfig,
+  buildWorkerStdin,
+  extractFinalAssistantResponse,
   buildInitialInput,
   buildWorkerPrompt,
   canonicalWorkerIssueBody,
@@ -103,7 +105,8 @@ import {
   markFrontendOnlyRecoveryObserved,
   parseResearchMountRetryArgs,
   prepareCommittedCandidate,
-  prepareCopilotHome,
+  prepareClaudeHome,
+  readClaudeWorkerCredential,
   prepareGitHubMediaInput,
   prepareReopenedMedia,
   publishPullRequestIssueComment,
@@ -121,16 +124,16 @@ import {
   restoreReadyOutcomeFromWorkerLog,
   runCommand,
   selectWorkerHassMcpConfig,
-  selectWorkerSessionCandidate,
-  shouldRetryWorkerSessionWithoutName,
   shouldVerifyExistingPullRequestVisualEvidence,
   summarizeFailedCheckLogs,
   synchronizeCandidateBase,
   unreviewableIssueMedia,
   waitForMergedPullRequest,
   workerInputAttachments,
-  workerMediaAttachmentArgs,
-  workerHassPermissionArgs,
+  workerMediaContentBlocks,
+  workerMcpConfigPath,
+  workerPermissionArgs,
+  workerSessionTranscriptExists,
   workerInputSnapshot,
   updateWorkflowDigestConfig,
   validationCommands,
@@ -492,11 +495,10 @@ function workerExtensionFixture() {
   const root = mkdtempSync(join(homedir(), '.admin-issue-extension-test-'))
   temporaryDirectories.push(root)
   const extensionPath = join(root, 'worker-extension.mjs')
-  const packagePath = join(root, 'node_modules/@github/copilot-sdk')
+  const driverPath = join(root, 'node_modules/drive-worker.mjs')
   const dockerBin = join(root, 'node_modules/.worker-test-bin')
   const dockerArgsPath = join(root, 'node_modules/worker-docker-args.txt')
   mkdirSync(join(root, 'src'), { mode: 0o700 })
-  mkdirSync(packagePath, { recursive: true })
   mkdirSync(dockerBin, { recursive: true })
   writeFileSync(join(root, '.gitignore'), '.cache/\nartifacts/\nnode_modules/\n.env.development\n')
   writeFileSync(join(root, 'src/locked.txt'), 'immutable\n')
@@ -505,19 +507,31 @@ function workerExtensionFixture() {
     resolve(process.cwd(), 'ops/admin-issue-controller/worker-extension.mjs'),
     extensionPath,
   )
-  writeFileSync(join(packagePath, 'package.json'), JSON.stringify({
-    exports: { './extension': './extension.mjs' },
-    name: '@github/copilot-sdk',
-    type: 'module',
-  }))
-  writeFileSync(join(packagePath, 'extension.mjs'), [
-    'export async function joinSession({ tools }) {',
-    '  const result = await tools[0].handler({',
-    '    command: process.env.ADMIN_ISSUE_TEST_COMMAND ?? "printf worker-smoke-ok",',
-    '    timeout_seconds: 60,',
-    '  });',
-    '  process.stdout.write(JSON.stringify(result));',
-    '}',
+  // Drives the MCP stdio server through one tools/call, the way Claude Code does.
+  writeFileSync(driverPath, [
+    'import { spawn } from "node:child_process";',
+    'const server = spawn(process.execPath, [process.argv[2]], { stdio: ["pipe", "pipe", "inherit"] });',
+    'let buffer = "";',
+    'server.stdout.on("data", (chunk) => {',
+    '  buffer += chunk;',
+    '  for (const line of buffer.split("\\n").slice(0, -1)) {',
+    '    const message = JSON.parse(line);',
+    '    if (message.id !== 2) continue;',
+    '    const text = message.result.content[0].text;',
+    '    server.kill();',
+    '    if (message.result.isError) { process.stderr.write(text); process.exit(1); }',
+    '    process.stdout.write(JSON.stringify({ resultType: "success", textResultForLlm: text }));',
+    '    process.exit(0);',
+    '  }',
+    '  buffer = buffer.slice(buffer.lastIndexOf("\\n") + 1);',
+    '});',
+    'const send = (message) => server.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\\n`);',
+    'send({ id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } });',
+    'send({ method: "notifications/initialized" });',
+    'send({ id: 2, method: "tools/call", params: { name: "admin_issue_workspace", arguments: {',
+    '  command: process.env.ADMIN_ISSUE_TEST_COMMAND ?? "printf worker-smoke-ok",',
+    '  timeout_seconds: 60,',
+    '} } });',
   ].join('\n'))
   writeFileSync(join(dockerBin, 'docker'), [
     '#!/bin/sh',
@@ -535,7 +549,7 @@ function workerExtensionFixture() {
   const run = (
     overrides: Record<string, string> = {},
     fakeDocker = true,
-  ) => spawnSync(process.execPath, [extensionPath], {
+  ) => spawnSync(process.execPath, [driverPath, extensionPath], {
     cwd: root,
     encoding: 'utf8',
     env: {
@@ -2554,13 +2568,25 @@ describe('admin issue controller domain', () => {
     issue.worktreePath = join(root, 'worktree')
     mkdirSync(issue.worktreePath)
     materializeWorkerInputAttachments(config, issue)
-    const nativeArgs = workerMediaAttachmentArgs(issue)
-    expect(nativeArgs).toEqual([
-      '--attachment',
-      resolve(issue.worktreePath, `artifacts/admin-issue-${issue.issueNumber}/reported/input-4-${media.attachments?.[0].id}.png`),
-    ])
-    expect(statSync(nativeArgs[1]).mode & 0o777).toBe(0o400)
-    expect(readFileSync(nativeArgs[1])).toEqual(pngBytes)
+    const materialized = resolve(
+      issue.worktreePath,
+      `artifacts/admin-issue-${issue.issueNumber}/reported/input-4-${media.attachments?.[0].id}.png`,
+    )
+    expect(statSync(materialized).mode & 0o777).toBe(0o400)
+    expect(readFileSync(materialized)).toEqual(pngBytes)
+    const nativeMedia = workerMediaContentBlocks(issue)
+    expect(nativeMedia).toEqual([{
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: pngBytes.toString('base64') },
+    }])
+    const stdin = JSON.parse(buildWorkerStdin('prompt text', nativeMedia))
+    expect(stdin).toEqual({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [{ type: 'text', text: 'prompt text' }, ...nativeMedia],
+      },
+    })
     expect(buildWorkerPrompt(issue)).toContain('Submitted media (also attached directly')
     expect(workerInputAttachments(issue)).toHaveLength(1)
 
@@ -2709,16 +2735,6 @@ describe('admin issue controller domain', () => {
     expect(unreviewableIssueMedia(issue)).toHaveLength(1)
     expect(buildWorkerPrompt(issue)).toContain('Media the controller could not make available')
     expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
-  })
-
-  it('teaches the dedicated worker to inspect attached media rather than names or links', () => {
-    const skill = readFileSync(resolve('ops/admin-issue-controller/tandem-research/SKILL.md'), 'utf8')
-    expect(skill).toContain('native image attachments')
-    expect(skill).toContain('Inspect the attached pixels, not merely a path')
-    expect(skill).toContain('unsupported media')
-    expect(skill).toContain('GPT-5.6 Luna `medium/default`')
-    expect(skill).toContain('not the global guarded Sol/Opus tandem')
-    expect(skill).not.toContain('Astra')
   })
 
   it('preserves duplicate media contexts but downloads a GitHub asset once per input', async () => {
@@ -4358,69 +4374,43 @@ describe('admin issue controller security configuration', () => {
     )
   })
 
-  it('selects the substantive stable session when an empty duplicate name exists', () => {
-    expect(
-      selectWorkerSessionCandidate(
-        [
-          {
-            id: '50eac06b-59ef-4236-8db6-1aef35d91c52',
-            name: 'admin-issue-190-task',
-            summaryCount: 0,
-            updatedAt: '2026-09-22T14:24:07.801Z',
-          },
-          {
-            id: 'e0642349-ed35-4b5a-b89e-0c5213b72a92',
-            name: 'admin-issue-190-task',
-            summaryCount: 1,
-            updatedAt: '2026-09-22T14:03:39.202Z',
-          },
-        ],
-        'admin-issue-190-task',
-      )?.id,
-    ).toBe('e0642349-ed35-4b5a-b89e-0c5213b72a92')
-  })
+  it('resumes a Claude worker session only when its transcript exists', () => {
+    const workerHome = mkdtempSync(join(homedir(), '.admin-issue-session-test-'))
+    temporaryDirectories.push(workerHome)
+    const sessionId = 'fdc5c356-c9f0-42c1-8b54-492e5ea48f35'
+    expect(workerSessionTranscriptExists({ workerHome }, sessionId)).toBe(false)
+    const project = join(workerHome, '.claude/projects/-worktree')
+    mkdirSync(project, { recursive: true })
+    writeFileSync(join(project, `${sessionId}.jsonl`), '{}\n')
+    expect(workerSessionTranscriptExists({ workerHome }, sessionId)).toBe(true)
+    expect(workerSessionTranscriptExists({ workerHome }, randomUUID())).toBe(false)
 
-  it('recovers a remotely existing stable session without renaming it', () => {
-    const commonArgs = ['--model', 'gpt-5.6-sol', '-p', 'continue']
-    expect(
-      buildCopilotWorkerArgs(
-        'fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
-        'admin-issue-167-task',
-        commonArgs,
-        false,
-      ),
-    ).toEqual([
-      '--session-id=fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+    const commonArgs = ['--print', '--model', 'claude-opus-5-5']
+    expect(buildClaudeWorkerArgs(sessionId, 'admin-issue-167-task', commonArgs, false)).toEqual([
+      '--session-id',
+      sessionId,
       '--name',
       'admin-issue-167-task',
       ...commonArgs,
     ])
-
-    const conflict = {
-      exitCode: 1,
-      stderr:
-        "error: option '-n, --name <name>' cannot be used with option '--session-id <id>' when it resolves to an existing or remote session or task.",
-      stdout: '',
-    }
-    expect(shouldRetryWorkerSessionWithoutName(true, conflict)).toBe(true)
-    expect(
-      buildCopilotWorkerArgs(
-        'fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
-        'admin-issue-167-task',
-        commonArgs,
-        true,
-      ),
-    ).toEqual([
-      '--session-id=fdc5c356-c9f0-42c1-8b54-492e5ea48f35',
+    expect(buildClaudeWorkerArgs(sessionId, 'admin-issue-167-task', commonArgs, true)).toEqual([
+      '--resume',
+      sessionId,
       ...commonArgs,
     ])
-    expect(shouldRetryWorkerSessionWithoutName(false, conflict)).toBe(false)
-    expect(
-      shouldRetryWorkerSessionWithoutName(true, {
-        ...conflict,
-        stderr: 'error: authentication failed',
-      }),
-    ).toBe(false)
+  })
+
+  it('reads the Claude result event and still recovers retired Copilot logs', () => {
+    const result = (fields: Record<string, unknown>) =>
+      `${JSON.stringify({ type: 'system', subtype: 'init' })}\n${JSON.stringify({
+        type: 'result', subtype: 'success', is_error: false, result: '{"decision":"blocked"}', ...fields,
+      })}\n`
+    expect(extractFinalAssistantResponse(result({}))).toBe('{"decision":"blocked"}')
+    expect(() => extractFinalAssistantResponse(result({ is_error: true, subtype: 'error_max_turns' })))
+      .toThrow('without a successful result')
+    expect(extractFinalAssistantResponse(
+      `${JSON.stringify({ type: 'assistant.message', data: { content: 'legacy' } })}\n`,
+    )).toBe('legacy')
   })
 
   it('summarizes the useful failing assertion instead of leading setup logs', () => {
@@ -5682,32 +5672,33 @@ describe('admin issue controller security configuration', () => {
     ).toThrow('protected path')
   })
 
-  it('rejects executable Copilot configuration outside the dedicated extension', () => {
+  it('rejects executable Claude Code configuration outside the dedicated worker home', () => {
     const root = mkdtempSync(join(homedir(), '.admin-issue-controller-host-config-test-'))
     temporaryDirectories.push(root)
     const repositoryPath = join(root, 'repository')
-    const policyPath = join(root, 'policy')
+    const managedPath = join(root, 'managed')
     mkdirSync(repositoryPath, { recursive: true })
-    mkdirSync(policyPath, { recursive: true })
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).not.toThrow()
+    mkdirSync(join(managedPath, 'managed-settings.d'), { recursive: true })
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).not.toThrow()
 
-    const extensionPath = join(repositoryPath, '.github/extensions')
-    mkdirSync(extensionPath, { recursive: true })
-    writeFileSync(join(extensionPath, 'unexpected.mjs'), 'export {};\n')
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
-      'Project Copilot extensions are not allowed',
+    mkdirSync(join(repositoryPath, '.claude/agents'), { recursive: true })
+    writeFileSync(join(repositoryPath, '.claude/agents/unexpected.md'), '# agent\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).toThrow(
+      'Project Claude Code configuration is not allowed',
     )
-    rmSync(join(repositoryPath, '.github'), { force: true, recursive: true })
+    rmSync(join(repositoryPath, '.claude'), { force: true, recursive: true })
 
     writeFileSync(join(repositoryPath, '.mcp.json'), '{}\n')
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).toThrow(
       'Project MCP configuration is not allowed',
     )
     rmSync(join(repositoryPath, '.mcp.json'))
 
-    writeFileSync(join(policyPath, 'mandatory.json'), '{}\n')
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
-      'Copilot policy hooks are not allowed',
+    writeFileSync(join(managedPath, 'managed-settings.json'), '{"model":"opus"}\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).not.toThrow()
+    writeFileSync(join(managedPath, 'managed-settings.d', 'mandatory.json'), '{"hooks":{}}\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).toThrow(
+      'Claude Code managed hooks are not allowed',
     )
   })
 
@@ -5716,13 +5707,12 @@ describe('admin issue controller security configuration', () => {
     temporaryDirectories.push(root)
     const repositoryPath = join(root, 'repository')
     const workerExtensionPath = join(root, 'worker-extension.mjs')
-    const tandemSkillPath = join(root, 'tandem-research', 'SKILL.md')
+    const claudeTokenPath = join(root, 'claude-token')
     const hassMcpConfigPath = join(root, 'mcp-config.json')
     const runnerControllerConfigPath = join(root, 'runner-controller.json')
     mkdirSync(repositoryPath, { recursive: true })
-    mkdirSync(resolve(tandemSkillPath, '..'), { recursive: true })
     writeFileSync(workerExtensionPath, 'export {};\n')
-    writeFileSync(tandemSkillPath, '# Tandem research\n')
+    writeFileSync(claudeTokenPath, 'sk-ant-oat01-synthetic-test-token\n', { mode: 0o600 })
     writeFileSync(
       hassMcpConfigPath,
       JSON.stringify({
@@ -5760,7 +5750,7 @@ describe('admin issue controller security configuration', () => {
       runnerControllerConfigPath,
       runnerControllerService: 'ha-dashboard-runner-controller.service',
       stateDirectory: join(root, 'state'),
-      tandemSkillPath,
+      claudeTokenPath,
       todoEntityId: 'todo.groceries',
       workerExtensionPath,
       workerImageId: `sha256:${'a'.repeat(64)}`,
@@ -5787,25 +5777,39 @@ describe('admin issue controller security configuration', () => {
         hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test' },
       },
     })
-    prepareCopilotHome(loaded)
-    expect(
-      JSON.parse(readFileSync(join(base.workerHome, '.copilot/mcp-config.json'), 'utf8')),
-    ).toEqual({
+    expect(readClaudeWorkerCredential(loaded)).toEqual({
+      CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat01-synthetic-test-token',
+    })
+    chmodSync(claudeTokenPath, 0o644)
+    expect(() => readClaudeWorkerCredential(loaded)).toThrow('must not be readable')
+    chmodSync(claudeTokenPath, 0o600)
+    const sandboxEnvironment = { ADMIN_ISSUE_WORKSPACE: '/private/worktree' }
+    prepareClaudeHome(loaded)
+    const claudeHome = join(base.workerHome, '.claude')
+    expect(JSON.parse(readFileSync(join(claudeHome, 'settings.json'), 'utf8')))
+      .toEqual({ disableAllHooks: true })
+    expect(statSync(join(claudeHome, 'admin-issue-worker/server.mjs')).mode & 0o777).toBe(0o600)
+    expect(buildWorkerMcpConfig(loaded, sandboxEnvironment)).toEqual({
       mcpServers: {
         hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test' },
+        'admin-issue-worker': {
+          type: 'stdio',
+          command: process.execPath,
+          args: [join(claudeHome, 'admin-issue-worker/server.mjs')],
+          env: sandboxEnvironment,
+        },
       },
     })
-    expect(statSync(join(base.workerHome, '.copilot/mcp-config.json')).mode & 0o777).toBe(0o600)
+    expect(workerMcpConfigPath(loaded)).toBe(join(claudeHome, 'worker-mcp.json'))
+    mkdirSync(join(claudeHome, 'skills/unreviewed'), { recursive: true })
+    mkdirSync(join(claudeHome, 'projects/-worktree'), { recursive: true })
+    prepareClaudeHome(loaded)
+    expect(existsSync(join(claudeHome, 'skills'))).toBe(false)
+    expect(existsSync(join(claudeHome, 'projects/-worktree'))).toBe(true)
     const first = isolatedWorkerConfig(loaded, record())
     const second = isolatedWorkerConfig(loaded, { issueNumber: 322, uid: 'another-task' })
     expect(first.workerHome).not.toBe(second.workerHome)
-    prepareCopilotHome(first)
-    const firstMcp = readFileSync(join(first.workerHome, '.copilot/mcp-config.json'), 'utf8')
-    prepareCopilotHome(second)
-    expect(readFileSync(join(first.workerHome, '.copilot/mcp-config.json'), 'utf8'))
-      .toBe(firstMcp)
-    expect(statSync(join(second.workerHome, '.copilot/mcp-config.json')).mode & 0o777)
-      .toBe(0o600)
+    expect(workerMcpConfigPath(first)).not.toBe(workerMcpConfigPath(second))
     expect(() =>
       selectWorkerHassMcpConfig(JSON.parse(readFileSync(hassMcpConfigPath, 'utf8')), 'missing'),
     ).toThrow('is not configured')
@@ -6029,20 +6033,18 @@ describe('admin issue controller security configuration', () => {
 
   it('pins the worker model and excludes privileged built-in tools', () => {
     const controller = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
-    expect(controller).toContain("'gpt-5.6-sol'")
-    expect(controller).toContain("'max'")
-    expect(controller).toContain("'--disable-builtin-mcps'")
-    expect(controller).toContain("'--enable-mcp-server'")
-    expect(controller).toContain("'--allow-all-mcp-server-instructions'")
-    expect(controller).toContain('mcp:*')
-    expect(controller).toContain("'custom-tool(admin_issue_workspace)'")
+    expect(controller).toContain("WORKER_CLAUDE_MODEL = 'claude-opus-5-5'")
+    expect(controller).toContain("WORKER_CLAUDE_EFFORT = 'high'")
+    expect(controller).toContain("WORKER_BUILTIN_TOOLS = ['Agent', 'ToolSearch'] as const")
+    expect(controller).toContain("'--strict-mcp-config'")
+    expect(controller).toContain("'--setting-sources',\n    'user'")
     expect(controller).toContain('config.hassMcpServerName')
-    expect(controller).toContain("'GH_TOKEN'")
+    expect(controller).not.toContain("'GH_TOKEN'")
     expect(controller).toContain(
-      'buildCopilotWorkerArgs(session.id, record.sessionName, commonArgs, session.resume)',
+      'buildClaudeWorkerArgs(session.id, record.sessionName, commonArgs, session.resume)',
     )
     expect(controller).toContain('disableAllHooks: true')
-    expect(controller).toContain("'installed-plugins'")
+    expect(controller).toContain("'plugins'")
     expect(controller).toContain("const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']")
     expect(controller).not.toContain("'--allow-all-tools'")
     expect(controller).toContain('MAX_BASE_RESYNCS_PER_GENERATION = 2')
@@ -6208,11 +6210,15 @@ describe('admin issue controller security configuration', () => {
     expect(prompt).toContain('render exactly one distinct PNG for each requested alternative')
     expect(prompt).toContain('needs_input.visualEvidence')
     expect(prompt).not.toContain('Otherwise implement the complete fix')
-    expect(workerHassPermissionArgs('hass', true)).toContain('hass(ha_get_state)')
-    expect(workerHassPermissionArgs('hass', true)).toContain('hass(ha_get_history)')
-    expect(workerHassPermissionArgs('hass', true)).not.toContain('hass')
-    expect(workerHassPermissionArgs('hass', true)).not.toContain('hass(ha_call_service)')
-    expect(workerHassPermissionArgs('hass', false)).toEqual(['--allow-tool', 'hass'])
+    const researchArgs = workerPermissionArgs('hass', true)
+    expect(researchArgs.slice(0, 3)).toEqual(['--permission-mode', 'dontAsk', '--allowedTools'])
+    const allowed = researchArgs[3].split(',')
+    expect(allowed).toContain('mcp__hass__ha_get_state')
+    expect(allowed).toContain('mcp__hass__ha_get_history')
+    expect(allowed).toContain('mcp__admin-issue-worker__admin_issue_workspace')
+    expect(allowed).not.toContain('mcp__hass')
+    expect(allowed).not.toContain('mcp__hass__ha_call_service')
+    expect(workerPermissionArgs('hass', false)).toEqual(['--permission-mode', 'bypassPermissions'])
     expect(() => assertResearchOnlyOutcome(issue, { decision: 'ready_for_pr' }, []))
       .toThrow('cannot implement or close')
     expect(() => assertResearchOnlyOutcome(issue, { decision: 'resolved_without_pr' }, []))
