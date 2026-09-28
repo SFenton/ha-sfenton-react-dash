@@ -1,0 +1,2038 @@
+/** Chrome 63+, Safari 11.1+ */
+import {VideoRTC} from './video-rtc.js?v=1.9.12';
+import {DigitalPTZ} from './digital-ptz.js?v=3.3.0';
+import {streamManager} from './stream-manager.js?v=1.3.0';
+
+// Version identifier for debugging cache issues
+const WEBRTC_VERSION = '3.10.3';
+console.log(`[WebRTC Camera] Version: ${WEBRTC_VERSION}`);
+
+// ========== Debug Logging Infrastructure ==========
+// Stores logs in memory and localStorage for persistence
+// Access via: window.__webrtcDebugLogs or download via window.__webrtcDownloadLogs()
+if (typeof window !== 'undefined') {
+    // Debug logging is off by default. Enable with: window.__webrtcEnableDebug()
+    if (window.__webrtcDebugEnabled === undefined) {
+        window.__webrtcDebugEnabled = false;
+    }
+    if (!window.__webrtcDebugLogs) {
+        window.__webrtcDebugLogs = [];
+        // Try to restore from localStorage
+        try {
+            const stored = localStorage.getItem('sfenton-webrtc-debug-log');
+            if (stored) {
+                window.__webrtcDebugLogs = JSON.parse(stored);
+            }
+        } catch (e) { /* ignore */ }
+    }
+    
+    window.__webrtcLog = function(category, message, data = {}) {
+        if (!window.__webrtcDebugEnabled) return;
+        const entry = {
+            timestamp: new Date().toISOString(),
+            category,
+            message,
+            data: JSON.parse(JSON.stringify(data)), // Deep clone to capture state
+        };
+        window.__webrtcDebugLogs.push(entry);
+        // Keep last 500 entries
+        if (window.__webrtcDebugLogs.length > 500) {
+            window.__webrtcDebugLogs.shift();
+        }
+        // Persist to localStorage only when enabled
+        try {
+            localStorage.setItem('sfenton-webrtc-debug-log', JSON.stringify(window.__webrtcDebugLogs));
+        } catch (e) { /* ignore quota errors */ }
+        // Also log to console for immediate visibility
+        console.log(`[WebRTC-Debug] [${category}] ${message}`, data);
+    };
+    
+    window.__webrtcDownloadLogs = function() {
+        const blob = new Blob([JSON.stringify(window.__webrtcDebugLogs, null, 2)], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'sfenton-webrtc-debug.log';
+        a.click();
+    };
+    
+    window.__webrtcClearLogs = function() {
+        window.__webrtcDebugLogs = [];
+        localStorage.removeItem('sfenton-webrtc-debug-log');
+        console.log('[WebRTC-Debug] Logs cleared');
+    };
+    
+    window.__webrtcEnableDebug = function() {
+        window.__webrtcDebugEnabled = true;
+        console.log('[WebRTC-Debug] Debug logging enabled');
+    };
+    
+    window.__webrtcDisableDebug = function() {
+        window.__webrtcDebugEnabled = false;
+        console.log('[WebRTC-Debug] Debug logging disabled');
+    };
+    
+    window.__webrtcLog('INIT', 'Debug logging initialized', { version: WEBRTC_VERSION });
+}
+
+/**
+ * Global WebRTC Audio State API
+ * 
+ * This provides a simple API for external components (like Bubble Card) to query
+ * the mute state of WebRTC cameras. Each browser/device has its own state.
+ * 
+ * Usage in Bubble Card styles template:
+ *   ${icon.setAttribute("icon", window.__webrtcGetMuteState?.('card-id') ? 'mdi:volume-off' : 'mdi:volume-high')}
+ *   
+ * Or for background color:
+ *   .bubble-icon-container {
+ *     background-color: ${window.__webrtcGetMuteState?.('card-id') ? '' : 'green'} !important;
+ *   }
+ */
+if (typeof window !== 'undefined') {
+    // State storage - maps card_id to muted boolean
+    if (!window.__webrtcAudioState) {
+        window.__webrtcAudioState = {};
+    }
+    
+    /**
+     * Get the mute state for a specific card
+     * @param {string} cardId - The card_id of the WebRTC camera
+     * @returns {boolean} - true if muted, false if unmuted, true (default) if unknown
+     */
+    window.__webrtcGetMuteState = function(cardId) {
+        if (!cardId) return true;
+        // Default to muted if not yet known
+        return window.__webrtcAudioState[cardId] ?? true;
+    };
+    
+    /**
+     * Set the mute state for a specific card (called internally by WebRTC camera)
+     * @param {string} cardId - The card_id of the WebRTC camera  
+     * @param {boolean} muted - true if muted, false if unmuted
+     */
+    window.__webrtcSetMuteState = function(cardId, muted) {
+        if (!cardId) return;
+        window.__webrtcAudioState[cardId] = muted;
+        window.__webrtcLog?.('STATE_API', 'Mute state updated', { cardId, muted });
+    };
+    
+    /**
+     * Get all mute states (for debugging)
+     * @returns {Object} - Map of card_id to muted boolean
+     */
+    window.__webrtcGetAllMuteStates = function() {
+        return { ...window.__webrtcAudioState };
+    };
+    
+    window.__webrtcLog?.('INIT', 'Global audio state API installed', {
+        functions: ['__webrtcGetMuteState(cardId)', '__webrtcSetMuteState(cardId, muted)', '__webrtcGetAllMuteStates()']
+    });
+}
+
+/**
+ * Global listener to update Bubble Card button icons when audio state changes.
+ * This works around the limitation that :host-context() CSS doesn't react to
+ * dynamic body class changes.
+ * 
+ * Bubble Card DOM structure (from createBaseStructure):
+ * - .bubble-icon-container / .bubble-main-icon-container (div) - the background container
+ * - .bubble-icon / .bubble-main-icon (ha-icon) - the icon element itself
+ */
+if (typeof window !== 'undefined' && !window.__webrtcAudioStateListener) {
+    window.__webrtcAudioStateListener = true;
+    
+    /**
+     * Helper to find elements inside bubble-card, handling nested shadow DOMs
+     */
+    function findInBubbleCard(card, selector) {
+        // Try direct shadowRoot first
+        if (card.shadowRoot) {
+            const found = card.shadowRoot.querySelector(selector);
+            if (found) return found;
+        }
+        
+        // Try the card's content property (Bubble Card stores DOM here)
+        if (card.content) {
+            const found = card.content.querySelector?.(selector);
+            if (found) return found;
+        }
+        
+        // Try nested ha-card elements
+        const haCard = card.shadowRoot?.querySelector('ha-card') || card.querySelector?.('ha-card');
+        if (haCard?.shadowRoot) {
+            const found = haCard.shadowRoot.querySelector(selector);
+            if (found) return found;
+        }
+        
+        // Try the card element itself
+        if (card.querySelector) {
+            const found = card.querySelector(selector);
+            if (found) return found;
+        }
+        
+        return null;
+    }
+    
+    document.addEventListener('webrtc-audio-state', (event) => {
+        const { target_id, muted } = event.detail || {};
+        if (!target_id) return;
+        
+        window.__webrtcLog?.('BUBBLE_UPDATE', 'Audio state event received', { target_id, muted });
+        
+        // Find all Bubble Card buttons that have a tap_action targeting this camera
+        const bubbleCards = document.querySelectorAll('bubble-card');
+        
+        bubbleCards.forEach(card => {
+            try {
+                // Check if this bubble card targets our camera for toggle-mute
+                const config = card._config || card.config;
+                const buttonAction = config?.button_action;
+                const tapAction = buttonAction?.tap_action;
+                
+                if (tapAction?.action === 'fire-dom-event' && 
+                    tapAction?.event === 'webrtc-toggle-mute' &&
+                    tapAction?.target_id === target_id) {
+                    
+                    // Log full structure for debugging
+                    window.__webrtcLog?.('BUBBLE_UPDATE', 'Found matching Bubble Card - examining structure', { 
+                        target_id, 
+                        muted,
+                        hasShadowRoot: !!card.shadowRoot,
+                        hasContent: !!card.content,
+                        shadowRootChildren: card.shadowRoot?.children?.length,
+                        contentChildren: card.content?.children?.length
+                    });
+                    
+                    // Try multiple selector strategies to find the icon container
+                    const containerSelectors = [
+                        '.bubble-icon-container',
+                        '.bubble-main-icon-container',
+                        '.icon-container',
+                        '[class*="icon-container"]'
+                    ];
+                    
+                    let iconContainer = null;
+                    for (const sel of containerSelectors) {
+                        iconContainer = findInBubbleCard(card, sel);
+                        if (iconContainer) {
+                            window.__webrtcLog?.('BUBBLE_UPDATE', `Found container with selector: ${sel}`);
+                            break;
+                        }
+                    }
+                    
+                    // Try multiple selector strategies to find the icon element
+                    const iconSelectors = [
+                        'ha-icon.bubble-icon',
+                        'ha-icon.bubble-main-icon',
+                        '.bubble-icon-container ha-icon',
+                        '.bubble-main-icon-container ha-icon',
+                        'ha-icon.icon',
+                        'ha-icon[icon]'
+                    ];
+                    
+                    let iconElement = null;
+                    for (const sel of iconSelectors) {
+                        iconElement = findInBubbleCard(card, sel);
+                        if (iconElement) {
+                            window.__webrtcLog?.('BUBBLE_UPDATE', `Found icon with selector: ${sel}`);
+                            break;
+                        }
+                    }
+                    
+                    window.__webrtcLog?.('BUBBLE_UPDATE', 'Element search results', { 
+                        hasIconContainer: !!iconContainer,
+                        hasIconElement: !!iconElement,
+                        iconContainerClass: iconContainer?.className,
+                        iconElementTag: iconElement?.tagName,
+                        iconElementClass: iconElement?.className,
+                        currentIcon: iconElement?.icon || iconElement?.getAttribute?.('icon')
+                    });
+                    
+                    if (iconContainer) {
+                        // Update background color based on mute state
+                        // Unmuted = green (audio on), Muted = default (inherit theme)
+                        if (muted) {
+                            iconContainer.style.removeProperty('background-color');
+                            iconContainer.style.removeProperty('background');
+                        } else {
+                            iconContainer.style.setProperty('background-color', 'green', 'important');
+                        }
+                        window.__webrtcLog?.('BUBBLE_UPDATE', 'Updated icon container background', { muted });
+                    }
+                    
+                    // Update the icon
+                    if (iconElement) {
+                        const newIcon = muted ? 'mdi:volume-off' : 'mdi:volume-high';
+                        // Bubble Card pattern: set both .icon property and attribute
+                        iconElement.icon = newIcon;
+                        iconElement.setAttribute('icon', newIcon);
+                        window.__webrtcLog?.('BUBBLE_UPDATE', 'Updated icon element', { 
+                            newIcon,
+                            iconProperty: iconElement.icon,
+                            iconAttribute: iconElement.getAttribute('icon')
+                        });
+                    }
+                    
+                    // Force Bubble Card to re-render to pick up the changes
+                    // This triggers LitElement's update cycle and re-evaluates styles templates
+                    if (typeof card.requestUpdate === 'function') {
+                        card.requestUpdate();
+                        window.__webrtcLog?.('BUBBLE_UPDATE', 'Called card.requestUpdate()');
+                    }
+                    
+                    if (!iconElement) {
+                        window.__webrtcLog?.('BUBBLE_UPDATE', 'Could not find icon element - dumping structure');
+                        // Dump structure for debugging
+                        if (card.shadowRoot) {
+                            window.__webrtcLog?.('BUBBLE_UPDATE', 'shadowRoot innerHTML (truncated)', {
+                                html: card.shadowRoot.innerHTML?.substring(0, 500)
+                            });
+                        }
+                        if (card.content) {
+                            window.__webrtcLog?.('BUBBLE_UPDATE', 'content innerHTML (truncated)', {
+                                html: card.content.innerHTML?.substring(0, 500)
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                window.__webrtcLog?.('BUBBLE_UPDATE', 'Error processing bubble card', { error: e.message, stack: e.stack });
+            }
+        });
+    });
+    
+    window.__webrtcLog?.('INIT', 'Bubble Card audio state listener installed');
+}
+
+/**
+ * Global stream registry for sharing streams between cards.
+ * Allows multiple cards to display the same stream without multiple connections.
+ * @type {Map<string, {stream: MediaStream|null, video: HTMLVideoElement, subscribers: Set<WebRTCCamera>, owner: WebRTCCamera}>}
+ */
+if (typeof window !== 'undefined' && !window.__webrtcStreams) {
+    window.__webrtcStreams = new Map();
+}
+
+class WebRTCCamera extends VideoRTC {
+    constructor() {
+        super();
+        this._globalActionBindings = null;
+        this._isClone = false;
+        this._sourceCardId = null;
+    }
+    /**
+     * Step 1. Called by the Hass, when config changed.
+     * @param {Object} config
+     */
+    setConfig(config) {
+        // Allow clone cards that only have a source reference
+        if (!config.source && !config.url && !config.entity && !config.streams) {
+            throw new Error('Missing `url` or `entity` or `streams` or `source`');
+        }
+
+        if (config.background) this.background = config.background;
+
+        if (config.intersection === 0) this.visibilityThreshold = 0;
+        else this.visibilityThreshold = config.intersection || 0.75;
+
+        /**
+         * @type {{
+         *     url: string,
+         *     entity: string,
+         *     mode: string,
+         *     media: string,
+         *
+         *     source: string,
+         *
+         *     streams: Array<{
+         *         name: string,
+         *         url: string,
+         *         entity: string,
+         *         mode: string,
+         *         media: string,
+         *     }>,
+         *
+         *     title: string,
+         *     poster: string,
+         *     poster_remote: boolean,
+         *     muted: boolean,
+         *     intersection: number,
+         *     ui: boolean,
+         *     controls: boolean,
+         *     style: string,
+         *     background: boolean,
+         *
+         *     server: string,
+         *
+         *     mse: boolean,
+         *     webrtc: boolean,
+         *
+         *     digital_ptz:{
+         *         mouse_drag_pan: boolean,
+         *         mouse_wheel_zoom: boolean,
+         *         mouse_double_click_zoom: boolean,
+         *         touch_pinch_zoom: boolean,
+         *         touch_drag_pan: boolean,
+         *         touch_tap_drag_zoom: boolean,
+         *         persist: boolean|string,
+         *     },
+         *     ptz:{
+         *         opacity: number|string,
+         *         service: string,
+         *         data_left, data_up, data_right, data_down, data_zoom_in, data_zoom_out, data_home
+         *     },
+         *     shortcuts:Array<{ name:string, icon:string }>,
+         *
+         *     tap_action: {action: string, entity?: string, service?: string, data?: object, navigation_path?: string, url_path?: string},
+         *     double_tap_action: {action: string, entity?: string, service?: string, data?: object, navigation_path?: string, url_path?: string},
+         *     hold_action: {action: string, entity?: string, service?: string, data?: object, navigation_path?: string, url_path?: string},
+         *     
+         *     shared: boolean,
+         * }} config
+         */
+        
+        // Check if this is a clone card (explicit source reference)
+        this._isClone = !!config.source;
+        this._sourceCardId = config.source || null;
+        
+        // Check if this card uses the shared stream manager
+        this._useStreamManager = !!config.shared;
+        
+        this.config = Object.assign({
+            mode: config.mse === false ? 'webrtc' : config.webrtc === false ? 'mse' : this.mode,
+            media: this.media,
+            streams: config.source ? [] : [{url: config.url, entity: config.entity}],
+            poster_remote: config.poster && (config.poster.indexOf('://') > 0 || config.poster.charAt(0) === '/'),
+        }, config);
+
+        if (!this.config.id && this.config.card_id) {
+            this.config.id = this.config.card_id;
+        }
+
+        this.streamID = -1;
+        this.nextStream(false);
+
+        this.onhass = [];
+    }
+
+    set hass(hass) {
+        this._hass = hass;
+        this.onhass.forEach(fn => fn());
+        
+        // Update stream manager with hass instance
+        if (this._useStreamManager && streamManager) {
+            streamManager.setHass(hass);
+        }
+        // if card in vertical stack - `hass` property assign after `onconnect`
+        // this.onconnect();
+    }
+
+    get hass() {
+        return this._hass;
+    }
+
+    /**
+     * Called by the Hass to calculate default card height.
+     */
+    getCardSize() {
+        return 5; // x 50px
+    }
+
+    /**
+     * Called by the Hass to get defaul card config
+     * @return {{url: string}}
+     */
+    static getStubConfig() {
+        return {'url': ''};
+    }
+
+    setStatus(mode, status) {
+        const divMode = this.querySelector('.mode').innerText;
+        if (mode === 'error' && divMode !== 'Loading..' && divMode !== 'Loading...') return;
+
+        this.querySelector('.mode').innerText = mode;
+        this.querySelector('.status').innerText = status || '';
+    }
+
+    /** @param reload {boolean} */
+    nextStream(reload) {
+        // Clone cards don't have their own streams
+        if (this._isClone || !this.config.streams || this.config.streams.length === 0) {
+            return;
+        }
+        
+        this.streamID = (this.streamID + 1) % this.config.streams.length;
+
+        const stream = this.config.streams[this.streamID];
+        this.config.url = stream.url;
+        this.config.entity = stream.entity;
+        this.mode = stream.mode || this.config.mode;
+        this.media = stream.media || this.config.media;
+
+        if (reload) {
+            this.ondisconnect();
+            setTimeout(() => this.onconnect(), 100); // wait ws.close event
+        }
+    }
+
+    /** @return {string} */
+    get streamName() {
+        if (this._isClone) return 'Clone';
+        if (!this.config.streams || this.config.streams.length === 0) return '';
+        return this.config.streams[this.streamID].name || `S${this.streamID}`;
+    }
+
+    connectedCallback() {
+        // For clone cards, handle subscription instead of normal connection
+        if (this._isClone) {
+            // Still need to initialize the video element if not done
+            if (!this.video) {
+                this.oninit();
+            }
+            this._updateStreamStatus('connecting');
+            this._subscribeToSource();
+            this._bindGlobalActionEvents();
+            this._initializeActionHandlers();
+            this._initializeAudioState();
+            return;
+        }
+        
+        // For shared stream manager mode
+        if (this._useStreamManager) {
+            if (!this.video) {
+                this.oninit();
+            }
+            this._updateStreamStatus('connecting');
+            this._subscribeToStreamManager();
+            this._bindGlobalActionEvents();
+            this._initializeActionHandlers();
+            this._initializeAudioState();
+            return;
+        }
+        
+        super.connectedCallback();
+        this._bindGlobalActionEvents();
+        this._initializeActionHandlers();
+        // Emit initial mute state (will set body class if muted)
+        this._initializeAudioState();
+        
+        // Cancel deferred unregistration if we reconnected in time
+        if (this._deferredUnregisterTID) {
+            clearTimeout(this._deferredUnregisterTID);
+            this._deferredUnregisterTID = 0;
+        }
+        
+        // Register as stream owner for sharing
+        if (this.config?.id) {
+            this._registerAsStreamOwner();
+        }
+    }
+
+    disconnectedCallback() {
+        this._unbindGlobalActionEvents();
+        this._cleanupActionHandlers();
+        this._cleanupBodyMuteClass();
+        this._stopMediaWatchdog();
+        
+        // For clone cards, unsubscribe from source
+        if (this._isClone) {
+            this._unsubscribeFromSource();
+            return;
+        }
+        
+        // For shared stream manager mode, unsubscribe
+        if (this._useStreamManager) {
+            this._unsubscribeFromStreamManager();
+            return;
+        }
+        
+        // Defer stream owner unregistration to match parent's disconnect
+        // grace period. The parent class waits DISCONNECT_TIMEOUT (5s) before
+        // actually disconnecting — if we unregister immediately, clone cards
+        // lose their stream even on brief DOM detach/reattach cycles.
+        if (this.config?.id) {
+            this._deferredUnregisterTID = setTimeout(() => {
+                this._deferredUnregisterTID = 0;
+                this._unregisterAsStreamOwner();
+            }, this.DISCONNECT_TIMEOUT);
+        }
+        
+        super.disconnectedCallback();
+    }
+    
+    _initializeAudioState() {
+        // Defer to next tick to ensure video is initialized
+        setTimeout(() => this.emitAudioState(), 0);
+    }
+    
+    _cleanupBodyMuteClass() {
+        const cardId = this.config ? this.config.id : undefined;
+        if (cardId && typeof document !== 'undefined' && document.body) {
+            document.body.classList.remove(`webrtc-muted-${cardId}`);
+            document.body.classList.remove(`webrtc-unmuted-${cardId}`);
+        }
+    }
+
+    // ========== Stream Sharing Methods ==========
+
+    /**
+     * Get the global stream registry.
+     * @returns {Map<string, {stream: MediaStream|null, video: HTMLVideoElement, subscribers: Set<WebRTCCamera>, owner: WebRTCCamera}>}
+     */
+    static get streamRegistry() {
+        if (typeof window === 'undefined') return new Map();
+        if (!window.__webrtcStreams) window.__webrtcStreams = new Map();
+        return window.__webrtcStreams;
+    }
+
+    /**
+     * Register this card as a stream owner in the global registry.
+     * Called when a primary card (non-clone) establishes a connection.
+     */
+    _registerAsStreamOwner() {
+        const cardId = this.config?.id;
+        if (!cardId) return;
+
+        const registry = WebRTCCamera.streamRegistry;
+        
+        // Check if already registered
+        if (registry.has(cardId)) {
+            const existing = registry.get(cardId);
+            // If we're the existing owner, just update
+            if (existing.owner === this) {
+                existing.video = this.video;
+                existing.stream = this.video?.srcObject || null;
+                return;
+            }
+            // Someone else owns it - don't overwrite
+            return;
+        }
+
+        registry.set(cardId, {
+            stream: this.video?.srcObject || null,
+            video: this.video,
+            subscribers: new Set(),
+            owner: this,
+        });
+    }
+
+    /**
+     * Update the registered stream when video source changes.
+     * Called when stream becomes available.
+     */
+    _updateRegisteredStream() {
+        const cardId = this.config?.id;
+        if (!cardId) return;
+
+        const registry = WebRTCCamera.streamRegistry;
+        const entry = registry.get(cardId);
+        
+        if (entry && entry.owner === this) {
+            const newStream = this.video?.srcObject || null;
+            entry.stream = newStream;
+            entry.video = this.video;
+            
+            // Notify all subscribers that stream is available
+            entry.subscribers.forEach(subscriber => {
+                subscriber._onSourceStreamUpdated(newStream);
+            });
+        }
+    }
+
+    /**
+     * Unregister this card from the stream registry.
+     * Called when a primary card disconnects.
+     */
+    _unregisterAsStreamOwner() {
+        const cardId = this.config?.id;
+        if (!cardId) return;
+
+        const registry = WebRTCCamera.streamRegistry;
+        const entry = registry.get(cardId);
+        
+        if (entry && entry.owner === this) {
+            // Notify subscribers that stream is going away
+            entry.subscribers.forEach(subscriber => {
+                subscriber._onSourceStreamUpdated(null);
+            });
+            registry.delete(cardId);
+        }
+    }
+
+    /**
+     * Subscribe to another card's stream (for clone cards).
+     * @returns {boolean} True if successfully subscribed
+     */
+    _subscribeToSource() {
+        if (!this._sourceCardId) return false;
+
+        const registry = WebRTCCamera.streamRegistry;
+        const entry = registry.get(this._sourceCardId);
+        
+        if (!entry) {
+            // Source not available yet - we'll retry on connect
+            return false;
+        }
+
+        entry.subscribers.add(this);
+        
+        // If stream is already available, use it
+        if (entry.stream) {
+            this._onSourceStreamUpdated(entry.stream);
+        }
+        
+        return true;
+    }
+
+    /**
+     * Unsubscribe from the source stream.
+     */
+    _unsubscribeFromSource() {
+        if (!this._sourceCardId) return;
+
+        const registry = WebRTCCamera.streamRegistry;
+        const entry = registry.get(this._sourceCardId);
+        
+        if (entry) {
+            entry.subscribers.delete(this);
+        }
+    }
+
+    /**
+     * Called when the source stream is updated (for clone cards).
+     * @param {MediaStream|null} stream
+     */
+    _onSourceStreamUpdated(stream) {
+        if (!this.video) return;
+        
+        if (stream) {
+            this.video.srcObject = stream;
+            this.setStatus('CLONE', this.config.title || '');
+            this._updateStreamStatus('connected');
+            this.play();
+        } else {
+            this.video.srcObject = null;
+            this.setStatus('Waiting...', '');
+            this._updateStreamStatus('connecting');
+        }
+    }
+
+    /**
+     * Check if this card is a clone of another.
+     * @returns {boolean}
+     */
+    get isCloneCard() {
+        return this._isClone;
+    }
+
+    // ========== Stream Manager Methods ==========
+
+    /**
+     * Subscribe to the global stream manager.
+     * The stream manager maintains persistent connections across page navigation.
+     */
+    _subscribeToStreamManager() {
+        if (!this.config) return;
+        
+        // Update the stream manager with current hass instance
+        if (this._hass && streamManager) {
+            streamManager.setHass(this._hass);
+        }
+
+        // Get current stream config
+        const streamConfig = this.config.streams?.[this.streamID] || {
+            url: this.config.url,
+            entity: this.config.entity,
+        };
+
+        if (!streamConfig.url && !streamConfig.entity) {
+            this.setStatus('error', 'No URL or entity');
+            return;
+        }
+
+        // Build config for stream manager
+        const managerConfig = {
+            url: streamConfig.url,
+            entity: streamConfig.entity,
+            mode: streamConfig.mode || this.config.mode || 'webrtc,mse,hls,mjpeg',
+            media: streamConfig.media || this.config.media || 'video,audio',
+            server: this.config.server,
+        };
+
+        this.setStatus('Loading..', '');
+        this._updateStreamStatus('connecting');
+
+        // Subscribe to the stream manager
+        this._streamManagerUnsubscribe = streamManager.subscribe(managerConfig, (stream, status, mode) => {
+            this._onStreamManagerUpdate(stream, status, mode);
+        });
+    }
+
+    /**
+     * Unsubscribe from the stream manager.
+     */
+    _unsubscribeFromStreamManager() {
+        if (this._streamManagerUnsubscribe) {
+            this._streamManagerUnsubscribe();
+            this._streamManagerUnsubscribe = null;
+        }
+    }
+
+    /**
+     * Handle stream updates from the stream manager.
+     * @param {MediaStream|null} stream 
+     * @param {string} status - 'connecting', 'connected', 'disconnected', 'error'
+     * @param {string|null} mode - 'webrtc', 'mse', 'hls', 'mjpeg'
+     */
+    _onStreamManagerUpdate(stream, status, mode) {
+        if (!this.video) return;
+
+        // Update data attribute for CSS targeting (spinners, etc.)
+        this._updateStreamStatus(status);
+
+        switch (status) {
+            case 'connecting':
+                this.setStatus('Loading...', '');
+                break;
+                
+            case 'connected':
+                if (stream) {
+                    if (this.video.srcObject !== stream) this.video.srcObject = stream;
+                    this.setStatus(mode?.toUpperCase() || 'SHARED', this.config.title || '');
+                    this.play();
+                    // Update registry for other cards that might clone this one
+                    this._updateRegisteredStream();
+                }
+                break;
+                
+            case 'disconnected':
+                this.setStatus('Reconnecting...', '');
+                break;
+                
+            case 'error':
+                this.setStatus('error', 'Stream failed');
+                break;
+        }
+    }
+
+    /**
+     * Update the data-stream-status attribute for CSS targeting.
+     * Allows external CSS (card_mod) to show spinners, overlays, etc. based on connection state.
+     * Sets attribute on both the host element and the inner ha-card for styling flexibility.
+     * @param {string} status - 'connecting', 'connected', 'disconnected', 'error'
+     */
+    _updateStreamStatus(status) {
+        // Set on host element for external CSS (card_mod on parent containers)
+        this.setAttribute('data-stream-status', status);
+        
+        // Also set on inner ha-card for shadow DOM styling
+        const card = this.shadowRoot?.querySelector('ha-card');
+        if (card) {
+            card.setAttribute('data-stream-status', status);
+        }
+    }
+
+    // ========== End Stream Sharing Methods ==========
+
+    /**
+     * Initialize action handlers for tap_action, double_tap_action, and hold_action.
+     * Follows Bubble Card's pattern for dispatching hass-action events.
+     */
+    _initializeActionHandlers() {
+        if (this._actionHandlersInitialized) return;
+        
+        // Only set up handlers if any action is configured
+        const { tap_action, double_tap_action, hold_action } = this.config || {};
+        if (!tap_action && !double_tap_action && !hold_action) return;
+
+        // State for gesture detection
+        this._actionState = {
+            startX: 0,
+            startY: 0,
+            holdTimer: null,
+            lastTapTime: 0,
+            tapCount: 0,
+            tapTimer: null,
+            holdTriggered: false,
+        };
+
+        // Bind event handlers
+        this._handlePointerDown = this._onPointerDown.bind(this);
+        this._handlePointerUp = this._onPointerUp.bind(this);
+        this._handlePointerCancel = this._onPointerCancel.bind(this);
+
+        this.addEventListener('pointerdown', this._handlePointerDown);
+        this.addEventListener('pointerup', this._handlePointerUp);
+        this.addEventListener('pointercancel', this._handlePointerCancel);
+        this.addEventListener('pointerleave', this._handlePointerCancel);
+
+        // Prevent context menu on long press (for hold action)
+        if (hold_action) {
+            this._handleContextMenu = e => e.preventDefault();
+            this.addEventListener('contextmenu', this._handleContextMenu);
+        }
+
+        this._actionHandlersInitialized = true;
+    }
+
+    _cleanupActionHandlers() {
+        if (!this._actionHandlersInitialized) return;
+
+        if (this._handlePointerDown) {
+            this.removeEventListener('pointerdown', this._handlePointerDown);
+        }
+        if (this._handlePointerUp) {
+            this.removeEventListener('pointerup', this._handlePointerUp);
+        }
+        if (this._handlePointerCancel) {
+            this.removeEventListener('pointercancel', this._handlePointerCancel);
+            this.removeEventListener('pointerleave', this._handlePointerCancel);
+        }
+        if (this._handleContextMenu) {
+            this.removeEventListener('contextmenu', this._handleContextMenu);
+        }
+
+        if (this._actionState) {
+            clearTimeout(this._actionState.holdTimer);
+            clearTimeout(this._actionState.tapTimer);
+        }
+
+        this._actionState = null;
+        this._actionHandlersInitialized = false;
+    }
+
+    _onPointerDown(event) {
+        // Ignore right-clicks
+        if (event.button !== 0) return;
+        
+        const state = this._actionState;
+        if (!state) return;
+
+        state.startX = event.clientX;
+        state.startY = event.clientY;
+        state.holdTriggered = false;
+
+        // Set up hold timer
+        const holdAction = this.config?.hold_action;
+        if (holdAction && holdAction.action !== 'none') {
+            state.holdTimer = setTimeout(() => {
+                state.holdTriggered = true;
+                this._executeAction('hold');
+            }, 500); // 500ms for hold
+        }
+    }
+
+    _onPointerUp(event) {
+        const state = this._actionState;
+        if (!state) return;
+
+        // Clear hold timer
+        clearTimeout(state.holdTimer);
+
+        // If hold was triggered, don't also trigger tap
+        if (state.holdTriggered) return;
+
+        // Check if pointer moved significantly (cancel if dragged)
+        const dx = event.clientX - state.startX;
+        const dy = event.clientY - state.startY;
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) return;
+
+        const now = Date.now();
+        const doubleTapAction = this.config?.double_tap_action;
+        const tapAction = this.config?.tap_action;
+
+        // Double-tap detection
+        if (doubleTapAction && doubleTapAction.action !== 'none') {
+            if (now - state.lastTapTime < 300) {
+                // Double tap detected
+                clearTimeout(state.tapTimer);
+                state.tapCount = 0;
+                state.lastTapTime = 0;
+                this._executeAction('double_tap');
+                return;
+            }
+            
+            // First tap - wait to see if there's a second
+            state.lastTapTime = now;
+            state.tapTimer = setTimeout(() => {
+                state.lastTapTime = 0;
+                if (tapAction && tapAction.action !== 'none') {
+                    this._executeAction('tap');
+                }
+            }, 300);
+        } else if (tapAction && tapAction.action !== 'none') {
+            // No double-tap configured, execute tap immediately
+            this._executeAction('tap');
+        }
+    }
+
+    _onPointerCancel() {
+        const state = this._actionState;
+        if (!state) return;
+
+        clearTimeout(state.holdTimer);
+        state.holdTriggered = false;
+    }
+
+    /**
+     * Execute an action by dispatching a hass-action event.
+     * @param {'tap'|'double_tap'|'hold'} actionType
+     */
+    _executeAction(actionType) {
+        const actionKey = `${actionType}_action`;
+        const actionConfig = this.config?.[actionKey];
+        if (!actionConfig || actionConfig.action === 'none') return;
+
+        const action = actionConfig.action;
+
+        // Handle navigate action directly (required for hash navigation to work with Bubble Card popups)
+        if (action === 'navigate') {
+            const path = actionConfig.navigation_path;
+            if (path) {
+                if (actionConfig.navigation_replace) {
+                    history.replaceState(null, "", path);
+                } else {
+                    history.pushState(null, "", path);
+                }
+                // Dispatch location-changed event (required for Bubble Card popups)
+                const event = new Event('location-changed', { bubbles: true, composed: true });
+                event.detail = { replace: actionConfig.navigation_replace || false };
+                window.dispatchEvent(event);
+            }
+            return;
+        }
+
+        // Handle URL action directly
+        if (action === 'url') {
+            const url = actionConfig.url_path;
+            if (url) {
+                window.open(url, '_blank');
+            }
+            return;
+        }
+
+        // For other actions (more-info, toggle, call-service, fire-dom-event), use hass-action
+        // Build the config object for hass-action
+        const hassActionConfig = {
+            ...actionConfig,
+            entity: actionConfig.entity || this.config.entity,
+        };
+
+        // Dispatch hass-action event (this is what HA's frontend listens for)
+        const event = new Event('hass-action', { bubbles: true, composed: true });
+        event.detail = {
+            config: hassActionConfig,
+            action: actionType,
+        };
+        this.dispatchEvent(event);
+    }
+
+    oninit() {
+        super.oninit();
+        
+        // Always disable native browser video controls inside the card.
+        // The card provides its own UI (when ui:true) or is meant to be
+        // a clean video-only view. Native controls look broken on mobile
+        // and interfere with gesture handlers (PTZ, tap actions).
+        // Set controls: true in config to explicitly re-enable native controls.
+        if (this.video) {
+            this.video.controls = !!this.config.controls;
+        }
+        
+        this.renderMain();
+        this.renderDigitalPTZ();
+        this.renderPTZ();
+        this.renderCustomUI();
+        this.renderShortcuts();
+        this.renderStyle();
+
+        this.addEventListener('webrtc-screenshot', ev => {
+            this.handleScreenshotRequest(ev.detail || {});
+        });
+        this.addEventListener('webrtc-mute', ev => {
+            this.handleMuteRequest(ev.detail || {}, true);
+        });
+        this.addEventListener('webrtc-unmute', ev => {
+            this.handleMuteRequest(ev.detail || {}, false);
+        });
+        this.addEventListener('webrtc-toggle-mute', ev => {
+            this.handleToggleMuteRequest(ev.detail || {});
+        });
+        this.addEventListener('webrtc-fullscreen', ev => {
+            this.handleFullscreenRequest(ev.detail || {});
+        });
+
+        if (this.video) {
+            this.video.addEventListener('volumechange', () => this.emitAudioState());
+            this.emitAudioState();
+        }
+    }
+
+    onconnect() {
+        // Clone cards don't establish their own connection
+        if (this._isClone) {
+            // Try to subscribe to source if not already subscribed
+            if (!this._subscribeToSource()) {
+                this.setStatus('Waiting...', 'for source');
+            }
+            return false;
+        }
+        
+        if (!this.config || !this.hass) return false;
+        if (!this.isConnected || this.ws || this.pc) return false;
+
+        const divMode = this.querySelector('.mode').innerText;
+        if (divMode === 'Loading..') return;
+
+        this.setStatus('Loading..');
+        this._updateStreamStatus('connecting');
+
+        this.hass.callWS({
+            type: 'auth/sign_path', path: '/api/webrtc/ws'
+        }).then(data => {
+            if (this.config.poster && !this.config.poster_remote) {
+                this.video.poster = this.hass.hassUrl(data.path) + '&poster=' + encodeURIComponent(this.config.poster);
+            }
+
+            this.wsURL = 'ws' + this.hass.hassUrl(data.path).substring(4);
+
+            if (this.config.entity) {
+                this.wsURL += '&entity=' + this.config.entity;
+            } else if (this.config.url) {
+                this.wsURL += '&url=' + encodeURIComponent(this.config.url);
+            } else {
+                this.setStatus('IMG');
+                return;
+            }
+
+            if (this.config.server) {
+                this.wsURL += '&server=' + encodeURIComponent(this.config.server);
+            }
+
+            if (super.onconnect()) {
+                this.setStatus('Loading...');
+            } else {
+                this.setStatus('error', 'unable to connect');
+                this._updateStreamStatus('error');
+            }
+        }).catch(er => {
+            this.setStatus('error', er);
+            this._updateStreamStatus('error');
+        });
+    }
+
+    onopen() {
+        const result = super.onopen();
+
+        this.onmessage['stream'] = msg => {
+            switch (msg.type) {
+                case 'error':
+                    this.setStatus('error', msg.value);
+                    break;
+                case 'mse':
+                case 'hls':
+                case 'mp4':
+                case 'mjpeg':
+                    this.setStatus(msg.type.toUpperCase(), this.config.title || '');
+                    this._updateStreamStatus('connected');
+                    // Update registry when stream type is known
+                    this._updateRegisteredStream();
+                    break;
+            }
+        };
+
+        return result;
+    }
+
+    onpcvideo(ev) {
+        super.onpcvideo(ev);
+
+        if (this.pcState !== WebSocket.CLOSED) {
+            this.setStatus('RTC', this.config.title || '');
+            this._updateStreamStatus('connected');
+            // Update registry for WebRTC streams
+            this._updateRegisteredStream();
+            // Start watchdog to detect stalled media
+            this._startMediaWatchdog();
+        }
+    }
+
+    /**
+     * Monitor video playback and force reconnect if media stalls
+     * while the WebRTC peer connection still appears alive.
+     */
+    _startMediaWatchdog() {
+        this._stopMediaWatchdog();
+        let lastTime = 0;
+        let stallCount = 0;
+        this._watchdogTID = setInterval(() => {
+            if (!this.video || this.video.paused) return;
+            const currentTime = this.video.currentTime;
+            if (currentTime === lastTime && this.pcState === WebSocket.OPEN) {
+                stallCount++;
+                if (stallCount >= 3) { // ~15 seconds stalled
+                    window.__webrtcLog?.('WATCHDOG', 'Media stalled, forcing reconnect', {
+                        currentTime, stallCount, configId: this.config?.id,
+                    });
+                    this._stopMediaWatchdog();
+                    if (this.pc) { this.pc.close(); this.pc = null; }
+                    this.pcState = WebSocket.CLOSED;
+                    this._updateStreamStatus('connecting');
+                    this.onconnect();
+                }
+            } else {
+                stallCount = 0;
+            }
+            lastTime = currentTime;
+        }, 5000);
+    }
+
+    _stopMediaWatchdog() {
+        if (this._watchdogTID) {
+            clearInterval(this._watchdogTID);
+            this._watchdogTID = 0;
+        }
+    }
+
+    renderMain() {
+        const shadow = this.attachShadow({mode: 'open'});
+        shadow.innerHTML = `
+        <style>
+            ha-card {
+                width: 100%;
+                height: 100%;
+                margin: auto;
+                overflow: hidden;
+                position: relative;
+                isolation: isolate; /* Create stacking context to contain z-index */
+                border-radius: 28px;
+                border-width: 0;
+                border-color: transparent;
+            }
+            ha-icon {
+                color: white;
+                cursor: pointer;
+            }
+            .player {
+                background-color: black;
+                height: 100%;
+                position: relative; /* important for Safari */
+                border-radius: inherit; /* Inherit rounded corners from ha-card */
+                overflow: hidden; /* Clip video to rounded corners */
+            }
+            .player:active {
+                cursor: move; /* important for zoom-controller */
+            }
+            .player .ptz-transform {
+                height: 100%;
+            }
+            .header {
+                position: absolute;
+                top: 6px;
+                left: 10px;
+                right: 10px;
+                color: white;
+                display: flex;
+                justify-content: space-between;
+                pointer-events: none;
+            }
+            .mode {
+                cursor: pointer;
+                opacity: 0.6;
+                pointer-events: auto;
+            }
+            /* Loading spinner for stream status */
+            @keyframes webrtc-spin {
+                to { transform: rotate(360deg); }
+            }
+            .loading-spinner {
+                display: none;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 40px;
+                height: 40px;
+                margin: -20px 0 0 -20px;
+                border: 4px solid rgba(255,255,255,0.3);
+                border-top-color: white;
+                border-radius: 50%;
+                animation: webrtc-spin 1s linear infinite;
+                z-index: 2;
+                pointer-events: none;
+            }
+            ha-card[data-stream-status="connecting"] .loading-spinner,
+            ha-card[data-stream-status="disconnected"] .loading-spinner {
+                display: block;
+            }
+            /* Label overlay */
+            .label {
+                position: absolute;
+                left: 16px;
+                bottom: 16px;
+                font-size: 13px;
+                line-height: 1.2;
+                font-weight: 600;
+                color: white;
+                pointer-events: none;
+                z-index: 1;
+                text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            }
+        </style>
+        <ha-card class="card">
+            <div class="player">
+                <div class="ptz-transform"></div>
+            </div>
+            <div class="header">
+                <div class="status"></div>
+                <div class="mode"></div>
+            </div>
+            <div class="loading-spinner"></div>
+            <div class="label"></div>
+        </ha-card>
+        `;
+
+        this.querySelector = selectors => this.shadowRoot.querySelector(selectors);
+        this.querySelector('.ptz-transform').appendChild(this.video);
+
+        const mode = this.querySelector('.mode');
+        mode.addEventListener('click', () => this.nextStream(true));
+
+        if (this.config.muted) this.setUserMuted(true);
+        if (this.config.poster_remote) this.video.poster = this.config.poster;
+        
+        // Set label if configured
+        if (this.config.label) {
+            this.querySelector('.label').textContent = this.config.label;
+        }
+    }
+
+    renderDigitalPTZ() {
+        if (this.config.digital_ptz === false) return;
+        new DigitalPTZ(
+            this.querySelector('.player'),
+            this.querySelector('.player .ptz-transform'),
+            this.video,
+            Object.assign({}, this.config.digital_ptz, {persist_key: this.config.url})
+        );
+    }
+
+    renderPTZ() {
+        if (!this.config.ptz || !this.config.ptz.service) return;
+
+        let hasMove = false;
+        let hasZoom = false;
+        let hasHome = false;
+        for (const prefix of ['', '_start', '_end', '_long']) {
+            hasMove = hasMove || this.config.ptz['data' + prefix + '_right'];
+            hasMove = hasMove || this.config.ptz['data' + prefix + '_left'];
+            hasMove = hasMove || this.config.ptz['data' + prefix + '_up'];
+            hasMove = hasMove || this.config.ptz['data' + prefix + '_down'];
+
+            hasZoom = hasZoom || this.config.ptz['data' + prefix + '_zoom_in'];
+            hasZoom = hasZoom || this.config.ptz['data' + prefix + '_zoom_out'];
+
+            hasHome = hasHome || this.config.ptz['data' + prefix + '_home'];
+        }
+
+        const card = this.querySelector('.card');
+        card.insertAdjacentHTML('beforebegin', `
+            <style>
+                .ptz {
+                    position: absolute;
+                    top: 50%;
+                    right: 10px;
+                    transform: translateY(-50%);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    transition: opacity .3s ease-in-out;
+                    opacity: ${parseFloat(this.config.ptz.opacity) || 0.4};
+                }
+                .ptz:hover {
+                    opacity: 1 !important;
+                }
+                .ptz-move {
+                    position: relative;
+                    background-color: rgba(0, 0, 0, 0.3);
+                    border-radius: 50%;
+                    width: 80px;
+                    height: 80px;
+                    display: ${hasMove ? 'block' : 'none'};
+                }
+                .ptz-zoom {
+                    position: relative;
+                    width: 80px;
+                    height: 40px;
+                    background-color: rgba(0, 0, 0, 0.3);
+                    border-radius: 4px;
+                    display: ${hasZoom ? 'block' : 'none'};
+                }
+                .ptz-home {
+                    position: relative;
+                    width: 40px;
+                    height: 40px;
+                    background-color: rgba(0, 0, 0, 0.3);
+                    border-radius: 4px;
+                    align-self: center;
+                    display: ${hasHome ? 'block' : 'none'};
+                }
+                .up {
+                    position: absolute;
+                    top: 5px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                }
+                .down {
+                    position: absolute;
+                    bottom: 5px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                }
+                .left {
+                    position: absolute;
+                    left: 5px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                }
+                .right {
+                    position: absolute;
+                    right: 5px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                }
+                .zoom_out {
+                    position: absolute;
+                    left: 5px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                }
+                .zoom_in {
+                    position: absolute;
+                    right: 5px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                }
+                .home {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                }
+            </style>
+        `);
+        card.insertAdjacentHTML('beforeend', `
+            <div class="ptz">
+                <div class="ptz-move">
+                    <ha-icon class="right" icon="mdi:arrow-right"></ha-icon>
+                    <ha-icon class="left" icon="mdi:arrow-left"></ha-icon>
+                    <ha-icon class="up" icon="mdi:arrow-up"></ha-icon>
+                    <ha-icon class="down" icon="mdi:arrow-down"></ha-icon>
+                </div>
+                <div class="ptz-zoom">
+                    <ha-icon class="zoom_in" icon="mdi:plus"></ha-icon>
+                    <ha-icon class="zoom_out" icon="mdi:minus"></ha-icon>
+                </div>
+                <div class="ptz-home">
+                    <ha-icon class="home" icon="mdi:home"></ha-icon>
+                </div>
+            </div>
+        `);
+
+        const template = JSON.stringify(this.config.ptz);
+        const handle = path => {
+            if (!this.config.ptz['data_' + path]) return;
+            const config = template.indexOf('${') < 0 ? this.config.ptz : JSON.parse(eval('`' + template + '`'));
+            const [domain, service] = config.service.split('.', 2);
+            const data = config['data_' + path];
+            this.hass.callService(domain, service, data);
+        };
+        const ptz = this.querySelector('.ptz');
+        for (const [start, end] of [['touchstart', 'touchend'], ['mousedown', 'mouseup']]) {
+            ptz.addEventListener(start, startEvt => {
+                const {className} = startEvt.target;
+                startEvt.preventDefault();
+                handle('start_' + className);
+                window.addEventListener(end, endEvt => {
+                    endEvt.preventDefault();
+                    handle('end_' + className);
+                    if (endEvt.timeStamp - startEvt.timeStamp > 400) {
+                        handle('long_' + className);
+                    } else {
+                        handle(className);
+                    }
+                }, {once: true});
+            });
+        }
+    }
+
+    saveScreenshot() {
+        const a = document.createElement('a');
+
+        if (this.video.videoWidth && this.video.videoHeight) {
+            const canvas = document.createElement('canvas');
+            canvas.width = this.video.videoWidth;
+            canvas.height = this.video.videoHeight;
+            canvas.getContext('2d').drawImage(this.video, 0, 0, canvas.width, canvas.height);
+            a.href = canvas.toDataURL('image/jpeg');
+        } else if (this.video.poster && this.video.poster.startsWith('data:image/jpeg')) {
+            a.href = this.video.poster;
+        } else {
+            return;
+        }
+
+        const ts = new Date().toISOString().substring(0, 19).replaceAll('-', '').replaceAll(':', '');
+        a.download = `snapshot_${ts}.jpeg`;
+        a.click();
+    }
+
+    handleScreenshotRequest(detail = {}) {
+        if (!this.matchesActionTarget(detail)) return;
+        this.saveScreenshot();
+    }
+
+    handleMuteRequest(detail = {}, mute) {
+        window.__webrtcLog?.('MUTE_REQUEST', 'handleMuteRequest called', {
+            detail,
+            mute,
+            configId: this.config?.id,
+            configEntity: this.config?.entity,
+            configUrl: this.config?.url,
+            hasVideo: !!this.video,
+            currentMuted: this.video?.muted,
+        });
+        if (!this.matchesActionTarget(detail)) {
+            window.__webrtcLog?.('MUTE_REQUEST', 'Target mismatch, ignoring', { detail });
+            return;
+        }
+        if (!this.video) {
+            window.__webrtcLog?.('MUTE_REQUEST', 'No video element', {});
+            return;
+        }
+        const wasMuted = this.video.muted;
+        this.setUserMuted(mute);
+        window.__webrtcLog?.('MUTE_REQUEST', 'Mute state changed', { wasMuted, newMuted: mute });
+        this.emitAudioState();
+        this._updateVolumeIcon();
+    }
+
+    handleToggleMuteRequest(detail = {}) {
+        window.__webrtcLog?.('TOGGLE_MUTE', 'handleToggleMuteRequest called', {
+            detail,
+            configId: this.config?.id,
+            configEntity: this.config?.entity,
+            configUrl: this.config?.url,
+            hasVideo: !!this.video,
+            currentMuted: this.video?.muted,
+        });
+        if (!this.matchesActionTarget(detail)) {
+            window.__webrtcLog?.('TOGGLE_MUTE', 'Target mismatch, ignoring', { detail });
+            return;
+        }
+        if (!this.video) {
+            window.__webrtcLog?.('TOGGLE_MUTE', 'No video element', {});
+            return;
+        }
+        const wasMuted = this.video.muted;
+        this.setUserMuted(!this.video.muted);
+        window.__webrtcLog?.('TOGGLE_MUTE', 'Mute toggled', { wasMuted, newMuted: this.video.muted });
+        this.emitAudioState();
+        this._updateVolumeIcon();
+    }
+
+    /**
+     * Update the volume icon to reflect the current mute state.
+     * Called after mute state changes to ensure UI stays in sync.
+     */
+    _updateVolumeIcon() {
+        window.__webrtcLog?.('UPDATE_ICON', '_updateVolumeIcon called', {
+            hasVideo: !!this.video,
+            videoMuted: this.video?.muted,
+            configUi: this.config?.ui,
+            configId: this.config?.id,
+        });
+        if (!this.video) {
+            window.__webrtcLog?.('UPDATE_ICON', 'No video element, returning', {});
+            return;
+        }
+        if (!this.config?.ui) {
+            window.__webrtcLog?.('UPDATE_ICON', 'UI not enabled, returning', { configUi: this.config?.ui });
+            return;
+        }
+        const volume = this.querySelector('.volume');
+        window.__webrtcLog?.('UPDATE_ICON', 'Volume element query result', {
+            volumeFound: !!volume,
+            volumeTagName: volume?.tagName,
+            volumeClassName: volume?.className,
+            currentIcon: volume?.icon,
+            currentIconAttr: volume?.getAttribute?.('icon'),
+        });
+        if (!volume) {
+            window.__webrtcLog?.('UPDATE_ICON', 'Volume element not found, returning', {});
+            return;
+        }
+        const newIcon = this.video.muted ? 'mdi:volume-mute' : 'mdi:volume-high';
+        window.__webrtcLog?.('UPDATE_ICON', 'Setting new icon', {
+            videoMuted: this.video.muted,
+            oldIcon: volume.icon,
+            oldIconAttr: volume.getAttribute('icon'),
+            newIcon,
+        });
+        
+        // Set both property and attribute
+        volume.icon = newIcon;
+        volume.setAttribute('icon', newIcon);
+        
+        // Force ha-icon to re-render by triggering requestUpdate if available (Lit element)
+        if (typeof volume.requestUpdate === 'function') {
+            volume.requestUpdate();
+            window.__webrtcLog?.('UPDATE_ICON', 'Called requestUpdate on ha-icon', {});
+        }
+        
+        // Also try setting the icon on the inner ha-svg-icon if present
+        const innerIcon = volume.shadowRoot?.querySelector('ha-svg-icon');
+        if (innerIcon) {
+            innerIcon.setAttribute('path', ''); // Clear to force refresh
+            innerIcon.path = '';
+            window.__webrtcLog?.('UPDATE_ICON', 'Found inner ha-svg-icon, cleared path', {});
+        }
+        
+        window.__webrtcLog?.('UPDATE_ICON', 'Icon set complete', {
+            iconAfter: volume.icon,
+            iconAttrAfter: volume.getAttribute('icon'),
+        });
+    }
+
+    handleFullscreenRequest(detail = {}) {
+        if (!this.matchesActionTarget(detail)) return;
+        const request = this.requestFullscreen
+            ? () => this.requestFullscreen()
+            : this.video && this.video.requestFullscreen
+                ? () => this.video.requestFullscreen()
+                : null;
+        if (!request) return;
+        const result = request();
+        if (result && result.catch) result.catch(console.warn);
+    }
+
+    matchesActionTarget(detail = {}) {
+        const targetEntity = detail.target_entity;
+        const targetUrl = detail.target_url;
+        const targetId = detail.target_id;
+        const hasFilter = !!(targetEntity || targetUrl || targetId);
+
+        if (!hasFilter) return false;
+        if (!this.config) return false;
+        if (targetEntity && targetEntity !== this.config.entity) return false;
+        if (targetUrl && targetUrl !== this.config.url) return false;
+        if (targetId && targetId !== this.config.id) return false;
+
+        return true;
+    }
+
+    emitAudioState() {
+        window.__webrtcLog?.('EMIT_STATE', 'emitAudioState called', {
+            hasVideo: !!this.video,
+            videoMuted: this.video?.muted,
+            configId: this.config?.id,
+        });
+        if (!this.video) {
+            window.__webrtcLog?.('EMIT_STATE', 'No video element, returning', {});
+            return;
+        }
+        const muted = !!this.video.muted;
+        this.dataset.muted = muted ? 'true' : 'false';
+        window.__webrtcLog?.('EMIT_STATE', 'Dataset muted set', {
+            datasetMuted: this.dataset.muted,
+        });
+        
+        // Update body class for CSS targeting from sibling elements
+        const cardId = this.config ? this.config.id : undefined;
+        if (cardId && typeof document !== 'undefined' && document.body) {
+            const className = `webrtc-muted-${cardId}`;
+            if (muted) {
+                document.body.classList.add(className);
+                document.body.classList.remove(`webrtc-unmuted-${cardId}`);
+                window.__webrtcLog?.('EMIT_STATE', 'Body class updated for muted', { className });
+            } else {
+                document.body.classList.remove(className);
+                document.body.classList.add(`webrtc-unmuted-${cardId}`);
+                window.__webrtcLog?.('EMIT_STATE', 'Body class updated for unmuted', { className: `webrtc-unmuted-${cardId}` });
+            }
+        }
+        
+        // Update global state API for external components to query
+        if (cardId && typeof window !== 'undefined' && window.__webrtcSetMuteState) {
+            window.__webrtcSetMuteState(cardId, muted);
+        }
+        
+        const detail = {
+            target_entity: this.config ? this.config.entity : undefined,
+            target_url: this.config ? this.config.url : undefined,
+            target_id: this.config ? this.config.id : undefined,
+            muted,
+        };
+        window.__webrtcLog?.('EMIT_STATE', 'Dispatching webrtc-audio-state event', { detail });
+        // Dispatch on window to ensure event reaches document listeners across shadow DOM boundaries
+        window.dispatchEvent(new CustomEvent('webrtc-audio-state', {
+            bubbles: false,
+            detail,
+        }));
+    }
+
+    _bindGlobalActionEvents() {
+        if (this._globalActionBindings || typeof window === 'undefined') return;
+
+        // Map of webrtc event names to handlers
+        const eventHandlers = {
+            'webrtc-screenshot': detail => this.handleScreenshotRequest(detail),
+            'webrtc-mute': detail => this.handleMuteRequest(detail, true),
+            'webrtc-unmute': detail => this.handleMuteRequest(detail, false),
+            'webrtc-toggle-mute': detail => this.handleToggleMuteRequest(detail),
+            'webrtc-fullscreen': detail => this.handleFullscreenRequest(detail),
+        };
+
+        // Listen for raw CustomEvents (e.g. from Browser Mod or manual dispatch)
+        const rawBindings = Object.entries(eventHandlers).map(([type, handler]) => {
+            const fn = event => {
+                const path = event.composedPath ? event.composedPath() : [];
+                if (path.includes(this)) return;
+                handler(event.detail || {});
+            };
+            window.addEventListener(type, fn);
+            return {type, fn};
+        });
+
+        // Listen for hass-action events (from Bubble Card's fire-dom-event)
+        const hassActionHandler = event => {
+            const config = event.detail?.config;
+            if (!config) return;
+
+            // Check for fire-dom-event action type
+            const action = config.tap_action || config;
+            if (action.action !== 'fire-dom-event') return;
+
+            const eventName = action.event;
+            const handler = eventHandlers[eventName];
+            if (!handler) return;
+
+            // Build detail from the action config
+            const detail = {
+                target_id: action.target_id,
+                target_entity: action.target_entity,
+                target_url: action.target_url,
+                ...(action.data || {}),
+            };
+
+            handler(detail);
+        };
+        window.addEventListener('hass-action', hassActionHandler);
+
+        this._globalActionBindings = {
+            raw: rawBindings,
+            hassAction: hassActionHandler,
+        };
+    }
+
+    _unbindGlobalActionEvents() {
+        if (!this._globalActionBindings || typeof window === 'undefined') return;
+        this._globalActionBindings.raw.forEach(({type, fn}) => window.removeEventListener(type, fn));
+        window.removeEventListener('hass-action', this._globalActionBindings.hassAction);
+        this._globalActionBindings = null;
+    }
+
+    renderCustomUI() {
+        window.__webrtcLog?.('RENDER_UI', 'renderCustomUI called', {
+            configUi: this.config.ui,
+            configId: this.config?.id,
+            hasVideo: !!this.video,
+        });
+        if (!this.config.ui) {
+            window.__webrtcLog?.('RENDER_UI', 'UI not enabled, returning', {});
+            return;
+        }
+
+        this.video.controls = false;
+        this.video.style.pointerEvents = 'none';
+
+        const card = this.querySelector('.card');
+        card.insertAdjacentHTML('beforebegin', `
+            <style>
+                .spinner {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                }
+                .controls {
+                    position: absolute;
+                    left: 5px;
+                    right: 5px;
+                    bottom: 5px;
+                    display: flex;
+                    align-items: center;
+                }
+                .space {
+                    width: 100%;
+                }
+                .volume {
+                    display: none;
+                }
+                .stream {
+                    padding-top: 2px;
+                    margin-left: 2px;
+                    font-weight: 400;
+                    font-size: 20px;
+                    color: white;
+                    display: none;
+                    cursor: pointer;
+                }
+            </style>
+        `);
+        card.insertAdjacentHTML('beforeend', `
+            <div class="ui">
+                <ha-circular-progress class="spinner"></ha-circular-progress>
+                <div class="controls">
+                    <ha-icon class="fullscreen" icon="mdi:fullscreen"></ha-icon>
+                    <ha-icon class="screenshot" icon="mdi:floppy"></ha-icon>
+                    <ha-icon class="pictureinpicture" icon="mdi:picture-in-picture-bottom-right"></ha-icon>
+                    <span class="stream">${this.streamName}</span>
+                    <span class="space"></span>
+                    <ha-icon class="play" icon="mdi:play"></ha-icon>
+                    <ha-icon class="volume" icon="mdi:volume-high"></ha-icon>
+                </div>
+            </div>
+        `);
+
+        const video = this.video;
+
+        const fullscreen = this.querySelector('.fullscreen');
+        if (this.requestFullscreen) {
+            this.addEventListener('fullscreenchange', () => {
+                const newIcon = document.fullscreenElement ? 'mdi:fullscreen-exit' : 'mdi:fullscreen';
+                fullscreen.icon = newIcon;
+                fullscreen.setAttribute('icon', newIcon);
+            });
+        } else if (video.webkitEnterFullscreen) {
+            this.requestFullscreen = () => new Promise((resolve, reject) => {
+                try {
+                    video.webkitEnterFullscreen();
+                } catch (e) {
+                    reject(e);
+                }
+            });
+            video.addEventListener('webkitendfullscreen', () => {
+                setTimeout(() => this.play(), 1000); // fix bug in iOS
+            });
+        } else {
+            fullscreen.style.display = 'none';
+        }
+
+        const pip = this.querySelector('.pictureinpicture');
+        if (video.requestPictureInPicture) {
+            video.addEventListener('enterpictureinpicture', () => {
+                pip.icon = 'mdi:rectangle';
+                pip.setAttribute('icon', 'mdi:rectangle');
+                this.background = true;
+            });
+            video.addEventListener('leavepictureinpicture', () => {
+                pip.icon = 'mdi:picture-in-picture-bottom-right';
+                pip.setAttribute('icon', 'mdi:picture-in-picture-bottom-right');
+                this.background = this.config.background;
+                this.play();
+            });
+        } else {
+            pip.style.display = 'none';
+        }
+
+        const ui = this.querySelector('.ui');
+        ui.addEventListener('click', ev => {
+            const icon = ev.target.icon;
+            window.__webrtcLog?.('UI_CLICK', 'UI click event', {
+                targetTagName: ev.target.tagName,
+                targetClassName: ev.target.className,
+                icon,
+                iconAttr: ev.target.getAttribute?.('icon'),
+                videoMuted: video.muted,
+                configId: this.config?.id,
+            });
+            if (icon === 'mdi:play') {
+                this.play();
+            } else if (icon === 'mdi:volume-mute') {
+                window.__webrtcLog?.('UI_CLICK', 'Volume mute icon clicked - unmuting', {
+                    currentMuted: video.muted,
+                });
+                this.setUserMuted(false);
+                window.__webrtcLog?.('UI_CLICK', 'Video muted set to false', {
+                    newMuted: video.muted,
+                });
+                this.emitAudioState();
+                this._updateVolumeIcon();
+            } else if (icon === 'mdi:volume-high') {
+                window.__webrtcLog?.('UI_CLICK', 'Volume high icon clicked - muting', {
+                    currentMuted: video.muted,
+                });
+                this.setUserMuted(true);
+                window.__webrtcLog?.('UI_CLICK', 'Video muted set to true', {
+                    newMuted: video.muted,
+                });
+                this.emitAudioState();
+                this._updateVolumeIcon();
+            } else if (icon === 'mdi:fullscreen') {
+                this.requestFullscreen().catch(console.warn);
+            } else if (icon === 'mdi:fullscreen-exit') {
+                document.exitFullscreen().catch(console.warn);
+            } else if (icon === 'mdi:floppy') {
+                this.saveScreenshot();
+            } else if (icon === 'mdi:picture-in-picture-bottom-right') {
+                video.requestPictureInPicture().catch(console.warn);
+            } else if (icon === 'mdi:rectangle') {
+                document.exitPictureInPicture().catch(console.warn);
+            } else if (ev.target.className === 'stream') {
+                this.nextStream(true);
+                ev.target.innerText = this.streamName;
+            }
+        });
+
+        const spinner = this.querySelector('.spinner');
+        video.addEventListener('waiting', () => {
+            spinner.style.display = 'block';
+        });
+        video.addEventListener('playing', () => {
+            spinner.style.display = 'none';
+        });
+
+        const play = this.querySelector('.play');
+        video.addEventListener('play', () => {
+            play.style.display = 'none';
+        });
+        video.addEventListener('pause', () => {
+            play.style.display = 'block';
+        });
+
+        const volume = this.querySelector('.volume');
+        window.__webrtcLog?.('RENDER_UI', 'Volume element found during render', {
+            volumeFound: !!volume,
+            volumeTagName: volume?.tagName,
+            initialIcon: volume?.icon,
+            initialIconAttr: volume?.getAttribute?.('icon'),
+            configId: this.config?.id,
+        });
+        video.addEventListener('loadeddata', () => {
+            const hasAudio = this.hasAudio;
+            window.__webrtcLog?.('VIDEO_EVENT', 'loadeddata event - setting volume visibility', {
+                hasAudio,
+                volumeDisplay: hasAudio ? 'block' : 'none',
+            });
+            volume.style.display = hasAudio ? 'block' : 'none';
+        });
+        video.addEventListener('volumechange', () => {
+            window.__webrtcLog?.('VIDEO_EVENT', 'volumechange event fired', {
+                videoMuted: video.muted,
+                videoVolume: video.volume,
+                configId: this.config?.id,
+            });
+            this._updateVolumeIcon();
+        });
+
+        const stream = this.querySelector('.stream');
+        stream.style.display = this.config.streams.length > 1 ? 'block' : 'none';
+    }
+
+    renderShortcuts() {
+        if (!this.config.shortcuts) return;
+
+        const card = this.querySelector('.card');
+        card.insertAdjacentHTML('beforebegin', `
+            <style>
+                .shortcuts {
+                    position: absolute;
+                    top: 5px;
+                    left: 5px;
+                }
+            </style>
+        `);
+        card.insertAdjacentHTML('beforeend', '<div class="shortcuts"></div>');
+
+        const shortcuts = this.querySelector('.shortcuts');
+        shortcuts.addEventListener('click', ev => {
+            const value = this.config.shortcuts[ev.target.dataset.index];
+            if (value.more_info !== undefined) {
+                const event = new Event('hass-more-info', {
+                    bubbles: true,
+                    cancelable: true,
+                    composed: true,
+                });
+                event.detail = {entityId: value.more_info};
+                ev.target.dispatchEvent(event);
+            }
+            if (value.service !== undefined) {
+                const [domain, name] = value.service.split('.');
+                this.hass.callService(domain, name, value.service_data || {});
+            }
+        });
+
+        this.renderTemplate('shortcuts', () => {
+            const innerHTML = this.config.shortcuts.map((value, index) => `
+                <ha-icon data-index="${index}" icon="${value.icon}" title="${value.name}"></ha-icon>
+            `).join('');
+
+            if (shortcuts.innerHTML !== innerHTML) {
+                shortcuts.innerHTML = innerHTML;
+            }
+        });
+    }
+
+    renderStyle() {
+        if (!this.config.style) return;
+
+        const style = document.createElement('style');
+        const card = this.querySelector('.card');
+        card.insertAdjacentElement('beforebegin', style);
+
+        this.renderTemplate('style', () => {
+            style.innerText = this.config.style;
+        });
+    }
+
+    renderTemplate(name, renderHTML) {
+        const config = this.config[name];
+        // support config param as string or as object
+        const template = typeof config === 'string' ? config : JSON.stringify(config);
+        // check if config param has template
+        if (template.indexOf('${') >= 0) {
+            const render = () => {
+                try {
+                    const states = this.hass ? this.hass.states : undefined;
+                    this.config[name] = JSON.parse(eval('`' + template + '`'));
+                    renderHTML();
+                } catch (e) {
+                    console.debug(e);
+                }
+            };
+            this.onhass.push(render);
+            render();
+        } else {
+            renderHTML();
+        }
+    }
+
+    get hasAudio() {
+        return (
+            (this.video.srcObject && this.video.srcObject.getAudioTracks && this.video.srcObject.getAudioTracks().length) ||
+            (this.video.mozHasAudio || this.video.webkitAudioDecodedByteCount) ||
+            (this.video.audioTracks && this.video.audioTracks.length)
+        );
+    }
+}
+
+customElements.define('webrtc-camera-sfenton', WebRTCCamera);
+
+const card = {
+    type: 'webrtc-camera-sfenton',
+    name: 'WebRTC Camera',
+    preview: false,
+    description: 'WebRTC camera allows you to view the stream of almost any camera without delay',
+};
+// Apple iOS 12 doesn't support `||=`
+if (window.customCards) window.customCards.push(card);
+else window.customCards = [card];
