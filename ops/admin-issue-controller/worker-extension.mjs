@@ -2,7 +2,11 @@ import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
-import { joinSession } from "@github/copilot-sdk/extension";
+import { createInterface } from "node:readline";
+
+// Minimal MCP stdio server exposing the single sandboxed repository tool to a
+// Claude Code worker. It deliberately has no package dependencies because the
+// controller copies this file alone into the dedicated worker home.
 
 const MAX_OUTPUT_BYTES = 512 * 1024;
 const ALLOWED_MUTABLE_WORKSPACE_PATHS = new Set([
@@ -131,11 +135,8 @@ async function runIsolated(command, timeoutSeconds) {
     };
   }
 
-  const workspace = await realpath(process.cwd());
-  const configuredWorkspace = await realpath(
-    requiredEnvironment("ADMIN_ISSUE_WORKSPACE"),
-  );
-  if (workspace !== configuredWorkspace || workspace.includes(",")) {
+  const workspace = await realpath(requiredEnvironment("ADMIN_ISSUE_WORKSPACE"));
+  if (workspace !== requiredEnvironment("ADMIN_ISSUE_WORKSPACE") || workspace.includes(",")) {
     return {
       textResultForLlm: "The worker workspace binding is invalid.",
       resultType: "failure",
@@ -355,31 +356,95 @@ async function runIsolated(command, timeoutSeconds) {
   });
 }
 
-await joinSession({
-  tools: [
-    {
-      name: "admin_issue_workspace",
-      description:
-        "Read and test the assigned repository in a networkless container. Research-only worktrees are read-only except for their private ignored research PNG directory; approved workers may edit their assigned worktree.",
-      parameters: {
-        type: "object",
-        properties: {
-          command: {
-            type: "string",
-            description: "Bash command to run inside the isolated worktree.",
-          },
-          timeout_seconds: {
-            type: "integer",
-            minimum: 1,
-            maximum: 1800,
-            default: 300,
-          },
-        },
-        required: ["command"],
-        additionalProperties: false,
+const TOOL = {
+  name: "admin_issue_workspace",
+  description:
+    "Read and test the assigned repository in a networkless container. Research-only worktrees are read-only except for their private ignored research PNG directory; approved workers may edit their assigned worktree.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      command: {
+        type: "string",
+        description: "Bash command to run inside the isolated worktree.",
       },
-      handler: async ({ command, timeout_seconds = 300 }) =>
-        await runIsolated(command, timeout_seconds),
+      timeout_seconds: {
+        type: "integer",
+        minimum: 1,
+        maximum: 1800,
+        default: 300,
+      },
     },
-  ],
+    required: ["command"],
+    additionalProperties: false,
+  },
+};
+
+async function callTool(params) {
+  if (params?.name !== TOOL.name) {
+    return { content: [{ type: "text", text: `Unknown tool: ${params?.name}` }], isError: true };
+  }
+  const { command, timeout_seconds: timeoutSeconds = 300 } = params.arguments ?? {};
+  if (typeof command !== "string" || !command.trim() ||
+    !Number.isInteger(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 1800) {
+    return { content: [{ type: "text", text: "Invalid admin_issue_workspace arguments." }], isError: true };
+  }
+  let result;
+  try {
+    result = await runIsolated(command, timeoutSeconds);
+  } catch (error) {
+    result = { textResultForLlm: error instanceof Error ? error.message : String(error), resultType: "failure" };
+  }
+  return {
+    content: [{ type: "text", text: result.textResultForLlm }],
+    isError: result.resultType !== "success",
+  };
+}
+
+async function handle(message) {
+  switch (message.method) {
+    case "initialize":
+      return {
+        protocolVersion: message.params?.protocolVersion ?? "2025-06-18",
+        capabilities: { tools: {} },
+        serverInfo: { name: "admin-issue-worker", version: "1.0.0" },
+      };
+    case "ping":
+      return {};
+    case "tools/list":
+      return { tools: [TOOL] };
+    case "tools/call":
+      return await callTool(message.params);
+    default: {
+      const error = new Error(`Method not found: ${message.method}`);
+      error.code = -32601;
+      throw error;
+    }
+  }
+}
+
+function send(message) {
+  process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
+}
+
+createInterface({ input: process.stdin, crlfDelay: Infinity }).on("line", async (line) => {
+  if (!line.trim()) return;
+  let message;
+  try {
+    message = JSON.parse(line);
+  } catch {
+    send({ id: null, error: { code: -32700, message: "Parse error" } });
+    return;
+  }
+  if (message?.id === undefined || message.id === null) return;
+  try {
+    send({ id: message.id, result: await handle(message) });
+  } catch (error) {
+    send({
+      id: message.id,
+      error: {
+        code: Number.isInteger(error?.code) ? error.code : -32603,
+        message: error instanceof Error ? error.message : String(error),
+      },
+    });
+  }
 });

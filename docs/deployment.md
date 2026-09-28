@@ -12,8 +12,8 @@ failure-signature marker that excludes the run and source SHA. If an open issue
 already has that exact signature, the workflow appends the new run to the
 canonical issue instead of filing another investigation. Different errors,
 deployed baselines, or uncertain mutation/rollback states always file a new
-issue. The Admin issue controller adopts a newly filed issue, runs tandem
-research, and may change only the deployment workflow,
+issue. The Admin issue controller adopts a newly filed issue, runs a Claude
+Code worker, and may change only the deployment workflow,
 `scripts/deploy-dashboard-ci.ts`, and its directly owned test in addition to
 ordinary dashboard paths. The failed deployment itself still performs no
 success-shaped mutation or automatic Home Assistant restart.
