@@ -583,12 +583,17 @@ function stableJson(value: unknown) {
   return `${JSON.stringify(value, null, 2)}\n`
 }
 
-function writeGenerated(path: string, value: unknown) {
-  const absolute = resolve(ROOT, path)
+// Unchanged files are left untouched so a sync can run where only the files it
+// actually changes are writable (the admin worker sandbox keeps the legacy
+// baseline read-only).
+export function writeGenerated(path: string, value: unknown, root = ROOT) {
+  const absolute = resolve(root, path)
+  const content = stableJson(value)
+  if (existsSync(absolute) && readFileSync(absolute, 'utf8') === content) return false
   const directory = dirname(absolute)
   if (!existsSync(directory)) {
-    const parts = normalizePath(relative(ROOT, directory)).split('/')
-    let current = ROOT
+    const parts = normalizePath(relative(root, directory)).split('/')
+    let current = root
     for (const part of parts) {
       current = join(current, part)
       if (!existsSync(current)) {
@@ -596,7 +601,8 @@ function writeGenerated(path: string, value: unknown) {
       }
     }
   }
-  writeFileSync(absolute, stableJson(value))
+  writeFileSync(absolute, content)
+  return true
 }
 
 export function currentBaseline(inventory: CopyInventory): LegacyBaseline {

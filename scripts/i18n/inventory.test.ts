@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { assertNoNewLegacy, buildCopyInventory, currentBaseline } from './inventory'
+import { assertNoNewLegacy, buildCopyInventory, currentBaseline, writeGenerated } from './inventory'
 
 describe('copy inventory', () => {
   let repositoryInventory: ReturnType<typeof buildCopyInventory>
@@ -9,6 +9,20 @@ describe('copy inventory', () => {
   beforeAll(() => {
     repositoryInventory = buildCopyInventory()
   }, 30_000)
+
+  it('leaves unchanged generated files untouched so read-only files can be synced around', () => {
+    const root = mkdtempSync(join(tmpdir(), 'inventory-write-'))
+    try {
+      expect(writeGenerated('generated/baseline.json', { version: 1 }, root)).toBe(true)
+      const path = join(root, 'generated/baseline.json')
+      chmodSync(path, 0o444)
+      expect(writeGenerated('generated/baseline.json', { version: 1 }, root)).toBe(false)
+      expect(() => writeGenerated('generated/baseline.json', { version: 2 }, root)).toThrow()
+      expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ version: 1 })
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
+  })
 
   it('tracks migrated catalogs separately', () => {
     const inventory = repositoryInventory
