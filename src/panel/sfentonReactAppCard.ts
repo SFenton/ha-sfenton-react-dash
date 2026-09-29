@@ -17,6 +17,9 @@ const REACT_DASHBOARD_VERSION_PARAM = 'v'
 const REACT_DASHBOARD_ENTRY_SCRIPT_SELECTOR = 'script[type="module"][src]'
 // A deferred build update still lands on an always-visible wall display within a working day.
 const REACT_DASHBOARD_UPDATE_MAX_DEFER_MS = 6 * 60 * 60 * 1_000
+// How long a frame load interrupted by backgrounding may take to start the app once the dashboard is visible again.
+const REACT_DASHBOARD_STALLED_LOAD_GRACE_MS = 4_000
+const REACT_DASHBOARD_STALLED_LOAD_RETRY_MS = 60_000
 const LEGACY_REACT_DASHBOARD_PATH = '/sfenton-react-dash/home'
 const RTC_PILOT_DASHBOARD_PATH = '/sfenton-react-fold-test/home'
 const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
@@ -100,11 +103,18 @@ interface CustomCardMetadata {
   type: string
 }
 
+interface PendingFrameLoad {
+  interruptedByHidden: boolean
+}
+
 interface PersistentReactDashboardFrame {
   iframe: HTMLIFrameElement
+  lastStalledRecoveryAt?: number
   owner?: SfentonReactAppCard
+  pendingLoad?: PendingFrameLoad
   releasePendingUpdate?: () => void
   releaseRouteCleanup?: () => void
+  releaseStalledLoadWatch?: () => void
   releaseTimer?: number
 }
 
@@ -188,6 +198,74 @@ async function publishedEntryScript(ownerWindow: CustomCardWindow, source: URL) 
   return entry ? new URL(entry, source).href : undefined
 }
 
+function navigateFrame(frame: PersistentReactDashboardFrame, source: string) {
+  frame.pendingLoad = { interruptedByHidden: frame.iframe.ownerDocument.hidden }
+  frame.iframe.src = source
+}
+
+function frameAppStarted(iframe: HTMLIFrameElement) {
+  try {
+    const childWindow = iframe.contentWindow as DisposableDashboardWindow | null
+    return typeof childWindow?.[REACT_DASHBOARD_DISPOSE_PROPERTY] === 'function'
+  } catch {
+    return false
+  }
+}
+
+// iOS freezes a backgrounded web view, and a frame navigation caught by that freeze can stall for good: the
+// document stays `interactive` and the app bundle never runs, leaving a blank dashboard. Once the dashboard is
+// visible again, restart a load that backgrounding interrupted if the app still has not started. Slow loads that
+// were never hidden are left alone.
+function watchStalledFrameLoads(ownerWindow: CustomCardWindow, frame: PersistentReactDashboardFrame) {
+  const ownerDocument = ownerWindow.document
+  let check: number | undefined
+  const onLoad = () => {
+    try {
+      if (frame.iframe.contentWindow?.location.href === 'about:blank') return
+    } catch {
+      // A cross-origin document still ends the pending load.
+    }
+    frame.pendingLoad = undefined
+  }
+  const recoverIfStalled = () => {
+    check = undefined
+    const pending = frame.pendingLoad
+    if (!pending?.interruptedByHidden || ownerDocument.hidden || !frame.iframe.isConnected) return
+    if (frameAppStarted(frame.iframe)) {
+      frame.pendingLoad = undefined
+      return
+    }
+    const now = Date.now()
+    if (
+      frame.lastStalledRecoveryAt !== undefined
+      && now - frame.lastStalledRecoveryAt < REACT_DASHBOARD_STALLED_LOAD_RETRY_MS
+    ) return
+    const source = frame.iframe.getAttribute('src')
+    if (!source) return
+    frame.lastStalledRecoveryAt = now
+    disposeReactDashboardFrame(frame.iframe, 'legacy-card-stalled-load')
+    navigateFrame(frame, source)
+  }
+  const onVisibilityChange = () => {
+    if (ownerDocument.hidden) {
+      if (frame.pendingLoad) frame.pendingLoad.interruptedByHidden = true
+      if (check !== undefined) ownerWindow.clearTimeout(check)
+      check = undefined
+      return
+    }
+    if (frame.pendingLoad?.interruptedByHidden && check === undefined) {
+      check = ownerWindow.setTimeout(recoverIfStalled, REACT_DASHBOARD_STALLED_LOAD_GRACE_MS)
+    }
+  }
+  frame.iframe.addEventListener('load', onLoad)
+  ownerDocument.addEventListener('visibilitychange', onVisibilityChange)
+  return () => {
+    if (check !== undefined) ownerWindow.clearTimeout(check)
+    frame.iframe.removeEventListener('load', onLoad)
+    ownerDocument.removeEventListener('visibilitychange', onVisibilityChange)
+  }
+}
+
 function loadFrameSource(
   frame: PersistentReactDashboardFrame,
   resolvedUrl: URL,
@@ -197,7 +275,7 @@ function loadFrameSource(
   frame.releasePendingUpdate?.()
   disposeReactDashboardFrame(frame.iframe, reason)
   frame.iframe.dataset.configuredAppUrl = resolvedUrl.href
-  frame.iframe.src = source
+  navigateFrame(frame, source)
 }
 
 // Reloading on every deployment restarts the dashboard whenever Home Assistant refreshes the card config,
@@ -232,7 +310,7 @@ function scheduleVersionUpdate(
   const apply = () => {
     release()
     disposeReactDashboardFrame(frame.iframe, 'legacy-card-version-update')
-    frame.iframe.src = source
+    navigateFrame(frame, source)
   }
   const deferUnlessIdentical = (published: string | undefined) => {
     if (cancelled) return
@@ -260,6 +338,7 @@ function disposePersistentFrame(
   reason: string,
 ) {
   frame.releasePendingUpdate?.()
+  frame.releaseStalledLoadWatch?.()
   clearPersistentFrameRelease(ownerWindow, frame)
   disposeReactDashboardFrame(frame.iframe, reason)
   frame.iframe.remove()
@@ -278,12 +357,15 @@ function acquirePersistentFrame(card: SfentonReactAppCard) {
       || !frame.iframe.isConnected
     )
   ) {
+    frame.releaseStalledLoadWatch?.()
     clearPersistentFrameRelease(ownerWindow, frame)
     frame = undefined
   }
   if (!frame) {
-    frame = { iframe: createPersistentFrame(card.ownerDocument) }
-    ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] = frame
+    const created: PersistentReactDashboardFrame = { iframe: createPersistentFrame(card.ownerDocument) }
+    created.releaseStalledLoadWatch = watchStalledFrameLoads(ownerWindow, created)
+    ownerWindow[REACT_DASHBOARD_FRAME_PROPERTY] = created
+    frame = created
   }
 
   clearPersistentFrameRelease(ownerWindow, frame)

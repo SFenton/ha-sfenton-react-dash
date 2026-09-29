@@ -382,4 +382,105 @@ describe('Sfenton React app card', () => {
       expect(iframe).toHaveAttribute('src', '/local/ha-sfenton-react-dash-next/index.html?v=first')
     })
   })
+
+  describe('stalled frame loads', () => {
+    function trackNavigations(iframe: HTMLIFrameElement) {
+      const navigations: string[] = []
+      Object.defineProperty(iframe, 'src', {
+        configurable: true,
+        get: () => iframe.getAttribute('src') ?? '',
+        set: (value: string) => {
+          navigations.push(value)
+          iframe.setAttribute('src', value)
+        },
+      })
+      return navigations
+    }
+
+    function unstartedFrame(iframe: HTMLIFrameElement | null) {
+      Object.defineProperty(iframe, 'contentWindow', {
+        configurable: true,
+        value: { location: { href: 'https://ha.example/local/ha-sfenton-react-dash/index.html' } },
+      })
+    }
+
+    async function hiddenVersionUpdate() {
+      vi.useFakeTimers()
+      publishBuild('./assets/app-next.js')
+      const { card, iframe } = mountRunningCard('first')
+      const navigations = trackNavigations(iframe!)
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second` })
+      await vi.waitFor(() => expect(navigations).toEqual([`${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`]))
+      unstartedFrame(iframe)
+      return { iframe: iframe!, navigations }
+    }
+
+    it('restarts a hidden update whose app never started once the dashboard is visible', async () => {
+      const { navigations } = await hiddenVersionUpdate()
+
+      setDocumentHidden(false)
+      await vi.advanceTimersByTimeAsync(3_999)
+      expect(navigations).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect(navigations).toEqual([
+        `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`,
+        `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`,
+      ])
+    })
+
+    it('leaves an interrupted load alone once it finished or the app started', async () => {
+      const finished = await hiddenVersionUpdate()
+      finished.iframe.dispatchEvent(new Event('load'))
+      setDocumentHidden(false)
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(finished.navigations).toHaveLength(1)
+
+      persistentIframe()?.remove()
+      document.body.replaceChildren()
+      Reflect.deleteProperty(window, '__sfentonReactDashboardCardFrame')
+
+      const started = await hiddenVersionUpdate()
+      Object.defineProperty(started.iframe, 'contentWindow', {
+        configurable: true,
+        value: { [REACT_DASHBOARD_DISPOSE_PROPERTY]: () => true },
+      })
+      setDocumentHidden(false)
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(started.navigations).toHaveLength(1)
+    })
+
+    it('never restarts a slow load that was not interrupted by backgrounding', async () => {
+      vi.useFakeTimers()
+      const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+      document.body.append(card)
+      const iframe = persistentIframe()!
+      const navigations = trackNavigations(iframe)
+      card.setConfig({ url: '/local/ha-sfenton-react-dash-next/index.html?v=first' })
+      unstartedFrame(iframe)
+
+      setDocumentHidden(false)
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      expect(navigations).toEqual(['/local/ha-sfenton-react-dash-next/index.html?v=first'])
+    })
+
+    it('restarts a stalled load at most once a minute', async () => {
+      const { navigations } = await hiddenVersionUpdate()
+
+      setDocumentHidden(false)
+      await vi.advanceTimersByTimeAsync(4_000)
+      setDocumentHidden(true)
+      setDocumentHidden(false)
+      await vi.advanceTimersByTimeAsync(4_000)
+      expect(navigations).toHaveLength(2)
+
+      setDocumentHidden(true)
+      await vi.advanceTimersByTimeAsync(60_000)
+      setDocumentHidden(false)
+      await vi.advanceTimersByTimeAsync(4_000)
+      expect(navigations).toHaveLength(3)
+    })
+  })
 })
