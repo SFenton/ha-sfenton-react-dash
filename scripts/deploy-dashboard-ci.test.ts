@@ -17,6 +17,7 @@ import {
   artifactManifestHash,
   assertAutomaticDeploymentPaths,
   assertPanelBridgeUnchanged,
+  candidateArtifactPublished,
   classifyDeploymentDisposition,
   createDeploymentRecordV2,
   createPublishDirectory,
@@ -195,6 +196,145 @@ describe('dashboard CI deployment', () => {
         sha256: 'b'.repeat(64),
       }]),
     ).toThrow('manual restart-aware release')
+  })
+
+  it('recognizes a candidate whose every file is already published', () => {
+    const published = [
+      { path: 'index.html', size: 10, sha256: 'a'.repeat(64) },
+      { path: 'assets/app-1.js', size: 3, sha256: 'b'.repeat(64) },
+      { path: 'assets/app-old.js', size: 9, sha256: 'c'.repeat(64) },
+      { path: 'deployment.json', size: 99, sha256: 'd'.repeat(64) },
+    ]
+    const candidate = [
+      ...published.slice(0, 2),
+      { path: 'deployment.json', size: 215, sha256: 'e'.repeat(64) },
+    ]
+
+    expect(candidateArtifactPublished(published, candidate)).toBe(true)
+    expect(candidateArtifactPublished(published, [
+      ...candidate,
+      { path: 'assets/app-2.js', size: 3, sha256: 'e'.repeat(64) },
+    ])).toBe(false)
+    expect(candidateArtifactPublished(published, [
+      { ...candidate[0], sha256: 'f'.repeat(64) },
+    ])).toBe(false)
+    expect(candidateArtifactPublished(published, [
+      { ...candidate[0], size: 11 },
+    ])).toBe(false)
+  })
+
+  it('leaves production untouched when a forward candidate rebuilds the published bytes', async () => {
+    const candidate = await fixture()
+    const production = join(candidate.root, 'production')
+    const assets = join(production, 'assets')
+    const authorizationPath = join(candidate.root, 'authorization.json')
+    const receiptPath = join(candidate.root, 'receipt.json')
+    const firstSha = 'a'.repeat(40)
+    const secondSha = 'b'.repeat(40)
+    await mkdir(join(assets, 'assets'), { recursive: true })
+    await writeFile(join(assets, 'index.html'), 'prior dashboard')
+    await writeFile(join(assets, 'sfenton-react-app-card.js'), 'card')
+    await writeFile(join(assets, 'sfenton-react-panel.js'), 'panel')
+    await writeFile(
+      join(production, 'metadata.json'),
+      `${JSON.stringify({
+        legacyWrapperUrl: '/local/ha-sfenton-react-dash/index.html?v=0000000',
+        legacyCardResourceUrl:
+          '/local/ha-sfenton-react-dash/sfenton-react-app-card.js?v=0000000',
+        panelRegistered: true,
+      })}\n`,
+    )
+    const local = new LocalProductionAdapter(production)
+    const adapter = Object.assign(local, {
+      async acquireLease() {},
+      async reconcileAssets() {},
+      async finalizeRelease() {},
+    })
+    const fetchImpl = vi.fn<typeof fetch>(async (input) => {
+      const url = new URL(String(input))
+      const path = decodeURIComponent(
+        url.pathname.replace('/local/ha-sfenton-react-dash/', ''),
+      )
+      return new Response(await readFile(join(assets, path)))
+    })
+    const deploy = async (sourceSha: string, runId: string, deployedSha: string) => {
+      await prepareDeploymentArtifact({
+        distDirectory: candidate.dist,
+        manifestPath: candidate.manifest,
+        sourceSha,
+        runId,
+        runAttempt: 1,
+      })
+      await writeFile(authorizationPath, JSON.stringify({
+        mode: 'production',
+        runId,
+        runAttempt: 1,
+        runnerId: 42,
+        runnerName: 'runner-42',
+        decision: 'allow',
+      }))
+      process.env.GITHUB_RUN_ID = runId
+      return deployDashboardArtifact(candidate.dist, candidate.manifest, receiptPath, {
+        adapter,
+        authorizationPath,
+        fetchImpl,
+        now: () => new Date('2026-09-28T21:00:00.000Z'),
+        resolveLineage: async () => ({
+          masterSha: sourceSha,
+          deployedSha,
+          candidateSha: sourceSha,
+          candidateIsMasterAncestor: true,
+          deployedIsMasterAncestor: true,
+          deployedIsCandidateAncestor: true,
+          candidateIsDeployedAncestor: false,
+          pathsFromDeployedToCandidate: ['e2e/layout/contracts.ts'],
+        }),
+      })
+    }
+    const previousRunId = process.env.GITHUB_RUN_ID
+    const previousRunAttempt = process.env.GITHUB_RUN_ATTEMPT
+    const previousHaUrl = process.env.HA_DEPLOY_URL
+    process.env.GITHUB_RUN_ATTEMPT = '1'
+    process.env.HA_DEPLOY_URL = 'http://ha-api-proxy:8123'
+    try {
+      await expect(deploy(firstSha, '200', '0000000')).resolves.toMatchObject({
+        disposition: 'forward',
+        deployedSha: firstSha,
+        mutationState: 'deployed',
+      })
+      const recordBefore = await readFile(join(assets, 'deployment.json'), 'utf8')
+
+      await expect(deploy(secondSha, '201', firstSha)).resolves.toMatchObject({
+        status: 'success',
+        disposition: 'artifact-unchanged',
+        sourceSha: secondSha,
+        previousSha: firstSha,
+        deployedSha: firstSha,
+        mutationState: 'none',
+        leaseReleased: true,
+      })
+      expect(await readFile(join(assets, 'deployment.json'), 'utf8')).toBe(recordBefore)
+      expect(
+        JSON.parse(await readFile(join(production, 'metadata.json'), 'utf8')),
+      ).toMatchObject({
+        legacyWrapperUrl: `/local/ha-sfenton-react-dash/index.html?v=${firstSha}`,
+      })
+
+      await writeFile(join(candidate.dist, 'assets/app-1.js'), 'changed app')
+      await expect(deploy(secondSha, '202', firstSha)).resolves.toMatchObject({
+        disposition: 'forward',
+        deployedSha: secondSha,
+        mutationState: 'deployed',
+      })
+    } finally {
+      if (previousRunId === undefined) delete process.env.GITHUB_RUN_ID
+      else process.env.GITHUB_RUN_ID = previousRunId
+      if (previousRunAttempt === undefined) delete process.env.GITHUB_RUN_ATTEMPT
+      else process.env.GITHUB_RUN_ATTEMPT = previousRunAttempt
+      if (previousHaUrl === undefined) delete process.env.HA_DEPLOY_URL
+      else process.env.HA_DEPLOY_URL = previousHaUrl
+      await rm(candidate.root, { recursive: true, force: true })
+    }
   })
 
   it('retains prior hashed assets while replacing stable build files', async () => {

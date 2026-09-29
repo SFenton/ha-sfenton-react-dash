@@ -3478,6 +3478,13 @@ describe('admin issue controller domain', () => {
       version: 2,
     }
     expect(deploymentReceiptIsAccepted(receipt, sha, { id: 123, runAttempt: 2 })).toBe(true)
+    expect(
+      deploymentReceiptIsAccepted(
+        { ...receipt, disposition: 'artifact-unchanged', deployedSha: 'b'.repeat(40) },
+        sha,
+      ),
+    ).toBe(true)
+    expect(deploymentReceiptIsAccepted({ ...receipt, disposition: 'full-rerun-required' }, sha)).toBe(false)
     expect(deploymentReceiptIsAccepted({ ...receipt, leaseReleased: false }, sha)).toBe(false)
     expect(deploymentReceiptIsAccepted({ ...receipt, sourceSha: 'b'.repeat(40) }, sha)).toBe(false)
     expect(deploymentReceiptIsAccepted({ ...receipt, verifiedPaths: [] }, sha)).toBe(false)

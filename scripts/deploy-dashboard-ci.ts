@@ -72,6 +72,7 @@ export type DeploymentReceipt = {
   disposition?:
     | 'forward'
     | 'already-current'
+    | 'artifact-unchanged'
     | 'superseded'
     | 'full-rerun-required'
   sourceSha: string
@@ -367,6 +368,24 @@ export function assertPanelBridgeUnchanged(
       fileHash(candidateFiles, PANEL_BRIDGE_PATH),
     'Automatic deployment cannot publish a changed custom-panel bridge; use the manual restart-aware release',
   )
+}
+
+/**
+ * Whether production already serves every candidate file with identical bytes. Merges that change only tests,
+ * tooling, or documentation rebuild the same bundle; republishing it would still rewrite the wrapper version and
+ * make every open React Dash client reload its app for no change. The per-SHA deployment record is excluded
+ * because every deployment replaces it.
+ */
+export function candidateArtifactPublished(
+  currentFiles: readonly ProductionFile[],
+  candidateFiles: readonly ProductionFile[],
+) {
+  const current = new Map(currentFiles.map((file) => [file.path, file]))
+  return candidateFiles.every((file) => {
+    if (file.path === DEPLOYMENT_RECORD_PATH) return true
+    const published = current.get(file.path)
+    return published?.sha256 === file.sha256 && published.size === file.size
+  })
 }
 
 async function git(
@@ -889,9 +908,9 @@ export async function deployDashboardArtifact(
     const action = planDeploymentAction(lineage, currentRecord)
     disposition = action.disposition
 
-    if (!action.requiresForwardDeployment) {
+    const settleWithoutMutation = async () => {
       assert(
-        currentRecord?.version === DEPLOYMENT_RECORD_VERSION,
+        snapshot && currentRecord?.version === DEPLOYMENT_RECORD_VERSION,
         'No-op verification requires deployment.json v2',
       )
       const deploymentRecord = currentRecord
@@ -933,8 +952,19 @@ export async function deployDashboardArtifact(
       return receipt
     }
 
+    if (!action.requiresForwardDeployment) {
+      return await settleWithoutMutation()
+    }
+
     assertPanelBridgeUnchanged(snapshot.files, manifest.files)
     assertAutomaticDeploymentPaths(lineage.pathsFromDeployedToCandidate)
+    if (
+      currentRecord?.version === DEPLOYMENT_RECORD_VERSION &&
+      candidateArtifactPublished(snapshot.files, manifest.files)
+    ) {
+      disposition = 'artifact-unchanged'
+      return await settleWithoutMutation()
+    }
     publishFiles = await createPublishDirectory(
       join(backup, 'assets'),
       resolve(artifactRoot),
