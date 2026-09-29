@@ -59,6 +59,7 @@ import {
   assertPullRequestBinding,
   assertPullRequestContainsVisualEvidence,
   buildClaudeWorkerArgs,
+  createSharedGitRunner,
   buildWorkerMcpConfig,
   buildWorkerStdin,
   extractFinalAssistantResponse,
@@ -5604,6 +5605,44 @@ describe('admin issue controller security configuration', () => {
         candidateHeadSha,
       ),
     ).toBeUndefined()
+  })
+
+  it('serializes shared Git ref updates across parallel workers and retries lock contention', async () => {
+    let active = 0
+    let maxActive = 0
+    const calls: string[] = []
+    let contended = false
+    const waits: number[] = []
+    const run = (async (_file: string, args: string[]) => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      calls.push(args.join(' '))
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 5))
+      active -= 1
+      if (args[0] === 'fetch' && !contended) {
+        contended = true
+        return {
+          exitCode: 1,
+          stderr: "error: cannot lock ref 'refs/remotes/origin/master': Unable to create '/repo/.git/refs/remotes/origin/master.lock': File exists.",
+          stdout: '',
+        }
+      }
+      if (args[0] === 'push') return { exitCode: 1, stderr: 'rejected', stdout: '' }
+      return { exitCode: 0, stderr: '', stdout: 'ok' }
+    }) as Parameters<typeof createSharedGitRunner>[0]
+    const runShared = createSharedGitRunner(run, async (milliseconds) => { waits.push(milliseconds) })
+    const results = await Promise.all([
+      runShared(['fetch', '--quiet', 'origin', 'master']),
+      runShared(['fetch', '--quiet', 'origin', 'master']),
+      runShared(['worktree', 'add', '/w', 'branch']),
+    ])
+    expect(maxActive).toBe(1)
+    expect(results.map((result) => result.exitCode)).toEqual([0, 0, 0])
+    expect(calls.filter((call) => call.startsWith('fetch'))).toHaveLength(3)
+    expect(waits).toEqual([2_000])
+    await expect(runShared(['push', 'origin', 'branch'])).rejects.toThrow('git push origin branch failed with exit 1')
+    expect((await runShared(['push', 'origin', 'branch'], { allowFailure: true })).exitCode).toBe(1)
+    expect((await runShared(['fetch', '--quiet', 'origin', 'master'])).exitCode).toBe(0)
   })
 
   it('regenerates only base-sync conflicts confined to generated files', () => {
