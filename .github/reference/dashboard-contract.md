@@ -331,7 +331,12 @@ Both maintained wrappers keep their same-origin app iframe in the stable top
 document and hand it to an immediate replacement host. This lets stock Home
 Assistant rebuild the Lovelace card or embedded custom panel after reconnect
 without remounting the React app. Source changes, route departure, and abandoned
-hosts still dispose the frame.
+hosts still dispose the frame. A legacy wrapper URL change that differs only in
+its `v` deployment query is not a source change: the card fetches the published
+`index.html` and keeps the running app when its entry script is unchanged. A
+changed build is swapped only while the HA document is hidden, or after six
+hours on an always-visible display, so a resumed mobile client that re-fetches
+the dashboard config does not restart the app in front of the user.
 
 ## Cameras And RTC
 
