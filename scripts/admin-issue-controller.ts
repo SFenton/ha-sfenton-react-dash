@@ -408,6 +408,44 @@ function now() {
   return new Date().toISOString()
 }
 
+const GIT_LOCK_CONTENTION = /Unable to create '[^']+\.lock': File exists|cannot lock ref/i
+
+// Parallel issue workers share one Git common directory, so commands that update
+// shared refs or worktree metadata (fetch, push, worktree add/remove/prune) run
+// one at a time. A lock held by another process is retried briefly.
+export function createSharedGitRunner(
+  run: typeof runCommand = runCommand,
+  wait: (milliseconds: number) => Promise<unknown> = sleep,
+  attempts = 3,
+) {
+  let queue: Promise<unknown> = Promise.resolve()
+  return (args: string[], options: CommandOptions = {}) => {
+    const execute = async () => {
+      for (let attempt = 1; ; attempt += 1) {
+        const result = await run('git', args, { ...options, allowFailure: true })
+        if (result.exitCode !== 0 && attempt < attempts && GIT_LOCK_CONTENTION.test(result.stderr)) {
+          await wait(2_000 * attempt)
+          continue
+        }
+        if (result.exitCode !== 0 && !options.allowFailure) {
+          throw new Error(
+            truncate(
+              `git ${args.join(' ')} failed with exit ${result.exitCode}\n${result.stderr}\n${result.stdout}`,
+              24_000,
+            ),
+          )
+        }
+        return result
+      }
+    }
+    const next = queue.then(execute, execute)
+    queue = next.catch(() => undefined)
+    return next
+  }
+}
+
+const runSharedGit = createSharedGitRunner()
+
 function sleep(milliseconds: number) {
   return new Promise((resolveSleep) => setTimeout(resolveSleep, milliseconds))
 }
@@ -766,7 +804,7 @@ async function rotateRunnerWorkflowDigest(
     config.runnerControllerConfigPath,
     'runnerControllerConfigPath',
   )
-  await runCommand('git', ['fetch', '--quiet', 'origin', 'master'], {
+  await runSharedGit(['fetch', '--quiet', 'origin', 'master'], {
     cwd: config.repositoryPath,
     timeoutMs: 120_000,
   })
@@ -2582,7 +2620,7 @@ async function ensureWorktree(
   state: AdminIssueControllerState,
   record: AdminIssueRecord,
 ) {
-  await runCommand('git', ['fetch', '--quiet', 'origin', 'master'], {
+  await runSharedGit(['fetch', '--quiet', 'origin', 'master'], {
     cwd: config.repositoryPath,
     timeoutMs: 120_000,
   })
@@ -2609,12 +2647,12 @@ async function ensureWorktree(
     { allowFailure: true, cwd: config.repositoryPath },
   )
   if (branchExists.exitCode === 0) {
-    await runCommand('git', ['worktree', 'add', path, branch], {
+    await runSharedGit(['worktree', 'add', path, branch], {
       cwd: config.repositoryPath,
       timeoutMs: 120_000,
     })
   } else {
-    await runCommand('git', ['worktree', 'add', '-b', branch, path, 'origin/master'], {
+    await runSharedGit(['worktree', 'add', '-b', branch, path, 'origin/master'], {
       cwd: config.repositoryPath,
       timeoutMs: 120_000,
     })
@@ -4626,7 +4664,7 @@ async function fetchMaster(
   record: AdminIssueRecord,
 ) {
   if (!record.worktreePath) throw new AdminIssueProvenanceError('Worker worktree is missing')
-  await runCommand('git', ['fetch', '--quiet', 'origin', 'master'], {
+  await runSharedGit(['fetch', '--quiet', 'origin', 'master'], {
     cwd: record.worktreePath,
     timeoutMs: 120_000,
   })
@@ -4829,8 +4867,7 @@ export async function pushCandidate(
   }
   candidate.pushAttempted = true
   writeState(config, state)
-  const push = await runCommand(
-    'git',
+  const push = await runSharedGit(
     [
       '-c',
       'core.hooksPath=/dev/null',
@@ -5250,8 +5287,7 @@ export async function synchronizeCandidateBase(
           `Remote branch changed during base synchronization to ${remoteBefore ?? 'absent'}`,
         )
       }
-      const push = await runCommand(
-        'git',
+      const push = await runSharedGit(
         [
           '-c',
           'core.hooksPath=/dev/null',
@@ -6361,7 +6397,7 @@ export async function commitIsAncestor(
 }
 
 async function fetchCurrentMaster(config: AdminIssueControllerConfig) {
-  await runCommand('git', ['fetch', '--quiet', 'origin', 'master'], {
+  await runSharedGit(['fetch', '--quiet', 'origin', 'master'], {
     cwd: config.repositoryPath,
     timeoutMs: 120_000,
   })
@@ -7378,12 +7414,12 @@ async function cleanupWorktree(
     throw new Error(`Refusing to clean worktree outside configured root: ${path}`)
   }
   if (existsSync(path)) {
-    await runCommand('git', ['worktree', 'remove', '--force', path], {
+    await runSharedGit(['worktree', 'remove', '--force', path], {
       cwd: config.repositoryPath,
       timeoutMs: 120_000,
     })
   } else {
-    await runCommand('git', ['worktree', 'prune'], {
+    await runSharedGit(['worktree', 'prune'], {
       cwd: config.repositoryPath,
       timeoutMs: 120_000,
     })
@@ -7395,8 +7431,7 @@ async function cleanupWorktree(
       { allowFailure: true, cwd: config.repositoryPath, timeoutMs: 60_000 },
     )
     if (remoteBranch.exitCode === 0) {
-      await runCommand(
-        'git',
+      await runSharedGit(
         ['-c', 'core.hooksPath=/dev/null', 'push', 'origin', '--delete', record.branch],
         {
           cwd: config.repositoryPath,
