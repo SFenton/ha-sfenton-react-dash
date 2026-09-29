@@ -133,7 +133,7 @@ dimensions to positional arrays or confuse a resize with native input emulation.
 | Scenario | Family | States | Manual question |
 | --- | --- | --- | --- |
 | quick-links | modal | root, rooms, back | Are text-aware links and left-aligned room tracks readable, with real end clearance and unchanged return geometry? |
-| camera | modal | loading, live | Do the shared camera tiles and modal media preserve their geometry from loading to decoded live video? The RTC pilot transport and audible output require separate real-media evidence. |
+| camera | modal | loading, live | Do the shared camera tiles and modal media preserve their geometry from loading to decoded live video? RTC is the production camera transport on every host; real decoded video and audible output require separate real-media evidence. |
 | summary | modal | overdue, upcoming, expired | Does the selected incoming Summary content retain readable type and columns on rotation before refreshing a tab? |
 | filters | modal | choices | Are filter descriptions readable at the actual column width, and are options and footer usable? |
 | recipe-grocery | modal | ready, loading, success, exhausted | Does the missing-ingredients action retain one stable command area while the button, spinner and success check transition, and does an exhausting individual add hide that command without redundant visible copy until removal restores it? |
