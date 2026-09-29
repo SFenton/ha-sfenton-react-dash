@@ -21,6 +21,43 @@ function persistentIframe() {
   ) as HTMLIFrameElement | null
 }
 
+const APP_ENTRY = '/local/ha-sfenton-react-dash/assets/app-current.js'
+
+function runningBuild(iframe: HTMLIFrameElement | null, dispose: () => boolean) {
+  const childDocument = document.implementation.createHTMLDocument()
+  const entry = childDocument.createElement('script')
+  entry.type = 'module'
+  entry.src = new URL(APP_ENTRY, window.location.origin).href
+  childDocument.head.append(entry)
+  Object.defineProperty(childDocument, 'readyState', { configurable: true, value: 'complete' })
+  Object.defineProperty(iframe, 'contentDocument', { configurable: true, value: childDocument })
+  setIframeDisposer(iframe, dispose)
+}
+
+function publishBuild(entry: string | Error) {
+  return vi.spyOn(window, 'fetch').mockImplementation(async () => {
+    if (entry instanceof Error) throw entry
+    return new Response(`<!doctype html><script type="module" crossorigin src="${entry}"></script>`)
+  })
+}
+
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+function setDocumentHidden(hidden: boolean) {
+  Object.defineProperty(document, 'hidden', { configurable: true, value: hidden })
+  document.dispatchEvent(new Event('visibilitychange'))
+}
+
+function mountRunningCard(version: string) {
+  const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+  card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=${version}` })
+  document.body.append(card)
+  const iframe = persistentIframe()
+  const dispose = vi.fn(() => true)
+  runningBuild(iframe, dispose)
+  return { card, dispose, iframe }
+}
+
 describe('Sfenton React app card', () => {
   it('reserves a distinct custom element tag for the Fold-only bridge build', () => {
     expect(SFENTON_REACT_FOLD_CARD_TAG).toBe(FOLD_TEST_CARD_TAG)
@@ -33,6 +70,7 @@ describe('Sfenton React app card', () => {
     persistentIframe()?.remove()
     document.body.replaceChildren()
     window.history.replaceState({}, '', '/')
+    Reflect.deleteProperty(document, 'hidden')
     vi.restoreAllMocks()
   })
 
@@ -219,5 +257,129 @@ describe('Sfenton React app card', () => {
 
     expect(dispose).toHaveBeenCalledWith('legacy-card-disconnected')
     expect(iframe).not.toBeInTheDocument()
+  })
+
+  describe('deployment version changes', () => {
+    it('keeps the running app when the published build is unchanged', async () => {
+      const fetch = publishBuild('./assets/app-current.js')
+      const { card, dispose, iframe } = mountRunningCard('first')
+
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second` })
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+      setDocumentHidden(true)
+
+      expect(fetch).toHaveBeenCalledWith(
+        new URL(`${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`, window.location.origin).href,
+        { cache: 'no-store', credentials: 'same-origin' },
+      )
+      expect(dispose).not.toHaveBeenCalled()
+      expect(iframe).toHaveAttribute('src', `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=first`)
+      expect(iframe?.dataset.configuredAppUrl).toBe(
+        new URL(`${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`, window.location.origin).href,
+      )
+    })
+
+    it('defers a changed build until the dashboard is hidden', async () => {
+      const fetch = publishBuild('./assets/app-next.js')
+      const { card, dispose, iframe } = mountRunningCard('first')
+
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second` })
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+      await settle()
+
+      expect(dispose).not.toHaveBeenCalled()
+      expect(iframe).toHaveAttribute('src', `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=first`)
+
+      setDocumentHidden(true)
+
+      expect(dispose).toHaveBeenCalledWith('legacy-card-version-update')
+      expect(iframe).toHaveAttribute('src', `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`)
+    })
+
+    it('applies a changed build immediately when the dashboard is already hidden', async () => {
+      publishBuild('./assets/app-next.js')
+      const { card, dispose, iframe } = mountRunningCard('first')
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true })
+
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second` })
+
+      await vi.waitFor(() => expect(dispose).toHaveBeenCalledWith('legacy-card-version-update'))
+      expect(iframe).toHaveAttribute('src', `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`)
+    })
+
+    it('treats an unreadable published build as changed', async () => {
+      const fetch = publishBuild(new Error('offline'))
+      const { card, dispose, iframe } = mountRunningCard('first')
+
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second` })
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+      await settle()
+      expect(dispose).not.toHaveBeenCalled()
+
+      setDocumentHidden(true)
+
+      expect(dispose).toHaveBeenCalledWith('legacy-card-version-update')
+      expect(iframe).toHaveAttribute('src', `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`)
+    })
+
+    it('applies a changed build after the maximum deferral on an always-visible display', async () => {
+      vi.useFakeTimers()
+      const fetch = publishBuild('./assets/app-next.js')
+      const { card, dispose, iframe } = mountRunningCard('first')
+
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second` })
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1_000 - 1)
+      expect(dispose).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect(dispose).toHaveBeenCalledWith('legacy-card-version-update')
+      expect(iframe).toHaveAttribute('src', `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second`)
+    })
+
+    it('replaces a pending update when another deployment arrives', async () => {
+      const fetch = publishBuild('./assets/app-next.js')
+      const { card, dispose, iframe } = mountRunningCard('first')
+
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second` })
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=third` })
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
+      await settle()
+
+      setDocumentHidden(true)
+
+      expect(dispose).toHaveBeenCalledTimes(1)
+      expect(iframe).toHaveAttribute('src', `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=third`)
+    })
+
+    it('cancels a pending update when the card leaves the dashboard', async () => {
+      const fetch = publishBuild('./assets/app-next.js')
+      const { card, dispose, iframe } = mountRunningCard('first')
+
+      card.setConfig({ url: `${DEFAULT_REACT_DASHBOARD_CARD_URL}?v=second` })
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1))
+      await settle()
+      card.remove()
+      expect(dispose).toHaveBeenCalledWith('legacy-card-disconnected')
+      dispose.mockClear()
+
+      setDocumentHidden(true)
+
+      expect(dispose).not.toHaveBeenCalled()
+      expect(iframe).not.toBeInTheDocument()
+    })
+
+    it('reloads immediately when the app path changes', () => {
+      const fetch = publishBuild('./assets/app-next.js')
+      const { card, dispose, iframe } = mountRunningCard('first')
+
+      card.setConfig({ url: '/local/ha-sfenton-react-dash-next/index.html?v=first' })
+
+      expect(fetch).not.toHaveBeenCalled()
+      expect(dispose).toHaveBeenCalledWith('legacy-card-source-change')
+      expect(iframe).toHaveAttribute('src', '/local/ha-sfenton-react-dash-next/index.html?v=first')
+    })
   })
 })

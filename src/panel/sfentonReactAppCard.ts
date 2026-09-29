@@ -13,6 +13,10 @@ const REACT_DASHBOARD_ROUTE_EVENTS = [
   'pageshow',
   'popstate',
 ] as const
+const REACT_DASHBOARD_VERSION_PARAM = 'v'
+const REACT_DASHBOARD_ENTRY_SCRIPT_SELECTOR = 'script[type="module"][src]'
+// A deferred build update still lands on an always-visible wall display within a working day.
+const REACT_DASHBOARD_UPDATE_MAX_DEFER_MS = 6 * 60 * 60 * 1_000
 const LEGACY_REACT_DASHBOARD_PATH = '/sfenton-react-dash/home'
 const RTC_PILOT_DASHBOARD_PATH = '/sfenton-react-fold-test/home'
 const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
@@ -99,12 +103,14 @@ interface CustomCardMetadata {
 interface PersistentReactDashboardFrame {
   iframe: HTMLIFrameElement
   owner?: SfentonReactAppCard
+  releasePendingUpdate?: () => void
   releaseRouteCleanup?: () => void
   releaseTimer?: number
 }
 
 type CustomCardWindow = Window & {
   [REACT_DASHBOARD_FRAME_PROPERTY]?: PersistentReactDashboardFrame
+  DOMParser: typeof DOMParser
   customCards?: CustomCardMetadata[]
 }
 
@@ -152,11 +158,108 @@ function isReactDashboardCardPath(pathname: string) {
     || currentPath === RTC_PILOT_DASHBOARD_PATH
 }
 
+function withoutVersion(url: URL) {
+  const copy = new URL(url.href)
+  copy.searchParams.delete(REACT_DASHBOARD_VERSION_PARAM)
+  return copy.href
+}
+
+// Deployments rewrite only the cache-busting version, including for merges that leave the bundle unchanged.
+function isVersionOnlyChange(currentHref: string | undefined, next: URL) {
+  if (!currentHref) return false
+  return withoutVersion(new URL(currentHref)) === withoutVersion(next)
+}
+
+function runningEntryScript(iframe: HTMLIFrameElement) {
+  try {
+    const childDocument = iframe.contentDocument
+    if (!childDocument || childDocument.readyState === 'loading') return undefined
+    return childDocument.querySelector<HTMLScriptElement>(REACT_DASHBOARD_ENTRY_SCRIPT_SELECTOR)?.src || undefined
+  } catch {
+    return undefined
+  }
+}
+
+async function publishedEntryScript(ownerWindow: CustomCardWindow, source: URL) {
+  const response = await ownerWindow.fetch(source.href, { cache: 'no-store', credentials: 'same-origin' })
+  if (!response.ok) return undefined
+  const published = new ownerWindow.DOMParser().parseFromString(await response.text(), 'text/html')
+  const entry = published.querySelector(REACT_DASHBOARD_ENTRY_SCRIPT_SELECTOR)?.getAttribute('src')
+  return entry ? new URL(entry, source).href : undefined
+}
+
+function loadFrameSource(
+  frame: PersistentReactDashboardFrame,
+  resolvedUrl: URL,
+  source: string,
+  reason: string,
+) {
+  frame.releasePendingUpdate?.()
+  disposeReactDashboardFrame(frame.iframe, reason)
+  frame.iframe.dataset.configuredAppUrl = resolvedUrl.href
+  frame.iframe.src = source
+}
+
+// Reloading on every deployment restarts the dashboard whenever Home Assistant refreshes the card config,
+// which is exactly when a resumed mobile app reconnects. Keep the running build unless the published entry
+// changed, and swap a changed build only while the dashboard is hidden.
+function scheduleVersionUpdate(
+  ownerWindow: CustomCardWindow,
+  frame: PersistentReactDashboardFrame,
+  resolvedUrl: URL,
+  source: string,
+) {
+  const running = runningEntryScript(frame.iframe)
+  if (!running) {
+    loadFrameSource(frame, resolvedUrl, source, 'legacy-card-source-change')
+    return
+  }
+
+  frame.releasePendingUpdate?.()
+  frame.iframe.dataset.configuredAppUrl = resolvedUrl.href
+  const ownerDocument = ownerWindow.document
+  let cancelled = false
+  let deadline: number | undefined
+  const onVisibilityChange = () => {
+    if (ownerDocument.hidden) apply()
+  }
+  const release = () => {
+    cancelled = true
+    ownerDocument.removeEventListener('visibilitychange', onVisibilityChange)
+    if (deadline !== undefined) ownerWindow.clearTimeout(deadline)
+    if (frame.releasePendingUpdate === release) frame.releasePendingUpdate = undefined
+  }
+  const apply = () => {
+    release()
+    disposeReactDashboardFrame(frame.iframe, 'legacy-card-version-update')
+    frame.iframe.src = source
+  }
+  const deferUnlessIdentical = (published: string | undefined) => {
+    if (cancelled) return
+    if (published === running) {
+      release()
+      return
+    }
+    if (ownerDocument.hidden) {
+      apply()
+      return
+    }
+    ownerDocument.addEventListener('visibilitychange', onVisibilityChange)
+    deadline = ownerWindow.setTimeout(apply, REACT_DASHBOARD_UPDATE_MAX_DEFER_MS)
+  }
+  frame.releasePendingUpdate = release
+  publishedEntryScript(ownerWindow, resolvedUrl).then(
+    deferUnlessIdentical,
+    () => deferUnlessIdentical(undefined),
+  )
+}
+
 function disposePersistentFrame(
   ownerWindow: CustomCardWindow,
   frame: PersistentReactDashboardFrame,
   reason: string,
 ) {
+  frame.releasePendingUpdate?.()
   clearPersistentFrameRelease(ownerWindow, frame)
   disposeReactDashboardFrame(frame.iframe, reason)
   frame.iframe.remove()
@@ -290,12 +393,16 @@ export class SfentonReactAppCard extends HTMLElement {
     }
     if (!this.isConnected) return
 
-    const iframe = this.iframe()
-    const configuredUrl = this.configuredUrl()
-    if (iframe.dataset.configuredAppUrl !== configuredUrl.resolvedUrl.href) {
-      disposeReactDashboardFrame(iframe, 'legacy-card-source-change')
-      iframe.dataset.configuredAppUrl = configuredUrl.resolvedUrl.href
-      iframe.src = configuredUrl.source
+    const frame = acquirePersistentFrame(this)
+    const { iframe } = frame
+    const { resolvedUrl, source } = this.configuredUrl()
+    const currentUrl = iframe.dataset.configuredAppUrl
+    if (currentUrl !== resolvedUrl.href) {
+      if (isVersionOnlyChange(currentUrl, resolvedUrl)) {
+        scheduleVersionUpdate(cardWindow(this), frame, resolvedUrl, source)
+      } else {
+        loadFrameSource(frame, resolvedUrl, source, 'legacy-card-source-change')
+      }
     }
     iframe.title = this.iframeTitle()
     this.connectSafeAreaBridge()
