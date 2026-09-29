@@ -357,9 +357,9 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   camera: {
     family: 'modal', states: ['loading', 'live'],
-    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera', 'src/components/hass/RtcPilotCamera', 'src/components/hass/rtcCardResource', 'src/components/hass/mockRtcCard', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/constants/rtcPilot'],
+    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera.module.css', 'src/components/hass/RtcPilotCamera', 'src/components/hass/rtcCardResource', 'src/components/hass/mockRtcCard', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/constants/rtcPilot'],
     legacy: ['feedback-regressions.spec.ts', 'landscape-modal-adaptation.spec.ts'],
-    question: 'Do the shared camera tiles and modal media preserve their geometry from loading to decoded live video? The RTC pilot transport and audible output require separate real-media evidence.',
+    question: 'Do the shared camera tiles and modal media preserve their geometry from loading to decoded live video? RTC is the production camera transport on every host; real decoded video and audible output require separate real-media evidence.',
   },
   summary: {
     family: 'modal', states: ['overdue', 'upcoming', 'expired'],

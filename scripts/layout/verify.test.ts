@@ -59,6 +59,7 @@ describe('layout scope and selection', () => {
     expect(SURFACE_CONTRACTS.camera.owners).toContain('src/constants/rtcPilot')
     expect(SURFACE_CONTRACTS.host.states).toEqual(['legacy', 'pilot', 'panel'])
     expect(classifyChanges(['src/components/hass/RtcPilotCamera.tsx']).scenarios).toContain('camera')
+    expect(classifyChanges(['src/components/hass/HlsCamera.module.css'])).toMatchObject({ mode: 'focused', scenarios: ['camera'] })
     expect(classifyChanges(['src/panel/sfentonReactAppCard.ts']).scenarios).toContain('host')
   })
 

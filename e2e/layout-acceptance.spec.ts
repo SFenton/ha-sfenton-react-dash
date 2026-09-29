@@ -373,13 +373,15 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     const media = await frame.evaluate((element) => {
       const focus = element.parentElement as HTMLElement | null
       const host = element.firstElementChild as HTMLElement | null
-      const video = element.querySelector<HTMLVideoElement>('video[data-camera-entity]')
+      const card = element.querySelector<HTMLElement>('webrtc-camera-sfenton')
+      const video = card?.shadowRoot?.querySelector('video')
       const focusBox = focus?.getBoundingClientRect()
       const frameBox = element.getBoundingClientRect()
       const hostBox = host?.getBoundingClientRect()
       const videoBox = video?.getBoundingClientRect()
       return {
-        entityId: video?.dataset.cameraEntity,
+        transport: element.getAttribute('data-camera-transport'),
+        card: card ? { fill: card.dataset.dashboardFill, variant: card.dataset.dashboardVariant } : null,
         focus: focusBox ? { height: focusBox.height, width: focusBox.width } : null,
         frame: { height: frameBox.height, width: frameBox.width },
         host: hostBox ? { height: hostBox.height, width: hostBox.width } : null,
@@ -387,7 +389,8 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
         video: videoBox ? { height: videoBox.height, width: videoBox.width } : null,
       }
     })
-    expect(media.entityId).toBe('camera.front_door_camera')
+    expect(media.transport).toBe('webrtc')
+    expect(media.card).toEqual({ fill: 'true', variant: 'modal' })
     expect(media.focus).not.toBeNull()
     expect(media.host).not.toBeNull()
     expect(media.video).not.toBeNull()
