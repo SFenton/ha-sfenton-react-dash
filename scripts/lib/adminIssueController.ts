@@ -2280,7 +2280,7 @@ export function deploymentReceiptIsAccepted(
     /^[a-f0-9]{64}$/.test(receipt.manifestHash) &&
     typeof receipt.deploymentHash === 'string' &&
     /^[a-f0-9]{64}$/.test(receipt.deploymentHash) &&
-    ['forward', 'already-current', 'superseded'].includes(String(disposition)) &&
+    ['forward', 'already-current', 'artifact-unchanged', 'superseded'].includes(String(disposition)) &&
     receipt.panelRegistered === true &&
     receipt.leaseReleased === true &&
     Array.isArray(rawVerifiedPaths) &&

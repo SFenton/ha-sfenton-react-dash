@@ -101,8 +101,10 @@ fail before mutation when the cumulative range since the deployed SHA contains
 Home Assistant runtime or Home MCP changes, or when the custom-panel bridge
 changed. Those changes retain the restart-aware manual release below.
 Rapid merges converge monotonically rather than by merge-order FIFO: queued
-deploy jobs may settle as `forward`, verified `already-current`, or verified
-`superseded` outcomes under the production lease. Unsupported deploy-only or
+deploy jobs may settle as `forward`, verified `already-current`, verified
+`artifact-unchanged` (production already serves identical bytes, so the wrapper
+version is not rewritten), or verified `superseded` outcomes under the
+production lease. Unsupported deploy-only or
 partial reruns must fail as `full-rerun-required` before HA mutation, and
 older v1 deployment records must be migrated through a forward v2 deployment
 before no-op supersession is allowed.
