@@ -1,6 +1,7 @@
 import {
   readReactDashboardLifecycleHistory,
   reactDashboardLifecycleHost,
+  type ReactDashboardLifecycleEvent,
 } from './reactDashboardLifecycle'
 
 export const RESUME_TELEMETRY_STORAGE_KEY = 'sfenton-react-dash.session'
@@ -10,6 +11,7 @@ export const RESUME_TELEMETRY_LOGGER = 'react_dash.resume'
 // A machine-readable diagnostic line for the HA system log, not user-visible copy.
 export const RESUME_TELEMETRY_LOG_PREFIX = 'RESUME_TELEMETRY'
 const HASS_CONNECTION_TIMEOUT_MS = 30_000
+const RECENT_LIFECYCLE_EVENTS = 6
 
 /**
  * Why this React Dash instance started, from the previous instance's persisted heartbeat:
@@ -34,25 +36,68 @@ export interface DashboardSessionHeartbeat {
   hiddenAt?: number
   instanceId: string
   topOrigin: number
+  topPath?: string
   updatedAt: number
   visibility: DocumentVisibilityState
+  visibleAt?: number
 }
 
 export interface DashboardStartSignals {
-  disposeReason?: string
+  disposeEvent?: ReactDashboardLifecycleEvent
+  lifecycle?: ReactDashboardLifecycleEvent[]
   now: number
   sessionMarker: boolean
   topNavigationType?: string
   topOrigin: number
+  topPath?: string
+}
+
+/** Where and when the bridge disposed the previous instance, relative to the previous instance becoming visible. */
+export interface DashboardDisposeContext {
+  afterVisibleMs?: number
+  beforeStartMs: number
+  childPath: string
+  hostPath: string
 }
 
 export interface DashboardStartClassification {
   awaySeconds?: number
+  dispose?: DashboardDisposeContext
   disposeReason?: string
   kind: DashboardStartKind
+  previousTopPath?: string
   previousVisibility?: DocumentVisibilityState
+  recentLifecycle?: string[]
   sessionMarker: boolean
   topNavigationType?: string
+  topPath?: string
+}
+
+// Length of the previous instance's latest absence: still away, or away until it last became visible again.
+function awaySeconds(previous: DashboardSessionHeartbeat, now: number) {
+  if (previous.hiddenAt === undefined) return undefined
+  const returnedAt = previous.visibility === 'visible' && previous.visibleAt !== undefined && previous.visibleAt >= previous.hiddenAt
+    ? previous.visibleAt
+    : now
+  return Math.max(0, Math.round((returnedAt - previous.hiddenAt) / 1_000))
+}
+
+function windowPath(targetWindow: Window) {
+  try {
+    return targetWindow.location.pathname
+  } catch {
+    return undefined
+  }
+}
+
+// Compact `event:reason@hostPath -Ns` entries, newest last, so one log line shows the sequence around a restart.
+function recentLifecycleSummary(events: ReactDashboardLifecycleEvent[] | undefined, now: number) {
+  if (!events?.length) return undefined
+  return events.slice(-RECENT_LIFECYCLE_EVENTS).map((event) => {
+    const reason = event.reason ? `:${event.reason}` : ''
+    const secondsAgo = Math.round((now - event.timestamp) / 100) / 10
+    return `${event.event}${reason}@${event.hostPath} -${secondsAgo}s`
+  })
 }
 
 type TelemetryWindow = Window & {
@@ -67,18 +112,34 @@ export function classifyDashboardStart(
   const shared = {
     sessionMarker: current.sessionMarker,
     topNavigationType: current.topNavigationType,
+    topPath: current.topPath,
   }
   if (!previous) return { ...shared, kind: 'first-start' }
 
   const context = {
     ...shared,
-    awaySeconds: previous.hiddenAt === undefined
-      ? undefined
-      : Math.max(0, Math.round((current.now - previous.hiddenAt) / 1_000)),
+    awaySeconds: awaySeconds(previous, current.now),
+    previousTopPath: previous.topPath,
     previousVisibility: previous.visibility,
+    recentLifecycle: recentLifecycleSummary(current.lifecycle, current.now),
   }
   if (Math.round(previous.topOrigin) === Math.round(current.topOrigin)) {
-    return { ...context, disposeReason: current.disposeReason ?? 'unknown', kind: 'dashboard-reload' }
+    const disposeEvent = current.disposeEvent
+    return {
+      ...context,
+      dispose: disposeEvent
+        ? {
+            afterVisibleMs: previous.visibleAt === undefined
+              ? undefined
+              : Math.round(disposeEvent.timestamp - previous.visibleAt),
+            beforeStartMs: Math.max(0, Math.round(current.now - disposeEvent.timestamp)),
+            childPath: disposeEvent.childPath,
+            hostPath: disposeEvent.hostPath,
+          }
+        : undefined,
+      disposeReason: disposeEvent?.reason ?? 'unknown',
+      kind: 'dashboard-reload',
+    }
   }
   if (previous.closedCleanly) return { ...context, kind: 'ha-page-reload' }
   return { ...context, kind: current.sessionMarker ? 'web-process-restart' : 'app-cold-start' }
@@ -179,17 +240,20 @@ export function installResumeTelemetry({
 
   const sessionMarker = claimSessionMarker(sessionStorage)
 
-  const disposeReason = previous
-    ? readReactDashboardLifecycleHistory(currentWindow)
+  const lifecycle = readReactDashboardLifecycleHistory(currentWindow)
+  const disposeEvent = previous
+    ? lifecycle
       .filter((event) => event.instanceId === previous.instanceId && event.event === 'disposed')
-      .at(-1)?.reason
+      .at(-1)
     : undefined
   const classification = classifyDashboardStart(previous, {
-    disposeReason,
+    disposeEvent,
+    lifecycle,
     now: now(),
     sessionMarker,
     topNavigationType: navigationType(hostWindow),
     topOrigin,
+    topPath: windowPath(hostWindow),
   })
   hostWindow[RESUME_TELEMETRY_RESULT_PROPERTY] = classification
 
@@ -202,14 +266,14 @@ export function installResumeTelemetry({
     visibility: currentWindow.document.visibilityState,
   }
   const persist = (changes: Partial<DashboardSessionHeartbeat>) => {
-    Object.assign(heartbeat, changes, { updatedAt: now() })
+    Object.assign(heartbeat, changes, { topPath: windowPath(hostWindow), updatedAt: now() })
     writeHeartbeat(storage, heartbeat)
   }
   persist({})
 
   const onVisibilityChange = () => {
     const visibility = currentWindow.document.visibilityState
-    persist(visibility === 'hidden' ? { hiddenAt: now(), visibility } : { hiddenAt: undefined, visibility })
+    persist(visibility === 'hidden' ? { hiddenAt: now(), visibility } : { visibility, visibleAt: now() })
   }
   const onPageHide = (event: Event) => {
     if ((event as PageTransitionEvent).persisted) return

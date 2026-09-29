@@ -49,15 +49,72 @@ describe('classifyDashboardStart', () => {
   it('attributes a restart inside the same HA page to the dashboard bridge', () => {
     expect(classifyDashboardStart(previous, {
       ...current,
-      disposeReason: 'legacy-card-source-change',
+      disposeEvent: {
+        childPath: '/local/ha-sfenton-react-dash/index.html',
+        event: 'disposed',
+        hostPath: '/sfenton-react-dash/home',
+        instanceId: 'previous',
+        reason: 'legacy-card-source-change',
+        timeOrigin: 1_010,
+        timestamp: 69_500,
+      },
       topOrigin: 1_000.4,
     })).toMatchObject({
       awaySeconds: 60,
+      dispose: {
+        afterVisibleMs: undefined,
+        beforeStartMs: 500,
+        childPath: '/local/ha-sfenton-react-dash/index.html',
+        hostPath: '/sfenton-react-dash/home',
+      },
       disposeReason: 'legacy-card-source-change',
       kind: 'dashboard-reload',
       previousVisibility: 'hidden',
     })
-    expect(classifyDashboardStart(previous, { ...current, topOrigin: 1_000 }).disposeReason).toBe('unknown')
+    expect(classifyDashboardStart(previous, { ...current, topOrigin: 1_000 })).toMatchObject({
+      dispose: undefined,
+      disposeReason: 'unknown',
+    })
+  })
+
+  it('times a teardown that follows a return from the background', () => {
+    // The first reported phone restart: away 5 min 24 s, torn down shortly after becoming visible again.
+    const returned = { ...previous, topPath: '/sfenton-react-dash/home', visibility: 'visible' as const, visibleAt: 334_000 }
+    const classification = classifyDashboardStart(returned, {
+      ...current,
+      disposeEvent: {
+        childPath: '/local/ha-sfenton-react-dash/index.html',
+        event: 'disposed',
+        hostPath: '/sfenton-react-dash',
+        instanceId: 'previous',
+        reason: 'legacy-card-disconnected',
+        timeOrigin: 1_010,
+        timestamp: 334_700,
+      },
+      lifecycle: [
+        { childPath: '/a', event: 'mounted', hostPath: '/sfenton-react-dash/home', instanceId: 'previous', timeOrigin: 1_010, timestamp: 2_000 },
+        { childPath: '/a', event: 'disposed', hostPath: '/sfenton-react-dash', instanceId: 'previous', reason: 'legacy-card-disconnected', timeOrigin: 1_010, timestamp: 334_700 },
+        { childPath: '/a', event: 'mounted', hostPath: '/sfenton-react-dash/home', instanceId: 'next', timeOrigin: 334_800, timestamp: 334_950 },
+      ],
+      now: 335_000,
+      topOrigin: 1_000,
+      topPath: '/sfenton-react-dash/home',
+    })
+
+    expect(classification).toMatchObject({
+      awaySeconds: 324,
+      dispose: { afterVisibleMs: 700, beforeStartMs: 300, hostPath: '/sfenton-react-dash' },
+      disposeReason: 'legacy-card-disconnected',
+      kind: 'dashboard-reload',
+      previousTopPath: '/sfenton-react-dash/home',
+      previousVisibility: 'visible',
+      recentLifecycle: [
+        'mounted@/sfenton-react-dash/home -333s',
+        'disposed:legacy-card-disconnected@/sfenton-react-dash -0.3s',
+        'mounted@/sfenton-react-dash/home -0.1s',
+      ],
+      topPath: '/sfenton-react-dash/home',
+    })
   })
 
   it('treats a clean HA page exit as an ordinary reload', () => {
@@ -124,7 +181,8 @@ describe('installResumeTelemetry', () => {
 
     clock = 9_000
     setVisibility('visible')
-    expect(storedHeartbeat()?.hiddenAt).toBeUndefined()
+    expect(storedHeartbeat()).toMatchObject({ hiddenAt: 6_000, visibility: 'visible', visibleAt: 9_000 })
+    expect(storedHeartbeat()?.topPath).toBe(window.location.pathname)
 
     pageHide(true)
     expect(storedHeartbeat()?.closedCleanly).toBe(false)
@@ -142,9 +200,9 @@ describe('installResumeTelemetry', () => {
       topOrigin: window.performance.timeOrigin,
     }))
     ;(window as unknown as Record<string, unknown>)[REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY] = JSON.stringify([
-      { event: 'mounted', instanceId: 'previous', timestamp: 1 },
-      { event: 'disposed', instanceId: 'other', reason: 'pagehide', timestamp: 2 },
-      { event: 'disposed', instanceId: 'previous', reason: 'legacy-card-source-change', timestamp: 3 },
+      { childPath: '/app', event: 'mounted', hostPath: '/sfenton-react-dash/home', instanceId: 'previous', timestamp: 1 },
+      { childPath: '/app', event: 'disposed', hostPath: '/sfenton-react-dash/home', instanceId: 'other', reason: 'pagehide', timestamp: 2 },
+      { childPath: '/app', event: 'disposed', hostPath: '/sfenton-react-dash/home', instanceId: 'previous', reason: 'legacy-card-source-change', timestamp: 3 },
     ])
     const report = vi.fn(async () => undefined)
 
@@ -154,6 +212,7 @@ describe('installResumeTelemetry', () => {
       awaySeconds: 60,
       disposeReason: 'legacy-card-source-change',
       kind: 'dashboard-reload',
+      recentLifecycle: expect.arrayContaining([expect.stringMatching(/^disposed:legacy-card-source-change@/)]),
     })
     expect((window as unknown as Record<string, unknown>)[RESUME_TELEMETRY_RESULT_PROPERTY])
       .toBe(telemetry.classification)
