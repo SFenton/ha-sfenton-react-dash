@@ -65,11 +65,18 @@ The automatic path publishes frontend assets only. It:
    - `forward`: deployed SHA is an ancestor of candidate and candidate is on
      current `master`;
    - `already-current`: candidate equals deployed;
+   - `artifact-unchanged`: candidate would be a `forward` deployment, passes the
+     Home Assistant runtime and panel-bridge checks, and production already
+     serves every candidate file with identical bytes (a test-, tooling-, or
+     docs-only merge). Republishing would only rewrite the wrapper version and
+     restart React Dash on every open client, so production stays at the
+     deployed SHA;
    - `superseded`: candidate is an ancestor of a verified deployed SHA that is
      still on current `master`;
    - divergent/unverifiable states fail closed;
-4. treats successful `already-current`/`superseded` outcomes as verified no-op
-   completions (no asset or metadata mutation) and emits truthful v2 receipts;
+4. treats successful `already-current`/`artifact-unchanged`/`superseded`
+   outcomes as verified no-op completions (no asset or metadata mutation) and
+   emits truthful v2 receipts;
 5. requires a successful same-attempt build for the active deploy attempt.
    Unsupported deploy-only/partial reruns are rejected as
    `full-rerun-required`; operators must re-run all jobs for the workflow run;
@@ -163,7 +170,7 @@ from an unchecked `ssh-keyscan`.
 Runs upload a sanitized deployment receipt keyed by the full merge SHA and run
 attempt whenever admission or deployment reaches receipt generation. Receipts
 are v2 and include disposition
-(`forward`/`already-current`/`superseded`/`full-rerun-required`), deployment
+(`forward`/`already-current`/`artifact-unchanged`/`superseded`/`full-rerun-required`), deployment
 hash provenance when available, exact verification scope, and rollback status.
 They contain no token, host name, IP address, browser storage, or screenshot.
 
