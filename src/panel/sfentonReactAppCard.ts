@@ -6,9 +6,11 @@ const ACTIVE_REACT_APP_CARD_TAG = import.meta.env.MODE === 'fold-bridge'
 export const DEFAULT_REACT_DASHBOARD_CARD_URL = '/local/ha-sfenton-react-dash/index.html'
 const REACT_DASHBOARD_DISPOSE_PROPERTY = '__sfentonReactDashboardDispose'
 const REACT_DASHBOARD_FRAME_PROPERTY = '__sfentonReactDashboardCardFrame'
+export const REACT_DASHBOARD_REPAIRED_PATH_PROPERTY = '__sfentonReactDashboardRepairedPath'
 const REACT_DASHBOARD_REATTACH_GRACE_MS = 5_000
+const REACT_DASHBOARD_ROUTE_CHANGE_EVENT = 'dashboard-route-change'
 const REACT_DASHBOARD_ROUTE_EVENTS = [
-  'dashboard-route-change',
+  REACT_DASHBOARD_ROUTE_CHANGE_EVENT,
   'location-changed',
   'pageshow',
   'popstate',
@@ -22,6 +24,7 @@ const REACT_DASHBOARD_STALLED_LOAD_GRACE_MS = 4_000
 const REACT_DASHBOARD_STALLED_LOAD_RETRY_MS = 60_000
 const LEGACY_REACT_DASHBOARD_PATH = '/sfenton-react-dash/home'
 const RTC_PILOT_DASHBOARD_PATH = '/sfenton-react-fold-test/home'
+const REACT_DASHBOARD_CARD_PATHS = [LEGACY_REACT_DASHBOARD_PATH, RTC_PILOT_DASHBOARD_PATH] as const
 const SAFE_AREA_EDGES = ['top', 'right', 'bottom', 'left'] as const
 
 type DisposableDashboardWindow = Window & {
@@ -120,6 +123,7 @@ interface PersistentReactDashboardFrame {
 
 type CustomCardWindow = Window & {
   [REACT_DASHBOARD_FRAME_PROPERTY]?: PersistentReactDashboardFrame
+  [REACT_DASHBOARD_REPAIRED_PATH_PROPERTY]?: string
   DOMParser: typeof DOMParser
   customCards?: CustomCardMetadata[]
 }
@@ -162,10 +166,45 @@ function clearPersistentFrameRelease(
   frame.releaseRouteCleanup = undefined
 }
 
-function isReactDashboardCardPath(pathname: string) {
+// The Home Assistant iOS app saves its last page by deleting the literal text `?external_auth=1`, so
+// `/sfenton-react-dash/home?external_auth=1&path=office` is restored as `/sfenton-react-dash/home&path=office`.
+function reactDashboardCardPath(pathname: string) {
   const currentPath = pathname.replace(/\/+$/, '')
-  return currentPath === LEGACY_REACT_DASHBOARD_PATH
-    || currentPath === RTC_PILOT_DASHBOARD_PATH
+  for (const hostPath of REACT_DASHBOARD_CARD_PATHS) {
+    if (currentPath === hostPath) return { hostPath }
+    if (currentPath.startsWith(`${hostPath}&`)) {
+      return { hostPath, restoredQuery: currentPath.slice(hostPath.length + 1) }
+    }
+  }
+  return undefined
+}
+
+function isReactDashboardCardPath(pathname: string) {
+  return reactDashboardCardPath(pathname) !== undefined
+}
+
+// Move a query the iOS app folded into the path back into the search before the app reads its route.
+function repairRestoredCardUrl(ownerWindow: CustomCardWindow) {
+  const { location } = ownerWindow
+  const cardPath = reactDashboardCardPath(location.pathname)
+  if (cardPath?.restoredQuery === undefined) return
+
+  const params = new URLSearchParams(cardPath.restoredQuery)
+  new URLSearchParams(location.search).forEach((value, key) => params.set(key, value))
+  const search = params.toString()
+  const restoredPath = location.pathname
+  try {
+    ownerWindow.history.replaceState(
+      ownerWindow.history.state,
+      '',
+      `${cardPath.hostPath}${search ? `?${search}` : ''}${location.hash}`,
+    )
+  } catch (error) {
+    console.error('Unable to repair the restored React dashboard URL.', error)
+    return
+  }
+  ownerWindow[REACT_DASHBOARD_REPAIRED_PATH_PROPERTY] = restoredPath
+  ownerWindow.dispatchEvent(new Event(REACT_DASHBOARD_ROUTE_CHANGE_EVENT))
 }
 
 function withoutVersion(url: URL) {
@@ -475,6 +514,7 @@ export class SfentonReactAppCard extends HTMLElement {
     }
     if (!this.isConnected) return
 
+    repairRestoredCardUrl(cardWindow(this))
     const frame = acquirePersistentFrame(this)
     const { iframe } = frame
     const { resolvedUrl, source } = this.configuredUrl()

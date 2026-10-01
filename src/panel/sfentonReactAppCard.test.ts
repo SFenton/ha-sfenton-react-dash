@@ -1,7 +1,9 @@
 import { FOLD_TEST_REACT_DASHBOARD_HOST } from '../constants/dashboardHosts'
 import { REACT_DASHBOARD_DISPOSE_PROPERTY } from '../lifecycle/reactDashboardLifecycle'
+import { RESUME_TELEMETRY_REPAIRED_PATH_PROPERTY } from '../lifecycle/resumeTelemetry'
 import {
   DEFAULT_REACT_DASHBOARD_CARD_URL,
+  REACT_DASHBOARD_REPAIRED_PATH_PROPERTY,
   SFENTON_REACT_APP_CARD_TAG,
   SFENTON_REACT_FOLD_CARD_TAG,
   SfentonReactAppCard,
@@ -243,6 +245,92 @@ describe('Sfenton React app card', () => {
 
     expect(dispose).toHaveBeenCalledWith('legacy-card-disconnected')
     expect(iframe).not.toBeInTheDocument()
+  })
+
+  describe('iOS-restored dashboard paths', () => {
+    afterEach(() => {
+      Reflect.deleteProperty(window, REACT_DASHBOARD_REPAIRED_PATH_PROPERTY)
+    })
+
+    it('shares the repaired-path property name with resume telemetry', () => {
+      expect(REACT_DASHBOARD_REPAIRED_PATH_PROPERTY).toBe(RESUME_TELEMETRY_REPAIRED_PATH_PROPERTY)
+    })
+
+    it.each([
+      ['/sfenton-react-dash/home&path=office', '/sfenton-react-dash/home', '?path=office'],
+      [`/${FOLD_TEST_REACT_DASHBOARD_HOST}/home&path=security`, `/${FOLD_TEST_REACT_DASHBOARD_HOST}/home`, '?path=security'],
+    ])('moves the folded query on %s back into the search before loading the app', (restored, pathname, search) => {
+      window.history.replaceState({ restored: true }, '', `${restored}#camera-front-door`)
+      const routeChange = vi.fn()
+      window.addEventListener('dashboard-route-change', routeChange)
+
+      const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+      card.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+      document.body.append(card)
+      window.removeEventListener('dashboard-route-change', routeChange)
+
+      expect(window.location.pathname).toBe(pathname)
+      expect(window.location.search).toBe(search)
+      expect(window.location.hash).toBe('#camera-front-door')
+      expect(window.history.state).toEqual({ restored: true })
+      expect((window as unknown as Record<string, unknown>)[REACT_DASHBOARD_REPAIRED_PATH_PROPERTY]).toBe(restored)
+      expect(routeChange).toHaveBeenCalledTimes(1)
+      expect(persistentIframe()).toHaveAttribute('src', DEFAULT_REACT_DASHBOARD_CARD_URL)
+    })
+
+    it('keeps a later route query over the folded one', () => {
+      window.history.replaceState({}, '', '/sfenton-react-dash/home&path=office?path=to-do&back=1')
+
+      const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+      card.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+      document.body.append(card)
+
+      expect(window.location.pathname).toBe('/sfenton-react-dash/home')
+      expect(new URLSearchParams(window.location.search).getAll('path')).toEqual(['to-do'])
+      expect(new URLSearchParams(window.location.search).get('back')).toBe('1')
+    })
+
+    it.each([
+      '/sfenton-react-dash/home',
+      '/sfenton-react-dash/home?path=office',
+      '/another-dashboard/home&path=office',
+      '/sfenton-react-dash/homeroom&path=office',
+    ])('leaves %s unchanged', (path) => {
+      window.history.replaceState({}, '', path)
+
+      const card = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+      card.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+      document.body.append(card)
+
+      expect(`${window.location.pathname}${window.location.search}`).toBe(path)
+      expect((window as unknown as Record<string, unknown>)[REACT_DASHBOARD_REPAIRED_PATH_PROPERTY]).toBeUndefined()
+    })
+
+    it('keeps the app frame through a Lovelace detach while the HA path is still folded', () => {
+      vi.useFakeTimers()
+      window.history.replaceState({}, '', '/sfenton-react-dash/home')
+      const firstCard = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+      firstCard.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+      document.body.append(firstCard)
+      const iframe = persistentIframe()
+      const dispose = vi.fn(() => true)
+      setIframeDisposer(iframe, dispose)
+
+      window.history.replaceState({}, '', '/sfenton-react-dash/home&path=office')
+      firstCard.remove()
+      vi.advanceTimersByTime(5_100)
+
+      expect(persistentIframe()).toBe(iframe)
+      expect(dispose).not.toHaveBeenCalled()
+
+      const replacement = document.createElement(SFENTON_REACT_APP_CARD_TAG) as SfentonReactAppCard
+      replacement.setConfig({ url: DEFAULT_REACT_DASHBOARD_CARD_URL })
+      document.body.append(replacement)
+
+      expect(persistentIframe()).toBe(iframe)
+      expect(dispose).not.toHaveBeenCalled()
+      expect(window.location.search).toBe('?path=office')
+    })
   })
 
   it('disposes the current app when Home Assistant removes the card', () => {
