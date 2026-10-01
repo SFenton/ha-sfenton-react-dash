@@ -338,6 +338,14 @@ changed build is swapped only while the HA document is hidden, or after six
 hours on an always-visible display, so a resumed mobile client that re-fetches
 the dashboard config does not restart the app in front of the user.
 
+The Home Assistant iOS app restores its last page by deleting the literal text
+`?external_auth=1`, which reopens `/sfenton-react-dash/home?external_auth=1&path=office`
+as `/sfenton-react-dash/home&path=office`. The legacy card bridge treats that
+folded path as its own host and, before loading the app, moves the query back
+into the search with `history.replaceState`. `RESUME_TELEMETRY` reports the
+original path as `repairedTopPath`. The custom panel cannot repair this,
+because Home Assistant does not resolve `/sfenton-react-panel&…` to the panel.
+
 ## Cameras And RTC
 
 Camera implementation must support real Home Assistant stream playback, not

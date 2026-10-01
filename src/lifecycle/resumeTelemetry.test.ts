@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import {
   RESUME_TELEMETRY_LOGGER,
+  RESUME_TELEMETRY_REPAIRED_PATH_PROPERTY,
   RESUME_TELEMETRY_RESULT_PROPERTY,
   RESUME_TELEMETRY_SESSION_KEY,
   RESUME_TELEMETRY_STORAGE_KEY,
@@ -152,6 +153,7 @@ describe('installResumeTelemetry', () => {
     window.sessionStorage.clear()
     Reflect.deleteProperty(document, 'visibilityState')
     Reflect.deleteProperty(window, RESUME_TELEMETRY_RESULT_PROPERTY)
+    Reflect.deleteProperty(window, RESUME_TELEMETRY_REPAIRED_PATH_PROPERTY)
     Reflect.deleteProperty(window, REACT_DASHBOARD_LIFECYCLE_HISTORY_PROPERTY)
     Reflect.deleteProperty(window, 'hassConnection')
   })
@@ -237,6 +239,23 @@ describe('installResumeTelemetry', () => {
         message: expect.stringContaining('"kind":"app-cold-start"'),
       }),
       type: 'call_service',
+    }))
+    telemetry.dispose()
+  })
+
+  it('reports the HA path the card bridge repaired before this start', () => {
+    window.localStorage.setItem(RESUME_TELEMETRY_STORAGE_KEY, JSON.stringify(previous))
+    ;(window as unknown as Record<string, unknown>)[RESUME_TELEMETRY_REPAIRED_PATH_PROPERTY] = '/sfenton-react-dash/home&path=office'
+    const report = vi.fn(async () => undefined)
+
+    const telemetry = installResumeTelemetry({ instanceId: 'next', now: () => 70_000, report })
+
+    expect(telemetry.classification).toMatchObject({
+      kind: 'app-cold-start',
+      repairedTopPath: '/sfenton-react-dash/home&path=office',
+    })
+    expect(report).toHaveBeenCalledWith(window, expect.objectContaining({
+      repairedTopPath: '/sfenton-react-dash/home&path=office',
     }))
     telemetry.dispose()
   })

@@ -7,6 +7,8 @@ import {
 export const RESUME_TELEMETRY_STORAGE_KEY = 'sfenton-react-dash.session'
 export const RESUME_TELEMETRY_SESSION_KEY = 'sfenton-react-dash.session-marker'
 export const RESUME_TELEMETRY_RESULT_PROPERTY = '__sfentonReactDashboardStart'
+// Written by the card bridge, which must stay self-contained and therefore repeats this name.
+export const RESUME_TELEMETRY_REPAIRED_PATH_PROPERTY = '__sfentonReactDashboardRepairedPath'
 export const RESUME_TELEMETRY_LOGGER = 'react_dash.resume'
 // A machine-readable diagnostic line for the HA system log, not user-visible copy.
 export const RESUME_TELEMETRY_LOG_PREFIX = 'RESUME_TELEMETRY'
@@ -46,6 +48,8 @@ export interface DashboardStartSignals {
   disposeEvent?: ReactDashboardLifecycleEvent
   lifecycle?: ReactDashboardLifecycleEvent[]
   now: number
+  /** The malformed HA path the card bridge repaired before this instance started (see sfentonReactAppCard). */
+  repairedTopPath?: string
   sessionMarker: boolean
   topNavigationType?: string
   topOrigin: number
@@ -68,6 +72,7 @@ export interface DashboardStartClassification {
   previousTopPath?: string
   previousVisibility?: DocumentVisibilityState
   recentLifecycle?: string[]
+  repairedTopPath?: string
   sessionMarker: boolean
   topNavigationType?: string
   topPath?: string
@@ -101,6 +106,7 @@ function recentLifecycleSummary(events: ReactDashboardLifecycleEvent[] | undefin
 }
 
 type TelemetryWindow = Window & {
+  [RESUME_TELEMETRY_REPAIRED_PATH_PROPERTY]?: unknown
   [RESUME_TELEMETRY_RESULT_PROPERTY]?: DashboardStartClassification
   hassConnection?: Promise<{ conn: { sendMessagePromise: (message: Record<string, unknown>) => Promise<unknown> } }>
 }
@@ -110,6 +116,7 @@ export function classifyDashboardStart(
   current: DashboardStartSignals,
 ): DashboardStartClassification {
   const shared = {
+    repairedTopPath: current.repairedTopPath,
     sessionMarker: current.sessionMarker,
     topNavigationType: current.topNavigationType,
     topPath: current.topPath,
@@ -239,6 +246,7 @@ export function installResumeTelemetry({
   const topOrigin = hostWindow.performance.timeOrigin
 
   const sessionMarker = claimSessionMarker(sessionStorage)
+  const repairedTopPath = hostWindow[RESUME_TELEMETRY_REPAIRED_PATH_PROPERTY]
 
   const lifecycle = readReactDashboardLifecycleHistory(currentWindow)
   const disposeEvent = previous
@@ -250,6 +258,7 @@ export function installResumeTelemetry({
     disposeEvent,
     lifecycle,
     now: now(),
+    repairedTopPath: typeof repairedTopPath === 'string' ? repairedTopPath : undefined,
     sessionMarker,
     topNavigationType: navigationType(hostWindow),
     topOrigin,
