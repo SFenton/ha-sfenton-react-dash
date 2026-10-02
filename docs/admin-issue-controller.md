@@ -29,23 +29,20 @@ the operator for issue-scoped state, history, trace, configuration, service,
 and validation work, while the MCP server retains its own safety contracts and
 secret handling.
 
-The worker's only repository tool remains `admin_issue_workspace`, implemented
-by the project asset in `ops/admin-issue-controller/worker-extension.mjs`, a
-dependency-free MCP stdio server that the controller registers beside the
-`hass` server in the worker home's `mcp-config.json`, with built-in MCP
-servers disabled. The worker runs Copilot CLI (`claude-opus-5.5`, `high`
-reasoning effort) with `--available-tools
-task,read_agent,write_agent,tool_search_tool,admin-issue-worker,hass`, so the
-host shell, file, and web tools are not available to the model or its `task`
-subagents.
+The controller registers the project `admin_issue_workspace` MCP server beside
+`hass` in the worker home's `mcp-config.json`, with built-in MCP servers
+disabled. The worker runs Copilot CLI (`claude-opus-5.5`, `high` reasoning
+effort) with `--allow-all-tools`, `--allow-all-paths`, and
+`--allow-all-urls`. This is an unrestricted CLI tool surface, including for
+research-only workers; research-only behavior remains an instruction and
+controller-enforced outcome/worktree guard, not a model permission allowlist.
 
 When Copilot CLI reports a usage-quota or rate-limit failure, the same run falls
 back to Claude Code (`claude-opus-5-5`, `high` effort) with the same prompt,
-media, sandbox and HASS tool surface: built-in tools limited to
-`Agent,ToolSearch`, `--strict-mcp-config` with a Claude-format copy of the two
-MCP servers under the worker home's `.claude/`, `--setting-sources user`, and
-hooks disabled. Research-only Claude workers use `dontAsk` with the same
-read-only HASS allowlist; approved workers use `bypassPermissions`. The
+media, sandbox and HASS MCP configuration: `--strict-mcp-config` with a
+Claude-format copy of the two MCP servers under the worker home's `.claude/`,
+`--setting-sources user`, `--permission-mode bypassPermissions`, and hooks
+disabled for every worker. The
 controller reads the Claude OAuth token (from `claude setup-token`) or API key
 from `claudeTokenPath` only when it falls back, and rejects project `.claude`
 configuration or managed Claude Code hooks before starting it.
@@ -91,27 +88,47 @@ when the worktree carries `.github/extensions/`, project MCP configuration
 (`.mcp.json`, `.github/mcp.json`, `.vscode/mcp.json`), or machine policy hooks
 in `/etc/github-copilot/policy.d`.
 
-Every worker runs with `--no-ask-user`, so any tool not explicitly allowed is
-denied rather than prompted. Approved implementation workers receive
-`--allow-tool admin-issue-worker(admin_issue_workspace)` and `--allow-tool
-hass`. Research-only workers receive the sandbox tool plus one `--allow-tool
-hass(<tool>)` per dedicated HASS read tool, so Home Assistant stays read-only
-until the owner approves. Copilot CLI also auto-approves MCP tools that the
-`hass` server annotates with `readOnlyHint`, so research-only workers may use
-other annotated read tools such as `ha_list_floors_areas`. Every unannotated
-(mutating) HASS tool, such as `ha_call_service`, is denied.
+Every Copilot worker retains `--no-ask-user` while its allow-all flags prevent
+interactive permission prompts. The controller still enforces protected-path
+checks, research-only clean-worktree and outcome checks, candidate/PR/merge/
+deployment gates, and worker-host configuration safety after every run.
 
 The CLI authenticates with the controller user's `gh auth token`, passed only
 as `GH_TOKEN` and marked with `--secret-env-vars GH_TOKEN` so it is redacted
 from output and stripped from MCP server environments. It is not passed to the
-sandbox server or mounted into its containers, and the model has no shell or
-GitHub tool that could read or use it. The private HASS MCP endpoint remains
+sandbox server or mounted into its containers. The private HASS MCP endpoint remains
 in a `0600` MCP configuration file outside the worktree; neither it nor the HA
 token is mounted into the Docker workspace or included in worker prompts and
 logs.
 
 The worker receives the issue report, follow-up inputs, and verified images
 as they are, in one prompt; no research skill or second researcher is seeded.
+
+## Labels, triage, and progress receipts
+
+Each controller cycle idempotently creates the managed `status:*` and
+`type:*` labels when absent, then synchronizes every non-ignored issue to its
+phase label. Worker outcomes may include a strict structured `triage` record:
+`kind` (`bug`, `feature`, `task`, or `research`), up to four lowercase
+`areas`, a concise summary, one to five acceptance criteria, confidence from
+zero through one, and up to ten supplied media names or URLs actually
+inspected. Triage adds the matching `type:*` and on-demand `area:*` labels,
+removes only stale managed status/type/area labels, and never changes
+unmanaged labels such as `bug`.
+
+The controller upserts one `triage` comment and one `progress` comment per
+issue using stable receipt markers. A later input revision replaces the same
+triage comment. The progress receipt records phase, last worker provider,
+worker/repair counts, pull request and merge state, the five latest normalized
+deployment events, and its update time. Body hashes prevent duplicate writes;
+all label/comment synchronization errors are digest-logged and never alter a
+phase or fail the lifecycle.
+
+Deployment history retains at most 20 de-duplicated events. It records
+deployment binding, successful post-merge layout or production validation,
+holds while a workflow waits or is superseded, verified rollbacks, and failed
+deployment runs. These receipts explain progress; they do not relax the
+existing candidate, merge, deployment, or completion gates.
 
 ## Lifecycle
 
@@ -148,8 +165,7 @@ as they are, in one prompt; no research skill or second researcher is seeded.
    structured question only when a consequential decision still remains.
    Explicit "research and propose, do not implement yet" instructions remain
    research-only: Docker mounts the assigned worktree read-only except for
-   its private ignored PNG directory, the Copilot tool allowlist grants only
-   dedicated HASS read tools, and the host requires a Git-clean worktree with a
+   its private ignored PNG directory, and the host requires a Git-clean worktree with a
    `needs_input` or `blocked` response. When the owner asks for mockups, the
    worker renders and inspects one PNG per requested alternative there, then
    returns their paths in `needs_input.visualEvidence`. The host validates the
@@ -159,8 +175,8 @@ as they are, in one prompt; no research skill or second researcher is seeded.
    hashes and upload attempts before attaching the images to the same
    decision comment. Unknown upload outcomes
    block rather than silently reuploading. These are research mockups, not
-   proposed fixed behavior or proof of implementation. The worker cannot
-   propose a PR, close the issue, or mutate HA through the allowed tool set.
+   proposed fixed behavior or proof of implementation.    The controller refuses research-only PR/closure outcomes and tracked-file
+   changes even though the worker CLI itself is unrestricted.
    A later trusted owner approval is required to lift that issue-specific
    restriction.
    Direct implementation approval remains valid; short replies such as
