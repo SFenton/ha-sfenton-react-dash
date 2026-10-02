@@ -40,7 +40,7 @@ export function FoodHubPage({ onNavigate, preload = false }: FoodHubPageProps) {
       >
         <ResponsiveSectionGrid gap={12}>
           <ResponsiveSectionItem span="full">
-            <section className={`${styles.section} ${styles.leadingSection}`} id="section-suggested-recipes">
+            <section className={styles.section} id="section-suggested-recipes">
               <SectionHeader title={copy('sections.suggestedRecipes')} />
               <SuggestedRecipeCarousel onLoadStateChange={handleCarouselLoadState} onOpenRecipe={recipeDetail.openRecipe} preload={preload} />
             </section>

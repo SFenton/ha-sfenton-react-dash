@@ -3,7 +3,7 @@
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 12px;
-  margin: 26px 0 12px;
+  margin: var(--section-header-space-before, 26px) 0 12px;
 }
 
 .sectionHeader h2 {
