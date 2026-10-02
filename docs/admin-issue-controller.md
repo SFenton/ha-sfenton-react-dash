@@ -2,7 +2,7 @@
 
 The Admin issue controller mirrors new Home Assistant Admin To-Do items into
 GitHub issues and also adopts trusted workflow-filed layout and deployment
-issues. It runs one serialized, resumable Claude Code lifecycle for each issue.
+issues. It runs one serialized, resumable Copilot CLI lifecycle for each issue.
 Issue workers may run independently up to the configured cap, while one host
 controller serializes their protected release decisions. The controller is
 intentionally separate from the dashboard deployment runner: deployment
@@ -19,7 +19,7 @@ The host controller owns every privileged action:
 - verifies protected checks and the exact deployment receipt;
 - closes the GitHub issue and removes the worktree.
 
-Claude Code receives Home Assistant capabilities through only the configured
+The Copilot CLI worker receives Home Assistant capabilities through only the configured
 `hass` MCP server, while the model and Docker workspace receive no raw Home
 Assistant credential or GitHub mutation tool. Before each run, the controller
 copies only that server entry from the operator's private MCP configuration into the dedicated worker home;
@@ -32,9 +32,23 @@ secret handling.
 The worker's only repository tool remains `admin_issue_workspace`, implemented
 by the project asset in `ops/admin-issue-controller/worker-extension.mjs`, a
 dependency-free MCP stdio server that the controller registers beside the
-`hass` server with `--strict-mcp-config`. The worker runs Claude Code
-(`claude-opus-5-5`, `high` effort) with `--tools Agent,ToolSearch`, so the host
-Bash, file, and web tools are not available to the model or its subagents.
+`hass` server in the worker home's `mcp-config.json`, with built-in MCP
+servers disabled. The worker runs Copilot CLI (`claude-opus-5.5`, `high`
+reasoning effort) with `--available-tools
+task,read_agent,write_agent,tool_search_tool,admin-issue-worker,hass`, so the
+host shell, file, and web tools are not available to the model or its `task`
+subagents.
+
+When Copilot CLI reports a usage-quota or rate-limit failure, the same run falls
+back to Claude Code (`claude-opus-5-5`, `high` effort) with the same prompt,
+media, sandbox and HASS tool surface: built-in tools limited to
+`Agent,ToolSearch`, `--strict-mcp-config` with a Claude-format copy of the two
+MCP servers under the worker home's `.claude/`, `--setting-sources user`, and
+hooks disabled. Research-only Claude workers use `dontAsk` with the same
+read-only HASS allowlist; approved workers use `bypassPermissions`. The
+controller reads the Claude OAuth token (from `claude setup-token`) or API key
+from `claudeTokenPath` only when it falls back, and rejects project `.claude`
+configuration or managed Claude Code hooks before starting it.
 Each repository command runs in Docker with no network, a read-only root filesystem, dropped capabilities,
 `no-new-privileges`, resource limits, and read-only Git metadata. Approved
 implementation workers receive a writable issue worktree; research-only
@@ -70,23 +84,28 @@ claim a dashboard deployment.
 Repository env and package-credential files are masked with `/dev/null`, and
 build caches use per-command tmpfs mounts, so model commands cannot read local
 tokens or persist a cache that influences trusted validation.
-Hooks are disabled, user agents/commands/plugins/skills/instructions are
-removed from the dedicated Claude config directory (`CLAUDE_CONFIG_DIR`) before
-each run, only user settings are loaded, and the controller refuses to start a
-worker when the worktree carries `.claude/` or project MCP configuration or
-machine-managed Claude Code settings define hooks.
+Hooks and memory are disabled, user agents, extensions, plugins, skills,
+instructions, and MCP files are removed from the dedicated Copilot home
+(`COPILOT_HOME`) before each run, and the controller refuses to start a worker
+when the worktree carries `.github/extensions/`, project MCP configuration
+(`.mcp.json`, `.github/mcp.json`, `.vscode/mcp.json`), or machine policy hooks
+in `/etc/github-copilot/policy.d`.
 
-Approved implementation workers run with `--permission-mode
-bypassPermissions`; their tool surface is already limited to the sandbox and
-HASS MCP servers. Research-only workers run with `--permission-mode dontAsk`
-and an `--allowedTools` list of the dedicated HASS read tools, so Home
-Assistant stays read-only until the owner approves.
+Every worker runs with `--no-ask-user`, so any tool not explicitly allowed is
+denied rather than prompted. Approved implementation workers receive
+`--allow-tool admin-issue-worker(admin_issue_workspace)` and `--allow-tool
+hass`. Research-only workers receive the sandbox tool plus one `--allow-tool
+hass(<tool>)` per dedicated HASS read tool, so Home Assistant stays read-only
+until the owner approves. Copilot CLI also auto-approves MCP tools that the
+`hass` server annotates with `readOnlyHint`, so research-only workers may use
+other annotated read tools such as `ha_list_floors_areas`. Every unannotated
+(mutating) HASS tool, such as `ha_call_service`, is denied.
 
-The controller reads a Claude OAuth token (from `claude setup-token`) or an
-Anthropic API key from the private `claudeTokenPath` file and passes it to the
-CLI only as `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY`. It is not passed
-to the sandbox server or mounted into its containers, and no GitHub token is
-given to the worker. The private HASS MCP endpoint remains
+The CLI authenticates with the controller user's `gh auth token`, passed only
+as `GH_TOKEN` and marked with `--secret-env-vars GH_TOKEN` so it is redacted
+from output and stripped from MCP server environments. It is not passed to the
+sandbox server or mounted into its containers, and the model has no shell or
+GitHub tool that could read or use it. The private HASS MCP endpoint remains
 in a `0600` MCP configuration file outside the worktree; neither it nor the HA
 token is mounted into the Docker workspace or included in worker prompts and
 logs.
@@ -115,11 +134,13 @@ as they are, in one prompt; no research skill or second researcher is seeded.
    images, Markdown images and links, and standalone video URLs. Track comment
    edits rather than treating a numeric comment cursor as proof that the
    content has not changed.
-5. Create or resume the stable UUID-bound Claude Code session with
-   `claude-opus-5-5` at `high` effort, the isolated repository tool, and the
-   operator's configured `hass` MCP server. The session resumes only when its
-   transcript exists in the worker's Claude config directory; a session ID
-   recorded by the retired Copilot worker starts a fresh Claude session.
+5. Create or resume the stable UUID-bound Copilot CLI session with
+   `claude-opus-5.5` at `high` reasoning effort, the isolated repository tool,
+   and the operator's configured `hass` MCP server. The session resumes only
+   when its state exists under the worker's `COPILOT_HOME/session-state`.
+   A Claude Code fallback run uses the same UUID but resumes only its own
+   transcript under the worker's `.claude/projects`, so each CLI starts fresh
+   the first time it sees an issue.
    Re-read the owner- and UID-bound original GitHub issue body before each
    worker run so long Admin To-Do summaries survive the 240-character issue
    title limit and are included in the worker's canonical input.
@@ -127,7 +148,7 @@ as they are, in one prompt; no research skill or second researcher is seeded.
    structured question only when a consequential decision still remains.
    Explicit "research and propose, do not implement yet" instructions remain
    research-only: Docker mounts the assigned worktree read-only except for
-   its private ignored PNG directory, the Claude Code allowlist grants only
+   its private ignored PNG directory, the Copilot tool allowlist grants only
    dedicated HASS read tools, and the host requires a Git-clean worktree with a
    `needs_input` or `blocked` response. When the owner asks for mockups, the
    worker renders and inspects one PNG per requested alternative there, then
@@ -231,7 +252,7 @@ applicable Admin To-Do completion boundary, and removes the retained worktree.
 
 A manually closed issue pauses automation and does not complete Home
 Assistant. Reopening it creates a new worktree generation while retaining the
-stable Claude Code session. Manual iOS follow-up remains open after deployment only
+stable Copilot CLI session. Manual iOS follow-up remains open after deployment only
 when the canonical issue names platform-specific browser behavior, the
 candidate changes a browser-facing surface, and the follow-up reason identifies
 the behavior that local evidence cannot certify. Persisted follow-up gates are
@@ -244,7 +265,7 @@ platform or viewport.
 
 On Linux, every bounded host command runs in its own process group. Timeout and
 output-limit enforcement kill the launcher and its local descendants together,
-so a Claude Code process or Docker client cannot retain the controller's output pipe
+so a Copilot CLI process or Docker client cannot retain the controller's output pipe
 after the launcher exits. On startup, after acquiring the exclusive lock,
 the controller removes stale labeled containers. A failed worker removes only
 its own UID-labeled containers, never its active peers.
@@ -331,11 +352,26 @@ fallbacks.
 
 `maxConcurrentWorkers` accepts integers from 1 through 10 and defaults to
 **1** for existing installations. Each admitted issue has its own UUID-bound
-claim, worktree, Docker container label and private Claude config directory with only
+claim, worktree, Docker container label and private Copilot home with only
 the configured HASS MCP entry. Pending owner edits retain their input revision
 while a worker is in flight, and a restart clears only claims from the
 previous locked controller after its stale containers are removed. Failed
-workers retry with a bounded backoff or become explicitly blocked; awaiting
+workers retry with a bounded backoff or become explicitly blocked. A model
+provider usage-quota or rate-limit failure is not a repair attempt. The
+controller detects it only from structured CLI stream events (Copilot
+`session.error` with `errorType` `quota` or `rate_limit`, or a Claude Code
+rejected `rate_limit_event`) and records per-provider receipts
+(`workerCopilotLimitKind`/`Count`/`RetryAt` or
+`workerClaudeLimitKind`/`Count`/`RetryAt`). The retry time is the provider's
+reset when reported, clamped to between one minute and eight days; otherwise
+quota limits back off from one hour to 24 hours and rate limits from five
+minutes to one hour. A Copilot limit falls back to Claude Code in the same run,
+and later runs skip Copilot until its pause expires. When both providers are
+limited, or Claude Code cannot start, the issue returns to the queue with
+`workerRetryAfter` at the earliest usable reset, and admission of every worker
+pauses only while both providers are limited. A successful run clears the
+receipts of the provider that succeeded and records `lastWorkerProvider`.
+Awaiting
 user, paused, blocked and completed issues occupy no worker slot. A separate
 single-slot lane owns candidate publication, protected checks, normal merge,
 deployment verification, HA completion and worktree cleanup. It never
@@ -425,9 +461,9 @@ records each source occurrence, stable GitHub URL (never a signed redirect),
 type, byte count and SHA-256, or an explicit unsupported reason. It scans up to
 32 references, downloads at most 10 MiB per GitHub upload and 32 MiB per
 input, and passes at most eight current verified files into one worker run.
-Only PNG, JPEG, GIF and WebP are passed to Claude Code, as base64 image
-content blocks in the `stream-json` prompt message, after the controller
-re-verifies their bytes. PDF is explicitly unsupported. Animated GIF and
+Only PNG, JPEG, GIF and WebP are passed to the model, after the controller
+re-verifies their bytes: one Copilot CLI `--attachment` per materialized file,
+or native image content blocks on the Claude Code fallback's stream-json input. PDF is explicitly unsupported. Animated GIF and
 WebP files are also reported as unsupported; a static-frame check does not
 certify motion. GitHub-supported
 video, audio, SVG, bitmap/TIFF, Office, text and
@@ -514,15 +550,18 @@ Prerequisites:
 - the repository checkout is on `master` and can push to GitHub over its
   configured HTTPS credential helper;
 - `gh auth status` succeeds for the pinned repository owner;
-- Docker and Claude Code (`claude`) are available to the user service;
-- `~/.config/admin-issue-controller/claude-token` (or the configured
+- Docker and GitHub Copilot CLI (`copilot`) are available to the user
+  service, and the `gh` account has a Copilot plan that can use
+  `claude-opus-5.5`;
+- for the fallback, Claude Code (`claude`) is on the service `PATH` and
+  `~/.config/admin-issue-controller/claude-token` (or the configured
   `claudeTokenPath`) holds a token from `claude setup-token` and is readable
-  only by the owning user;
+  only by the owning user. Without it, Copilot limits defer the issue instead;
 - Node 22 is installed at `~/.local/bin/node`;
 - `.env.development` supplies the existing Home Assistant URL and token;
 - `~/.copilot/mcp-config.json` (the operator MCP file named by
   `hassMcpConfigPath`; the controller copies only its `hass` entry into the
-  worker's Claude MCP config) contains an enabled `hass` MCP server and is
+  worker's Copilot MCP config) contains an enabled `hass` MCP server and is
   readable only by the owning user;
 - the worker image contains Node 22 and the Playwright 1.60 browser/runtime
   dependencies required by this repository.
