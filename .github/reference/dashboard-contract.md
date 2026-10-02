@@ -424,7 +424,7 @@ Add tests as features are implemented.
 
 1. Build shell, route structure, shared Page shell, mobile bottom nav, and shared styling tokens.
 2. Recreate `at-a-glance/overview` content and its modals.
-3. Add reusable entity controls as they appear: light slider, climate display, occupancy/contact status, alarm/security controls, todo list controls, camera/HLS cards.
+3. Add reusable entity controls as they appear: light slider, climate display, occupancy/contact status, alarm/security controls, todo list controls, RTC camera cards.
 4. Move page-by-page through the Home Assistant dashboard tabs, planning each page before implementing it.
 5. Add Playwright tests alongside each completed page behavior.
 

@@ -22,18 +22,12 @@ function devHttpsOptions(mode: string, env: Record<string, string>): HttpsServer
   }
 }
 
-export function dashboardCameraAliases(mode: string) {
+export function dashboardAliases(mode: string) {
   if (mode === 'test') {
     return {
       '@hakit/components': resolve('src/test/mocks/hakitComponents.tsx'),
       '@hakit/core': resolve('src/test/mocks/hakitCore.ts'),
     }
-  }
-  if (mode === 'rtc-pilot') {
-    return [{
-      find: './HlsCamera',
-      replacement: resolve('src/components/hass/RtcPilotCamera.tsx'),
-    }]
   }
   return undefined
 }
@@ -67,7 +61,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     resolve: {
-      alias: dashboardCameraAliases(mode),
+      alias: dashboardAliases(mode),
     },
     server: {
       host: '0.0.0.0',

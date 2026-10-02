@@ -6972,7 +6972,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByLabelText('PC Window Closed')).not.toHaveClass(/bubble/)
   })
 
-  it('opens Security camera popups with HLS media actions and recording script payloads', async () => {
+  it('opens Security camera popups with RTC media actions and recording script payloads', async () => {
     render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Front Door camera' }))

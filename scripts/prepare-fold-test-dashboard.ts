@@ -9,7 +9,7 @@ import {
   FOLD_TEST_CARD_BUNDLE_DIRECTORY,
   FOLD_TEST_CARD_RESOURCE_PATH,
   FOLD_TEST_CARD_TAG,
-  RTC_PILOT_RESOURCE_PATH,
+  RTC_CAMERA_RESOURCE,
   RTC_PILOT_STAGE_DIRECTORY,
 } from '../src/constants/rtcPilot'
 import { resolveDeploymentVersion } from './lib/dashboardDeployment'
@@ -115,10 +115,10 @@ export async function prepareFoldTestDashboard({
     readFile(join(foldBridgeDirectory, `${FOLD_TEST_CARD_TAG}.js`), 'utf8'),
   ])
   if (!indexHtml.includes(`./assets/${appFiles[0]}`)
-    || !app.includes(RTC_PILOT_RESOURCE_PATH)
+    || !app.includes(RTC_CAMERA_RESOURCE)
     || !app.includes('webrtc-camera-sfenton')
     || app.includes('camera/stream')) {
-    throw new Error('The Fold pilot requires a Vite rtc-pilot build, not the production HLS build.')
+    throw new Error('The Fold pilot requires an RTC dashboard build; Home Assistant HLS streams are retired.')
   }
   if (!bridge.includes(`${FOLD_TEST_REACT_DASHBOARD_HOST}/home`)) {
     throw new Error('The Fold pilot bridge does not recognize its dashboard host.')
