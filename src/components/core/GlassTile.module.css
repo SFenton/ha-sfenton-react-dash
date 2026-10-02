@@ -144,6 +144,11 @@
   width: auto;
 }
 
+.disclosureContext {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .progressFill {
   position: absolute;
   inset: 0 auto 0 0;
