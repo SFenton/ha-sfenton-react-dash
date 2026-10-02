@@ -268,6 +268,16 @@ export interface AdminIssueDeployment {
   url?: string
 }
 
+export interface AdminIssueDeployEvent {
+  at: string
+  decision: 'deployed' | 'validated' | 'hold' | 'rolled_back' | 'failed'
+  fromSha?: string
+  reason: string
+  runId?: number
+  toSha?: string
+  url?: string
+}
+
 export interface AdminIssueWorkerClaim {
   generation: number
   id: string
@@ -293,6 +303,7 @@ export interface AdminIssueRecord {
   commentCursor: number
   createdAt: string
   deployment?: AdminIssueDeployment
+  deployHistory?: AdminIssueDeployEvent[]
   description: string
   generation: number
   inputRevision: number
@@ -337,6 +348,15 @@ export interface AdminIssueQuestion {
   question: string
   reason?: 'ci_evidence_unavailable'
   recommendation?: string
+}
+
+export interface AdminIssueTriage {
+  acceptance: string[]
+  areas: string[]
+  confidence: number
+  kind: 'bug' | 'feature' | 'task' | 'research'
+  mediaReviewed?: string[]
+  summary: string
 }
 
 export interface AdminIssueIosFollowUp {
@@ -394,6 +414,7 @@ export type AdminIssueWorkerOutcome =
     questions: AdminIssueQuestion[]
     schemaVersion: 1
     summary: string
+    triage?: AdminIssueTriage
     visualEvidence: AdminIssueVisualEvidenceDraft[]
   }
   | {
@@ -405,6 +426,7 @@ export type AdminIssueWorkerOutcome =
     resolutionType: 'home_assistant' | 'no_repository_change'
     schemaVersion: 1
     summary: string
+    triage?: AdminIssueTriage
     verification: string[]
     visualEvidence: []
   }
@@ -418,6 +440,7 @@ export type AdminIssueWorkerOutcome =
     schemaVersion: 1
     summary: string
     tests: Array<{ command: string; result: string }>
+    triage?: AdminIssueTriage
     visualChange: AdminIssueVisualChange
     visualEvidence: AdminIssueVisualEvidenceDraft[]
   }
@@ -428,6 +451,7 @@ export type AdminIssueWorkerOutcome =
     reason: string
     schemaVersion: 1
     summary: string
+    triage?: AdminIssueTriage
     visualEvidence: []
   }
 
@@ -491,6 +515,67 @@ function iosFollowUp(value: unknown): AdminIssueIosFollowUp {
   return {
     required: value.required,
     reason: value.reason.trim(),
+  }
+}
+
+function workerTriage(value: unknown): AdminIssueTriage | undefined {
+  if (value === undefined) return undefined
+  assert(object(value), 'triage must be an object')
+  const allowed = new Set([
+    'kind',
+    'areas',
+    'summary',
+    'acceptance',
+    'confidence',
+    'mediaReviewed',
+  ])
+  assert(
+    Object.keys(value).every((key) => allowed.has(key)),
+    'triage contains an unknown field',
+  )
+  assert(
+    value.kind === 'bug' || value.kind === 'feature' || value.kind === 'task' || value.kind === 'research',
+    'triage.kind is invalid',
+  )
+  const areas = stringArray(value.areas, 'triage.areas').map((area) => area.trim())
+  assert(areas.length <= 4, 'triage.areas supports at most four areas')
+  assert(
+    areas.every((area) => /^[a-z0-9-]{1,32}$/.test(area)),
+    'triage.areas must contain lowercase slugs',
+  )
+  assert(new Set(areas).size === areas.length, 'triage.areas contains duplicates')
+  const summary = nonEmptyString(value.summary, 'triage.summary').trim()
+  assert(summary.length <= 300, 'triage.summary is too long')
+  const acceptance = stringArray(value.acceptance, 'triage.acceptance').map((item) => item.trim())
+  assert(
+    acceptance.length >= 1 && acceptance.length <= 5 && acceptance.every(
+      (item) => item.length > 0 && item.length <= 200,
+    ),
+    'triage.acceptance must contain one to five concise items',
+  )
+  assert(
+    typeof value.confidence === 'number' &&
+    Number.isFinite(value.confidence) &&
+    value.confidence >= 0 &&
+    value.confidence <= 1,
+    'triage.confidence must be between zero and one',
+  )
+  if (value.mediaReviewed === undefined) {
+    return { acceptance, areas, confidence: value.confidence, kind: value.kind, summary }
+  }
+  const mediaReviewed = stringArray(value.mediaReviewed, 'triage.mediaReviewed')
+    .map((item) => item.trim())
+  assert(
+    mediaReviewed.length <= 10 && mediaReviewed.every((item) => item.length > 0 && item.length <= 200),
+    'triage.mediaReviewed supports at most ten concise items',
+  )
+  return {
+    acceptance,
+    areas,
+    confidence: value.confidence,
+    kind: value.kind,
+    mediaReviewed,
+    summary,
   }
 }
 
@@ -1091,6 +1176,31 @@ function validateAdminIssueControllerState(value: unknown, version: 2 | 3) {
       Object.values(rawRecord.receipts).every((receipt) => typeof receipt === 'string'),
       `state.issues.${uid}.receipts must contain only strings`,
     )
+    if (rawRecord.lastOutcome !== undefined) {
+      assert(object(rawRecord.lastOutcome), `state.issues.${uid}.lastOutcome must be an object`)
+      parseWorkerOutcome(JSON.stringify(rawRecord.lastOutcome))
+    }
+    if (rawRecord.deployHistory !== undefined) {
+      assert(
+        Array.isArray(rawRecord.deployHistory) && rawRecord.deployHistory.length <= 20,
+        `state.issues.${uid}.deployHistory is invalid`,
+      )
+      for (const [index, event] of rawRecord.deployHistory.entries()) {
+        const field = `state.issues.${uid}.deployHistory[${index}]`
+        assert(object(event), `${field} must be an object`)
+        isoTimestamp(event.at, `${field}.at`)
+        assert(
+          ['deployed', 'validated', 'hold', 'rolled_back', 'failed'].includes(String(event.decision)),
+          `${field}.decision is invalid`,
+        )
+        const reason = nonEmptyString(event.reason, `${field}.reason`)
+        assert(reason.length <= 1_000, `${field}.reason is too long`)
+        if (event.fromSha !== undefined) sha(event.fromSha, `${field}.fromSha`)
+        if (event.toSha !== undefined) sha(event.toSha, `${field}.toSha`)
+        if (event.runId !== undefined) positiveInteger(event.runId, `${field}.runId`)
+        if (event.url !== undefined) nonEmptyString(event.url, `${field}.url`)
+      }
+    }
     if (rawRecord.researchMockups !== undefined) {
       assert(version === 3, `state.issues.${uid}.researchMockups requires v3`)
       const mockups = rawRecord.researchMockups
@@ -1775,6 +1885,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
   assert(value.schemaVersion === 1, 'Worker outcome schemaVersion must be 1')
   assert(typeof value.summary === 'string' && value.summary.trim(), 'Worker outcome summary is required')
   const ios = iosFollowUp(value.iosFollowUp)
+  const triage = workerTriage(value.triage)
 
   if (value.decision === 'needs_input') {
     const visualEvidence = visualEvidenceDrafts(value.visualEvidence)
@@ -1811,6 +1922,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
       summary: value.summary.trim(),
       questions,
       iosFollowUp: ios,
+      ...(triage ? { triage } : {}),
       visualEvidence,
     }
   }
@@ -1826,6 +1938,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
       questions: [],
       reason: value.reason.trim(),
       iosFollowUp: ios,
+      ...(triage ? { triage } : {}),
       visualEvidence: [],
     }
   }
@@ -1864,6 +1977,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
       resolutionType: value.resolutionType,
       verification,
       iosFollowUp: ios,
+      ...(triage ? { triage } : {}),
       visualEvidence: [],
     }
   }
@@ -1903,6 +2017,7 @@ export function parseWorkerOutcome(content: string): AdminIssueWorkerOutcome {
     summary: value.summary.trim(),
     questions: [],
     iosFollowUp: ios,
+    ...(triage ? { triage } : {}),
     changeSummary: normalizedChangeSummary,
     tests,
     review: {

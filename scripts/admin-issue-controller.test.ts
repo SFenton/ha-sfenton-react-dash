@@ -139,6 +139,7 @@ import {
   validationCommands,
   workerMutableInfrastructurePaths,
   generatedOnlyConflict,
+  ensureLabels,
   withControllerLock,
   workflowDigestRotationRequired,
   assertClaudeWorkerHostConfigurationSafe,
@@ -1725,6 +1726,92 @@ describe('bounded issue worker admission', () => {
     expect(pendingIssueWorkers(state, pool).map((issue) => issue.uid)).toEqual(['ready'])
     expect(guardedIssueRecords(state, pool).map((issue) => issue.uid))
       .toEqual([legacy.uid, quarantined.uid])
+  })
+})
+
+describe('controller label and triage receipts', () => {
+  it('creates only missing repository labels and memoizes the result', async () => {
+    const calls: Array<{ endpoint: string; method: string; body?: unknown }> = []
+    const config = { repository: 'SFenton/labels-test' } as Parameters<typeof ensureLabels>[0]
+    const request = async <T>(
+      _config: Parameters<typeof ensureLabels>[0],
+      method: 'DELETE' | 'GET' | 'POST' | 'PATCH',
+      endpoint: string,
+      body?: unknown,
+    ) => {
+      calls.push({ body, endpoint, method })
+      if (method === 'GET') return [{ name: 'status:queued' }] as T
+      return { name: (body as { name: string }).name } as T
+    }
+    await ensureLabels(config, [
+      { color: 'ffffff', description: 'Queued', name: 'status:queued' },
+      { color: '000000', description: 'Bug', name: 'type:bug' },
+    ], request)
+    await ensureLabels(config, [
+      { color: '000000', description: 'Bug', name: 'type:bug' },
+    ], request)
+    expect(calls).toEqual([
+      {
+        endpoint: 'repos/SFenton/labels-test/labels?per_page=100&page=1',
+        method: 'GET',
+      },
+      {
+        body: { color: '000000', description: 'Bug', name: 'type:bug' },
+        endpoint: 'repos/SFenton/labels-test/labels',
+        method: 'POST',
+      },
+    ])
+  })
+
+  it('accepts strict triage records and rejects unknown triage keys', () => {
+    const outcome = {
+      decision: 'needs_input',
+      iosFollowUp: { reason: '', required: false },
+      questions: [{ options: ['Keep investigating', 'Stop'], question: 'Continue?' }],
+      schemaVersion: 1,
+      summary: 'More evidence is needed.',
+      triage: {
+        acceptance: ['State the expected behavior.'],
+        areas: ['dashboard'],
+        confidence: 0.75,
+        kind: 'bug',
+        mediaReviewed: ['before.png'],
+        summary: 'A dashboard behavior regression.',
+      },
+      visualEvidence: [],
+    }
+    expect(parseWorkerOutcome(JSON.stringify(outcome)).triage).toEqual(outcome.triage)
+    expect(() => parseWorkerOutcome(JSON.stringify({
+      ...outcome,
+      triage: { ...outcome.triage, unexpected: true },
+    }))).toThrow('triage contains an unknown field')
+  })
+
+  it('validates persisted triage and deployment history', () => {
+    const issue = record()
+    issue.lastOutcome = parseWorkerOutcome(JSON.stringify({
+      decision: 'blocked',
+      iosFollowUp: { reason: '', required: false },
+      questions: [],
+      reason: 'The environment is unavailable.',
+      schemaVersion: 1,
+      summary: 'The controller cannot continue.',
+      triage: {
+        acceptance: ['Restore the worker environment.'],
+        areas: ['controller'],
+        confidence: 1,
+        kind: 'task',
+        summary: 'Controller recovery task.',
+      },
+      visualEvidence: [],
+    }))
+    issue.deployHistory = [{
+      at: '2026-10-02T10:00:00.000Z',
+      decision: 'hold',
+      reason: 'Waiting for deployment authorization.',
+      toSha: 'a'.repeat(40),
+    }]
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
   })
 })
 
@@ -5494,6 +5581,10 @@ describe('admin issue controller security configuration', () => {
         schemaVersion: 1,
         summary: 'Preserved candidate.',
         tests: [{ command: 'test validation', result: 'passed' }],
+        visualChange: {
+          reason: 'The existing candidate retains its already-published visual evidence.',
+          required: false,
+        },
         visualEvidence: [],
       },
     )
@@ -6303,13 +6394,10 @@ describe('admin issue controller security configuration', () => {
     },
   )
 
-  it('pins the worker model and excludes privileged built-in tools', () => {
+  it('pins the worker model and grants the worker unrestricted CLI permissions', () => {
     const controller = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
     expect(controller).toContain("WORKER_COPILOT_MODEL = 'claude-opus-5.5'")
     expect(controller).toContain("WORKER_COPILOT_REASONING_EFFORT = 'high'")
-    expect(controller).toContain(
-      "WORKER_BUILTIN_TOOLS = ['task', 'read_agent', 'write_agent', 'tool_search_tool'] as const",
-    )
     expect(controller).toContain("'--reasoning-effort',\n    WORKER_COPILOT_REASONING_EFFORT")
     expect(controller).toContain("'--disable-builtin-mcps'")
     expect(controller).toContain("'--no-ask-user'")
@@ -6320,13 +6408,16 @@ describe('admin issue controller security configuration', () => {
     )
     expect(controller).toContain("WORKER_CLAUDE_MODEL = 'claude-opus-5-5'")
     expect(controller).toContain("WORKER_CLAUDE_EFFORT = 'high'")
-    expect(controller).toContain("WORKER_CLAUDE_BUILTIN_TOOLS = ['Agent', 'ToolSearch'] as const")
     expect(controller).toContain("'--strict-mcp-config'")
     expect(controller).toContain("'--setting-sources',\n    'user'")
     expect(controller).toContain('disableAllHooks: true')
     expect(controller).toContain("'plugins'")
     expect(controller).toContain("const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']")
-    expect(controller).not.toContain("'--allow-all-tools'")
+    expect(controller).toContain("'--allow-all-tools'")
+    expect(controller).toContain("'--allow-all-paths'")
+    expect(controller).toContain("'--allow-all-urls'")
+    expect(controller).not.toContain("'--available-tools'")
+    expect(controller).not.toContain("'--allowedTools'")
     expect(controller).toContain('MAX_BASE_RESYNCS_PER_GENERATION = 2')
     expect(controller).toContain("runCommand('git', ['merge', '--abort']")
     expect(controller).toContain('assertPullRequestBinding(')
@@ -6490,31 +6581,19 @@ describe('admin issue controller security configuration', () => {
     expect(prompt).toContain('render exactly one distinct PNG for each requested alternative')
     expect(prompt).toContain('needs_input.visualEvidence')
     expect(prompt).not.toContain('Otherwise implement the complete fix')
-    const allowedTools = (args: string[]) =>
-      args.flatMap((arg, index) => args[index - 1] === '--allow-tool' ? [arg] : [])
     const researchArgs = workerPermissionArgs('hass', true)
-    expect(researchArgs.slice(0, 2)).toEqual([
-      '--available-tools',
-      'task,read_agent,write_agent,tool_search_tool,admin-issue-worker,hass',
+    expect(researchArgs).toEqual([
+      '--allow-all-tools',
+      '--allow-all-paths',
+      '--allow-all-urls',
     ])
-    const allowed = allowedTools(researchArgs)
-    expect(allowed).toContain('hass(ha_get_state)')
-    expect(allowed).toContain('hass(ha_get_history)')
-    expect(allowed).toContain('admin-issue-worker(admin_issue_workspace)')
-    expect(allowed).not.toContain('hass')
-    expect(allowed).not.toContain('hass(ha_call_service)')
-    expect(researchArgs).not.toContain('--allow-all-tools')
-    expect(allowedTools(workerPermissionArgs('hass', false))).toEqual([
-      'admin-issue-worker(admin_issue_workspace)',
-      'hass',
+    expect(workerPermissionArgs('hass', false)).toEqual([
+      '--allow-all-tools',
+      '--allow-all-paths',
+      '--allow-all-urls',
     ])
-    const claudeResearchArgs = claudeWorkerPermissionArgs('hass', true)
-    expect(claudeResearchArgs.slice(0, 3)).toEqual(['--permission-mode', 'dontAsk', '--allowedTools'])
-    const claudeAllowed = claudeResearchArgs[3].split(',')
-    expect(claudeAllowed).toContain('mcp__hass__ha_get_state')
-    expect(claudeAllowed).toContain('mcp__admin-issue-worker__admin_issue_workspace')
-    expect(claudeAllowed).not.toContain('mcp__hass')
-    expect(claudeAllowed).not.toContain('mcp__hass__ha_call_service')
+    expect(claudeWorkerPermissionArgs('hass', true))
+      .toEqual(['--permission-mode', 'bypassPermissions'])
     expect(claudeWorkerPermissionArgs('hass', false))
       .toEqual(['--permission-mode', 'bypassPermissions'])
     expect(() => assertResearchOnlyOutcome(issue, { decision: 'ready_for_pr' }, []))
