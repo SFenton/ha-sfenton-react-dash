@@ -231,6 +231,13 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
     spec: 'responsive-layout.spec.ts',
   },
   {
+    area: 'Equal page header spacing around the leading section separator, with and without status chips',
+    landscape: 'direct',
+    safeArea: 'owned',
+    safeAreaOwner: 'safe-area-responsive.spec.ts',
+    spec: 'page-leading-section-spacing.spec.ts',
+  },
+  {
     area: 'Physical callsites, landscape opener/kind rows, and literal portrait tile families',
     landscape: 'direct',
     safeArea: 'direct',
