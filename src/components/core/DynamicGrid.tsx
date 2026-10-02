@@ -20,6 +20,8 @@ import styles from './DynamicGrid.module.css'
 
 const LABEL_SELECTOR = '[data-dynamic-grid-label="true"]'
 const LABEL_CONTAINER_SELECTOR = '[data-dynamic-grid-label-container="true"]'
+const PRIMARY_LABEL_SELECTOR = '[data-dynamic-grid-primary-label="true"]'
+const ACCESSORY_CONTEXT_SELECTOR = '[data-dynamic-grid-accessory-context]'
 const MEASUREMENT_TOLERANCE_PX = 0.5
 
 type DynamicGridStyle = CSSProperties & {
@@ -165,7 +167,21 @@ function naturalLabelContainerWidth(labelContainer: HTMLElement) {
   )
 }
 
-function requiredCellWidth(cell: HTMLElement, columnWidth: number) {
+function missingAccessoryContextWidth(cell: HTMLElement, label: HTMLElement) {
+  const labelRect = label.getBoundingClientRect()
+  return Array.from(cell.querySelectorAll<HTMLElement>(ACCESSORY_CONTEXT_SELECTOR)).reduce((total, accessory) => {
+    const requiredGap = Number.parseFloat(accessory.dataset.dynamicGridAccessoryContext ?? '')
+    if (!Number.isFinite(requiredGap) || requiredGap <= 0) return total
+
+    const accessoryRect = accessory.getBoundingClientRect()
+    const measuredGap = labelRect.width > 0 && accessoryRect.width > 0
+      ? Math.max(0, accessoryRect.left - labelRect.right)
+      : 0
+    return total + Math.max(0, requiredGap - measuredGap)
+  }, 0)
+}
+
+function requiredCellWidth(cell: HTMLElement, columnWidth: number, primaryAccessoryOnly = false) {
   const grid = cell.parentElement
   const measurementGrid = grid?.cloneNode(false) as HTMLElement | undefined
   const clone = cell.cloneNode(true) as HTMLElement
@@ -204,19 +220,32 @@ function requiredCellWidth(cell: HTMLElement, columnWidth: number) {
   }
 
   let requiredWidth = 0
-  const labelContainers = new Set(
-    Array.from(clone.querySelectorAll<HTMLElement>(LABEL_SELECTOR))
-      .map((label) => label.closest<HTMLElement>(LABEL_CONTAINER_SELECTOR))
-      .filter((container): container is HTMLElement => Boolean(container && clone.contains(container))),
-  )
+  if (primaryAccessoryOnly) {
+    for (const label of clone.querySelectorAll<HTMLElement>(PRIMARY_LABEL_SELECTOR)) {
+      const renderedWidth = label.getBoundingClientRect().width || label.clientWidth
+      const naturalWidth = naturalLabelWidth(label)
+      if (naturalWidth <= 0 || renderedWidth <= 0) continue
 
-  for (const labelContainer of labelContainers) {
-    const labelContainerWidth = labelContainer.getBoundingClientRect().width || labelContainer.clientWidth
-    const naturalWidth = naturalLabelContainerWidth(labelContainer)
-    if (naturalWidth <= 0 || labelContainerWidth <= 0) continue
+      const nonLabelWidth = Math.max(0, columnWidth - renderedWidth)
+      const missingAccessoryContext = missingAccessoryContextWidth(clone, label)
+      requiredWidth = Math.max(requiredWidth, naturalWidth + nonLabelWidth + missingAccessoryContext)
+    }
+  } else {
+    const labelContainers = new Set(
+      Array.from(clone.querySelectorAll<HTMLElement>(LABEL_SELECTOR))
+        .map((label) => label.closest<HTMLElement>(LABEL_CONTAINER_SELECTOR))
+        .filter((container): container is HTMLElement => Boolean(container && clone.contains(container))),
+    )
 
-    const nonLabelWidth = Math.max(0, columnWidth - labelContainerWidth)
-    requiredWidth = Math.max(requiredWidth, naturalWidth + nonLabelWidth)
+    for (const labelContainer of labelContainers) {
+      const labelContainerWidth = labelContainer.getBoundingClientRect().width || labelContainer.clientWidth
+      const naturalWidth = naturalLabelContainerWidth(labelContainer)
+      if (naturalWidth <= 0 || labelContainerWidth <= 0) continue
+
+      const nonLabelWidth = Math.max(0, columnWidth - labelContainerWidth)
+      const missingAccessoryContext = missingAccessoryContextWidth(clone, labelContainer)
+      requiredWidth = Math.max(requiredWidth, naturalWidth + nonLabelWidth + missingAccessoryContext)
+    }
   }
 
   const measuredTree = measurementGrid ?? clone
@@ -282,7 +311,9 @@ function measuredLayout(
   if (columnWidth <= 0) return initialLayout(cells.length, availableColumns, fillRows, itemSizing)
 
   const requiredCellWidths = itemSizing === 'fixed'
-    ? cells.map(() => 0)
+    ? cells.map((cell) => cell.querySelector(ACCESSORY_CONTEXT_SELECTOR)
+      ? requiredCellWidth(cell, columnWidth, true)
+      : 0)
     : cells.map((cell) => requiredCellWidth(cell, columnWidth))
 
   const columns = itemSizing === 'uniform'
@@ -294,7 +325,8 @@ function measuredLayout(
       MEASUREMENT_TOLERANCE_PX,
     )
     : availableColumns
-  const minimumSpans = itemSizing === 'content-aware'
+  const measuredSpans = itemSizing === 'content-aware' || itemSizing === 'fixed'
+  const minimumSpans = measuredSpans
     ? requiredCellWidths.map((requiredCellWidth) => {
         let fittingSpan = availableColumns
 
@@ -310,10 +342,10 @@ function measuredLayout(
       })
     : cells.map(() => 1)
   const fillFinalRow = lastRow === 'fill'
-    || (lastRow === 'fill-minimum' && !expanded)
+    || (lastRow === 'fill-minimum' && !expanded && configured <= fallbackColumns)
   const rowFill = fillFinalRow ? 'all' : 'except-last'
   const fillMeasuredRows = fillRows !== false || fillFinalRow
-  const spans = itemSizing !== 'content-aware'
+  const spans = !measuredSpans
     ? (
       fillMeasuredRows
         ? packDynamicGridSpans(Array.from({ length: cells.length }, () => 1), columns, rowFill)
@@ -399,12 +431,10 @@ export function DynamicGrid({
       mutationObserver?.observe(grid, { characterData: true, childList: true, subtree: true })
     }
 
-    let active = itemSizing !== 'fixed'
-    if (active) {
-      void document.fonts?.ready.then(() => {
-        if (active) measure()
-      })
-    }
+    let active = true
+    void document.fonts?.ready.then(() => {
+      if (active) measure()
+    })
 
     return () => {
       active = false

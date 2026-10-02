@@ -1,3 +1,4 @@
+// @covers src/components/core/GlassTile.tsx
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { GlassTile } from './GlassTile'
@@ -11,6 +12,8 @@ describe('GlassTile semantics', () => {
     const navigation = screen.getByRole('button', { name: 'Navigate' })
     expect(navigation).toHaveAttribute('data-navigation-opener', 'true')
     expect(navigation.querySelector('[data-modal-disclosure="right-chevron"]')).toBeInTheDocument()
+    expect(navigation.querySelector('[data-dynamic-grid-accessory-context="8"]')).toBeInTheDocument()
+    expect(navigation.querySelector('[data-dynamic-grid-primary-label="true"]')).toHaveTextContent('Navigate')
 
     rerender(<GlassTile disclosure icon="mdi:flash" onClick={vi.fn()} semantics={{ kind: 'command' }} title="Run" />)
 

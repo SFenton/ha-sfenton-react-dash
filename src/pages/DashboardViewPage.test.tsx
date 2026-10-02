@@ -6791,6 +6791,7 @@ describe('DashboardViewPage', () => {
     const securityGrid = screen.getByRole('button', { name: /Security System Armed Home/i }).closest('[data-dynamic-grid="true"]')
     const cameraGrid = screen.getByRole('button', { name: 'Open Front Door camera' }).closest('[data-dynamic-grid="true"]')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
+    expect(securityGrid).toHaveAttribute('data-dynamic-grid-last-row', 'fill-minimum')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
     expect(securityGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
     expect(cameraGrid).toHaveAttribute('data-dynamic-grid-item-sizing', 'fixed')
