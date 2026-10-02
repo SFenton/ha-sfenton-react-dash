@@ -3,13 +3,14 @@ import { AtAGlancePage, LightsSheet } from './AtAGlancePage'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
-import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass, setMockDailyWeatherForecast, setMockEntityAttribute, setMockEntityState, setMockHourlyWeatherForecast } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass, setMockDailyWeatherForecast, setMockEntityAttribute, setMockEntityState, setMockConnectionStatus, setMockHourlyWeatherForecast } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { WEATHER_FORECAST_TTL_MS } from '../components/hass/useWeatherForecasts'
 import { HOUSEHOLD_RESIDENTS } from '../constants/householdResidents'
 
 // @covers src/constants/atAGlance.ts
+// @covers src/components/hass/WeatherSummary.tsx
 
 describe('AtAGlancePage', () => {
   beforeEach(() => {
@@ -905,7 +906,7 @@ describe('Home weather forecast freshness and ranges', () => {
     expect(rails[0]).toHaveStyle({ '--weather-rail-marker': '50%' })
   })
 
-  it.each([false, true])('reports refresh errors with cached forecasts=%s without silently hiding available data', async (cached) => {
+  it.each([false, true])('keeps refresh errors with cached forecasts=%s off the summary and inside the forecast sheet', async (cached) => {
     if (!cached) vi.mocked(mockState.helpers.callService).mockRejectedValue(new Error('Weather connection lost'))
     render(<WeatherSummary />)
     await settle()
@@ -914,11 +915,33 @@ describe('Home weather forecast freshness and ranges', () => {
       act(() => setMockEntityAttribute('weather.pirate_weather', 'temperature', 58))
       await settle()
     }
-    expect(screen.getAllByRole('status').map((status) => status.textContent)).toEqual(['Weather connection lost', 'Weather connection lost'])
+    expect(screen.queryAllByRole('status')).toHaveLength(0)
+    expect(screen.queryByText('Weather connection lost')).toBeNull()
     const dialog = await openWeather()
     expect(within(dialog).getAllByText('Weather connection lost')).toHaveLength(2)
     expect(within(dialog).queryByRole('article', { name: 'Now Cloudy 57°F' }) !== null).toBe(cached)
     expect(within(dialog).queryByRole('article', { name: 'Today Sunny H:65° L:48°' }) !== null).toBe(cached)
     expect(within(dialog).queryByLabelText('Loading 24-hour conditions')).toBeNull()
+  })
+
+  it('never shows Pirate Weather notice cards and quietly reloads forecasts after an HA reconnect', async () => {
+    render(<WeatherSummary />)
+    await settle()
+    vi.mocked(mockState.helpers.callService).mockRejectedValue({ code: 3, message: 'Connection lost' })
+    act(() => setMockEntityAttribute('weather.pirate_weather', 'temperature', 58))
+    await settle()
+    act(() => setMockConnectionStatus('disconnected'))
+    await settle()
+    expect(screen.queryAllByRole('status')).toHaveLength(0)
+    expect(screen.queryByText(/Unable to load Pirate Weather/)).toBeNull()
+    const calls = vi.mocked(mockState.helpers.callService).mock.calls.length
+    vi.mocked(mockState.helpers.callService).mockResolvedValue({ response: { 'weather.pirate_weather': { forecast: [{ condition: 'rainy', datetime: new Date().toISOString(), temperature: 77, templow: 50 }] } } })
+    act(() => setMockConnectionStatus('connected'))
+    await settle()
+    expect(vi.mocked(mockState.helpers.callService).mock.calls.length).toBe(calls + 2)
+    expect(screen.queryAllByRole('status')).toHaveLength(0)
+    const dialog = await openWeather()
+    expect(within(dialog).queryByText(/Unable to load Pirate Weather/)).toBeNull()
+    expect(within(dialog).getAllByText('77°').length).toBeGreaterThan(0)
   })
 })
