@@ -1,10 +1,10 @@
 // @covers vite.config.ts
 // @covers vite.fold-bridge.config.ts
 import { FOLD_TEST_CARD_BUNDLE_DIRECTORY, FOLD_TEST_CARD_TAG } from '../src/constants/rtcPilot'
-import dashboardConfig, { dashboardCameraAliases } from '../vite.config'
+import dashboardConfig, { dashboardAliases } from '../vite.config'
 import { foldBridgeBuildConfig } from '../vite.fold-bridge.config'
 
-describe('isolated RTC pilot build', () => {
+describe('dashboard Vite builds', () => {
   it('keeps HA routing without the removed frontend chat development proxy', async () => {
     if (typeof dashboardConfig !== 'function') throw new Error('Expected function-backed Vite config')
     const config = await dashboardConfig({ command: 'serve', mode: 'test', isSsrBuild: false, isPreview: false })
@@ -12,18 +12,13 @@ describe('isolated RTC pilot build', () => {
     expect(config.server?.proxy).not.toHaveProperty('/__home-mcp')
   })
 
-  it('keeps HLS as the default and preserves the existing test mocks', () => {
-    expect(dashboardCameraAliases('production')).toBeUndefined()
-    expect(dashboardCameraAliases('test')).toMatchObject({
+  it('aliases only the HAKit test mocks and never swaps the RTC camera adapter', () => {
+    expect(dashboardAliases('production')).toBeUndefined()
+    expect(dashboardAliases('rtc-pilot')).toBeUndefined()
+    expect(dashboardAliases('test')).toEqual({
+      '@hakit/components': expect.stringContaining('/src/test/mocks/hakitComponents.tsx'),
       '@hakit/core': expect.stringContaining('/src/test/mocks/hakitCore.ts'),
     })
-  })
-
-  it('resolves only the explicitly selected pilot build to the RTC adapter', () => {
-    expect(dashboardCameraAliases('rtc-pilot')).toEqual([{
-      find: './HlsCamera',
-      replacement: expect.stringContaining('/src/components/hass/RtcPilotCamera.tsx'),
-    }])
   })
 
   it('builds a standalone Fold card module without changing the production bridge entry', () => {
