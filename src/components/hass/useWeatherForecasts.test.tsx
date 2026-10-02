@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { WEATHER_ENTITY } from '../../constants/atAGlance'
-import { useWeatherForecasts, WEATHER_FORECAST_TTL_MS, type WeatherForecast, type WeatherForecastService } from './useWeatherForecasts'
+import { useWeatherForecasts, WEATHER_FORECAST_RETRY_MS, WEATHER_FORECAST_TTL_MS, type WeatherForecast, type WeatherForecastService } from './useWeatherForecasts'
 
 const NOW = new Date('2026-09-05T12:30:00Z')
 type Kind = 'daily' | 'hourly'
@@ -25,6 +25,25 @@ function delayedService() {
   }))
   return { callService, pending }
 }
+
+function fakeConnection() {
+  const listeners = new Set<() => void>()
+  const connection = {
+    connected: true,
+    addEventListener: vi.fn((_event: 'ready', listener: () => void) => { listeners.add(listener) }),
+    removeEventListener: vi.fn((_event: 'ready', listener: () => void) => { listeners.delete(listener) }),
+    reconnect() {
+      act(() => {
+        connection.connected = true
+        listeners.forEach((listener) => listener())
+      })
+    },
+    listeners,
+  }
+  return connection
+}
+
+const CONNECTION_LOST = { code: 3, message: 'Connection lost' }
 
 async function settle() {
   await act(async () => {})
@@ -330,5 +349,77 @@ describe('useWeatherForecasts', () => {
     expect(result.current.hourly.forecasts.map((forecast) => forecast.temperature)).toEqual([70])
     expect(result.current.hourly.refreshing).toBe(true)
     expect(callService).toHaveBeenCalledTimes(4)
+  })
+
+  it('keeps cached forecasts quiet when a resumed socket drops the refresh, then retries as soon as HA reconnects', async () => {
+    const connection = fakeConnection()
+    const callService = serviceMock()
+    const { result, rerender, unmount } = renderHook(({ sourceRevision }) => useWeatherForecasts({
+      callService, connection, enabled: true, sourceRevision,
+    }), { initialProps: { sourceRevision: 'a' } })
+    await settle()
+    expect(connection.listeners.size).toBe(1)
+    callService.mockRejectedValue(CONNECTION_LOST)
+    rerender({ sourceRevision: 'b' })
+    await settle()
+    expect(callService).toHaveBeenCalledTimes(4)
+    for (const kind of ['daily', 'hourly'] as const) {
+      expect(result.current[kind]).toMatchObject({ error: null, refreshing: false, status: 'ready' })
+      expect(result.current[kind].forecasts[0].temperature).toBe(60)
+    }
+    connection.connected = false
+    act(() => window.dispatchEvent(new Event('focus')))
+    await act(async () => { await vi.advanceTimersByTimeAsync(WEATHER_FORECAST_TTL_MS) })
+    expect(callService).toHaveBeenCalledTimes(4)
+    callService.mockResolvedValue(response(88))
+    connection.reconnect()
+    await settle()
+    expect(callService).toHaveBeenCalledTimes(6)
+    expect(result.current.daily).toMatchObject({ error: null, status: 'ready' })
+    expect(result.current.hourly.forecasts[0].temperature).toBe(88)
+    unmount()
+    expect(connection.listeners.size).toBe(0)
+  })
+
+  it.each([
+    ['ERR_CONNECTION_LOST', 3],
+    ['an in-flight connection loss', CONNECTION_LOST],
+    ['HAKit not-ready', new Error('callService: connection not established or not ready')],
+  ])('stays loading without an error after %s and retries with a short backoff', async (_label, failure) => {
+    const callService = serviceMock().mockRejectedValue(failure)
+    const { result } = renderHook(() => useWeatherForecasts({ callService, enabled: true, sourceRevision: 'a' }))
+    await settle()
+    expect(callService).toHaveBeenCalledTimes(2)
+    for (const kind of ['daily', 'hourly'] as const) {
+      expect(result.current[kind]).toMatchObject({ error: null, forecasts: [], refreshing: false, status: 'loading' })
+    }
+    await act(async () => { await vi.advanceTimersByTimeAsync(WEATHER_FORECAST_RETRY_MS - 1) })
+    expect(callService).toHaveBeenCalledTimes(2)
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+    expect(callService).toHaveBeenCalledTimes(4)
+    await act(async () => { await vi.advanceTimersByTimeAsync(WEATHER_FORECAST_RETRY_MS * 2 - 1) })
+    expect(callService).toHaveBeenCalledTimes(4)
+    callService.mockResolvedValue(response(64))
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+    expect(callService).toHaveBeenCalledTimes(6)
+    expect(result.current.daily).toMatchObject({ error: null, status: 'ready' })
+    expect(result.current.hourly.forecasts[0].temperature).toBe(64)
+    await act(async () => { await vi.advanceTimersByTimeAsync(WEATHER_FORECAST_TTL_MS - 1) })
+    expect(callService).toHaveBeenCalledTimes(6)
+  })
+
+  it('defers the first request while HA is reconnecting instead of failing it', async () => {
+    const connection = fakeConnection()
+    connection.connected = false
+    const callService = serviceMock()
+    const { result } = renderHook(() => useWeatherForecasts({ callService, connection, enabled: true, sourceRevision: 'a' }))
+    await settle()
+    expect(callService).not.toHaveBeenCalled()
+    expect(result.current.daily).toMatchObject({ error: null, status: 'idle' })
+    expect(vi.getTimerCount()).toBe(0)
+    connection.reconnect()
+    await settle()
+    expect(callService).toHaveBeenCalledTimes(2)
+    expect(result.current.daily).toMatchObject({ error: null, status: 'ready' })
   })
 })

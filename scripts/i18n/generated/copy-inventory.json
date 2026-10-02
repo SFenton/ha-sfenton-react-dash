@@ -13120,7 +13120,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "b3a51e2e8c350cfd",
       "lines": [
-        1635
+        1640
       ],
       "occurrences": 1,
       "origin": "legacy",
@@ -27695,7 +27695,7 @@
       "file": "src/components/hass/WeatherSummary.tsx",
       "id": "320d69bbe695dd72",
       "lines": [
-        1695
+        1694
       ],
       "occurrences": 1,
       "origin": "legacy",

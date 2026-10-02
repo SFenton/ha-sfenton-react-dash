@@ -1557,6 +1557,11 @@ function WeatherForecastSheet({
   )
 }
 
+// Idle and loading both mean a forecast is still expected, including while HA reconnects.
+function forecastPending(status: string) {
+  return status === WEATHER_FORECAST_PHASE.IDLE || status === WEATHER_FORECAST_PHASE.LOADING
+}
+
 interface WeatherSummaryProps {
   deferRefresh?: boolean
 }
@@ -1574,19 +1579,21 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
     returnNullIfNotFound: true,
   })
   const callService = useHass((state) => state.helpers.callService)
+  const connection = useHass((state) => state.connection)
   const [open, setOpen] = useState(false)
   const [sceneOverride, setSceneOverride] = useState<WeatherScene>()
   const { daily, hourly } = useWeatherForecasts({
     callService,
+    connection,
     enabled: !deferRefresh,
     sourceRevision: weather?.last_updated,
   })
   const forecasts = daily.forecasts
   const forecastError = daily.error
-  const forecastLoading = daily.refreshing && !forecasts.length
+  const forecastLoading = !forecasts.length && (daily.refreshing || forecastPending(daily.status))
   const hourlyForecasts = hourly.forecasts
   const hourlyForecastError = hourly.error
-  const hourlyForecastLoading = hourly.refreshing && !hourlyForecasts.length
+  const hourlyForecastLoading = !hourlyForecasts.length && (hourly.refreshing || forecastPending(hourly.status))
   const briefing = useWeatherDayBriefing({
     aqi: aqi?.state,
     daily: forecasts,
@@ -1597,8 +1604,6 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
     temperatureUnit: weather?.attributes.temperature_unit,
     windSpeedUnit: weather?.attributes.wind_speed_unit,
   })
-  const dailyNotice = forecastError ?? (daily.status === WEATHER_FORECAST_PHASE.EMPTY ? copy(WEATHER_COPY_KEYS.forecast.dailyEmpty) : null)
-  const hourlyNotice = hourlyForecastError ?? (hourly.status === WEATHER_FORECAST_PHASE.EMPTY ? copy(WEATHER_COPY_KEYS.forecast.hourlyEmpty) : null)
   const heroCarouselId = useId()
   const weatherCardButtonRef = useRef<HTMLButtonElement>(null)
   const {
@@ -1676,12 +1681,6 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
         />
         <WeatherCarouselPagination currentPage={currentHeroPage} hero hidden={!heroHasOverflow || heroPageCount <= 1} label={heroCarouselLabel} onPageChange={scrollHeroToPage} pageCount={heroPageCount} />
       </div>
-      {!deferRefresh && !open ? (
-        <>
-          {dailyNotice ? <div className={styles.errorState} role="status">{dailyNotice}</div> : null}
-          {hourlyNotice ? <div className={styles.errorState} role="status">{hourlyNotice}</div> : null}
-        </>
-      ) : null}
 
       <ModalSheet
         backdropPolicy={backdropPolicy}
