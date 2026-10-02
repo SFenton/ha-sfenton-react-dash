@@ -134,6 +134,16 @@ import {
   type EvidenceWorkflowRun,
   type LayoutFailureReference,
 } from './lib/adminIssueWorkflowEvidence'
+import {
+  AdminIssueProviderLimitError,
+  clearWorkerProviderLimit,
+  deferWorkerForProviderLimit,
+  detectWorkerProviderLimit,
+  recordWorkerProviderLimit,
+  workerProviderLimitReceipts,
+  workerProviderPauseUntil,
+  type WorkerProvider,
+} from './lib/adminIssueProviderLimits'
 
 export interface AdminIssueControllerConfig {
   completionReceiptEntityId: string
@@ -269,13 +279,18 @@ type ActionableTodoItem = HassTodoItem & {
 
 const MAX_GITHUB_BODY_BYTES = 60_000
 const MAX_WORKER_OUTPUT_BYTES = 50 * 1024 * 1024
+export const WORKER_COPILOT_MODEL = 'claude-opus-5.5'
+export const WORKER_COPILOT_REASONING_EFFORT = 'high'
+const WORKER_SANDBOX_MCP_SERVER = 'admin-issue-worker'
+const WORKER_SANDBOX_TOOL_NAME = 'admin_issue_workspace'
+// Built-in Copilot CLI tools the worker may use. Host file, shell, and web tools
+// stay unavailable; repository access goes only through the sandbox MCP tool.
+const WORKER_BUILTIN_TOOLS = ['task', 'read_agent', 'write_agent', 'tool_search_tool'] as const
+// Claude Code is the fallback when Copilot reports a usage or rate limit.
 export const WORKER_CLAUDE_MODEL = 'claude-opus-5-5'
 export const WORKER_CLAUDE_EFFORT = 'high'
-const WORKER_SANDBOX_MCP_SERVER = 'admin-issue-worker'
-const WORKER_SANDBOX_TOOL = `mcp__${WORKER_SANDBOX_MCP_SERVER}__admin_issue_workspace`
-// Built-in Claude Code tools the worker may use. Host file, shell, and web tools
-// stay unavailable; repository access goes only through the sandbox MCP tool.
-const WORKER_BUILTIN_TOOLS = ['Agent', 'ToolSearch'] as const
+const WORKER_CLAUDE_SANDBOX_TOOL = `mcp__${WORKER_SANDBOX_MCP_SERVER}__${WORKER_SANDBOX_TOOL_NAME}`
+const WORKER_CLAUDE_BUILTIN_TOOLS = ['Agent', 'ToolSearch'] as const
 const RESEARCH_MOUNT_RETRY_TARGET = {
   issueNumber: 242,
   uid: '9ec721c0-b834-11f1-9e46-525400aeeeef',
@@ -551,21 +566,12 @@ export function selectWorkerHassMcpConfig(value: unknown, serverName: string) {
       throw new Error(`HASS MCP server ${serverName} must use HTTP or HTTPS`)
     }
   }
-  const claudeServer = hasUrl
-    ? {
-      type: server.type === 'sse' ? 'sse' : 'http',
-      url: String(server.url),
-      ...(object(server.headers) ? { headers: server.headers } : {}),
-    }
-    : {
-      type: 'stdio',
-      command: String(server.command),
-      ...(Array.isArray(server.args) ? { args: server.args } : {}),
-      ...(object(server.env) ? { env: server.env } : {}),
-    }
   return {
     mcpServers: {
-      [serverName]: claudeServer,
+      [serverName]: {
+        ...server,
+        tools: Array.isArray(server.tools) ? server.tools : ['*'],
+      } as Record<string, unknown>,
     },
   }
 }
@@ -624,12 +630,6 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
     parseNonEmptyString(raw.workerHome, 'workerHome'),
     'workerHome',
   )
-  const workerExtensionPath = realpathSync(
-    parseNonEmptyString(raw.workerExtensionPath, 'workerExtensionPath').replace(
-      /^~(?=\/|$)/,
-      homedir(),
-    ),
-  )
   const claudeTokenPath = resolveInside(
     homedir(),
     parseNonEmptyString(
@@ -637,6 +637,12 @@ export function loadAdminIssueControllerConfig(configPath: string): AdminIssueCo
       'claudeTokenPath',
     ),
     'claudeTokenPath',
+  )
+  const workerExtensionPath = realpathSync(
+    parseNonEmptyString(raw.workerExtensionPath, 'workerExtensionPath').replace(
+      /^~(?=\/|$)/,
+      homedir(),
+    ),
   )
   const hassMcpConfigPath = resolveInside(
     homedir(),
@@ -1045,7 +1051,6 @@ async function verifyRuntimePreconditions(config: AdminIssueControllerConfig) {
   if (!existsSync(config.workerExtensionPath)) {
     throw new Error(`Missing worker extension: ${config.workerExtensionPath}`)
   }
-  readClaudeWorkerCredential(config)
   const image = await runCommand(
     'docker',
     ['image', 'inspect', '--format', '{{.Id}}', config.workerImageId],
@@ -1058,7 +1063,7 @@ async function verifyRuntimePreconditions(config: AdminIssueControllerConfig) {
       `Worker image mismatch: expected ${config.workerImageId}, received ${image.stdout.trim()}`,
     )
   }
-  await runCommand('claude', ['--version'], { timeoutMs: 30_000 })
+  await runCommand('copilot', ['--version'], { timeoutMs: 30_000 })
 }
 
 async function cleanupStaleWorkerContainers() {
@@ -2715,15 +2720,114 @@ export function isolatedWorkerConfig(
   return { ...config, workerHome: home }
 }
 
+export function workerCopilotHome(config: Pick<AdminIssueControllerConfig, 'workerHome'>) {
+  return join(config.workerHome, '.copilot')
+}
+
+function workerSandboxServerPath(home: string) {
+  return join(home, WORKER_SANDBOX_MCP_SERVER, 'server.mjs')
+}
+
+function installWorkerSandboxServer(config: AdminIssueControllerConfig, home: string) {
+  mkdirSync(join(home, WORKER_SANDBOX_MCP_SERVER), { mode: 0o700, recursive: true })
+  copyFileSync(config.workerExtensionPath, workerSandboxServerPath(home))
+  chmodSync(workerSandboxServerPath(home), 0o600)
+}
+
+export function workerMcpConfigPath(config: Pick<AdminIssueControllerConfig, 'workerHome'>) {
+  return join(workerCopilotHome(config), 'mcp-config.json')
+}
+
+export function prepareCopilotHome(config: AdminIssueControllerConfig) {
+  const copilotHome = workerCopilotHome(config)
+  // Session state survives so a worker can resume; every other user-level
+  // customization is rebuilt from reviewed assets each run.
+  for (const path of [
+    'agents',
+    'copilot-instructions.md',
+    'extensions',
+    'hooks',
+    'installed-plugins',
+    'instructions',
+    'lsp-config.json',
+    'mcp-config.json',
+    'mcp.json',
+    'plugins',
+    'settings.json',
+    'skills',
+    WORKER_SANDBOX_MCP_SERVER,
+  ]) {
+    rmSync(join(copilotHome, path), { force: true, recursive: true })
+  }
+  mkdirSync(join(copilotHome, 'logs'), { mode: 0o700, recursive: true })
+  installWorkerSandboxServer(config, copilotHome)
+  writeFileSync(
+    join(copilotHome, 'settings.json'),
+    `${JSON.stringify(
+      {
+        banner: 'never',
+        disableAllHooks: true,
+        memory: false,
+        notifications: false,
+        showTipsOnStartup: false,
+      },
+      null,
+      2,
+    )}\n`,
+    { mode: 0o600 },
+  )
+}
+
+export function buildWorkerMcpConfig(
+  config: AdminIssueControllerConfig,
+  sandboxEnvironment: Record<string, string>,
+) {
+  const hass = selectWorkerHassMcpConfig(
+    JSON.parse(readFileSync(config.hassMcpConfigPath, 'utf8')) as unknown,
+    config.hassMcpServerName,
+  )
+  return {
+    mcpServers: {
+      ...hass.mcpServers,
+      [WORKER_SANDBOX_MCP_SERVER]: {
+        type: 'local',
+        command: process.execPath,
+        args: [workerSandboxServerPath(workerCopilotHome(config))],
+        env: sandboxEnvironment,
+        tools: ['*'],
+      },
+    },
+  }
+}
+
+export function assertWorkerHostConfigurationSafe(
+  worktreePath: string,
+  policyHookDirectory = '/etc/github-copilot/policy.d',
+) {
+  const projectExtensions = join(worktreePath, '.github/extensions')
+  if (existsSync(projectExtensions) && readdirSync(projectExtensions, { recursive: true }).length > 0) {
+    throw new Error('Project Copilot extensions are not allowed in autonomous worker sessions')
+  }
+  if (
+    existsSync(join(worktreePath, '.mcp.json')) ||
+    existsSync(join(worktreePath, '.github/mcp.json')) ||
+    existsSync(join(worktreePath, '.vscode/mcp.json'))
+  ) {
+    throw new Error('Project MCP configuration is not allowed in autonomous worker sessions')
+  }
+  if (
+    existsSync(policyHookDirectory) &&
+    readdirSync(policyHookDirectory).some((entry) => entry.endsWith('.json'))
+  ) {
+    throw new Error('Copilot policy hooks are not allowed in autonomous worker sessions')
+  }
+}
+
 export function workerClaudeConfigDirectory(config: Pick<AdminIssueControllerConfig, 'workerHome'>) {
   return join(config.workerHome, '.claude')
 }
 
-function workerSandboxServerPath(config: Pick<AdminIssueControllerConfig, 'workerHome'>) {
-  return join(workerClaudeConfigDirectory(config), WORKER_SANDBOX_MCP_SERVER, 'server.mjs')
-}
-
-export function workerMcpConfigPath(config: Pick<AdminIssueControllerConfig, 'workerHome'>) {
+export function workerClaudeMcpConfigPath(config: Pick<AdminIssueControllerConfig, 'workerHome'>) {
   return join(workerClaudeConfigDirectory(config), 'worker-mcp.json')
 }
 
@@ -2765,54 +2869,54 @@ export function prepareClaudeHome(config: AdminIssueControllerConfig) {
   ]) {
     rmSync(join(claudeHome, path), { force: true, recursive: true })
   }
-  mkdirSync(join(claudeHome, WORKER_SANDBOX_MCP_SERVER), { mode: 0o700, recursive: true })
-  copyFileSync(config.workerExtensionPath, workerSandboxServerPath(config))
-  chmodSync(workerSandboxServerPath(config), 0o600)
+  installWorkerSandboxServer(config, claudeHome)
   writeFileSync(
     join(claudeHome, 'settings.json'),
-    `${JSON.stringify(
-      { disableAllHooks: true },
-      null,
-      2,
-    )}\n`,
+    `${JSON.stringify({ disableAllHooks: true }, null, 2)}\n`,
     { mode: 0o600 },
   )
 }
 
-export function buildWorkerMcpConfig(
+export function buildClaudeWorkerMcpConfig(
   config: AdminIssueControllerConfig,
   sandboxEnvironment: Record<string, string>,
 ) {
-  const hass = selectWorkerHassMcpConfig(
+  const server = selectWorkerHassMcpConfig(
     JSON.parse(readFileSync(config.hassMcpConfigPath, 'utf8')) as unknown,
     config.hassMcpServerName,
-  )
+  ).mcpServers[config.hassMcpServerName]
+  const hass = typeof server.url === 'string'
+    ? {
+      type: server.type === 'sse' ? 'sse' : 'http',
+      url: server.url,
+      ...(object(server.headers) ? { headers: server.headers } : {}),
+    }
+    : {
+      type: 'stdio',
+      command: String(server.command),
+      ...(Array.isArray(server.args) ? { args: server.args } : {}),
+      ...(object(server.env) ? { env: server.env } : {}),
+    }
   return {
     mcpServers: {
-      ...hass.mcpServers,
+      [config.hassMcpServerName]: hass,
       [WORKER_SANDBOX_MCP_SERVER]: {
         type: 'stdio',
         command: process.execPath,
-        args: [workerSandboxServerPath(config)],
+        args: [workerSandboxServerPath(workerClaudeConfigDirectory(config))],
         env: sandboxEnvironment,
       },
     },
   }
 }
 
-export function assertWorkerHostConfigurationSafe(
+export function assertClaudeWorkerHostConfigurationSafe(
   worktreePath: string,
   managedSettingsDirectory = '/etc/claude-code',
 ) {
   const projectClaude = join(worktreePath, '.claude')
   if (existsSync(projectClaude) && readdirSync(projectClaude, { recursive: true }).length > 0) {
     throw new Error('Project Claude Code configuration is not allowed in autonomous worker sessions')
-  }
-  if (
-    existsSync(join(worktreePath, '.mcp.json')) ||
-    existsSync(join(worktreePath, '.github/mcp.json'))
-  ) {
-    throw new Error('Project MCP configuration is not allowed in autonomous worker sessions')
   }
   const managedFiles = [
     join(managedSettingsDirectory, 'managed-settings.json'),
@@ -2834,6 +2938,42 @@ export function assertWorkerHostConfigurationSafe(
       throw new Error('Claude Code managed hooks are not allowed in autonomous worker sessions')
     }
   }
+}
+
+function buildClaudeWorkerEnvironment(
+  config: AdminIssueControllerConfig,
+  credential: Record<string, string>,
+) {
+  const environment: NodeJS.ProcessEnv = {
+    ...credential,
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+    CLAUDE_CONFIG_DIR: workerClaudeConfigDirectory(config),
+    DISABLE_AUTOUPDATER: '1',
+    HOME: config.workerHome,
+    LANG: process.env.LANG ?? 'C.UTF-8',
+    PATH: process.env.PATH,
+    TERM: process.env.TERM ?? 'xterm-256color',
+    TZ: process.env.TZ ?? 'UTC',
+  }
+  return environment
+}
+
+export function claudeWorkerPermissionArgs(serverName: string, researchOnly: boolean) {
+  // Approved workers bypass prompts; their tool surface is already limited to
+  // the sandbox and HASS MCP servers. Research-only workers keep a strict
+  // allowlist so Home Assistant stays read-only until the owner approves.
+  return researchOnly
+    ? [
+      '--permission-mode',
+      'dontAsk',
+      '--allowedTools',
+      [
+        ...WORKER_CLAUDE_BUILTIN_TOOLS,
+        WORKER_CLAUDE_SANDBOX_TOOL,
+        ...RESEARCH_ONLY_HASS_READ_TOOLS.map((tool) => `mcp__${serverName}__${tool}`),
+      ].join(','),
+    ]
+    : ['--permission-mode', 'bypassPermissions']
 }
 
 async function getGitCommonDirectory(worktreePath: string) {
@@ -2865,13 +3005,11 @@ function buildWorkerSandboxEnvironment(
 
 function buildWorkerEnvironment(
   config: AdminIssueControllerConfig,
-  credential: Record<string, string>,
+  githubToken: string,
 ) {
   const environment: NodeJS.ProcessEnv = {
-    ...credential,
-    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-    CLAUDE_CONFIG_DIR: workerClaudeConfigDirectory(config),
-    DISABLE_AUTOUPDATER: '1',
+    COPILOT_HOME: workerCopilotHome(config),
+    GH_TOKEN: githubToken,
     HOME: config.workerHome,
     LANG: process.env.LANG ?? 'C.UTF-8',
     PATH: process.env.PATH,
@@ -3003,21 +3141,19 @@ export function researchOnlyRequested(
 }
 
 export function workerPermissionArgs(serverName: string, researchOnly: boolean) {
-  // Approved workers bypass prompts; their tool surface is already limited to
-  // the sandbox and HASS MCP servers. Research-only workers keep a strict
-  // allowlist so Home Assistant stays read-only until the owner approves.
-  return researchOnly
-    ? [
-      '--permission-mode',
-      'dontAsk',
-      '--allowedTools',
-      [
-        ...WORKER_BUILTIN_TOOLS,
-        WORKER_SANDBOX_TOOL,
-        ...RESEARCH_ONLY_HASS_READ_TOOLS.map((tool) => `mcp__${serverName}__${tool}`),
-      ].join(','),
-    ]
-    : ['--permission-mode', 'bypassPermissions']
+  // Only the sandbox and HASS MCP servers plus a few orchestration built-ins
+  // are visible. Approved workers may use every HASS tool; research-only
+  // workers keep a strict allowlist so Home Assistant stays read-only until
+  // the owner approves. Under --no-ask-user, anything else is denied.
+  return [
+    '--available-tools',
+    [...WORKER_BUILTIN_TOOLS, WORKER_SANDBOX_MCP_SERVER, serverName].join(','),
+    '--allow-tool',
+    `${WORKER_SANDBOX_MCP_SERVER}(${WORKER_SANDBOX_TOOL_NAME})`,
+    ...(researchOnly
+      ? RESEARCH_ONLY_HASS_READ_TOOLS.flatMap((tool) => ['--allow-tool', `${serverName}(${tool})`])
+      : ['--allow-tool', serverName]),
+  ]
 }
 
 export function buildWorkerPrompt(
@@ -3239,6 +3375,20 @@ export function materializeWorkerInputAttachments(
   }
 }
 
+export function workerMediaAttachmentArgs(record: AdminIssueRecord) {
+  const worktreePath = record.worktreePath
+  if (!worktreePath) throw new GitHubMediaError('Worker worktree is missing')
+  return workerInputAttachments(record).flatMap(({ input, attachment }) => {
+    const path = resolve(worktreePath, workerAttachmentPath(record, input.revision, attachment))
+    const bytes = readFileSync(path)
+    if (bytes.length !== attachment.sizeBytes ||
+      createHash('sha256').update(bytes).digest('hex') !== attachment.sha256) {
+      throw new GitHubMediaError('Worker input media does not match its receipt')
+    }
+    return ['--attachment', path]
+  })
+}
+
 export function workerMediaContentBlocks(record: AdminIssueRecord) {
   const worktreePath = record.worktreePath
   if (!worktreePath) throw new GitHubMediaError('Worker worktree is missing')
@@ -3287,21 +3437,24 @@ function parseJsonLines(output: string) {
 
 export function extractFinalAssistantResponse(output: string) {
   const events = parseJsonLines(output)
-  const result = events.filter((event) => event.type === 'result').at(-1)
-  if (result) {
-    if (result.is_error !== false || result.subtype !== 'success' || typeof result.result !== 'string') {
-      throw new Error(`Claude worker ended without a successful result (${String(result.subtype)})`)
+  // Claude Code fallback runs end with a stream-json result event.
+  const legacyResult = events
+    .filter((event) => event.type === 'result' && 'subtype' in event)
+    .at(-1)
+  if (legacyResult) {
+    if (legacyResult.is_error !== false || legacyResult.subtype !== 'success' ||
+      typeof legacyResult.result !== 'string') {
+      throw new Error(`Worker ended without a successful result (${String(legacyResult.subtype)})`)
     }
-    return result.result
+    return legacyResult.result
   }
-  // Logs written by the retired Copilot worker remain readable for recovery.
-  const assistantMessages = events
+  const final = events
     .filter((event) => event.type === 'assistant.message')
     .map((event) => event.data)
     .filter((data): data is Record<string, unknown> => Boolean(data && typeof data === 'object'))
     .map((data) => data.content)
-    .filter((content): content is string => typeof content === 'string')
-  const final = assistantMessages.at(-1)
+    .filter((content): content is string => typeof content === 'string' && content.trim().length > 0)
+    .at(-1)
   if (!final) throw new Error('Worker emitted no final assistant message')
   return final
 }
@@ -3373,7 +3526,28 @@ export function restoreReadyOutcomeFromWorkerLog(
   return outcome
 }
 
-export function workerSessionTranscriptExists(
+export function workerSessionExists(
+  config: Pick<AdminIssueControllerConfig, 'workerHome'>,
+  sessionId: string,
+) {
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return false
+  return existsSync(join(workerCopilotHome(config), 'session-state', sessionId, 'events.jsonl'))
+}
+
+export function buildCopilotWorkerArgs(
+  sessionId: string,
+  sessionName: string,
+  commonArgs: readonly string[],
+  resume: boolean,
+) {
+  return [
+    `--session-id=${sessionId}`,
+    ...(resume ? [] : ['--name', sessionName]),
+    ...commonArgs,
+  ]
+}
+
+export function workerClaudeSessionExists(
   config: Pick<AdminIssueControllerConfig, 'workerHome'>,
   sessionId: string,
 ) {
@@ -3381,23 +3555,6 @@ export function workerSessionTranscriptExists(
   if (!existsSync(root)) return false
   return readdirSync(root, { withFileTypes: true }).some((entry) =>
     entry.isDirectory() && existsSync(join(root, entry.name, `${sessionId}.jsonl`)))
-}
-
-function bindWorkerSessionId(
-  config: AdminIssueControllerConfig,
-  state: AdminIssueControllerState,
-  record: AdminIssueRecord,
-) {
-  // A session ID recorded by the retired Copilot worker has no Claude
-  // transcript, so it starts a fresh Claude session under the same ID.
-  if (!record.sessionId) {
-    record.sessionId = randomUUID()
-    writeState(config, state)
-  }
-  return {
-    id: record.sessionId,
-    resume: workerSessionTranscriptExists(config, record.sessionId),
-  }
 }
 
 export function buildClaudeWorkerArgs(
@@ -3410,6 +3567,76 @@ export function buildClaudeWorkerArgs(
     ...(resume ? ['--resume', sessionId] : ['--session-id', sessionId, '--name', sessionName]),
     ...commonArgs,
   ]
+}
+
+export function shouldRetryWorkerSessionWithoutName(
+  namedSessionAttempt: boolean,
+  result: Pick<CommandResult, 'exitCode' | 'stderr'>,
+) {
+  return (
+    namedSessionAttempt &&
+    result.exitCode !== 0 &&
+    result.stderr.includes("cannot be used with option '--session-id <id>'") &&
+    result.stderr.includes('existing or remote session or task')
+  )
+}
+
+const WORKER_PROVIDER_LABELS: Record<WorkerProvider, string> = {
+  claude: 'Claude Code',
+  copilot: 'Copilot CLI',
+}
+
+function workerLogPath(
+  config: Pick<AdminIssueControllerConfig, 'stateDirectory'>,
+  record: Pick<AdminIssueRecord, 'issueNumber' | 'workerRuns'>,
+  suffix = '',
+) {
+  return join(
+    config.stateDirectory,
+    'worker-logs',
+    `issue-${record.issueNumber}-run-${record.workerRuns + 1}${suffix}.jsonl`,
+  )
+}
+
+function writeWorkerLog(
+  config: Pick<AdminIssueControllerConfig, 'stateDirectory'>,
+  record: Pick<AdminIssueRecord, 'issueNumber' | 'workerRuns'>,
+  result: CommandResult,
+) {
+  mkdirSync(join(config.stateDirectory, 'worker-logs'), { mode: 0o700, recursive: true })
+  const logPath = workerLogPath(config, record)
+  writeFileSync(logPath, `${result.stdout}\n${result.stderr}`, { mode: 0o600 })
+  return logPath
+}
+
+function throwWorkerFailure(
+  provider: WorkerProvider,
+  result: CommandResult,
+  logPath: string,
+  error?: unknown,
+): never {
+  const providerLimit = detectWorkerProviderLimit(result.stdout)
+  if (providerLimit) throw new AdminIssueProviderLimitError(provider, providerLimit)
+  if (error) throw error
+  throw new Error(
+    `${WORKER_PROVIDER_LABELS[provider]} worker failed with exit ${result.exitCode}; see ${logPath}\n${truncate(
+      result.stderr,
+      12_000,
+    )}`,
+  )
+}
+
+export function parseWorkerRunOutcome(
+  provider: WorkerProvider,
+  result: CommandResult,
+  logPath: string,
+): AdminIssueWorkerOutcome {
+  if (result.exitCode !== 0) throwWorkerFailure(provider, result, logPath)
+  try {
+    return parseWorkerOutcome(extractFinalAssistantResponse(result.stdout))
+  } catch (error) {
+    throwWorkerFailure(provider, result, logPath, error)
+  }
 }
 
 export function assertWorkerClaimCanStart(
@@ -3431,7 +3658,7 @@ export function assertWorkerClaimCanStart(
   }
 }
 
-async function runClaudeWorker(
+async function runIssueWorker(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
   record: AdminIssueRecord,
@@ -3472,29 +3699,211 @@ async function runClaudeWorker(
     )
   }
   assertWorkerHostConfigurationSafe(worktreePath)
-  prepareClaudeHome(workerConfig)
-  const credential = readClaudeWorkerCredential(config)
   const gitCommonDirectory = await getGitCommonDirectory(worktreePath)
+  if (!record.sessionId) {
+    record.sessionId = randomUUID()
+    writeState(config, state)
+  }
+  const run: PreparedWorkerRun = {
+    commandOptions: {
+      allowFailure: true,
+      cwd: worktreePath,
+      maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
+      timeoutMs: config.workerTimeoutMinutes * 60_000,
+    },
+    prompt: buildWorkerPrompt(
+      workerInput, originalIssueBody, researchOnly, approvalDecision.approvedScope,
+    ),
+    researchOnly,
+    sandboxEnvironment: buildWorkerSandboxEnvironment(
+      worktreePath,
+      gitCommonDirectory,
+      config.workerImageId,
+      record,
+      researchOnly,
+    ),
+    sessionId: record.sessionId,
+    workerConfig,
+    workerInput,
+    worktreePath,
+  }
+  const complete = (provider: WorkerProvider, outcome: AdminIssueWorkerOutcome) => {
+    if (record.generation !== generation ||
+      (options.claim && record.workerClaim?.id !== options.claim.id)) {
+      throw new AdminIssueProvenanceError('Worker issue claim changed during execution')
+    }
+    record.workerRuns += 1
+    markIssueInputsProcessed(record, revision, now())
+    record.lastOutcome = outcome
+    record.receipts.sessionCreatedAt ??= now()
+    record.receipts.lastWorkerRunAt = now()
+    record.receipts.lastWorkerProvider = provider
+    clearWorkerProviderLimit(record, provider)
+    record.updatedAt = now()
+    writeState(config, state)
+    return outcome
+  }
+
+  let copilotLimit: AdminIssueProviderLimitError | undefined
+  const copilotPausedUntil = workerProviderPauseUntil(state, 'copilot')
+  if (copilotPausedUntil <= Date.now()) {
+    if (options.claim) assertWorkerClaimCanStart(record, options.claim)
+    const result = await runCopilotWorkerCli(config, record, run)
+    const logPath = writeWorkerLog(config, record, result)
+    let outcome: AdminIssueWorkerOutcome | undefined
+    try {
+      outcome = parseWorkerRunOutcome('copilot', result, logPath)
+    } catch (error) {
+      if (!(error instanceof AdminIssueProviderLimitError)) throw error
+      copilotLimit = error
+    }
+    if (outcome) return complete('copilot', outcome)
+    copilotLimit = copilotLimit as AdminIssueProviderLimitError
+    const retryAt = recordWorkerProviderLimit(record, 'copilot', copilotLimit.limit)
+    renameSync(logPath, workerLogPath(config, record, '-copilot-limit'))
+    writeState(config, state)
+    process.stderr.write(
+      `[${now()}] Issue #${record.issueNumber} Copilot CLI ${copilotLimit.limit.kind} limit until ${retryAt}; falling back to Claude Code\n`,
+    )
+  } else {
+    const kind = record.receipts[workerProviderLimitReceipts('copilot').kind]
+    copilotLimit = new AdminIssueProviderLimitError('copilot', {
+      kind: kind === 'rate_limit' ? 'rate_limit' : 'quota',
+      retryAt: new Date(copilotPausedUntil).toISOString(),
+    })
+  }
+
+  let claude: ReturnType<typeof prepareClaudeWorkerRun>
+  try {
+    claude = prepareClaudeWorkerRun(config, run)
+  } catch (error) {
+    // Without a usable fallback the issue waits for Copilot instead of failing.
+    logParallelControllerError(`Issue #${record.issueNumber} Claude Code fallback setup`, error)
+    throw copilotLimit
+  }
+  if (options.claim) assertWorkerClaimCanStart(record, options.claim)
+  let result: CommandResult
+  try {
+    result = await runCommand('claude', claude.args, {
+      ...run.commandOptions,
+      env: claude.environment,
+      input: claude.input,
+    })
+  } catch (error) {
+    if (!isCommandSpawnFailure(error)) throw error
+    logParallelControllerError(`Issue #${record.issueNumber} Claude Code fallback launch`, error)
+    throw copilotLimit
+  }
+  const logPath = writeWorkerLog(config, record, result)
+  let outcome: AdminIssueWorkerOutcome
+  try {
+    outcome = parseWorkerRunOutcome('claude', result, logPath)
+  } catch (error) {
+    if (error instanceof AdminIssueProviderLimitError) {
+      recordWorkerProviderLimit(record, 'claude', error.limit)
+      writeState(config, state)
+    }
+    throw error
+  }
+  return complete('claude', outcome)
+}
+
+/** True only when the executable could not be launched, not when it ran and failed. */
+export function isCommandSpawnFailure(error: unknown) {
+  const errno = error as NodeJS.ErrnoException | undefined
+  return error instanceof Error &&
+    typeof errno?.syscall === 'string' &&
+    errno.syscall.startsWith('spawn')
+}
+
+interface PreparedWorkerRun {
+  commandOptions: CommandOptions & { allowFailure: true; cwd: string }
+  prompt: string
+  researchOnly: boolean
+  sandboxEnvironment: Record<string, string>
+  sessionId: string
+  workerConfig: AdminIssueControllerConfig
+  workerInput: AdminIssueRecord
+  worktreePath: string
+}
+
+async function runCopilotWorkerCli(
+  config: AdminIssueControllerConfig,
+  record: AdminIssueRecord,
+  run: PreparedWorkerRun,
+) {
+  prepareCopilotHome(run.workerConfig)
+  const githubToken = (
+    await runCommand('gh', ['auth', 'token'], {
+      cwd: config.repositoryPath,
+      timeoutMs: 30_000,
+    })
+  ).stdout.trim()
+  if (!githubToken) throw new Error('gh auth token returned an empty token')
   writeFileSync(
-    workerMcpConfigPath(workerConfig),
+    workerMcpConfigPath(run.workerConfig),
+    `${JSON.stringify(buildWorkerMcpConfig(run.workerConfig, run.sandboxEnvironment), null, 2)}\n`,
+    { mode: 0o600 },
+  )
+  const resume = workerSessionExists(run.workerConfig, run.sessionId)
+  const commonArgs = [
+    '-C',
+    run.worktreePath,
+    '--model',
+    WORKER_COPILOT_MODEL,
+    '--reasoning-effort',
+    WORKER_COPILOT_REASONING_EFFORT,
+    '--disable-builtin-mcps',
+    '--allow-all-mcp-server-instructions',
+    '--no-ask-user',
+    '--no-auto-update',
+    '--no-color',
+    '--output-format',
+    'json',
+    '--stream',
+    'on',
+    '--secret-env-vars',
+    'GH_TOKEN',
+    ...workerPermissionArgs(config.hassMcpServerName, run.researchOnly),
+    ...workerMediaAttachmentArgs(run.workerInput),
+    '-p',
+    run.prompt,
+  ]
+  const commandOptions = {
+    ...run.commandOptions,
+    env: buildWorkerEnvironment(run.workerConfig, githubToken),
+  }
+  let result = await runCommand(
+    'copilot',
+    buildCopilotWorkerArgs(run.sessionId, record.sessionName, commonArgs, resume),
+    commandOptions,
+  )
+  if (shouldRetryWorkerSessionWithoutName(!resume, result)) {
+    result = await runCommand(
+      'copilot',
+      buildCopilotWorkerArgs(run.sessionId, record.sessionName, commonArgs, true),
+      commandOptions,
+    )
+  }
+  return result
+}
+
+function prepareClaudeWorkerRun(
+  config: AdminIssueControllerConfig,
+  run: PreparedWorkerRun,
+) {
+  assertClaudeWorkerHostConfigurationSafe(run.worktreePath)
+  const credential = readClaudeWorkerCredential(config)
+  prepareClaudeHome(run.workerConfig)
+  writeFileSync(
+    workerClaudeMcpConfigPath(run.workerConfig),
     `${JSON.stringify(
-      buildWorkerMcpConfig(
-        workerConfig,
-        buildWorkerSandboxEnvironment(
-          worktreePath,
-          gitCommonDirectory,
-          config.workerImageId,
-          record,
-          researchOnly,
-        ),
-      ),
+      buildClaudeWorkerMcpConfig(run.workerConfig, run.sandboxEnvironment),
       null,
       2,
     )}\n`,
     { mode: 0o600 },
   )
-  const environment = buildWorkerEnvironment(workerConfig, credential)
-  const session = bindWorkerSessionId(workerConfig, state, record)
   const commonArgs = [
     '--print',
     '--model',
@@ -3502,66 +3911,31 @@ async function runClaudeWorker(
     '--effort',
     WORKER_CLAUDE_EFFORT,
     '--tools',
-    WORKER_BUILTIN_TOOLS.join(','),
+    WORKER_CLAUDE_BUILTIN_TOOLS.join(','),
     '--strict-mcp-config',
     '--mcp-config',
-    workerMcpConfigPath(workerConfig),
+    workerClaudeMcpConfigPath(run.workerConfig),
     '--setting-sources',
     'user',
-    ...workerPermissionArgs(config.hassMcpServerName, researchOnly),
+    ...claudeWorkerPermissionArgs(config.hassMcpServerName, run.researchOnly),
     '--input-format',
     'stream-json',
     '--output-format',
     'stream-json',
     '--verbose',
   ]
-  const commandOptions = {
-    allowFailure: true,
-    cwd: worktreePath,
-    env: environment,
-    input: buildWorkerStdin(
-      buildWorkerPrompt(workerInput, originalIssueBody, researchOnly, approvalDecision.approvedScope),
-      workerMediaContentBlocks(workerInput),
+  // The Copilot and Claude Code transcripts share the issue's session UUID but
+  // live in separate stores, so each CLI resumes only its own history.
+  return {
+    args: buildClaudeWorkerArgs(
+      run.sessionId,
+      run.workerInput.sessionName,
+      commonArgs,
+      workerClaudeSessionExists(run.workerConfig, run.sessionId),
     ),
-    maxOutputBytes: MAX_WORKER_OUTPUT_BYTES,
-    timeoutMs: config.workerTimeoutMinutes * 60_000,
+    environment: buildClaudeWorkerEnvironment(run.workerConfig, credential),
+    input: buildWorkerStdin(run.prompt, workerMediaContentBlocks(run.workerInput)),
   }
-  if (options.claim) assertWorkerClaimCanStart(record, options.claim)
-  const result = await runCommand(
-    'claude',
-    buildClaudeWorkerArgs(session.id, record.sessionName, commonArgs, session.resume),
-    commandOptions,
-  )
-
-  mkdirSync(join(config.stateDirectory, 'worker-logs'), { mode: 0o700, recursive: true })
-  const logPath = join(
-    config.stateDirectory,
-    'worker-logs',
-    `issue-${record.issueNumber}-run-${record.workerRuns + 1}.jsonl`,
-  )
-  writeFileSync(logPath, `${result.stdout}\n${result.stderr}`, { mode: 0o600 })
-  if (result.exitCode !== 0) {
-    throw new Error(
-      `Claude worker failed with exit ${result.exitCode}; see ${logPath}\n${truncate(
-        result.stderr,
-        12_000,
-      )}`,
-    )
-  }
-
-  const outcome = parseWorkerOutcome(extractFinalAssistantResponse(result.stdout))
-  if (record.generation !== generation ||
-    (options.claim && record.workerClaim?.id !== options.claim.id)) {
-    throw new AdminIssueProvenanceError('Worker issue claim changed during execution')
-  }
-  record.workerRuns += 1
-  markIssueInputsProcessed(record, revision, now())
-  record.lastOutcome = outcome
-  record.receipts.sessionCreatedAt ??= now()
-  record.receipts.lastWorkerRunAt = now()
-  record.updatedAt = now()
-  writeState(config, state)
-  return outcome
 }
 
 export async function changedFiles(worktreePath: string) {
@@ -4413,6 +4787,12 @@ async function validateCommittedCandidate(
   }
 }
 
+export function workerCommitTrailer(record: Pick<AdminIssueRecord, 'receipts'>) {
+  return record.receipts.lastWorkerProvider === 'claude'
+    ? 'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>'
+    : 'Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>'
+}
+
 async function commitWorkerChanges(
   record: AdminIssueRecord,
   outcome: Extract<AdminIssueWorkerOutcome, { decision: 'ready_for_pr' }>,
@@ -4427,7 +4807,7 @@ async function commitWorkerChanges(
     const messagePath = join(messageDirectory, 'message.txt')
     writeFileSync(
       messagePath,
-      `${outcome.pr.title.trim()}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n`,
+      `${outcome.pr.title.trim()}\n\n${workerCommitTrailer(record)}\n`,
       { mode: 0o600 },
     )
     await runCommand('git', ['-c', 'core.hooksPath=/dev/null', 'commit', '--file', messagePath], {
@@ -8293,7 +8673,7 @@ async function processRecord(
         if (!allowWorker) return
         record.phase = 'researching'
         writeState(config, state)
-        const outcome = await runClaudeWorker(config, state, record)
+        const outcome = await runIssueWorker(config, state, record)
         if (!(await refreshInputs('researching'))) return
         await handleWorkerOutcome(
           config,
@@ -8632,7 +9012,7 @@ async function runParallelIssueWorker(
   const claim = beginIssueWorkerClaim(record, randomUUID(), now())
   writeState(config, state)
   try {
-    const outcome = await runClaudeWorker(config, state, record, {
+    const outcome = await runIssueWorker(config, state, record, {
       claim,
       isolatedHome: true,
     })
@@ -8689,6 +9069,16 @@ async function handleParallelWorkerError(
     return
   }
   await cleanupIssueWorkerContainers(uid)
+  if (error instanceof AdminIssueProviderLimitError) {
+    // The worker already recorded the account-wide provider pause; only a
+    // researching issue is requeued, never a concurrently paused one.
+    const retryAt = deferWorkerForProviderLimit(state, record, error)
+    writeState(config, state)
+    process.stderr.write(
+      `[${now()}] Issue #${record.issueNumber} worker deferred: no model provider available until ${retryAt}\n`,
+    )
+    return
+  }
   const message = error instanceof Error ? error.message : String(error)
   const hash = createHash('sha256').update(message).digest('hex')
   record.receipts.workerFailureHash = hash

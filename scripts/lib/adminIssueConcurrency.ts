@@ -1,4 +1,5 @@
 import type { AdminIssueControllerState, AdminIssueRecord, AdminIssueWorkerClaim } from './adminIssueController'
+import { workerProvidersPausedUntil } from './adminIssueProviderLimits'
 
 export const MAX_ISSUE_WORKERS = 10
 
@@ -92,6 +93,7 @@ export function pendingIssueWorkers(
   pool: Pick<AdminIssueWorkerPool, 'has'>,
   currentTime = Date.now(),
 ) {
+  if (workerProvidersPausedUntil(state, currentTime) > currentTime) return []
   return Object.values(state.issues)
     .filter((record) =>
       ['queued', 'researching', 'implementing'].includes(record.phase) &&

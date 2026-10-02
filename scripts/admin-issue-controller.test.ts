@@ -25,7 +25,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -58,10 +58,9 @@ import {
   assertWorkerChangesSafe,
   assertPullRequestBinding,
   assertPullRequestContainsVisualEvidence,
-  buildClaudeWorkerArgs,
+  buildCopilotWorkerArgs,
   createSharedGitRunner,
   buildWorkerMcpConfig,
-  buildWorkerStdin,
   extractFinalAssistantResponse,
   buildInitialInput,
   buildWorkerPrompt,
@@ -106,8 +105,7 @@ import {
   markFrontendOnlyRecoveryObserved,
   parseResearchMountRetryArgs,
   prepareCommittedCandidate,
-  prepareClaudeHome,
-  readClaudeWorkerCredential,
+  prepareCopilotHome,
   prepareGitHubMediaInput,
   prepareReopenedMedia,
   publishPullRequestIssueComment,
@@ -125,16 +123,17 @@ import {
   restoreReadyOutcomeFromWorkerLog,
   runCommand,
   selectWorkerHassMcpConfig,
+  shouldRetryWorkerSessionWithoutName,
   shouldVerifyExistingPullRequestVisualEvidence,
   summarizeFailedCheckLogs,
   synchronizeCandidateBase,
   unreviewableIssueMedia,
   waitForMergedPullRequest,
   workerInputAttachments,
-  workerMediaContentBlocks,
+  workerMediaAttachmentArgs,
   workerMcpConfigPath,
   workerPermissionArgs,
-  workerSessionTranscriptExists,
+  workerSessionExists,
   workerInputSnapshot,
   updateWorkflowDigestConfig,
   validationCommands,
@@ -142,7 +141,21 @@ import {
   generatedOnlyConflict,
   withControllerLock,
   workflowDigestRotationRequired,
+  assertClaudeWorkerHostConfigurationSafe,
+  buildClaudeWorkerArgs,
+  buildClaudeWorkerMcpConfig,
+  buildWorkerStdin,
+  claudeWorkerPermissionArgs,
+  parseWorkerRunOutcome,
+  prepareClaudeHome,
+  readClaudeWorkerCredential,
+  workerClaudeMcpConfigPath,
+  workerClaudeSessionExists,
+  workerCommitTrailer,
+  isCommandSpawnFailure,
+  workerMediaContentBlocks,
 } from './admin-issue-controller'
+import { AdminIssueProviderLimitError } from './lib/adminIssueProviderLimits'
 import {
   CONTROLLER_COMMENT_MARKER,
   adminTodoCompletionRequired,
@@ -509,7 +522,7 @@ function workerExtensionFixture() {
     resolve(process.cwd(), 'ops/admin-issue-controller/worker-extension.mjs'),
     extensionPath,
   )
-  // Drives the MCP stdio server through one tools/call, the way Claude Code does.
+  // Drives the MCP stdio server through one tools/call, the way Copilot CLI does.
   writeFileSync(driverPath, [
     'import { spawn } from "node:child_process";',
     'const server = spawn(process.execPath, [process.argv[2]], { stdio: ["pipe", "pipe", "inherit"] });',
@@ -1609,6 +1622,19 @@ describe('bounded issue worker admission', () => {
       .toEqual([])
     expect(pendingIssueWorkers(state, pool, Date.parse('2026-09-24T16:05:01.000Z')))
       .toEqual([issue])
+
+    const deferred: AdminIssueRecord = { ...record(), issueNumber: 302, uid: 'provider-deferred', receipts: {} }
+    deferred.phase = 'paused'
+    deferred.receipts.workerCopilotLimitRetryAt = '2026-10-02T11:00:00.000Z'
+    state.issues[deferred.uid] = deferred
+    // Claude Code remains available as the fallback while only Copilot is limited.
+    expect(pendingIssueWorkers(state, pool, Date.parse('2026-10-02T10:59:59.000Z')))
+      .toEqual([issue])
+    deferred.receipts.workerClaudeLimitRetryAt = '2026-10-02T12:00:00.000Z'
+    expect(pendingIssueWorkers(state, pool, Date.parse('2026-10-02T10:59:59.000Z')))
+      .toEqual([])
+    expect(pendingIssueWorkers(state, pool, Date.parse('2026-10-02T11:00:01.000Z')))
+      .toEqual([issue])
   })
 
   it('fences new input behind an active release claim and recovers that claim after restart', () => {
@@ -2576,13 +2602,13 @@ describe('admin issue controller domain', () => {
     )
     expect(statSync(materialized).mode & 0o777).toBe(0o400)
     expect(readFileSync(materialized)).toEqual(pngBytes)
+    expect(workerMediaAttachmentArgs(issue)).toEqual(['--attachment', materialized])
     const nativeMedia = workerMediaContentBlocks(issue)
     expect(nativeMedia).toEqual([{
       type: 'image',
       source: { type: 'base64', media_type: 'image/png', data: pngBytes.toString('base64') },
     }])
-    const stdin = JSON.parse(buildWorkerStdin('prompt text', nativeMedia))
-    expect(stdin).toEqual({
+    expect(JSON.parse(buildWorkerStdin('prompt text', nativeMedia))).toEqual({
       type: 'user',
       message: {
         role: 'user',
@@ -4383,16 +4409,54 @@ describe('admin issue controller security configuration', () => {
     )
   })
 
-  it('resumes a Claude worker session only when its transcript exists', () => {
+  it('resumes a Copilot worker session only when its session state exists', () => {
     const workerHome = mkdtempSync(join(homedir(), '.admin-issue-session-test-'))
     temporaryDirectories.push(workerHome)
     const sessionId = 'fdc5c356-c9f0-42c1-8b54-492e5ea48f35'
-    expect(workerSessionTranscriptExists({ workerHome }, sessionId)).toBe(false)
+    expect(workerSessionExists({ workerHome }, sessionId)).toBe(false)
+    const sessionState = join(workerHome, '.copilot/session-state', sessionId)
+    mkdirSync(sessionState, { recursive: true })
+    expect(workerSessionExists({ workerHome }, sessionId)).toBe(false)
+    writeFileSync(join(sessionState, 'events.jsonl'), '{}\n')
+    expect(workerSessionExists({ workerHome }, sessionId)).toBe(true)
+    expect(workerSessionExists({ workerHome }, randomUUID())).toBe(false)
+    expect(workerSessionExists({ workerHome }, '../escape')).toBe(false)
+
+    const commonArgs = ['--model', 'claude-opus-5.5']
+    expect(buildCopilotWorkerArgs(sessionId, 'admin-issue-167-task', commonArgs, false)).toEqual([
+      `--session-id=${sessionId}`,
+      '--name',
+      'admin-issue-167-task',
+      ...commonArgs,
+    ])
+    expect(buildCopilotWorkerArgs(sessionId, 'admin-issue-167-task', commonArgs, true)).toEqual([
+      `--session-id=${sessionId}`,
+      ...commonArgs,
+    ])
+    const existingSession = {
+      exitCode: 1,
+      stderr: "error: option '-n, --name <name>' cannot be used with option '--session-id <id>' " +
+        'when it resolves to an existing or remote session or task.',
+    }
+    expect(shouldRetryWorkerSessionWithoutName(true, existingSession)).toBe(true)
+    expect(shouldRetryWorkerSessionWithoutName(false, existingSession)).toBe(false)
+    expect(shouldRetryWorkerSessionWithoutName(true, { ...existingSession, exitCode: 0 })).toBe(false)
+    expect(shouldRetryWorkerSessionWithoutName(true, { exitCode: 1, stderr: 'quota exceeded' }))
+      .toBe(false)
+  })
+
+  it('resumes a Claude Code fallback session only when its transcript exists', () => {
+    const workerHome = mkdtempSync(join(homedir(), '.admin-issue-session-test-'))
+    temporaryDirectories.push(workerHome)
+    const sessionId = 'fdc5c356-c9f0-42c1-8b54-492e5ea48f35'
+    expect(workerClaudeSessionExists({ workerHome }, sessionId)).toBe(false)
     const project = join(workerHome, '.claude/projects/-worktree')
     mkdirSync(project, { recursive: true })
     writeFileSync(join(project, `${sessionId}.jsonl`), '{}\n')
-    expect(workerSessionTranscriptExists({ workerHome }, sessionId)).toBe(true)
-    expect(workerSessionTranscriptExists({ workerHome }, randomUUID())).toBe(false)
+    expect(workerClaudeSessionExists({ workerHome }, sessionId)).toBe(true)
+    expect(workerClaudeSessionExists({ workerHome }, randomUUID())).toBe(false)
+    // Copilot session state under the same ID does not count as a Claude transcript.
+    expect(workerSessionExists({ workerHome }, sessionId)).toBe(false)
 
     const commonArgs = ['--print', '--model', 'claude-opus-5-5']
     expect(buildClaudeWorkerArgs(sessionId, 'admin-issue-167-task', commonArgs, false)).toEqual([
@@ -4409,7 +4473,76 @@ describe('admin issue controller security configuration', () => {
     ])
   })
 
-  it('reads the Claude result event and still recovers retired Copilot logs', () => {
+  it('classifies worker run failures by provider so only limits fall back or defer', async () => {
+    const outcome = {
+      decision: 'blocked',
+      iosFollowUp: { reason: '', required: false },
+      questions: [],
+      reason: 'Pirate Weather credentials are unavailable.',
+      schemaVersion: 1,
+      summary: 'Blocked on credentials.',
+      visualEvidence: [],
+    }
+    const copilotSuccess = {
+      exitCode: 0,
+      stderr: '',
+      stdout: JSON.stringify({ type: 'assistant.message', data: { content: JSON.stringify(outcome) } }),
+    }
+    expect(parseWorkerRunOutcome('copilot', copilotSuccess, '/log')).toMatchObject(outcome)
+    const claudeLimited = {
+      exitCode: 1,
+      stderr: '',
+      stdout: [
+        { type: 'rate_limit_event', rate_limit_info: { status: 'rejected', resetsAt: 1790938800 } },
+        { type: 'result', subtype: 'success', is_error: true, result: 'You\'ve hit your weekly limit' },
+      ].map((event) => JSON.stringify(event)).join('\n'),
+    }
+    let limited: unknown
+    try {
+      parseWorkerRunOutcome('claude', claudeLimited, '/log')
+    } catch (error) {
+      limited = error
+    }
+    expect(limited).toBeInstanceOf(AdminIssueProviderLimitError)
+    expect(limited).toMatchObject({
+      provider: 'claude',
+      limit: { kind: 'quota', retryAt: '2026-10-02T11:00:00.000Z' },
+    })
+    const copilotLimited = {
+      exitCode: 1,
+      stderr: '',
+      stdout: JSON.stringify({ type: 'session.error', data: { errorType: 'rate_limit', statusCode: 429 } }),
+    }
+    expect(() => parseWorkerRunOutcome('copilot', copilotLimited, '/log'))
+      .toThrow('Copilot CLI worker reported a rate limit')
+    expect(() => parseWorkerRunOutcome('claude', { exitCode: 2, stderr: 'boom', stdout: '' }, '/log'))
+      .toThrow('Claude Code worker failed with exit 2; see /log')
+    const missing = await runCommand('admin-issue-missing-claude-binary', [], { allowFailure: true })
+      .catch((error: unknown) => error)
+    expect(isCommandSpawnFailure(missing)).toBe(true)
+    const timedOut = await runCommand(process.execPath, ['-e', 'setTimeout(() => {}, 5000)'], {
+      allowFailure: true,
+      timeoutMs: 50,
+    }).catch((error: unknown) => error)
+    expect(isCommandSpawnFailure(timedOut)).toBe(false)
+    expect(workerCommitTrailer({ receipts: { lastWorkerProvider: 'claude' } }))
+      .toBe('Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>')
+    expect(workerCommitTrailer({ receipts: {} }))
+      .toBe('Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>')
+  })
+
+  it('reads the final Copilot assistant message and the Claude Code fallback result', () => {
+    const copilot = [
+      { type: 'assistant.message', data: { content: 'draft', toolRequests: [] } },
+      { type: 'assistant.message', data: { content: '', toolRequests: [{ name: 'task' }] } },
+      { type: 'assistant.message', data: { content: '{"decision":"blocked"}' } },
+      { type: 'result', exitCode: 0, usage: { premiumRequests: 1 } },
+    ].map((event) => JSON.stringify(event)).join('\n')
+    expect(extractFinalAssistantResponse(copilot)).toBe('{"decision":"blocked"}')
+    expect(() => extractFinalAssistantResponse(
+      `${JSON.stringify({ type: 'result', exitCode: 0 })}\n`,
+    )).toThrow('no final assistant message')
+
     const result = (fields: Record<string, unknown>) =>
       `${JSON.stringify({ type: 'system', subtype: 'init' })}\n${JSON.stringify({
         type: 'result', subtype: 'success', is_error: false, result: '{"decision":"blocked"}', ...fields,
@@ -4417,9 +4550,6 @@ describe('admin issue controller security configuration', () => {
     expect(extractFinalAssistantResponse(result({}))).toBe('{"decision":"blocked"}')
     expect(() => extractFinalAssistantResponse(result({ is_error: true, subtype: 'error_max_turns' })))
       .toThrow('without a successful result')
-    expect(extractFinalAssistantResponse(
-      `${JSON.stringify({ type: 'assistant.message', data: { content: 'legacy' } })}\n`,
-    )).toBe('legacy')
   })
 
   it('summarizes the useful failing assertion instead of leading setup logs', () => {
@@ -5747,32 +5877,59 @@ describe('admin issue controller security configuration', () => {
     ).toThrow('protected path')
   })
 
-  it('rejects executable Claude Code configuration outside the dedicated worker home', () => {
+  it('rejects executable Copilot configuration outside the dedicated worker home', () => {
+    const root = mkdtempSync(join(homedir(), '.admin-issue-controller-host-config-test-'))
+    temporaryDirectories.push(root)
+    const repositoryPath = join(root, 'repository')
+    const policyPath = join(root, 'policy.d')
+    mkdirSync(repositoryPath, { recursive: true })
+    mkdirSync(join(repositoryPath, '.github/extensions'), { recursive: true })
+    mkdirSync(policyPath, { recursive: true })
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).not.toThrow()
+
+    writeFileSync(join(repositoryPath, '.github/extensions/unexpected.mjs'), 'export {}\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
+      'Project Copilot extensions are not allowed',
+    )
+    rmSync(join(repositoryPath, '.github/extensions'), { force: true, recursive: true })
+
+    for (const mcpPath of ['.mcp.json', '.github/mcp.json', '.vscode/mcp.json']) {
+      mkdirSync(dirname(join(repositoryPath, mcpPath)), { recursive: true })
+      writeFileSync(join(repositoryPath, mcpPath), '{}\n')
+      expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
+        'Project MCP configuration is not allowed',
+      )
+      rmSync(join(repositoryPath, mcpPath))
+    }
+
+    writeFileSync(join(policyPath, 'README'), 'not a hook\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).not.toThrow()
+    writeFileSync(join(policyPath, 'mandatory.json'), '{"hooks":{}}\n')
+    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, policyPath)).toThrow(
+      'Copilot policy hooks are not allowed',
+    )
+  })
+
+  it('rejects executable Claude Code configuration before the fallback worker starts', () => {
     const root = mkdtempSync(join(homedir(), '.admin-issue-controller-host-config-test-'))
     temporaryDirectories.push(root)
     const repositoryPath = join(root, 'repository')
     const managedPath = join(root, 'managed')
     mkdirSync(repositoryPath, { recursive: true })
     mkdirSync(join(managedPath, 'managed-settings.d'), { recursive: true })
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).not.toThrow()
+    expect(() => assertClaudeWorkerHostConfigurationSafe(repositoryPath, managedPath)).not.toThrow()
 
     mkdirSync(join(repositoryPath, '.claude/agents'), { recursive: true })
     writeFileSync(join(repositoryPath, '.claude/agents/unexpected.md'), '# agent\n')
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).toThrow(
+    expect(() => assertClaudeWorkerHostConfigurationSafe(repositoryPath, managedPath)).toThrow(
       'Project Claude Code configuration is not allowed',
     )
     rmSync(join(repositoryPath, '.claude'), { force: true, recursive: true })
 
-    writeFileSync(join(repositoryPath, '.mcp.json'), '{}\n')
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).toThrow(
-      'Project MCP configuration is not allowed',
-    )
-    rmSync(join(repositoryPath, '.mcp.json'))
-
     writeFileSync(join(managedPath, 'managed-settings.json'), '{"model":"opus"}\n')
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).not.toThrow()
+    expect(() => assertClaudeWorkerHostConfigurationSafe(repositoryPath, managedPath)).not.toThrow()
     writeFileSync(join(managedPath, 'managed-settings.d', 'mandatory.json'), '{"hooks":{}}\n')
-    expect(() => assertWorkerHostConfigurationSafe(repositoryPath, managedPath)).toThrow(
+    expect(() => assertClaudeWorkerHostConfigurationSafe(repositoryPath, managedPath)).toThrow(
       'Claude Code managed hooks are not allowed',
     )
   })
@@ -5849,7 +6006,7 @@ describe('admin issue controller security configuration', () => {
       selectWorkerHassMcpConfig(JSON.parse(readFileSync(hassMcpConfigPath, 'utf8')), 'hass'),
     ).toEqual({
       mcpServers: {
-        hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test' },
+        hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test', tools: ['*'] },
       },
     })
     expect(readClaudeWorkerCredential(loaded)).toEqual({
@@ -5858,13 +6015,41 @@ describe('admin issue controller security configuration', () => {
     chmodSync(claudeTokenPath, 0o644)
     expect(() => readClaudeWorkerCredential(loaded)).toThrow('must not be readable')
     chmodSync(claudeTokenPath, 0o600)
+    expect(() => readClaudeWorkerCredential({ claudeTokenPath: join(root, 'missing-token') }))
+      .toThrow('Missing Claude worker credential')
     const sandboxEnvironment = { ADMIN_ISSUE_WORKSPACE: '/private/worktree' }
+    prepareCopilotHome(loaded)
+    const copilotHome = join(base.workerHome, '.copilot')
+    expect(JSON.parse(readFileSync(join(copilotHome, 'settings.json'), 'utf8')))
+      .toMatchObject({ disableAllHooks: true, memory: false })
+    expect(statSync(join(copilotHome, 'admin-issue-worker/server.mjs')).mode & 0o777).toBe(0o600)
+    expect(buildWorkerMcpConfig(loaded, sandboxEnvironment)).toEqual({
+      mcpServers: {
+        hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test', tools: ['*'] },
+        'admin-issue-worker': {
+          type: 'local',
+          command: process.execPath,
+          args: [join(copilotHome, 'admin-issue-worker/server.mjs')],
+          env: sandboxEnvironment,
+          tools: ['*'],
+        },
+      },
+    })
+    expect(workerMcpConfigPath(loaded)).toBe(join(copilotHome, 'mcp-config.json'))
+    mkdirSync(join(copilotHome, 'skills/unreviewed'), { recursive: true })
+    writeFileSync(join(copilotHome, 'copilot-instructions.md'), 'unreviewed\n')
+    mkdirSync(join(copilotHome, 'session-state/fdc5c356-c9f0-42c1-8b54-492e5ea48f35'), { recursive: true })
+    prepareCopilotHome(loaded)
+    expect(existsSync(join(copilotHome, 'skills'))).toBe(false)
+    expect(existsSync(join(copilotHome, 'copilot-instructions.md'))).toBe(false)
+    expect(existsSync(join(copilotHome, 'session-state/fdc5c356-c9f0-42c1-8b54-492e5ea48f35')))
+      .toBe(true)
     prepareClaudeHome(loaded)
     const claudeHome = join(base.workerHome, '.claude')
     expect(JSON.parse(readFileSync(join(claudeHome, 'settings.json'), 'utf8')))
       .toEqual({ disableAllHooks: true })
     expect(statSync(join(claudeHome, 'admin-issue-worker/server.mjs')).mode & 0o777).toBe(0o600)
-    expect(buildWorkerMcpConfig(loaded, sandboxEnvironment)).toEqual({
+    expect(buildClaudeWorkerMcpConfig(loaded, sandboxEnvironment)).toEqual({
       mcpServers: {
         hass: { type: 'http', url: 'http://127.0.0.1:9583/private-test' },
         'admin-issue-worker': {
@@ -5875,7 +6060,7 @@ describe('admin issue controller security configuration', () => {
         },
       },
     })
-    expect(workerMcpConfigPath(loaded)).toBe(join(claudeHome, 'worker-mcp.json'))
+    expect(workerClaudeMcpConfigPath(loaded)).toBe(join(claudeHome, 'worker-mcp.json'))
     mkdirSync(join(claudeHome, 'skills/unreviewed'), { recursive: true })
     mkdirSync(join(claudeHome, 'projects/-worktree'), { recursive: true })
     prepareClaudeHome(loaded)
@@ -6120,16 +6305,24 @@ describe('admin issue controller security configuration', () => {
 
   it('pins the worker model and excludes privileged built-in tools', () => {
     const controller = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
+    expect(controller).toContain("WORKER_COPILOT_MODEL = 'claude-opus-5.5'")
+    expect(controller).toContain("WORKER_COPILOT_REASONING_EFFORT = 'high'")
+    expect(controller).toContain(
+      "WORKER_BUILTIN_TOOLS = ['task', 'read_agent', 'write_agent', 'tool_search_tool'] as const",
+    )
+    expect(controller).toContain("'--reasoning-effort',\n    WORKER_COPILOT_REASONING_EFFORT")
+    expect(controller).toContain("'--disable-builtin-mcps'")
+    expect(controller).toContain("'--no-ask-user'")
+    expect(controller).toContain("'--secret-env-vars',\n    'GH_TOKEN'")
+    expect(controller).toContain('config.hassMcpServerName')
+    expect(controller).toContain(
+      'buildCopilotWorkerArgs(run.sessionId, record.sessionName, commonArgs, resume)',
+    )
     expect(controller).toContain("WORKER_CLAUDE_MODEL = 'claude-opus-5-5'")
     expect(controller).toContain("WORKER_CLAUDE_EFFORT = 'high'")
-    expect(controller).toContain("WORKER_BUILTIN_TOOLS = ['Agent', 'ToolSearch'] as const")
+    expect(controller).toContain("WORKER_CLAUDE_BUILTIN_TOOLS = ['Agent', 'ToolSearch'] as const")
     expect(controller).toContain("'--strict-mcp-config'")
     expect(controller).toContain("'--setting-sources',\n    'user'")
-    expect(controller).toContain('config.hassMcpServerName')
-    expect(controller).not.toContain("'GH_TOKEN'")
-    expect(controller).toContain(
-      'buildClaudeWorkerArgs(session.id, record.sessionName, commonArgs, session.resume)',
-    )
     expect(controller).toContain('disableAllHooks: true')
     expect(controller).toContain("'plugins'")
     expect(controller).toContain("const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']")
@@ -6297,15 +6490,33 @@ describe('admin issue controller security configuration', () => {
     expect(prompt).toContain('render exactly one distinct PNG for each requested alternative')
     expect(prompt).toContain('needs_input.visualEvidence')
     expect(prompt).not.toContain('Otherwise implement the complete fix')
+    const allowedTools = (args: string[]) =>
+      args.flatMap((arg, index) => args[index - 1] === '--allow-tool' ? [arg] : [])
     const researchArgs = workerPermissionArgs('hass', true)
-    expect(researchArgs.slice(0, 3)).toEqual(['--permission-mode', 'dontAsk', '--allowedTools'])
-    const allowed = researchArgs[3].split(',')
-    expect(allowed).toContain('mcp__hass__ha_get_state')
-    expect(allowed).toContain('mcp__hass__ha_get_history')
-    expect(allowed).toContain('mcp__admin-issue-worker__admin_issue_workspace')
-    expect(allowed).not.toContain('mcp__hass')
-    expect(allowed).not.toContain('mcp__hass__ha_call_service')
-    expect(workerPermissionArgs('hass', false)).toEqual(['--permission-mode', 'bypassPermissions'])
+    expect(researchArgs.slice(0, 2)).toEqual([
+      '--available-tools',
+      'task,read_agent,write_agent,tool_search_tool,admin-issue-worker,hass',
+    ])
+    const allowed = allowedTools(researchArgs)
+    expect(allowed).toContain('hass(ha_get_state)')
+    expect(allowed).toContain('hass(ha_get_history)')
+    expect(allowed).toContain('admin-issue-worker(admin_issue_workspace)')
+    expect(allowed).not.toContain('hass')
+    expect(allowed).not.toContain('hass(ha_call_service)')
+    expect(researchArgs).not.toContain('--allow-all-tools')
+    expect(allowedTools(workerPermissionArgs('hass', false))).toEqual([
+      'admin-issue-worker(admin_issue_workspace)',
+      'hass',
+    ])
+    const claudeResearchArgs = claudeWorkerPermissionArgs('hass', true)
+    expect(claudeResearchArgs.slice(0, 3)).toEqual(['--permission-mode', 'dontAsk', '--allowedTools'])
+    const claudeAllowed = claudeResearchArgs[3].split(',')
+    expect(claudeAllowed).toContain('mcp__hass__ha_get_state')
+    expect(claudeAllowed).toContain('mcp__admin-issue-worker__admin_issue_workspace')
+    expect(claudeAllowed).not.toContain('mcp__hass')
+    expect(claudeAllowed).not.toContain('mcp__hass__ha_call_service')
+    expect(claudeWorkerPermissionArgs('hass', false))
+      .toEqual(['--permission-mode', 'bypassPermissions'])
     expect(() => assertResearchOnlyOutcome(issue, { decision: 'ready_for_pr' }, []))
       .toThrow('cannot implement or close')
     expect(() => assertResearchOnlyOutcome(issue, { decision: 'resolved_without_pr' }, []))

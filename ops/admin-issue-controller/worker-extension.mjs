@@ -5,7 +5,7 @@ import { isAbsolute, join, relative, sep } from "node:path";
 import { createInterface } from "node:readline";
 
 // Minimal MCP stdio server exposing the single sandboxed repository tool to a
-// Claude Code worker. It deliberately has no package dependencies because the
+// Copilot CLI worker. It deliberately has no package dependencies because the
 // controller copies this file alone into the dedicated worker home.
 
 const MAX_OUTPUT_BYTES = 512 * 1024;
