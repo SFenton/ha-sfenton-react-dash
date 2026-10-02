@@ -616,7 +616,8 @@ async function openTheaterRemote(page: Page) {
 }
 
 // @covers src/components/hass/SecurityDashboard.tsx
-test('Home cameras and Security tiles keep stable equal tracks at every tier', async ({ page }) => {
+// @covers src/components/core/GlassTile.module.css
+test('Home cameras keep stable tracks while Security reserves disclosure context at every tier', async ({ page }) => {
   test.setTimeout(120_000)
   const gridViewports = [
     PAGE_LAYOUT_VIEWPORTS[0],
@@ -651,16 +652,45 @@ test('Home cameras and Security tiles keep stable equal tracks at every tier', a
       expect(Math.abs((geometry[0]?.width ?? 0) - (geometry[1]?.width ?? 0))).toBeLessThanOrEqual(1)
       expect(Math.abs((geometry[0]?.width ?? 0) - (geometry[2]?.width ?? 0))).toBeLessThanOrEqual(1)
       expect(Math.abs((geometry[0]?.x ?? 0) + (geometry[0]?.width ?? 0) - ((geometry[1]?.x ?? 0) + (geometry[1]?.width ?? 0)))).toBeLessThanOrEqual(1)
-      const cells = await grid.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((elements) =>
-        elements.map((cell) => ({
-          span: Number(cell.getAttribute('data-dynamic-grid-span')),
-          width: cell.getBoundingClientRect().width,
-        })),
-      )
-      for (const cell of cells) {
-        expect(cell.span).toBe(1)
-        expect(Math.abs(cell.width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
-      }
+    }
+
+    const controlCells = await controlGrid.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((elements) =>
+      elements.map((cell) => ({
+        span: Number(cell.getAttribute('data-dynamic-grid-span')),
+        width: cell.getBoundingClientRect().width,
+      })),
+    )
+    expect(controlCells[0].span).toBeGreaterThanOrEqual(1)
+    expect(controlCells[0].span).toBeLessThanOrEqual(viewport.cameraColumns)
+    expect(Math.abs(
+      controlCells[0].width
+      - (controlCells[0].span * viewport.securityCellWidth + (controlCells[0].span - 1) * 10),
+    )).toBeLessThanOrEqual(1)
+    expect(controlCells.slice(1).map((cell) => cell.span)).toEqual(
+      viewport.cameraColumns === 2 ? [1, 1, 2] : [1, 1, 1],
+    )
+    for (const cell of controlCells.slice(1)) {
+      expect(Math.abs(
+        cell.width - (cell.span * viewport.securityCellWidth + (cell.span - 1) * 10),
+      )).toBeLessThanOrEqual(1)
+    }
+    const securityContextGap = await root.getByRole('button', { name: /Security System Armed Home/i }).evaluate((button) => {
+      const title = button.querySelector<HTMLElement>('[data-dynamic-grid-primary-label="true"]')
+      const accessory = button.querySelector<HTMLElement>('[data-dynamic-grid-accessory-context] [data-modal-disclosure]')
+      if (!title || !accessory) throw new Error('Security tile is missing its primary label or disclosure accessory')
+      return accessory.getBoundingClientRect().left - title.getBoundingClientRect().right
+    })
+    expect(securityContextGap).toBeGreaterThanOrEqual(8)
+
+    const cameraCells = await cameraGrid.locator(':scope > [data-dynamic-grid-cell]').evaluateAll((elements) =>
+      elements.map((cell) => ({
+        span: Number(cell.getAttribute('data-dynamic-grid-span')),
+        width: cell.getBoundingClientRect().width,
+      })),
+    )
+    for (const cell of cameraCells) {
+      expect(cell.span).toBe(1)
+      expect(Math.abs(cell.width - viewport.securityCellWidth)).toBeLessThanOrEqual(1)
     }
 
     if (viewport.width === 820) {

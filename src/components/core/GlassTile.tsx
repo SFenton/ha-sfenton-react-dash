@@ -143,7 +143,7 @@ export function GlassTile({
           {iconContent}
         </span>
         <span className={styles.labelGroup} data-dynamic-grid-label-container="true">
-          <span className={styles.title} data-dynamic-grid-label="true">{title}</span>
+          <span className={styles.title} data-dynamic-grid-label="true" data-dynamic-grid-primary-label="true">{title}</span>
           {subtitle && <span className={styles.subtitle} data-dynamic-grid-label="true">{subtitle}</span>}
           {dynamicGridMeasurementLabels?.map((label) => (
             <span
@@ -158,7 +158,11 @@ export function GlassTile({
           ))}
         </span>
       </span>
-      {showDisclosure && accessorySemantics && <SurfaceAccessory semantics={accessorySemantics} size={variant === 'header' ? 'compact' : 'standard'} />}
+      {showDisclosure && accessorySemantics && (
+        <span aria-hidden="true" className={styles.disclosureContext} data-dynamic-grid-accessory-context="8">
+          <SurfaceAccessory semantics={accessorySemantics} size={variant === 'header' ? 'compact' : 'standard'} />
+        </span>
+      )}
     </>
   )
   const liveAnnouncement = announcement !== undefined ? (

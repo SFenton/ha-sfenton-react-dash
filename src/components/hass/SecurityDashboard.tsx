@@ -214,7 +214,7 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
     <>
       <ResponsiveSectionGrid className={styles.dashboard} gap={20}>
         <Section className={styles.section} span="full" title={copy('sections.security')}>
-          <DynamicGrid className={styles.grid} columns={2} fillRows={false} itemSizing="fixed" layout="fill" maxCellWidth={280} maxColumns={4}>
+          <DynamicGrid className={styles.grid} columns={2} itemSizing="fixed" lastRow="fill-minimum" layout="fill" maxCellWidth={280} maxColumns={4}>
             {SECURITY_CONTROL_TILES.map((item) => <SecurityTile item={item} key={item.entityId} onOpenHash={onOpenHash} />)}
           </DynamicGrid>
         </Section>

@@ -132,6 +132,61 @@ describe('DynamicGrid', () => {
     })
   })
 
+  it('includes disclosure accessory context when selecting a content-aware span', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return 320
+      if (this.dataset.dynamicGridCell === 'true') return 155
+      if (this.dataset.dynamicGridLabelContainer === 'true') return Number(this.dataset.labelWidth ?? 0)
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
+      return Number(this.dataset.naturalWidth ?? 0)
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      const width = this.dataset.dynamicGridLabelContainer === 'true'
+        ? Number(this.dataset.labelWidth ?? 0)
+        : this.dataset.dynamicGridAccessoryContext
+          ? 24
+          : 0
+      const left = this.dataset.dynamicGridAccessoryContext
+        ? 100 + Number(this.dataset.accessoryGap ?? 0)
+        : 0
+      return {
+        bottom: 0,
+        height: 0,
+        left,
+        right: left + width,
+        toJSON: () => undefined,
+        top: 0,
+        width,
+        x: left,
+        y: 0,
+      }
+    })
+
+    render(
+      <DynamicGrid ariaLabel="Measured links" columns={2} fillRows={false}>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true" data-label-width="100">
+            <span data-dynamic-grid-label="true" data-natural-width="100">Security System</span>
+          </span>
+          <span data-accessory-gap="0" data-dynamic-grid-accessory-context="8" />
+        </button>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true" data-label-width="80">
+            <span data-dynamic-grid-label="true" data-natural-width="80">Media</span>
+          </span>
+          <span data-accessory-gap="20" data-dynamic-grid-accessory-context="8" />
+        </button>
+      </DynamicGrid>,
+    )
+
+    const grid = screen.getByRole('group', { name: 'Measured links' })
+    await waitFor(() => {
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['2', '1'])
+    })
+  })
+
   it('reduces uniform grids recursively while keeping every item one track wide', async () => {
     let gridWidth = 1_000
     const gap = 10
@@ -227,6 +282,62 @@ describe('DynamicGrid', () => {
     await waitFor(() => {
       expect(grid).toHaveAttribute('data-dynamic-grid-columns', '2')
       expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1'])
+    })
+  })
+
+  it('honors primary-label accessory context without sizing fixed grids from live status copy', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return 370
+      if (this.dataset.dynamicGridCell === 'true') return 180
+      return 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function () {
+      return Number(this.dataset.naturalWidth ?? 0)
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      const primaryLabel = this.dataset.dynamicGridPrimaryLabel === 'true'
+      const accessory = Boolean(this.dataset.dynamicGridAccessoryContext)
+      const width = primaryLabel ? 112 : accessory ? 24 : 0
+      const left = accessory ? 112 : 0
+      return {
+        bottom: 0,
+        height: 0,
+        left,
+        right: left + width,
+        toJSON: () => undefined,
+        top: 0,
+        width,
+        x: left,
+        y: 0,
+      }
+    })
+
+    const renderGrid = (state: string, stateWidth: number) => (
+      <DynamicGrid ariaLabel="Stable live tiles" columns={2} fillRows={false} itemSizing="fixed">
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-dynamic-grid-primary-label="true" data-natural-width="112">Security System</span>
+            <span data-dynamic-grid-label="true" data-natural-width={stateWidth}>{state}</span>
+          </span>
+          <span data-dynamic-grid-accessory-context="8" />
+        </button>
+        <button type="button">
+          <span data-dynamic-grid-label-container="true">
+            <span data-dynamic-grid-label="true" data-dynamic-grid-primary-label="true" data-natural-width="100">Front Door</span>
+          </span>
+        </button>
+      </DynamicGrid>
+    )
+    const view = render(renderGrid('Loading', 60))
+    const grid = screen.getByRole('group', { name: 'Stable live tiles' })
+
+    await waitFor(() => {
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['2', '1'])
+    })
+
+    view.rerender(renderGrid('A much longer live status', 300))
+    await waitFor(() => {
+      expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['2', '1'])
     })
   })
 
@@ -464,6 +575,29 @@ describe('DynamicGrid', () => {
 
     await waitFor(() => {
       expect(Array.from(grid.children).map((cell) => cell.getAttribute('data-dynamic-grid-span'))).toEqual(['1', '1', '2', '2', '1'])
+    })
+  })
+
+  it('fills the last row only while a fill layout uses its minimum column count', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function () {
+      if (this.dataset.dynamicGrid === 'true') return 800
+      return 0
+    })
+
+    render(
+      <DynamicGrid ariaLabel="Bounded controls" columns={2} lastRow="fill-minimum">
+        <button type="button">Only control</button>
+      </DynamicGrid>,
+    )
+
+    const grid = screen.getByRole('group', { name: 'Bounded controls' })
+    await waitFor(() => expect(grid.firstElementChild).toHaveAttribute('data-dynamic-grid-span', '2'))
+
+    grid.style.setProperty('--dynamic-grid-columns', '4')
+    act(() => window.dispatchEvent(new Event('resize')))
+    await waitFor(() => {
+      expect(grid).toHaveAttribute('data-dynamic-grid-columns', '4')
+      expect(grid.firstElementChild).toHaveAttribute('data-dynamic-grid-span', '1')
     })
   })
 })
