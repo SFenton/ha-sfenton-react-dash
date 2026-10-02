@@ -1,5 +1,11 @@
 .page {
   --page-content-max: var(--page-measure-dashboard);
+  --page-content-start-gap: 12px;
+  --page-header-rail-bleed: 8px;
+  /* AppHeader centers its 38px profile button in a 48px row. */
+  --page-header-visual-inset: 5px;
+  --page-leading-section-gap: 22px;
+  --section-header-space-before: 26px;
   display: flex;
   width: 100%;
   height: 100%;
@@ -39,6 +45,7 @@
 }
 
 .headerQuickLinks {
+  --status-rail-trailing-space: 0px;
   margin-top: 18px;
   transition:
     opacity 170ms ease-out,
@@ -53,7 +60,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   padding:
-    12px
+    calc(var(--page-content-start-gap) - var(--page-header-visual-inset))
     var(--rd-page-gutter-right)
     var(--page-bottom-extra-padding, 22px)
     var(--rd-page-gutter-left);
@@ -71,6 +78,10 @@
   padding-bottom: calc(var(--page-bottom-extra-padding, 22px) + max(18px, var(--rd-safe-bottom)) + var(--dashboard-keyboard-overlay-inset, 0px));
 }
 
+.scroller[data-header-quick-links='true'] {
+  padding-top: calc(var(--page-content-start-gap) - var(--page-header-rail-bleed));
+}
+
 .scroller[data-chrome-hidden='true'] {
   margin-bottom: 0;
   padding: 0 var(--rd-page-gutter-right) 0 var(--rd-page-gutter-left);
@@ -86,13 +97,29 @@
 }
 
 .scrollContent {
+  --page-leading-section-offset: 0px;
   width: 100%;
-  min-height: 100%;
+  min-height: calc(100% - var(--page-leading-section-offset));
+  margin-top: var(--page-leading-section-offset);
   margin-inline: auto;
 }
 
+.scrollContent:not([data-chrome-hidden='true']):has(
+  > [data-section-header]:first-child,
+  > :first-child > [data-section-header]:first-child,
+  > :first-child > :first-child > [data-section-header]:first-child,
+  > :first-child > :first-child > :first-child > [data-section-header]:first-child,
+  > :first-child > :first-child > :first-child > :first-child > [data-section-header]:first-child,
+  > :first-child > :first-child > :first-child > :first-child > :first-child > [data-section-header]:first-child,
+  > :first-child > :first-child > :first-child > :first-child > :first-child > :first-child > [data-section-header]:first-child,
+  > :first-child > :first-child > :first-child > :first-child > :first-child > :first-child > :first-child > [data-section-header]:first-child,
+  > :first-child > :first-child > :first-child > :first-child > :first-child > :first-child > :first-child > :first-child > [data-section-header]:first-child
+) {
+  --page-leading-section-offset: calc(var(--page-leading-section-gap) - var(--page-content-start-gap) - var(--section-header-space-before));
+}
+
 .scrollContent[data-scroll-lock='true'] {
-  height: 100%;
+  height: calc(100% - var(--page-leading-section-offset));
   min-height: 0;
 }
 
@@ -115,16 +142,16 @@
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
+  .page {
+    --page-content-start-gap: 8px;
+  }
+
   .headerDock {
     padding-top: max(8px, var(--rd-safe-top));
   }
 
   .headerQuickLinks {
     margin-top: 8px;
-  }
-
-  .scroller {
-    padding-top: 8px;
   }
 }
 

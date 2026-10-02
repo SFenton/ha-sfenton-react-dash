@@ -9,7 +9,7 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ className, separator = true, title }: SectionHeaderProps) {
   return (
-    <div className={[styles.sectionHeader, className].filter(Boolean).join(' ')}>
+    <div className={[styles.sectionHeader, className].filter(Boolean).join(' ')} data-section-header="">
       <h2>{title}</h2>
       <Separator className={styles.rule} visible={separator} />
     </div>

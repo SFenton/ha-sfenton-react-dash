@@ -8,10 +8,6 @@
   scroll-margin-top: 130px;
 }
 
-.leadingSection > :first-child {
-  margin-top: 0;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -20,6 +16,8 @@
 
 .fullWidthTile {
   display: grid;
+  /* The pager above already reserves transparent space in its 44px touch row. */
+  margin-top: -5px;
 }
 
 .singleTileGrid {

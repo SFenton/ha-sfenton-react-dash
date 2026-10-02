@@ -1,8 +1,8 @@
 .rail {
   display: flex;
   gap: 8px;
-  margin: 0 0 12px;
-  padding: 0 0 8px;
+  margin: 0 0 var(--status-rail-trailing-space, 12px);
+  padding: 0 0 var(--page-header-rail-bleed, 8px);
   overflow-x: auto;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;

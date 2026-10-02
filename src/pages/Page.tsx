@@ -56,7 +56,7 @@ export function Page({ activePath, backPath, chromeHidden = false, contentHidden
             </div>
           </div>
         )}
-        <div className={styles.scroller} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-page-scroller="true" data-scroll-lock={scrollLocked ? 'true' : undefined} ref={scrollerRef}>
+        <div className={styles.scroller} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-header-quick-links={!chromeHidden && headerQuickLinks ? 'true' : undefined} data-page-scroller="true" data-scroll-lock={scrollLocked ? 'true' : undefined} ref={scrollerRef}>
           <div aria-hidden={contentHidden ? true : undefined} className={styles.scrollContent} data-chrome-hidden={chromeHidden ? 'true' : undefined} data-page-content="true" data-scroll-lock={scrollLocked ? 'true' : undefined} inert={contentHidden ? true : undefined}>{children}</div>
         </div>
         </main>
