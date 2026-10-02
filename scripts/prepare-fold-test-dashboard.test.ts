@@ -7,6 +7,7 @@ import {
   FOLD_TEST_ASSET_FOLDER,
   FOLD_TEST_CARD_RESOURCE_PATH,
   FOLD_TEST_CARD_TAG,
+  RTC_CAMERA_RESOURCE,
   RTC_PILOT_RESOURCE_PATH,
 } from '../src/constants/rtcPilot'
 import {
@@ -64,7 +65,7 @@ describe('Fold RTC test dashboard staging', () => {
           writeFile(join(forkDirectory, 'custom_components/webrtc/www', file), `pilot ${file}`)),
       ])
       await writeFile(join(distDirectory, 'assets/app-pilot.js'),
-        `webrtc-camera-sfenton ${RTC_PILOT_RESOURCE_PATH}`)
+        `webrtc-camera-sfenton ${RTC_CAMERA_RESOURCE}`)
       const result = await prepareFoldTestDashboard({
         distDirectory, foldBridgeDirectory, forkDirectory, stageRoot, version: 'sha-123',
       })
@@ -104,21 +105,27 @@ describe('Fold RTC test dashboard staging', () => {
     }
   })
 
-  it('rejects a default HLS build before staging a misleading RTC dashboard', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'ha-fold-rtc-hls-'))
+  it('rejects builds that request Home Assistant HLS or omit the pinned RTC card resource', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ha-fold-rtc-retired-hls-'))
     const distDirectory = join(root, 'dist')
     const foldBridgeDirectory = join(root, 'bridge')
     try {
       await mkdir(join(distDirectory, 'assets'), { recursive: true })
       await mkdir(foldBridgeDirectory)
-      await writeFile(join(distDirectory, 'index.html'), '<script src="./assets/app-hls.js"></script>')
+      await writeFile(join(distDirectory, 'index.html'), '<script src="./assets/app-candidate.js"></script>')
       await writeFile(join(distDirectory, 'sfenton-react-app-card.js'), 'sfenton-react-fold-test/home')
-      await writeFile(join(distDirectory, 'assets/app-hls.js'), 'camera/stream')
       await writeFile(join(foldBridgeDirectory, `${FOLD_TEST_CARD_TAG}.js`),
         'customElements.define("sfenton-react-fold-app-card", class {}); // sfenton-react-fold-test/home')
-      await expect(prepareFoldTestDashboard({
-        distDirectory, foldBridgeDirectory, forkDirectory: root, stageRoot: join(root, 'stage'), version: 'bad',
-      })).rejects.toThrow('requires a Vite rtc-pilot build')
+      const candidates = [
+        `webrtc-camera-sfenton ${RTC_CAMERA_RESOURCE} camera/stream`,
+        'webrtc-camera-sfenton without its pinned card module',
+      ]
+      for (const [index, app] of candidates.entries()) {
+        await writeFile(join(distDirectory, 'assets/app-candidate.js'), app)
+        await expect(prepareFoldTestDashboard({
+          distDirectory, foldBridgeDirectory, forkDirectory: root, stageRoot: join(root, `stage-${index}`), version: 'bad',
+        })).rejects.toThrow('requires an RTC dashboard build; Home Assistant HLS streams are retired')
+      }
     } finally {
       await rm(root, { recursive: true, force: true })
     }

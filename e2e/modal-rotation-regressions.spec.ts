@@ -223,14 +223,14 @@ test('Quick Links gives portrait and landscape tiles enough width for their text
     await expect(dialog).toHaveAttribute('data-modal-presentation', 'sheet')
     await expect(grid).toHaveAttribute('data-dynamic-grid-item-sizing', 'content-aware')
     await expect(grid).toHaveAttribute('data-dynamic-grid-last-row', 'fill')
-    await expect.poll(async () => (await quickLinksLayout(dialog)).cards.map((card) => card.span)).toEqual([2, 2, 2, 1, 1, 2])
+    await expect.poll(async () => (await quickLinksLayout(dialog)).cards.map((card) => card.span)).toEqual([2, 2, 2, 2, 2, 2])
     const layout = await quickLinksLayout(dialog)
     expect(layout.columns).toBe(2)
     expect(layout.gridWidth).toBeCloseTo(359, 2)
-    expect(layout.gridHeight).toBeCloseTo(640, 2)
+    expect(layout.gridHeight).toBeCloseTo(770, 2)
     expect(Math.abs(layout.gridTop - layout.bodyTop)).toBeLessThanOrEqual(1)
-    const widths = [359, 359, 359, 174.5, 174.5, 359]
-    const rowTops = [0, 130, 260, 390, 390, 520]
+    const widths = [359, 359, 359, 359, 359, 359]
+    const rowTops = [0, 130, 260, 390, 520, 650]
     for (const [index, card] of layout.cards.entries()) {
       expect(card.width).toBeCloseTo(widths[index], 2)
       expect(card.y).toBeCloseTo(rowTops[index], 2)
@@ -268,7 +268,7 @@ test('Quick Links gives portrait and landscape tiles enough width for their text
     }
     await expect(rooms).toHaveAttribute('data-quick-links-node', 'original')
     if (profile === LANDSCAPES[0]) {
-      expect(layout.cards.map((card) => card.span)).toEqual([2, 2, 2, 1, 1, 2])
+      expect(layout.cards.map((card) => card.span)).toEqual([2, 2, 2, 2, 1, 2])
       const label = rooms.locator('[data-dynamic-grid-label="true"]').first()
       await label.evaluate((element) => { element.textContent = 'Open every room, light, and environmental control throughout the house' })
       await expect.poll(async () => (await rooms.boundingBox())?.width ?? 0).toBeGreaterThan(layout.cards[0].width + 10)

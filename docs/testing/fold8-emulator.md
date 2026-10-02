@@ -76,23 +76,25 @@ prepare a reproducible RTC candidate locally from the current dashboard
 worktree:
 
 ```bash
-npm run build -- --mode rtc-pilot
+npm run build
 npx vite build --mode fold-bridge --config vite.fold-bridge.config.ts
 npx tsx scripts/prepare-fold-test-dashboard.ts <absolute-SFenton-WebRTC-fork-path>
 ```
 
-Verify that the dashboard entry bundle contains `webrtc-camera-sfenton` but
-not `camera/stream`. The second build emits one self-contained,
+Verify that the dashboard entry bundle contains `webrtc-camera-sfenton` and
+its relative `rtc/webrtc-camera.js` resource but not `camera/stream`. The
+second build emits one self-contained,
 `sfenton-react-fold-app-card.js` module with its own custom element tag; it
 must not import hashed chunks or replace the production bridge. The preparer
 stages the dashboard, Fold card, and the pinned v3.10.3 fork frontend with
 three relative JavaScript dependencies in
 `.deploy/fold-rtc-dashboard/www/ha-sfenton-react-dash-fold-test/`. The preparer
-rejects a default HLS build and records file digests in the stage root's
+rejects a build that requests retired Home Assistant HLS streams or omits the
+pinned RTC resource, and records file digests in the stage root's
 `rtc-pilot-frontend.json`. A second staging attempt must use a fresh output
 directory so the first candidate remains auditable. Do **not** use
-`npm run prepare:ios-test-dashboard`: that rebuilds the existing iOS test
-app as HLS and does not stage the Fold candidate.
+`npm run prepare:ios-test-dashboard`: it prepares the separate iOS test
+dashboard and does not stage the Fold candidate.
 
 The SFenton/WebRTC integration must be enabled before real RTC playback can
 work. On the initial Fold pilot this was enabled and registered the existing
@@ -141,9 +143,10 @@ fork signaling sockets, peer/ICE identity, decoded or presented frame counts,
 received audio and mute state. Neither a retained Android process nor a
 `connected` card label proves that the document, video or sound survived.
 
-Compare matched cameras and network/device conditions against production
-HLS, recording distributions of foreground-to-first **new** frame and
-failed-stream recovery before deciding whether RTC is materially better.
+Compare matched cameras and network/device conditions against a recorded RTC
+baseline, recording distributions of foreground-to-first **new** frame and
+failed-stream recovery before accepting a change. The original pilot compared
+against the since-retired Home Assistant HLS path.
 Test a short warm background, a controlled HA websocket interruption,
 visibility around the fork's 30-second last-subscriber and 60-second
 hidden-retention windows, then a separate OS-discard case. Confirm an

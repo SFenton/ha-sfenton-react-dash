@@ -1153,7 +1153,7 @@ test('global Quick Links opens from a non-Home route and preserves one-sheet det
   })).toEqual({
     columns: 2,
     itemCount: 6,
-    rows: 5,
+    rows: 6,
     scrollsHorizontally: false,
   })
   const initialHash = await page.evaluate(() => window.location.hash)
