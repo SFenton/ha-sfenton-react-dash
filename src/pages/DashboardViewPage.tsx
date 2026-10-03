@@ -2245,6 +2245,8 @@ const SOLO_TRIP_TOGGLE_END_STATES: ReadonlySet<HouseholdAwayState> = new Set([
   HOUSEHOLD_AWAY_STATE.ACTIVE,
   HOUSEHOLD_AWAY_STATE.DEGRADED,
 ])
+// Covers the script's echo waits plus HA's ending -> idle restore before falling back to live state.
+const SOLO_TRIP_END_OPTIMISTIC_REVERT_MS = 60_000
 
 function householdAwaySetupError(copy: ReturnType<typeof useCopy>, snapshot: HouseholdAwaySnapshot) {
   if (householdAwayModeEngaged(snapshot, HOUSEHOLD_AWAY_MODE.VACATION)) return copy(SOLO_TRIP_COPY_KEYS.errors.vacationConflict)
@@ -2329,7 +2331,14 @@ function SoloTripPage() {
     || toggleAwaitingSnapshot
     || returnAwaitingState !== null
     || restoreAwaitingSnapshot
-  const toggleChecked = engaged
+  const [toggleChecked, commitToggleChecked, resetToggleChecked] = useOptimisticState(engaged, {
+    clearOn: 'confirmation',
+    revertMs: SOLO_TRIP_END_OPTIMISTIC_REVERT_MS,
+  })
+  const restoreRequired = snapshot.state === HOUSEHOLD_AWAY_STATE.RESTORE_REQUIRED
+  useEffect(() => {
+    if (restoreRequired) resetToggleChecked()
+  }, [resetToggleChecked, restoreRequired])
   const selectionLocked = editorOpen || scheduleAwaitingState !== null || engaged || vacationEngaged
   const knownTraveler = snapshot.traveler !== 'none' ? snapshot.traveler : selectedTraveler
   const canEditReturn = snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
@@ -2428,12 +2437,14 @@ function SoloTripPage() {
     }
     if (!snapshot.available || !snapshot.commandAvailable) return
     if (!SOLO_TRIP_TOGGLE_END_STATES.has(snapshot.state)) return
+    commitToggleChecked(false)
     const result = snapshot.state === 'scheduled'
       ? await controller.cancel()
       : await controller.endNow()
     if (result.status !== 'rejected') {
       setToggleAwaitingSnapshot(true)
     }
+    if (result.status !== 'accepted') resetToggleChecked()
   }
 
   const resolveSoloTripRestore = async (resolveAction: 'keep_current' | 'restore_saved') => {
