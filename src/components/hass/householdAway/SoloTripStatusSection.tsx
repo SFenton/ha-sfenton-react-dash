@@ -10,23 +10,29 @@ import type { useHouseholdAwayController } from './useHouseholdAwayController'
 import { useCopy, SOLO_TRIP_COPY_KEYS as C, SOLO_TRIP_COPY_NAMESPACE } from '../../../i18n'
 import { householdResidentForHaUserId } from '../../../constants/householdResidents'
 
+function householdAwayActivationSettling(snapshot: ReturnType<typeof useHouseholdAwayController>['snapshot']) {
+  return snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+    && (snapshot.state === HOUSEHOLD_AWAY_STATE.ACTIVATING || snapshot.state === HOUSEHOLD_AWAY_STATE.ACTIVE)
+}
+
 export function SoloTripActiveNotice({ controller }: {
   controller: ReturnType<typeof useHouseholdAwayController>
 }) {
   const copy = useCopy(SOLO_TRIP_COPY_NAMESPACE)
   const { snapshot } = controller
   const viewer = householdResidentForHaUserId(useUser()?.id)
-  const fullyActive = householdAwayFullyActive(snapshot)
   const travelerAway = snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
     && snapshot.traveler !== 'none'
     && snapshot.state !== HOUSEHOLD_AWAY_STATE.IDLE
     && snapshot.state !== HOUSEHOLD_AWAY_STATE.SCHEDULED
   if (!travelerAway) return null
   const travelerLabel = householdAwayResidentLabel(copy, snapshot.traveler)
+  // Activation and pending effect echoes optimistically present the confirmed result; HA reports failures as degraded.
+  const presentedActive = householdAwayFullyActive(snapshot) || householdAwayActivationSettling(snapshot)
 
   return (
-    <InfoBox title={copy(C.status.activeTitle, { traveler: travelerLabel })} tone={fullyActive ? 'success' : 'neutral'}>
-      {fullyActive ? householdAwayActiveDescription(copy, snapshot, viewer) : undefined}
+    <InfoBox title={copy(C.status.activeTitle, { traveler: travelerLabel })} tone={presentedActive ? 'success' : 'neutral'}>
+      {presentedActive ? householdAwayActiveDescription(copy, snapshot, viewer) : undefined}
     </InfoBox>
   )
 }
@@ -37,6 +43,7 @@ export function SoloTripStatusSection({
   endNowDisabled = false,
   showConfirmedActiveNotice = true,
   showActivatingEndNow = true,
+  showActivationProgress = true,
   onEndNow,
   onResolveRestore,
   restoreDisabled = false,
@@ -45,6 +52,7 @@ export function SoloTripStatusSection({
   endNowDisabled?: boolean
   showConfirmedActiveNotice?: boolean
   showActivatingEndNow?: boolean
+  showActivationProgress?: boolean
   onEndNow?: () => void
   onResolveRestore?: (resolveAction: 'keep_current' | 'restore_saved') => void
   restoreDisabled?: boolean
@@ -83,6 +91,7 @@ export function SoloTripStatusSection({
   }
 
   if (snapshot.state === 'activating') {
+    if (!showActivationProgress) return actionableError
     return (
       <div>
         <SectionHeader title={copy(C.status.activatingTitle)} />
@@ -136,6 +145,7 @@ export function SoloTripStatusSection({
   }
 
   if (!showConfirmedActiveNotice) {
+    if (!showActivationProgress) return actionableError
     return (
       <div>
         {actionableError}

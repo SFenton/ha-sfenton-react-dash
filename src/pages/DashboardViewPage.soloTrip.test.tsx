@@ -457,16 +457,40 @@ describe('DashboardViewPage Solo Trip', () => {
     expect(document.querySelector('article[aria-label="Stephen Home"]')).toBeInTheDocument()
   })
 
-  it('shows active unconfirmed state with a title-only neutral away chip', () => {
-    setupSoloTripSnapshot('active', {
+  it('presents the confirmed away chip while Solo Trip activation settles', () => {
+    const activeDescription = 'While Stephen is away from home and the Solo Trip setting is enabled in settings, your controls and alarms will control the entire bed.'
+    setMockUser({ id: HOUSEHOLD_RESIDENTS.steph.haUserId, name: 'Steph' })
+    setupSoloTripSnapshot('activating', {
+      effects: { sleepypod_live_follow: false, sleepypod_schedule: false, wake_light_source: false },
+    })
+    renderSoloTripPage()
+
+    const expectConfirmedPresentation = () => {
+      const notice = screen.getByRole('note', { name: 'Stephen Away' })
+      expect(notice).toHaveAttribute('data-tone', 'success')
+      expect(notice).toHaveTextContent(activeDescription)
+      expect(screen.queryByRole('heading', { name: 'Starting Solo Trip' })).not.toBeInTheDocument()
+      expect(screen.queryByText('Solo Trip is active, but some requested effects are still waiting for Home Assistant confirmation.')).not.toBeInTheDocument()
+    }
+
+    expectConfirmedPresentation()
+    act(() => {
+      setMockEntityState(STATUS_ENTITY, 'active')
+      setMockEntityAttribute(STATUS_ENTITY, 'effects', { sleepypod_live_follow: false, sleepypod_schedule: true, wake_light_source: true })
+    })
+    expectConfirmedPresentation()
+    act(() => setMockEntityAttribute(STATUS_ENTITY, 'effects', { sleepypod_live_follow: true, sleepypod_schedule: true, wake_light_source: true }))
+    expectConfirmedPresentation()
+  })
+
+  it('keeps the away chip neutral when Home Assistant reports degraded effects', () => {
+    setupSoloTripSnapshot('degraded', {
       effects: { sleepypod_live_follow: false, sleepypod_schedule: true, wake_light_source: true },
     })
     renderSoloTripPage()
     const notice = screen.getByRole('note', { name: 'Stephen Away' })
     expect(notice).toHaveAttribute('data-tone', 'neutral')
-    expect(notice).toHaveTextContent('Stephen Away')
     expect(notice).not.toHaveTextContent('controls and alarms will control the entire bed')
-    expect(screen.getByText('Solo Trip is active, but some requested effects are still waiting for Home Assistant confirmation.')).toBeInTheDocument()
   })
 
   it('uses the toggle as the activating end-now command without a separate action', async () => {
@@ -798,14 +822,33 @@ describe('DashboardViewPage Solo Trip', () => {
   })
 
   it('optimistically turns an active Solo Trip off while Home Assistant ends it', async () => {
+    setMockUser({ id: HOUSEHOLD_RESIDENTS.steph.haUserId, name: 'Steph' })
     setupSoloTripSnapshot('active')
     setMockCallServiceOutcome('script', 'household_away_command', 'pending')
     renderSoloTripPage()
     expect(soloTripToggle()).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('note', { name: 'Stephen Away' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Return Date')).toBeInTheDocument()
+
+    const expectSettledOffPresentation = () => {
+      expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+      expect(soloTripToggle()).toHaveAccessibleName('Solo Trip Select the user that will be away from home first.')
+      expect(screen.queryByRole('note', { name: 'Stephen Away' })).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Return Date')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Return Time')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Ending Solo Trip' })).not.toBeInTheDocument()
+      for (const name of ['Stephen', 'You']) {
+        const traveler = document.querySelector(`[aria-label="${name}"]`)
+        expect(traveler).toHaveAttribute('data-muted', 'true')
+        expect(traveler).toHaveAttribute('data-disabled', 'false')
+        expect(traveler).toHaveTextContent(name)
+        expect(traveler).not.toHaveTextContent(/Away|Home/)
+      }
+    }
 
     fireEvent.click(soloTripToggle())
 
-    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    expectSettledOffPresentation()
     expect(soloTripToggle()).toBeDisabled()
     await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
     expect(latestHouseholdAwayCall()).toMatchObject({ serviceData: { operation: 'end_now' } })
@@ -813,7 +856,7 @@ describe('DashboardViewPage Solo Trip', () => {
     act(() => setMockEntityAttribute(STATUS_ENTITY, 'revision', 1))
     await act(async () => acknowledgePendingMockHouseholdAwayCommands())
     act(() => setMockEntityState(STATUS_ENTITY, 'ending'))
-    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    expectSettledOffPresentation()
     expect(soloTripToggle()).toBeDisabled()
     fireEvent.click(soloTripToggle())
     expect(householdAwayCalls()).toHaveLength(1)
@@ -823,9 +866,11 @@ describe('DashboardViewPage Solo Trip', () => {
       setMockEntityAttribute(STATUS_ENTITY, 'mode', 'none')
       setMockEntityAttribute(STATUS_ENTITY, 'traveler', 'none')
       setMockEntityAttribute(STATUS_ENTITY, 'home_resident', 'none')
+      setMockEntityAttribute(STATUS_ENTITY, 'starts_at', null)
+      setMockEntityAttribute(STATUS_ENTITY, 'ends_at', null)
       setMockEntityAttribute(STATUS_ENTITY, 'revision', 2)
     })
-    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    expectSettledOffPresentation()
   })
 
   it('optimistically turns a scheduled Solo Trip off before Home Assistant responds', async () => {
@@ -848,9 +893,13 @@ describe('DashboardViewPage Solo Trip', () => {
     fireEvent.click(soloTripToggle())
 
     expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    expect(screen.queryByRole('note', { name: 'Stephen Away' })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByText('Home Assistant could not apply the Solo Trip change. Try again.')).toBeInTheDocument())
     expect(soloTripToggle()).toHaveAttribute('aria-checked', 'true')
     expect(soloTripToggle()).toBeEnabled()
+    expect(screen.getByRole('note', { name: 'Stephen Away' })).toHaveAttribute('data-tone', 'success')
+    expect(screen.getByLabelText('Return Date')).toBeEnabled()
+    expect(document.querySelector('[aria-label$=" Away"][data-muted="false"]')).toBeInTheDocument()
   })
 
   it('reverts the optimistic off state when an end command times out', async () => {
