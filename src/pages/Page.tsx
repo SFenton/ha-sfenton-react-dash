@@ -52,7 +52,7 @@ export function Page({ activePath, backPath, chromeHidden = false, contentHidden
           <div className={styles.headerDock} data-page-header="true">
             <div className={styles.headerContent}>
               <AppHeader activePath={activePath} actions={actions} backPath={backPath} onBack={onBack} onNavigate={onNavigate} title={title} />
-              {headerQuickLinks && <div className={styles.headerQuickLinks}>{headerQuickLinks}</div>}
+              {headerQuickLinks && <div className={styles.headerQuickLinks} data-page-header-quick-links="true">{headerQuickLinks}</div>}
             </div>
           </div>
         )}
