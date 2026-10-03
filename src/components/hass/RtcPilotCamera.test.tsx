@@ -1,4 +1,5 @@
 // @covers src/constants/rtcPilot.ts
+// @covers src/components/hass/rtcStreamRetention.ts
 import { act, render, waitFor } from '@testing-library/react'
 import { CAMERA_ITEMS } from '../../constants/atAGlance'
 import { resetMockHass, setMockConnectionStatus } from '../../test/mocks/hakitCoreState'
@@ -9,6 +10,7 @@ import {
   toggleCameraStreamMuted,
 } from './cameraStreamActions'
 import { RtcPilotCamera } from './RtcPilotCamera'
+import { isRtcStreamRetained, releaseRetainedRtcStreams } from './rtcStreamRetention'
 
 interface FakeRtcConfig {
   card_id: string
@@ -49,6 +51,7 @@ describe('RTC camera', () => {
     resetMockHass()
     setMockConnectionStatus('connected')
     FakeRtcCard.failuresRemaining = 0
+    releaseRetainedRtcStreams()
   })
 
   it('uses an HA-signed shared video-and-audio stream and requires decoded status for Live', async () => {
@@ -101,6 +104,41 @@ describe('RTC camera', () => {
     expect(card).toHaveAttribute('aria-hidden', 'true')
     expect(card).toHaveAttribute('inert')
     view.unmount()
+  })
+
+  it('keeps a shown stream pooled across page unmounts so tiles and modals reattach without reconnecting', async () => {
+    const unsubscribe = vi.fn()
+    const subscribe = vi.fn(() => unsubscribe)
+    vi.stubGlobal('__webrtcStreamManager', { subscribe })
+
+    const tile = render(<RtcPilotCamera camera={driveway} minHeight={190} variant="tile" />)
+    const tileCard = await waitFor(() => {
+      const card = tile.container.querySelector('webrtc-camera-sfenton')
+      expect(card).toBeInTheDocument()
+      return card as FakeRtcCard
+    })
+    expect(subscribe).toHaveBeenCalledTimes(1)
+    expect(subscribe).toHaveBeenCalledWith(tileCard.configuration?.streams[0], expect.any(Function))
+    expect(isRtcStreamRetained('garage_camera')).toBe(true)
+
+    tile.unmount()
+    expect(unsubscribe).not.toHaveBeenCalled()
+
+    const modal = render(<RtcPilotCamera camera={driveway} controls fill minHeight={310} variant="modal" />)
+    const modalCard = await waitFor(() => {
+      const card = modal.container.querySelector('webrtc-camera-sfenton')
+      expect(card).toBeInTheDocument()
+      return card as FakeRtcCard
+    })
+    expect(modalCard.configuration?.card_id).toBe(driveway.popupCardId)
+    expect(modalCard.configuration?.streams).toEqual(tileCard.configuration?.streams)
+    expect(subscribe).toHaveBeenCalledTimes(1)
+    modal.unmount()
+    expect(unsubscribe).not.toHaveBeenCalled()
+
+    releaseRetainedRtcStreams()
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+    vi.unstubAllGlobals()
   })
 
   it('marks tile and fill-modal hosts for scoped full-height sizing', async () => {

@@ -7,6 +7,7 @@ import {
 } from './cameraStreamActions'
 import { CAMERA_STREAM_PHASE, type CameraStreamStatus } from './cameraStreamStatus'
 import { rtcCardResourceUrl } from './rtcCardResource'
+import { retainRtcStream, rtcStreamConfig } from './rtcStreamRetention'
 import styles from './HlsCamera.module.css'
 import rtcStyles from './RtcPilotCamera.module.css'
 
@@ -232,11 +233,12 @@ export function RtcPilotCamera({
           controls,
           intersection: 0,
           digital_ptz: disabledDigitalPtzConfig(),
-          streams: [{ url: camera.rtcStreamId, mode: 'webrtc', media: 'video,audio' }],
+          streams: [rtcStreamConfig(camera.rtcStreamId)],
         })
         card.hass = hassShimRef.current
         host.replaceChildren(card)
         cardRef.current = card
+        retainRtcStream(camera.rtcStreamId)
         window.addEventListener('webrtc-audio-state', handleAudioState)
         stopChrome = hideRtcChrome(card)
         stopWatching = watchRtcStatus(card, report)
