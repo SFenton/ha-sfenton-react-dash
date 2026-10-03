@@ -797,6 +797,92 @@ describe('DashboardViewPage Solo Trip', () => {
     expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
   })
 
+  it('optimistically turns an active Solo Trip off while Home Assistant ends it', async () => {
+    setupSoloTripSnapshot('active')
+    setMockCallServiceOutcome('script', 'household_away_command', 'pending')
+    renderSoloTripPage()
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(soloTripToggle())
+
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    expect(soloTripToggle()).toBeDisabled()
+    await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
+    expect(latestHouseholdAwayCall()).toMatchObject({ serviceData: { operation: 'end_now' } })
+
+    act(() => setMockEntityAttribute(STATUS_ENTITY, 'revision', 1))
+    await act(async () => acknowledgePendingMockHouseholdAwayCommands())
+    act(() => setMockEntityState(STATUS_ENTITY, 'ending'))
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    expect(soloTripToggle()).toBeDisabled()
+    fireEvent.click(soloTripToggle())
+    expect(householdAwayCalls()).toHaveLength(1)
+
+    act(() => {
+      setMockEntityState(STATUS_ENTITY, 'idle')
+      setMockEntityAttribute(STATUS_ENTITY, 'mode', 'none')
+      setMockEntityAttribute(STATUS_ENTITY, 'traveler', 'none')
+      setMockEntityAttribute(STATUS_ENTITY, 'home_resident', 'none')
+      setMockEntityAttribute(STATUS_ENTITY, 'revision', 2)
+    })
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('optimistically turns a scheduled Solo Trip off before Home Assistant responds', async () => {
+    setupSoloTripSnapshot('scheduled')
+    setMockCallServiceOutcome('script', 'household_away_command', 'pending')
+    renderSoloTripPage()
+
+    fireEvent.click(soloTripToggle())
+
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
+    expect(latestHouseholdAwayCall()).toMatchObject({ serviceData: { operation: 'cancel' } })
+  })
+
+  it('reverts the optimistic off state when Home Assistant rejects the end command', async () => {
+    setupSoloTripSnapshot('active')
+    setMockCallServiceOutcome('script', 'household_away_command', 'reject')
+    renderSoloTripPage()
+
+    fireEvent.click(soloTripToggle())
+
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    await waitFor(() => expect(screen.getByText('Home Assistant could not apply the Solo Trip change. Try again.')).toBeInTheDocument())
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'true')
+    expect(soloTripToggle()).toBeEnabled()
+  })
+
+  it('reverts the optimistic off state when an end command times out', async () => {
+    vi.useFakeTimers()
+    setupSoloTripSnapshot('active')
+    setMockCallServiceOutcome('script', 'household_away_command', 'pending')
+    renderSoloTripPage()
+
+    fireEvent.click(soloTripToggle())
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+    await elapseHouseholdAwayTimeout()
+
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'true')
+    expect(soloTripToggle()).toBeDisabled()
+  })
+
+  it('reverts the optimistic off state when ending requires a restore decision', async () => {
+    setupSoloTripSnapshot('active')
+    setMockCallServiceOutcome('script', 'household_away_command', 'pending')
+    renderSoloTripPage()
+
+    fireEvent.click(soloTripToggle())
+    await waitFor(() => expect(householdAwayCalls()).toHaveLength(1))
+    await act(async () => acknowledgePendingMockHouseholdAwayCommands())
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'false')
+
+    act(() => setMockEntityState(STATUS_ENTITY, 'restore_required'))
+
+    expect(soloTripToggle()).toHaveAttribute('aria-checked', 'true')
+    expect(soloTripToggle()).toBeDisabled()
+  })
+
   it('locks a timed-out return update until the authoritative snapshot arrives', async () => {
     vi.useFakeTimers()
     setupSoloTripSnapshot('scheduled')
