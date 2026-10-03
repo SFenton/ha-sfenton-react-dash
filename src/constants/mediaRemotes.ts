@@ -181,6 +181,7 @@ export const MUSIC_ROOM_MEDIA_SOURCE_STATES = {
   off: 'Off',
   server: 'Server',
   tv: 'TV',
+  windowsPc: 'Windows PC',
   xbox: 'Xbox',
 } as const
 
@@ -188,6 +189,7 @@ export const MUSIC_ROOM_COMMAND_REVERT_MS = {
   fortnite: 120_000,
   server: 20_000,
   tv: 20_000,
+  windowsPc: 20_000,
   xbox: 90_000,
 } as const
 
@@ -279,6 +281,13 @@ const musicRoomServerOnAction = service('script', 'music_room_server', undefined
   optimisticIntent(MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID, OFF, MUSIC_ROOM_COMMAND_REVERT_MS.server),
   optimisticIntent(MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, 'HDMI 2', MUSIC_ROOM_COMMAND_REVERT_MS.server),
 ])
+const musicRoomWindowsPcOnAction = service('script', 'music_room_windows_pc', undefined, undefined, [
+  optimisticIntent(MUSIC_ROOM_CONTROL_ENTITY_ID, 'on', MUSIC_ROOM_COMMAND_REVERT_MS.windowsPc),
+  optimisticIntent(MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID, MUSIC_ROOM_MEDIA_SOURCE_STATES.windowsPc, MUSIC_ROOM_COMMAND_REVERT_MS.windowsPc),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID, ON, MUSIC_ROOM_COMMAND_REVERT_MS.windowsPc),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_LIGHT_SYNC_ENTITY_ID, OFF, MUSIC_ROOM_COMMAND_REVERT_MS.windowsPc),
+  optimisticIntent(MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID, 'HDMI 3', MUSIC_ROOM_COMMAND_REVERT_MS.windowsPc),
+])
 
 export const MUSIC_ROOM_MEDIA_ACTIONS = {
   fortnite: service('script', 'music_room_fortnite', undefined, undefined, [
@@ -301,6 +310,12 @@ export const MUSIC_ROOM_MEDIA_ACTIONS = {
     cases: [{ states: ['off', 'unavailable', 'unknown'], action: musicRoomTvOnAction }],
     defaultAction: musicRoomTvOffAction,
   },
+  windowsPcToggle: {
+    type: 'state',
+    entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
+    cases: [{ states: [MUSIC_ROOM_MEDIA_SOURCE_STATES.windowsPc], action: musicRoomTvOffAction }],
+    defaultAction: musicRoomWindowsPcOnAction,
+  },
   xboxSourceToggle: {
     type: 'state',
     entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
@@ -313,7 +328,7 @@ export const MUSIC_ROOM_MEDIA_ACTIONS = {
     cases: [{ states: [...MUSIC_ROOM_XBOX_ACTIVE_STATES, MUSIC_ROOM_XBOX_HDMI_LINKED.state], action: musicRoomXboxOffAction }],
     defaultAction: musicRoomXboxOnAction,
   },
-} satisfies Record<'fortnite' | 'serverToggle' | 'tvToggle' | 'xboxSourceToggle' | 'xboxToggle', MediaRemoteAction>
+} satisfies Record<'fortnite' | 'serverToggle' | 'tvToggle' | 'windowsPcToggle' | 'xboxSourceToggle' | 'xboxToggle', MediaRemoteAction>
 
 const musicRoomPowerAction = MUSIC_ROOM_MEDIA_ACTIONS.tvToggle
 
@@ -332,6 +347,10 @@ const musicRoomFortniteSemantics: ControlSemanticsResolver = (state) => ({
 const musicRoomServerSemantics: ControlSemanticsResolver = (state) => ({
   kind: 'selection',
   selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.server,
+})
+const musicRoomWindowsPcSemantics: ControlSemanticsResolver = (state) => ({
+  kind: 'selection',
+  selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.windowsPc,
 })
 
 const stateSemantics: ControlSemanticsResolver = () => ({ kind: 'state' })
@@ -543,6 +562,15 @@ export const MEDIA_REMOTE_CONFIGS: Record<string, MediaRemoteConfig> = {
         stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.server),
         semantics: musicRoomServerSemantics,
         action: MUSIC_ROOM_MEDIA_ACTIONS.serverToggle,
+      },
+      {
+        title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.windowsPc),
+        entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
+        icon: 'mdi:microsoft-windows',
+        activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.windowsPc],
+        stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.windowsPc),
+        semantics: musicRoomWindowsPcSemantics,
+        action: MUSIC_ROOM_MEDIA_ACTIONS.windowsPcToggle,
       },
       {
         title: copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.sonosBeam),

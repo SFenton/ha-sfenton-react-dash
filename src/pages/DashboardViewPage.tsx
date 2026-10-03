@@ -285,8 +285,14 @@ const APP_LAUNCH_TILE_MAX_WIDTH_PX = 200
 const APP_LAUNCH_MAX_COLUMNS = 6
 
 // `lead-row` sections render their first card in its own full-width grid, so the follow-up
-// controls keep the standard responsive room grid underneath it.
+// controls keep the standard responsive room grid underneath it. Three or more follow-ups
+// switch to `two-column-fill` so the controls never gain an implicit third column.
 const LEAD_ROW_GRID_LABEL_SUFFIX = 'Controls'
+const LEAD_ROW_STANDARD_FOLLOW_UP_LIMIT = 2
+
+function leadRowFollowUpLayout(followUpCount: number): RoomSourceSectionLayout | undefined {
+  return followUpCount > LEAD_ROW_STANDARD_FOLLOW_UP_LIMIT ? 'two-column-fill' : undefined
+}
 
 function RoomGrid({ ariaLabel, children, layout }: { ariaLabel: string; children: ReactNode; layout?: RoomSourceSectionLayout }) {
   if (layout === 'app-launch') {
@@ -1476,7 +1482,7 @@ function SourceRoomPage({ onNavigate, preload = false, preloadHash, preloadHashe
                     {leadCards.map(renderCard)}
                   </RoomGrid>
                   {followUpCards.length > 0 && (
-                    <RoomGrid ariaLabel={`${room.title} ${section.title} ${LEAD_ROW_GRID_LABEL_SUFFIX}`}>
+                    <RoomGrid ariaLabel={`${room.title} ${section.title} ${LEAD_ROW_GRID_LABEL_SUFFIX}`} layout={leadRowFollowUpLayout(followUpCards.length)}>
                       {followUpCards.map(renderCard)}
                     </RoomGrid>
                   )}

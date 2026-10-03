@@ -3572,10 +3572,13 @@ test('Music Room route keeps source controls and moves Fortnite into the remote 
   const remote = opener.getByRole('button', { name: 'Music Room Remote Off' })
   const xbox = controls.getByRole('button', { name: 'Xbox Off' })
   const server = controls.getByRole('button', { name: 'Server Off' })
+  const windowsPc = controls.getByRole('button', { name: 'Windows PC Off' })
   await expect(remote).toHaveAttribute('data-action-kind', 'modal')
   await expect(xbox).toHaveAttribute('data-action-kind', 'selection')
   await expect(xbox).toHaveAttribute('aria-pressed', 'false')
   await expect(server).toHaveAttribute('data-action-kind', 'selection')
+  await expect(windowsPc).toHaveAttribute('data-action-kind', 'selection')
+  await expect(windowsPc).toHaveAttribute('aria-pressed', 'false')
 
   await xbox.click()
   const selectedXbox = controls.getByRole('button', { name: 'Xbox On' })
@@ -3584,10 +3587,14 @@ test('Music Room route keeps source controls and moves Fortnite into the remote 
   await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
   await server.click()
   await expect(controls.getByRole('button', { name: 'Server On' })).toBeVisible()
+  await controls.getByRole('button', { name: 'Windows PC Off' }).click()
+  await expect(controls.getByRole('button', { name: 'Windows PC On' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(controls.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
   expect(await page.evaluate(() => (window as unknown as { __mockHass: { calls: Record<string, unknown>[] } }).__mockHass.calls)).toEqual([
     { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
     { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
     { domain: 'script', returnResponse: true, service: 'music_room_server' },
+    { domain: 'script', returnResponse: true, service: 'music_room_windows_pc' },
   ])
 
   await page.reload()
@@ -3628,6 +3635,7 @@ test('Music Room route keeps source controls and moves Fortnite into the remote 
   await expect(dialog.getByRole('switch', { name: 'TV On' })).toBeVisible()
   await expect(dialog.getByRole('switch', { name: 'Xbox On' })).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Server Off' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Windows PC Off' })).toBeVisible()
   await expect(dialog.getByLabel('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
   await expect(dialog.getByRole('button', { name: 'Sonos Beam Playing' })).toHaveCount(0)
   await dialog.getByRole('switch', { name: 'Xbox On' }).click()
@@ -3646,13 +3654,14 @@ test('Music Room route keeps source controls and moves Fortnite into the remote 
   ])
 })
 
-test('Media page includes the Music Room remote, Xbox, Server, and Fortnite controls', async ({ page }) => {
+test('Media page includes the Music Room remote, Xbox, Server, Windows PC, and Fortnite controls', async ({ page }) => {
   await page.goto('/at-a-glance/media')
 
   const musicSection = page.getByRole('heading', { exact: true, name: 'Music Room' }).locator('xpath=ancestor::section[1]')
   await expect(musicSection.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
   await expect(musicSection.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('data-action-kind', 'selection')
   await expect(musicSection.getByRole('button', { name: 'Server Off' })).toBeVisible()
+  await expect(musicSection.getByRole('button', { name: 'Windows PC Off' })).toHaveAttribute('data-action-kind', 'selection')
   const fortnite = musicSection.getByRole('button', { name: 'Fortnite' })
   await expect(fortnite).toBeVisible()
   await expect.poll(() => fortnite.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
@@ -3692,6 +3701,11 @@ test('Music Room source tiles follow external routed-source truth without simult
   await setSource('Server')
   await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
   await expect(controls.getByRole('button', { name: 'Server On' })).toHaveAttribute('aria-pressed', 'true')
+  await expect(controls.getByRole('button', { name: 'Windows PC Off' })).toHaveAttribute('aria-pressed', 'false')
+
+  await setSource('Windows PC')
+  await expect(controls.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(controls.getByRole('button', { name: 'Windows PC On' })).toHaveAttribute('aria-pressed', 'true')
 
   await page.evaluate(() => {
     const mock = window.__mockHass
@@ -3703,6 +3717,7 @@ test('Music Room source tiles follow external routed-source truth without simult
   })
   await expect(controls.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
   await expect(controls.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+  await expect(controls.getByRole('button', { name: 'Windows PC Off' })).toHaveAttribute('aria-pressed', 'false')
 })
 
 test('Free Sleep global Add Alarm defaults to weekdays and writes enabled backend records', async ({ page }) => {

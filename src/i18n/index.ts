@@ -808,6 +808,7 @@ export const MEDIA_COPY_KEYS = {
     sonosBeamVolume: 'musicRoom.sonosBeamVolume',
     title: 'musicRoom.title',
     tv: 'musicRoom.tv',
+    windowsPc: 'musicRoom.windowsPc',
     xbox: 'musicRoom.xbox',
   },
   remoteControls: {

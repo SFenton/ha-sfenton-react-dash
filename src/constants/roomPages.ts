@@ -155,11 +155,13 @@ const modalSemantics: ControlSemanticsResolver = () => ({ kind: 'modal' })
 const commandSemantics: ControlSemanticsResolver = () => ({ kind: 'command' })
 const musicRoomXboxSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.xbox || state === MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite })
 const musicRoomServerSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.server })
+const musicRoomWindowsPcSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.windowsPc })
 const musicRoomFortniteSemantics: ControlSemanticsResolver = (state) => ({ kind: 'selection', selected: state === MUSIC_ROOM_MEDIA_SOURCE_STATES.fortnite })
 const musicRoomTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.title)
 const musicRoomRemoteTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.remote)
 const musicRoomXboxTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.xbox)
 const musicRoomServerTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.server)
+const musicRoomWindowsPcTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.windowsPc)
 const musicRoomFortniteTitle = copy(MEDIA_COPY_NAMESPACE, MEDIA_COPY_KEYS.musicRoom.fortnite)
 
 export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
@@ -373,6 +375,17 @@ export const ROOM_PAGE_CONFIGS: Record<string, RoomPageSourceConfig> = {
             stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.server),
             semantics: musicRoomServerSemantics,
             action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.serverToggle),
+          },
+          {
+            title: musicRoomWindowsPcTitle,
+            entityId: MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID,
+            icon: 'mdi:microsoft-windows',
+            kind: 'media',
+            showState: true,
+            activeStates: [MUSIC_ROOM_MEDIA_SOURCE_STATES.windowsPc],
+            stateLabels: musicRoomSourceLabels(MUSIC_ROOM_MEDIA_SOURCE_STATES.windowsPc),
+            semantics: musicRoomWindowsPcSemantics,
+            action: sourceActionFromMediaAction(MUSIC_ROOM_MEDIA_ACTIONS.windowsPcToggle),
           },
         ],
       },

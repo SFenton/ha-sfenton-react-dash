@@ -1,3 +1,6 @@
+// @covers src/components/core/iconPaths.ts
+// @covers src/constants/mediaRemotes.ts
+// @covers src/i18n/locales/en/pages/media.json
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
 import { vi } from 'vitest'
@@ -455,7 +458,14 @@ describe('DashboardViewPage', () => {
           expect(grid.querySelector('[data-dynamic-grid-cell="true"]')).toHaveAttribute('data-dynamic-grid-span', '2')
           const followUpGrid = screen.getByRole('group', { name: `${room.title} ${section.title} Controls` })
           expect(followUpGrid).toHaveAttribute('data-dynamic-grid', 'true')
-          expect(followUpGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
+          if (section.cards.length - 1 > 2) {
+            expect(followUpGrid).not.toHaveAttribute('data-dynamic-grid-max-cell-width')
+            expect(followUpGrid).toHaveAttribute('data-dynamic-grid-columns', '2')
+            expect(followUpGrid).toHaveAttribute('data-dynamic-grid-last-row', 'fill')
+            expect(followUpGrid).toHaveAttribute('data-dynamic-grid-layout', 'fill')
+          } else {
+            expect(followUpGrid).toHaveAttribute('data-dynamic-grid-max-cell-width', '280')
+          }
           expect(followUpGrid.querySelectorAll('[data-dynamic-grid-cell="true"]')).toHaveLength(section.cards.length - 1)
         }
       }
@@ -468,8 +478,8 @@ describe('DashboardViewPage', () => {
     const implicitlyExpandableSections = ROOM_PAGE_ORDER.flatMap((path) =>
       ROOM_PAGE_CONFIGS[path].sourceSections
         .filter((section) => section.showOnRoomPage !== false)
-        .filter((section) => section.layout !== 'app-launch' && section.layout !== 'two-column-fill')
-        .filter((section) => (section.layout === 'lead-row' ? section.cards.length - 1 : section.cards.length) > 2)
+        .filter((section) => section.layout !== 'app-launch' && section.layout !== 'two-column-fill' && section.layout !== 'lead-row')
+        .filter((section) => section.cards.length > 2)
         .map((section) => `${path}:${section.title}`),
     )
     expect(implicitlyExpandableSections).toEqual([])
@@ -564,6 +574,9 @@ describe('DashboardViewPage', () => {
     const remote = within(opener).getByRole('button', { name: 'Music Room Remote Off' })
     const xbox = within(controls).getByRole('button', { name: 'Xbox Off' })
     const server = within(controls).getByRole('button', { name: 'Server Off' })
+    const windowsPc = within(controls).getByRole('button', { name: 'Windows PC Off' })
+    expect(materialIconPath('mdi:microsoft-windows')).not.toBe(materialIconPath('mdi:home'))
+    expect(windowsPc.querySelector('path')).toHaveAttribute('d', materialIconPath('mdi:microsoft-windows'))
 
     expect(remote).toHaveAttribute('data-action-kind', 'modal')
     expect(remote).toHaveAttribute('data-modal-opener', 'true')
@@ -572,6 +585,9 @@ describe('DashboardViewPage', () => {
     expect(server).toHaveAttribute('data-action-kind', 'selection')
     expect(server).toHaveAttribute('aria-pressed', 'false')
     expect(server).not.toHaveAttribute('data-modal-opener')
+    expect(windowsPc).toHaveAttribute('data-action-kind', 'selection')
+    expect(windowsPc).toHaveAttribute('aria-pressed', 'false')
+    expect(windowsPc).not.toHaveAttribute('data-modal-opener')
     expect(screen.queryByRole('heading', { name: 'Quick App Launch' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Fortnite' })).not.toBeInTheDocument()
   })
@@ -600,9 +616,19 @@ describe('DashboardViewPage', () => {
       act(() => vi.advanceTimersByTime(1))
       expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
 
+      fireEvent.click(screen.getByRole('button', { name: 'Windows PC Off' }))
+      expect(screen.getByRole('button', { name: 'Windows PC On' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+      expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+      act(() => vi.advanceTimersByTime(MUSIC_ROOM_COMMAND_REVERT_MS.windowsPc - 1))
+      expect(screen.getByRole('button', { name: 'Windows PC On' })).toBeInTheDocument()
+      act(() => vi.advanceTimersByTime(1))
+      expect(screen.getByRole('button', { name: 'Windows PC Off' })).toHaveAttribute('aria-pressed', 'false')
+
       expect(mockCallServiceCalls).toEqual([
         { domain: 'script', returnResponse: true, service: 'music_room_xbox' },
         { domain: 'script', returnResponse: true, service: 'music_room_server' },
+        { domain: 'script', returnResponse: true, service: 'music_room_windows_pc' },
       ])
     } finally {
       vi.clearAllTimers()
@@ -650,6 +676,43 @@ describe('DashboardViewPage', () => {
       { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
     ])
     expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('turns the full system off from an already-selected Windows PC source and shares that optimism with the modal', async () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Windows PC'
+    mockEntities['input_select.music_room_media_source'].state = 'Windows PC'
+    mockEntities['media_player.music_room_tv_android'].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_POWER_ENTITY_ID].state = 'on'
+    mockEntities[MUSIC_ROOM_HUE_SYNC_HDMI_INPUT_ENTITY_ID].state = 'HDMI 3'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    const windowsPc = screen.getByRole('button', { name: 'Windows PC On' })
+    expect(windowsPc).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(windowsPc)
+
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_tv_off' },
+    ])
+    expect(screen.getByRole('button', { name: 'Windows PC Off' })).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(screen.getByRole('button', { name: /^Music Room Remote/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Music Room Remote' })
+    await clickModalTab(within(dialog), 'Devices')
+    expect(within(dialog).getByRole('button', { name: 'Windows PC Off' })).toBeInTheDocument()
+  })
+
+  it('switches directly between active Server and Windows PC routes without dual selection', () => {
+    mockEntities[MUSIC_ROOM_ACTIVE_MEDIA_SOURCE_ENTITY_ID].state = 'Server'
+    render(<DashboardViewPage activePath="music-room" onNavigate={() => undefined} path="music-room" />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Windows PC Off' }))
+    expect(screen.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Windows PC On' })).toHaveAttribute('aria-pressed', 'true')
+    expect(mockCallServiceCalls).toEqual([
+      { domain: 'script', returnResponse: true, service: 'music_room_windows_pc' },
+    ])
   })
 
   it('lets an external routed-source change replace pending Xbox optimism immediately', () => {
@@ -714,6 +777,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByRole('switch', { name: 'TV Off' })).toBeInTheDocument()
     expect(within(dialog).getByRole('switch', { name: 'Xbox Off' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Server Off' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Windows PC Off' })).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
 
     await clickModalTab(within(dialog), 'Hue Sync')
