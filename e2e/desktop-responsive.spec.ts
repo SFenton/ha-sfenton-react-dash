@@ -427,6 +427,7 @@ test('Music Room media controls remain usable in a fine-pointer desktop context'
     await expect(root.getByRole('button', { name: 'Music Room Remote Off' })).toBeVisible()
     await expect(root.getByRole('button', { name: 'Xbox Off' })).toHaveAttribute('data-action-kind', 'selection')
     await expect(root.getByRole('button', { name: 'Server Off' })).toHaveAttribute('data-action-kind', 'selection')
+    await expect(root.getByRole('button', { name: 'Windows PC Off' })).toHaveAttribute('data-action-kind', 'selection')
     await expect(root.getByRole('button', { name: 'Fortnite' })).toHaveCount(0)
 
     await page.evaluate(() => {
@@ -445,6 +446,7 @@ test('Music Room media controls remain usable in a fine-pointer desktop context'
     await expect(dialog.getByRole('switch', { name: 'TV On' })).toBeVisible()
     await expect(dialog.getByRole('switch', { name: 'Xbox On' })).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Server Off' })).toHaveAttribute('aria-pressed', 'false')
+    await expect(dialog.getByRole('button', { name: 'Windows PC Off' })).toHaveAttribute('aria-pressed', 'false')
     await expect(dialog.getByLabel('Sonos Beam Playing')).toHaveAttribute('data-action-kind', 'state')
     await dialog.getByRole('tab', { name: 'Hue Sync' }).click()
     await expect(dialog.getByRole('switch', { name: 'Sync Box Power On' })).toBeVisible()
@@ -460,6 +462,7 @@ test('Music Room media controls remain usable in a fine-pointer desktop context'
     await expect(musicSection.getByRole('button', { name: /^Music Room Remote / })).toBeVisible()
     await expect(musicSection.getByRole('button', { name: 'Xbox Off' })).toBeVisible()
     await expect(musicSection.getByRole('button', { name: 'Server Off' })).toBeVisible()
+    await expect(musicSection.getByRole('button', { name: 'Windows PC Off' })).toBeVisible()
     const mediaFortnite = musicSection.getByRole('button', { name: 'Fortnite' })
     await expect(mediaFortnite).toBeVisible()
     await expect.poll(() => mediaFortnite.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true)
