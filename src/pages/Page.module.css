@@ -46,7 +46,7 @@
 
 .headerQuickLinks {
   --status-rail-trailing-space: 0px;
-  margin-top: 18px;
+  margin-top: calc(var(--page-content-start-gap) - var(--page-header-visual-inset));
   transition:
     opacity 170ms ease-out,
     transform 170ms ease-out;
@@ -148,10 +148,6 @@
 
   .headerDock {
     padding-top: max(8px, var(--rd-safe-top));
-  }
-
-  .headerQuickLinks {
-    margin-top: 8px;
   }
 }
 

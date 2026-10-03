@@ -71,6 +71,28 @@ async function measureHeaderSpacing(page: Page) {
   })
 }
 
+const STATUS_CHIP_ROUTES = ['/', '/at-a-glance/security', '/kitchen'] as const
+
+async function measureHeaderToChips(page: Page) {
+  return page.evaluate(() => {
+    const visible = (element: Element) => {
+      const bounds = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return bounds.width > 0 && bounds.height > 0 && style.visibility !== 'hidden' && Number(style.opacity) > 0
+    }
+    const header = document.querySelector<HTMLElement>('[data-page-header]')
+    const quickLinks = header?.querySelector<HTMLElement>('[data-page-header-quick-links="true"]')
+    if (!header || !quickLinks) return null
+    const headerRow = Array.from(header.querySelectorAll('button, a, h1'))
+      .filter((element) => visible(element) && !quickLinks.contains(element))
+    const chips = Array.from(quickLinks.querySelectorAll('button, a')).filter(visible)
+    if (!headerRow.length || !chips.length) return null
+    const headerBottom = Math.max(...headerRow.map((element) => element.getBoundingClientRect().bottom))
+    const chipsTop = Math.min(...chips.map((element) => element.getBoundingClientRect().top))
+    return chipsTop - headerBottom
+  })
+}
+
 async function openRoute(page: Page, path: string) {
   await page.goto(path)
   await expect(page.locator('[data-page-content="true"]').first()).toBeVisible({ timeout: 15_000 })
@@ -99,6 +121,19 @@ for (const viewport of VIEWPORTS) {
             ? 'equal'
             : `above ${spacing.above.toFixed(1)} / below ${spacing.below.toFixed(1)}`
         }, { timeout: 10_000 }).toBe('equal')
+      })
+    }
+
+    for (const path of STATUS_CHIP_ROUTES) {
+      test(`${path} status chips start one shared gap below the header row`, async ({ page }) => {
+        await openRoute(page, path)
+        await expectQuickLinks(page, true)
+        const startGap = viewport.width > viewport.height && viewport.height <= 500 ? 8 : 12
+        await expect.poll(async () => {
+          const gap = await measureHeaderToChips(page)
+          if (gap === null) return 'status chips not mounted'
+          return Math.abs(gap - startGap) <= 1 ? 'aligned' : `gap ${gap.toFixed(1)}`
+        }, { timeout: 10_000 }).toBe('aligned')
       })
     }
 

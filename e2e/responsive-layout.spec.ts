@@ -43,11 +43,11 @@ test('preserves the approved 393x852 Home geometry', async ({ page }) => {
 
   expect(geometry).toEqual({
     bottomNav: { height: 62, width: 365, x: 14, y: 778 },
-    camera: { height: 135, width: 174, x: 17, y: 423 },
+    camera: { height: 135, width: 174, x: 17, y: 412 },
     menu: { height: 28, width: 28, x: 10, y: 30 },
     profile: { height: 38, width: 38, x: 339, y: 25 },
-    scroller: { height: 624, width: 393, x: 0, y: 142 },
-    weather: { height: 222, width: 361, x: 16, y: 146 },
+    scroller: { height: 635, width: 393, x: 0, y: 131 },
+    weather: { height: 222, width: 361, x: 16, y: 135 },
   })
 })
 
