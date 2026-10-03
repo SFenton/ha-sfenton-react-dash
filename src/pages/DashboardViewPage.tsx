@@ -2339,8 +2339,11 @@ function SoloTripPage() {
   useEffect(() => {
     if (restoreRequired) resetToggleChecked()
   }, [resetToggleChecked, restoreRequired])
+  // An accepted off request presents the settled off page until HA confirms or the optimistic state reverts.
+  const endPending = engaged && !toggleChecked && !restoreRequired
+  const presentedEngaged = engaged && !endPending
   const selectionLocked = editorOpen || scheduleAwaitingState !== null || engaged || vacationEngaged
-  const knownTraveler = snapshot.traveler !== 'none' ? snapshot.traveler : selectedTraveler
+  const knownTraveler = endPending ? null : snapshot.traveler !== 'none' ? snapshot.traveler : selectedTraveler
   const canEditReturn = snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
     && snapshot.state !== HOUSEHOLD_AWAY_STATE.IDLE
     && snapshot.state !== HOUSEHOLD_AWAY_STATE.ENDING
@@ -2362,7 +2365,8 @@ function SoloTripPage() {
   }
 
   if (
-    snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
+    !endPending
+    && snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP
     && snapshot.traveler !== 'none'
     && selectedTraveler !== snapshot.traveler
   ) {
@@ -2438,6 +2442,8 @@ function SoloTripPage() {
     if (!snapshot.available || !snapshot.commandAvailable) return
     if (!SOLO_TRIP_TOGGLE_END_STATES.has(snapshot.state)) return
     commitToggleChecked(false)
+    setSelectedTraveler(null)
+    setReturnDraftDirty(false)
     const result = snapshot.state === 'scheduled'
       ? await controller.cancel()
       : await controller.endNow()
@@ -2515,7 +2521,7 @@ function SoloTripPage() {
         <ResponsiveSectionItem>
           <section className={styles.section}>
             <SectionHeader title={copy(SOLO_TRIP_COPY_KEYS.chooser.soloTrip)} />
-            <SoloTripActiveNotice controller={controller} />
+            {!endPending && <SoloTripActiveNotice controller={controller} />}
             <Description>{copy(SOLO_TRIP_COPY_KEYS.page.soloTripDescription)}</Description>
             <Card
               ariaLabel={copy(SOLO_TRIP_COPY_KEYS.page.toggleAriaLabel, { state: toggleSubtitle })}
@@ -2551,9 +2557,9 @@ function SoloTripPage() {
                 [HOUSEHOLD_RESIDENT.STEPH, SOLO_TRIP_COPY_KEYS.editor.travelerSteph],
               ] as const).map(([traveler, key]) => {
                 const selected = knownTraveler === traveler
-                const homeResident = snapshot.homeResident === traveler
+                const homeResident = !endPending && snapshot.homeResident === traveler
                 const title = viewerResident === traveler ? commonCopy(HOUSEHOLD_COPY_KEYS.you) : copy(key)
-                const subtitle = engaged
+                const subtitle = presentedEngaged
                   ? selected
                     ? copy(SOLO_TRIP_COPY_KEYS.page.travelerAway)
                     : homeResident
@@ -2567,7 +2573,7 @@ function SoloTripPage() {
                   <Card
                     ariaLabel={subtitle ? copy(SOLO_TRIP_COPY_KEYS.page.memberAriaLabel, { name: title, state: subtitle }) : title}
                     color={SOLO_TRIP_COLOR}
-                    disabled={!interactive}
+                    disabled={!interactive && !endPending}
                     icon={<MaterialIcon name={selected ? 'mdi:account-arrow-right-outline' : homeResident ? 'mdi:home-account' : 'mdi:account'} size={34} />}
                     key={traveler}
                     muted={vacationEngaged || !selected}
@@ -2580,7 +2586,7 @@ function SoloTripPage() {
                 )
               })}
             </DynamicGrid>
-            {snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP && authoritativeEnd && (
+            {!endPending && snapshot.mode === HOUSEHOLD_AWAY_MODE.SOLO_TRIP && authoritativeEnd && (
               <>
                 <div className={styles.soloTripFieldGrid}>
                   <NativePickerField disabled={!canEditReturn || controller.pending || returnAwaitingState !== null} label={copy(SOLO_TRIP_COPY_KEYS.editor.endDate)} onChange={(value) => void updateReturnDraft({ ...returnDraft, endDate: value })} type="date" value={returnDraft.endDate} />
@@ -2590,13 +2596,14 @@ function SoloTripPage() {
                 {returnDraftDirty && returnValidation.endInFuture && !returnValidation.endAfterStart && <InlineAlert>{copy(SOLO_TRIP_COPY_KEYS.editor.validation.endAfterStart)}</InlineAlert>}
               </>
             )}
-            {engaged && (
+            {presentedEngaged && (
               <SoloTripStatusSection
                 controller={controller}
                 onResolveRestore={(resolveAction) => void resolveSoloTripRestore(resolveAction)}
                 restoreDisabled={restoreAwaitingSnapshot}
                 showConfirmedActiveNotice={false}
                 showActivatingEndNow={false}
+                showActivationProgress={false}
               />
             )}
           </section>
