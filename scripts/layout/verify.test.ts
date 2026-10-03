@@ -57,6 +57,8 @@ describe('layout scope and selection', () => {
   it('assigns RTC camera and Fold host changes to their declared layout scenarios', () => {
     expect(SURFACE_CONTRACTS.camera.owners).toContain('src/components/hass/RtcPilotCamera')
     expect(SURFACE_CONTRACTS.camera.owners).toContain('src/constants/rtcPilot')
+    expect(SURFACE_CONTRACTS.camera.owners).toContain('src/components/hass/rtcStreamRetention')
+    expect(classifyChanges(['src/components/hass/rtcStreamRetention.ts'])).toMatchObject({ mode: 'focused', scenarios: ['camera'], unowned: [] })
     expect(SURFACE_CONTRACTS.host.states).toEqual(['legacy', 'pilot', 'panel'])
     expect(classifyChanges(['src/components/hass/RtcPilotCamera.tsx']).scenarios).toContain('camera')
     expect(classifyChanges(['src/components/hass/HlsCamera.module.css'])).toMatchObject({ mode: 'focused', scenarios: ['camera'] })
