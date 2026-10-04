@@ -652,10 +652,14 @@ async function soloTripSettingsFacts(root: Locator, state: string) {
     return { ...facts, state, invalidReturn: 'local-only', returnEditor: 'available', travelerCards }
   }
   if (state === 'activating') {
+    const status = root.getByRole('note', { name: 'Stephen Away' })
+    const activeCopy = "While you are away from home and the Solo Trip setting is enabled in settings, Steph's controls and alarms will control the entire bed."
     await expect(toggle).toBeEnabled()
-    await expect(root.getByRole('heading', { name: 'Starting Solo Trip' })).toBeVisible()
+    await expect(status).toHaveAttribute('data-tone', 'success')
+    await expect(status).toContainText(activeCopy)
+    await expect(root.getByRole('heading', { name: 'Starting Solo Trip' })).toHaveCount(0)
     await expect(root.getByRole('button', { name: 'End Solo Trip Now' })).toHaveCount(0)
-    return { ...facts, state, toggle: 'enabled-on', emergencyEnd: 'toggle-only', travelerCards }
+    return { ...facts, state, activeCopy, status: 'optimistic active while settling', toggle: 'enabled-on', emergencyEnd: 'toggle-only', travelerCards }
   }
   if (state === 'active' || state === 'active-home-viewer' || state === 'active-unknown-viewer') {
     const status = root.getByRole('note', { name: 'Stephen Away' })
