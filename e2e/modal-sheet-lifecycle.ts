@@ -322,6 +322,24 @@ export async function readModalLifecycleProbe(page: Page) {
   })
 }
 
+export type ModalExitWindowOutcome = 'inconclusive' | 'observed' | 'stuck'
+
+/**
+ * Classifies one accelerated close cycle. A starved renderer can let ModalSheet's
+ * wall-clock unmount timer win before Base UI finishes the exit transition; that
+ * cycle never exposes the closed-but-mounted window and proves nothing either way.
+ */
+export function classifyModalExitWindow(trace: ModalLifecycleTrace, popupMountedAfterRead: boolean): ModalExitWindowOutcome {
+  if (trace.frames.some((frame) => frame.popupPresent && frame.closed && !frame.ending)) return 'observed'
+  const popupNodeIds = new Set(trace.frames.filter((frame) => frame.popupPresent).map((frame) => frame.nodeId))
+  const popupEnding = trace.mutations.filter((mutation) =>
+    mutation.attribute === 'data-ending-style' && popupNodeIds.has(mutation.nodeId))
+  // Mutation values are read when the observer callback runs, so a null value on the popup proves removal.
+  const endingRemoved = popupEnding.some((mutation) => mutation.value === null)
+  if (popupEnding.length > 0 && !endingRemoved && !popupMountedAfterRead) return 'inconclusive'
+  return 'stuck'
+}
+
 export function assertTerminalModalLifecycle(trace: ModalLifecycleTrace) {
   const connectedClosed = trace.frames.filter((frame) => frame.popupPresent && frame.closed)
   if (connectedClosed.length === 0) throw new Error('Modal lifecycle trace never reached a connected closed state')
