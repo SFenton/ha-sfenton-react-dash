@@ -173,9 +173,9 @@ function createRtcPoster(host: HTMLElement, card: RtcCardElement, streamId: stri
     canvas.width = source.videoWidth
     canvas.height = source.videoHeight
     try {
-      const context = canvas.getContext('2d')
-      if (!context) return
-      context.drawImage(source, 0, 0, canvas.width, canvas.height)
+      const drawing = canvas.getContext('2d')
+      if (!drawing) return
+      drawing.drawImage(source, 0, 0, canvas.width, canvas.height)
     } catch {
       return
     }
@@ -326,7 +326,7 @@ export function RtcPilotCamera({
         card = created
       }
       const mounted = card
-      let lastStatus: CameraStreamStatus = 'loading'
+      let lastStatus: CameraStreamStatus = CAMERA_STREAM_PHASE.LOADING
       let stopChrome: (() => void) | null = null
       let stopWatching: (() => void) | null = null
       let unregisterActions: (() => void) | null = null
