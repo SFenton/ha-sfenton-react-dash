@@ -218,12 +218,15 @@ export interface AdminIssueDeploymentBinding {
 }
 
 export interface AdminIssueLayoutValidationBinding {
+  // "success" is the Automated layout job result, rather than the aggregate workflow result.
   conclusion: 'success'
   epoch: string
   generation: number
   mergeSha: string
   observedAt: string
+  replayBaseSha?: string
   revision: number
+  workflowEvent?: 'push' | 'workflow_dispatch'
   workflowHeadSha: string
   workflowRunAttempt: number
   workflowRunId: number
@@ -313,7 +316,7 @@ export interface AdminIssueRecord {
   issueUrl: string
   lastOutcome?: AdminIssueWorkerOutcome
   phase: AdminIssuePhase
-  origin?: 'github-automation'
+  origin?: 'github-automation' | 'github-owner'
   pr?: AdminIssuePullRequest
   processedRevision: number
   provenance: AdminIssueProvenance
@@ -1027,6 +1030,20 @@ function assertProvenance(value: unknown, field: string) {
     assert(validation.conclusion === 'success', `${field}.layoutValidation.conclusion is invalid`)
     sha(validation.mergeSha, `${field}.layoutValidation.mergeSha`)
     sha(validation.workflowHeadSha, `${field}.layoutValidation.workflowHeadSha`)
+    const workflowEvent = validation.workflowEvent ?? 'push'
+    assert(
+      workflowEvent === 'push' || workflowEvent === 'workflow_dispatch',
+      `${field}.layoutValidation.workflowEvent is invalid`,
+    )
+    if (workflowEvent === 'workflow_dispatch') {
+      sha(validation.replayBaseSha, `${field}.layoutValidation.replayBaseSha`)
+    } else {
+      assert(
+        validation.replayBaseSha === undefined &&
+        validation.workflowHeadSha === provenance.merge?.mergeSha,
+        `${field}.layoutValidation push binding does not exactly match the verified merge`,
+      )
+    }
     isoTimestamp(validation.observedAt, `${field}.layoutValidation.observedAt`)
     positiveInteger(validation.workflowRunId, `${field}.layoutValidation.workflowRunId`)
     positiveInteger(
@@ -1036,8 +1053,7 @@ function assertProvenance(value: unknown, field: string) {
     nonEmptyString(validation.workflowUrl, `${field}.layoutValidation.workflowUrl`)
     assert(provenance.merge, `${field}.layoutValidation has no verified merge`)
     assert(
-      validation.mergeSha === provenance.merge.mergeSha &&
-      validation.workflowHeadSha === provenance.merge.mergeSha,
+      validation.mergeSha === provenance.merge.mergeSha,
       `${field}.layoutValidation does not match the verified merge`,
     )
   }
@@ -1260,7 +1276,7 @@ function validateAdminIssueControllerState(value: unknown, version: 2 | 3) {
     }
     if (rawRecord.origin !== undefined) {
       assert(
-        rawRecord.origin === 'github-automation',
+        rawRecord.origin === 'github-automation' || rawRecord.origin === 'github-owner',
         `state.issues.${uid}.origin is invalid`,
       )
     }
@@ -1486,10 +1502,17 @@ export function assertLayoutFinalizationAuthorized(record: AdminIssueRecord) {
     layoutValidation.mergeSha === merge.mergeSha,
     'Layout validation merge does not match verified merge',
   )
-  assert(
-    layoutValidation.workflowHeadSha === merge.mergeSha,
-    'Layout validation workflow head does not match merge',
-  )
+  if ((layoutValidation.workflowEvent ?? 'push') === 'push') {
+    assert(
+      layoutValidation.workflowHeadSha === merge.mergeSha,
+      'Layout validation workflow head does not match merge',
+    )
+  } else {
+    assert(
+      layoutValidation.replayBaseSha,
+      'Layout replay validation is missing its replay base',
+    )
+  }
   assert(
     layoutValidation.conclusion === 'success',
     'Layout validation did not conclude successfully',
@@ -1659,7 +1682,7 @@ export function pendingIssueInputs(record: AdminIssueRecord) {
 }
 
 export function adminTodoCompletionRequired(record: AdminIssueRecord) {
-  return record.origin !== 'github-automation'
+  return record.origin === undefined
 }
 
 export function baselineAdminIssueState(
@@ -2157,6 +2180,7 @@ export function formatBlockedComment(
   uid: string,
   revision: number,
   outcome: Extract<AdminIssueWorkerOutcome, { decision: 'blocked' }>,
+  recoveryGuidance = '',
 ) {
   const ios = outcome.iosFollowUp.required
     ? `\n\n> **iOS follow-up required:** ${outcome.iosFollowUp.reason}`
@@ -2168,7 +2192,7 @@ ${controllerReceiptMarker(uid, `blocked-r${revision}`)}
 
 ${outcome.summary}
 
-${outcome.reason}${ios}`
+${outcome.reason}${ios}${recoveryGuidance ? `\n\n${recoveryGuidance}` : ''}`
 }
 
 export function formatResolvedWithoutPrComment(

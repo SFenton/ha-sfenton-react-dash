@@ -1,8 +1,9 @@
 # Admin issue controller
 
 The Admin issue controller mirrors new Home Assistant Admin To-Do items into
-GitHub issues and also adopts trusted workflow-filed layout and deployment
-issues. It runs one serialized, resumable Copilot CLI lifecycle for each issue.
+GitHub issues, adopts trusted workflow-filed layout and deployment issues, and
+adopts eligible issues filed directly by the repository owner. It runs one
+serialized, resumable Copilot CLI lifecycle for each issue.
 Issue workers may run independently up to the configured cap, while one host
 controller serializes their protected release decisions. The controller is
 intentionally separate from the dashboard deployment runner: deployment
@@ -134,7 +135,15 @@ existing candidate, merge, deployment, or completion gates.
 
 1. Poll `todo.groceries` and ignore the UIDs captured by the one-time baseline.
    Also discover open GitHub Actions issues carrying the exact trusted layout
-   or deployment-failure marker.
+   or deployment-failure marker, plus open issues filed by the pinned owner
+   account. Owner-filed intake requires the exact owner ID, case-insensitive
+   login, and `OWNER` association; it excludes pull requests, Admin To-Do and
+   automation markers, and labels `controller:manual` or `wontfix`
+   (case-insensitive). Owner-filed issues use the ordinary dashboard worker
+   scope and never complete a Home Assistant Admin To-Do item. After intake,
+   any owner edit to the issue title or body is journaled as a new input and
+   re-queues the issue, so a result computed from older requirements is
+   rejected.
 2. Create one GitHub issue carrying a stable Admin To-Do UID marker. A task
    filed with images uses the authenticated `sfenton_admin_todo` endpoint,
    which validates and temporarily stores up to four PNG, JPEG, or WebP files.
@@ -188,10 +197,8 @@ existing candidate, merge, deployment, or completion gates.
    and combined restart/deployment decisions do not lift the restriction.
    The worker receives the exact approved question/option as a bounded scope,
    not blanket authorization for Home Assistant actions.
-   Operational comments must carry the controller marker so they cannot be
-   mistaken for owner instructions. A previously blocked issue still needs a
-   genuine owner follow-up to resume; a source update alone never replays a
-   blocked destructive action.
+   Operational comments carry the controller marker so they cannot be mistaken
+   for owner instructions.
 7. If verified Home Assistant work fully resolves the issue, or no repository
    change is appropriate, require a clean untouched worktree, post the
    resolution and verification, close the GitHub issue, and complete the Admin
@@ -235,6 +242,37 @@ tail output rather than leading setup logs. If the rerun still fails, the
 stable worker receives that exact evidence once. Returning the same unchanged
 candidate into the same failure blocks instead of consuming repeated repair
 turns.
+
+## Block recovery commands
+
+Trusted owner comments may begin with `/retry` or `/retriage` (case-insensitive);
+the remainder of that comment is recorded as an operational note, not a worker
+requirement input. Each command comment is receipted exactly once.
+
+- `/retry` resumes only a blocked issue. Legacy/untrusted, quarantined, and
+  failed transition provenance starts a clean generation; a merged record
+  re-verifies its release; an active unmerged candidate re-enters protected
+  PR checks; all other records receive a bounded retry diagnostic and return
+  to the worker queue.
+- `/retriage` starts a clean generation and adds a controller diagnostic asking
+  the worker to triage from scratch. It is unavailable after merge, while
+  deployment verification is active, or after completion.
+
+Controller-generated recoverable blocks retry automatically after 30, 60, and
+120 minutes, at most three times. The controller posts a receipted
+`Retrying automatically (n/3)` comment before every retry; block comments
+state the next delay or that automatic retries are unavailable. Legacy
+untrusted provenance, quarantined worktrees, owner-closed unmerged pull
+requests, untrusted GitHub media, and worker-declared `blocked` decisions do
+not auto-retry. After automatic attempts are exhausted, `/retry` remains the
+explicit recovery path.
+
+Worker-fixable validation failures enter the existing bounded repair loop. In
+particular, a changed `e2e/layout-acceptance.spec.ts` without an attributable
+one-to-four-scenario hunk in `e2e/layout/contracts.ts` tells the worker exactly
+what contract hunk to add, rather than treating the error as provenance
+corruption. Unsafe paths, malformed or unreadable provenance, untrusted media,
+and worktree integrity failures remain fail-closed.
 
 A completed deployment workflow with a non-success conclusion blocks the
 original issue once and releases the serialized queue. The workflow files one
@@ -302,15 +340,21 @@ and checks the candidate commit and tree before and after each command. An
 ambiguous or missing changed owner fails closed; it is not a skipped test.
 This focused smoke runs no managed `layout:run` and cannot certify full
 layout acceptance: the post-merge master workflow still owns that evidence.
-For a GitHub-automation layout incident, a green workflow conclusion alone
-cannot complete the issue. The host validates the exact successful merge
-artifact against its original fingerprinted failure packet: planned/passed
-checkpoint counts and every originally failed browser/spec must be covered.
-A zero-checkpoint tooling run cannot stand in for prior WebKit failures; the
-controller blocks with the exact missing coverage instead of closing the
-incident. A separately authorized protected full-layout dispatch is
-diagnostic evidence, not a forged owner reply or an automatic exact-merge
-completion receipt.
+For a GitHub-automation layout incident, the controller judges the
+`Automated layout` job rather than the aggregate workflow conclusion. A passed
+layout job can therefore validate coverage even when unrelated protected-master
+jobs fail; it files one deduplicated master-red issue for those failed jobs and
+links it from the incident. A failed layout job waits briefly for the workflow's
+own deduplicated follow-up issue, supersedes the repaired incident when that
+issue appears, or starts one bounded repair generation before auto-retryable
+blocking. The host validates the successful artifact against its original
+fingerprinted failure packet: planned/passed checkpoint counts and every
+originally failed browser/spec must be covered. A zero-checkpoint tooling run
+cannot stand in for prior WebKit failures. For a tracked incident whose fix
+merged, the controller may dispatch the protected ancestor-bound replay and
+close only when its plan used the original base and its executed coverage
+satisfies the original contexts and checkpoints. Manual replays remain
+available; replay failures do not auto-file another issue.
 
 ## Independent intake and bounded workers
 

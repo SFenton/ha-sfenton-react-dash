@@ -36,13 +36,15 @@ preview of the exact head. A `non-layout` classification or zero-item manual
 worklist requires no human layout review.
 
 For a prior failed layout incident, a tooling-only follow-up with zero product
-checkpoints is not evidence of repair. An owner-authorized `workflow_dispatch`
-on protected `master` may replay against an exact ancestor with
+checkpoints is not evidence of repair. The Admin issue controller may dispatch
+a protected `workflow_dispatch` for a tracked incident whose fix merged,
+replaying against an exact original ancestor with
 `gh workflow run playwright.yml --ref master -f layout_base_sha=<40-hex-ancestor>`.
-Verify that its plan selects the originally failing Chromium and WebKit
-surfaces, inspect the run's ledgers and images, and keep manual judgments
-separate. Replay failures do not auto-file a second issue for the new commit;
-the original incident remains open until genuinely validated.
+It may close the incident only if the replay plan used that original base and
+its executed coverage satisfies the original failed contexts and checkpoints.
+Verify the run's ledgers and images and keep manual judgments separate. Manual
+replays remain available. Replay failures do not auto-file a second issue for
+the new commit; the original incident remains open until genuinely validated.
 
 Managed state/profile loops must run every selected checkpoint, even when the
 recorded CI journey needs a budget proportional to its declared obligations.

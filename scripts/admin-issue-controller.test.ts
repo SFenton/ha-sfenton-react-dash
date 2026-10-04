@@ -32,6 +32,7 @@ import {
   AdminIssueDeploymentRunError,
   AdminIssueNewInputError,
   AdminIssueProvenanceError,
+  AdminIssueRepairableValidationError,
   AdminIssueTodoSourceDriftError,
   AdminIssueWorkerDeferredError,
   assertDeploymentRunSucceeded,
@@ -43,6 +44,7 @@ import {
   assertExistingReleasePullRequestEvidence,
   assertExistingReleaseVerificationSnapshot,
   assertSuccessfulLayoutWorkflowRun,
+  automatedLayoutJobVerdict,
   assertResolvedWithoutPullRequestSnapshot,
   assertSuccessfulRequiredChecksForHead,
   assertIssueCommentBodyContainsVisualEvidence,
@@ -63,8 +65,12 @@ import {
   buildWorkerMcpConfig,
   extractFinalAssistantResponse,
   buildInitialInput,
+  buildGitHubIssueRecord,
   buildWorkerPrompt,
   canonicalWorkerIssueBody,
+  autoRetryDue,
+  blockedCommentReceipt,
+  blockedRetryPlan,
   changedFiles,
   classifyPullRequestHead,
   closeIssueWithReceipt,
@@ -99,11 +105,17 @@ import {
   loadAdminIssueControllerConfig,
   loadAdminIssueControllerState,
   materializeWorkerInputAttachments,
+  masterRedIssueDetails,
+  dispatchedWorkflowRunId,
+  ownerFiledBodyEdit,
+  ownerRetriageStartGeneration,
   mediaInputRequired,
   mediaSourceExternalId,
   mergedReleaseWaitStillCurrent,
   markFrontendOnlyRecoveryObserved,
   parseResearchMountRetryArgs,
+  parseOwnerSlashCommand,
+  postMergeLayoutFailurePlan,
   prepareCommittedCandidate,
   prepareCopilotHome,
   prepareGitHubMediaInput,
@@ -155,6 +167,7 @@ import {
   workerCommitTrailer,
   isCommandSpawnFailure,
   workerMediaContentBlocks,
+  trustedOwnerFiledIssue,
 } from './admin-issue-controller'
 import { AdminIssueProviderLimitError } from './lib/adminIssueProviderLimits'
 import {
@@ -774,7 +787,7 @@ describe('bounded issue worker admission', () => {
     expect(issueReads).toBe(12)
 
     const source = readFileSync(resolve(process.cwd(), 'scripts/admin-issue-controller.ts'), 'utf8')
-    expect(source.match(/const openIssues = await reconcileGitHubAutomationIssues\(config, state\)/g))
+    expect(source.match(/const openIssues = await reconcileGitHubIssues\(config, state\)/g))
       .toHaveLength(3)
     expect(source.match(/await reconcileGitHubInputs\(config, state, openIssues\)/g))
       .toHaveLength(3)
@@ -3209,6 +3222,47 @@ describe('admin issue controller domain', () => {
     )
   })
 
+  it('accepts replay layout bindings only with a valid replay base and event', () => {
+    const issue = record()
+    authorizeRecord(issue)
+    issue.automationKind = 'layout'
+    issue.origin = 'github-automation'
+    if (issue.provenance.kind !== 'active' || !issue.provenance.merge) {
+      throw new Error('Expected merge provenance')
+    }
+    delete issue.provenance.deployment
+    issue.provenance.layoutValidation = {
+      conclusion: 'success',
+      epoch: issue.provenance.epoch,
+      generation: issue.generation,
+      mergeSha: issue.provenance.merge.mergeSha,
+      observedAt: '2026-10-04T12:00:00.000Z',
+      replayBaseSha: 'e'.repeat(40),
+      revision: issue.processedRevision,
+      workflowEvent: 'workflow_dispatch',
+      workflowHeadSha: 'f'.repeat(40),
+      workflowRunAttempt: 1,
+      workflowRunId: 24,
+      workflowUrl: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
+    }
+    expect(() => assertAdminIssueControllerState(controllerState(issue))).not.toThrow()
+    expect(() => assertLayoutFinalizationAuthorized(issue)).not.toThrow()
+
+    const missingBase = structuredClone(issue)
+    if (missingBase.provenance.kind === 'active') {
+      delete missingBase.provenance.layoutValidation?.replayBaseSha
+    }
+    expect(() => assertAdminIssueControllerState(controllerState(missingBase)))
+      .toThrow('replayBaseSha')
+
+    const badEvent = structuredClone(issue)
+    if (badEvent.provenance.kind === 'active' && badEvent.provenance.layoutValidation) {
+      badEvent.provenance.layoutValidation.workflowEvent = 'schedule' as 'push'
+    }
+    expect(() => assertAdminIssueControllerState(controllerState(badEvent)))
+      .toThrow('workflowEvent')
+  })
+
   it('accepts only non-controller comments from the pinned repository owner', () => {
     const trusted = {
       author_association: 'OWNER',
@@ -3854,7 +3908,7 @@ describe('admin issue controller domain', () => {
     )
   })
 
-  it('binds layout validation to the exact protected master workflow run', () => {
+  it('binds layout validation to the exact protected master workflow run', async () => {
     const mergeSha = 'd'.repeat(40)
     expect(
       layoutWorkflowRunsPath('SFenton/ha-sfenton-react-dash', mergeSha),
@@ -3869,13 +3923,124 @@ describe('admin issue controller domain', () => {
       html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/24',
       status: 'completed',
     }
-    expect(() => assertSuccessfulLayoutWorkflowRun(run, mergeSha)).not.toThrow()
-    expect(() =>
-      assertSuccessfulLayoutWorkflowRun({ ...run, conclusion: 'failure' }, mergeSha),
-    ).toThrow('concluded failure')
-    expect(() =>
-      assertSuccessfulLayoutWorkflowRun({ ...run, head_sha: 'f'.repeat(40) }, mergeSha),
-    ).toThrow('does not bind exact merge')
+    const layoutJob = {
+      conclusion: 'success',
+      html_url: `${run.html_url}/job/1`,
+      id: 1,
+      name: 'Automated layout',
+      status: 'completed',
+    } as const
+    await expect(assertSuccessfulLayoutWorkflowRun(run, mergeSha, [layoutJob])).resolves.toMatchObject({
+      layout: 'success',
+    })
+    await expect(assertSuccessfulLayoutWorkflowRun(
+      { ...run, conclusion: 'failure' }, mergeSha, [layoutJob],
+    )).resolves.toMatchObject({ layout: 'success' })
+    await expect(assertSuccessfulLayoutWorkflowRun(
+      { ...run, conclusion: 'cancelled' }, mergeSha, [layoutJob],
+    )).rejects.toThrow('concluded cancelled')
+    await expect(assertSuccessfulLayoutWorkflowRun(
+      { ...run, head_sha: 'f'.repeat(40) }, mergeSha, [layoutJob],
+    )).rejects.toThrow('does not bind exact push head')
+  })
+
+  it('distinguishes the Automated layout job from unrelated workflow failures', () => {
+    const completed = (name: string, conclusion: string | null, id: number) => ({
+      conclusion,
+      html_url: `https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/1/job/${id}`,
+      id,
+      name,
+      status: 'completed',
+    })
+    const successful = automatedLayoutJobVerdict([
+      completed('Automated layout', 'success', 1),
+      completed('test (1)', 'failure', 2),
+      completed('Playwright gate', 'failure', 3),
+      completed('Report automated layout failure', 'failure', 4),
+    ])
+    expect(successful).toMatchObject({
+      layout: 'success',
+      unrelatedFailures: [{ name: 'test (1)' }],
+    })
+    expect(automatedLayoutJobVerdict([
+      completed('Automated layout', 'failure', 1),
+    ]).layout).toBe('failure')
+    expect(automatedLayoutJobVerdict([]).layout).toBe('missing')
+    expect(automatedLayoutJobVerdict([{
+      ...completed('Automated layout', null, 1),
+      status: 'in_progress',
+    }]).layout).toBe('pending')
+    expect(automatedLayoutJobVerdict([
+      completed('Automated layout', 'skipped', 1),
+    ]).layout).toBe('not-run')
+    expect(() => automatedLayoutJobVerdict([
+      completed('Automated layout', 'success', 1),
+      completed('Automated layout', 'success', 2),
+    ])).toThrow('more than one')
+  })
+
+  it('plans post-merge layout failure recovery at the exact follow-up boundary', () => {
+    const completedAtMs = Date.parse('2026-10-04T12:00:00.000Z')
+    const input = {
+      completedAtMs,
+      followUps: 0,
+      maxFollowUps: 2,
+      nowMs: completedAtMs + 9 * 60_000 + 59_999,
+    }
+    expect(postMergeLayoutFailurePlan({ ...input, followUpIssueNumber: 99 })).toBe('supersede')
+    expect(postMergeLayoutFailurePlan(input)).toBe('wait')
+    expect(postMergeLayoutFailurePlan({
+      ...input,
+      nowMs: completedAtMs + 10 * 60_000,
+    })).toBe('follow-up')
+    expect(postMergeLayoutFailurePlan({
+      ...input,
+      followUps: 2,
+      nowMs: completedAtMs + 10 * 60_000,
+    })).toBe('block')
+  })
+
+  it('builds bounded master-red issue reports without automation markers', () => {
+    const details = masterRedIssueDetails({
+      head_sha: 'a'.repeat(40),
+      html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/actions/runs/7',
+      id: 7,
+    }, Array.from({ length: 20 }, (_, index) => ({
+      name: `test shard ${index} with an intentionally long display name`,
+      url: `https://github.com/SFenton/ha-sfenton-react-dash/actions/jobs/${index}`,
+    })))
+    expect(details.marker).toBe('<!-- master-ci-failure-run-7 -->')
+    expect(details.title).toHaveLength(120)
+    expect(details.body).toContain('Automated layout job passed')
+    expect(details.body).not.toContain('layout-failure-commit-')
+  })
+
+  it('treats every owner-filed body edit after intake as a new requirement input', () => {
+    expect(ownerFiledBodyEdit({ issueBodySha256: 'a'.repeat(64), origin: 'github-owner' })).toBe(true)
+    expect(ownerFiledBodyEdit({ issueBodySha256: undefined, origin: 'github-owner' })).toBe(false)
+    expect(ownerFiledBodyEdit({ issueBodySha256: 'a'.repeat(64), origin: 'github-automation' })).toBe(false)
+    expect(ownerFiledBodyEdit({ issueBodySha256: 'a'.repeat(64), origin: undefined })).toBe(false)
+  })
+
+  it('resumes an interrupted owner re-triage without starting another generation', () => {
+    expect(ownerRetriageStartGeneration({ receipts: {} }, 11)).toBeUndefined()
+    expect(ownerRetriageStartGeneration({
+      receipts: { ownerRetriageCommentId: '10', ownerRetriageFromGeneration: '2' },
+    }, 11)).toBeUndefined()
+    expect(ownerRetriageStartGeneration({
+      receipts: { ownerRetriageCommentId: '11', ownerRetriageFromGeneration: '2' },
+    }, 11)).toBe(2)
+    expect(() => ownerRetriageStartGeneration({
+      receipts: { ownerRetriageCommentId: '11', ownerRetriageFromGeneration: 'x' },
+    }, 11)).toThrow('Owner re-triage receipt is invalid')
+  })
+
+  it('binds a protected replay only to a valid dispatch run ID', () => {
+    expect(dispatchedWorkflowRunId({ workflow_run_id: 37167778164 })).toBe(37167778164)
+    expect(dispatchedWorkflowRunId(undefined)).toBeUndefined()
+    expect(dispatchedWorkflowRunId({ workflow_run_id: '42' })).toBeUndefined()
+    expect(dispatchedWorkflowRunId({ workflow_run_id: 0 })).toBeUndefined()
+    expect(dispatchedWorkflowRunId({ workflow_run_id: 1.5 })).toBeUndefined()
   })
 
   it('restores the exact ready outcome from the retained successful worker log', () => {
@@ -6442,17 +6607,17 @@ describe('admin issue controller security configuration', () => {
       controller.indexOf('function bindVerifiedLayoutWorkflow('),
     )
     expect(layoutWait).toContain(
-      'assertSuccessfulLayoutWorkflowRun(run, mergeSha)\n    if (!(await refreshInputs())) return undefined',
+      'const verdict = automatedLayoutJobVerdict(jobs)',
     )
     expect(layoutWait).toContain(
-      'const coverageSha256 = await verifyLayoutIncidentWorkflowCoverage(config, record, run)',
+      'await ensureMasterRedIssue(config, state, record, run, verdict.unrelatedFailures)',
     )
     expect(layoutWait).toContain(
-      'if (!(await refreshInputs())) return undefined\n    return { run, coverageSha256 }',
+      'const coverage = await verifyLayoutIncidentWorkflowCoverage(',
     )
     expect(controller).toContain('record.receipts.layoutIncidentCoverageSha256 = coverageSha256')
-    expect(controller).toContain('await verifyLayoutIncidentWorkflowCoverage(config, record, run)')
-    expect(controller).toContain('bindVerifiedLayoutWorkflow(record, result.run, result.coverageSha256)')
+    expect(controller).toContain('await verifyLayoutIncidentWorkflowCoverage(')
+    expect(controller).toContain('bindVerifiedLayoutWorkflow(record, result)')
     expect(controller).toContain('finalizeLayoutIssue(config, state, record, result.run, reconcileInputs)')
     expect(controller).toContain('await closeControllerIssue(config, state, record, reconcileInputs)')
     expect(controller).toContain('await assertFreshFinalizationInputs(record, reconcileInputs)')
@@ -6753,5 +6918,246 @@ describe('admin issue controller security configuration', () => {
       source: 'issue-comment',
     })
     expect(researchOnlyRequested(issue, originalIssueBody, context)).toBe(true)
+  })
+})
+
+describe('owner-filed issue intake and recovery', () => {
+  const ownerConfig = { ownerId: 3988463, ownerLogin: 'SFenton' }
+  const ownerIssue = (overrides: Record<string, unknown> = {}) => ({
+    author_association: 'OWNER',
+    body: 'The dashboard should keep this control visible.',
+    created_at: '2026-10-04T12:00:00.000Z',
+    html_url: 'https://github.com/SFenton/ha-sfenton-react-dash/issues/320',
+    labels: [],
+    number: 320,
+    state: 'open' as const,
+    title: 'Keep the control visible',
+    updated_at: '2026-10-04T12:00:00.000Z',
+    user: { id: 3988463, login: 'SFenton' },
+    ...overrides,
+  })
+
+  it('accepts only unmarked owner-filed issues and builds their ordinary worker record', () => {
+    const issue = ownerIssue()
+    expect(trustedOwnerFiledIssue(ownerConfig, issue)).toBe(true)
+    expect(trustedOwnerFiledIssue(ownerConfig, ownerIssue({
+      body: '<!-- master-ci-failure-run-37167778164 -->',
+    }))).toBe(true)
+    expect(trustedOwnerFiledIssue(ownerConfig, ownerIssue({
+      user: { id: 1, login: 'SFenton' },
+    }))).toBe(false)
+    expect(trustedOwnerFiledIssue(ownerConfig, ownerIssue({
+      author_association: 'MEMBER',
+    }))).toBe(false)
+    expect(trustedOwnerFiledIssue(ownerConfig, ownerIssue({
+      pull_request: {},
+    }))).toBe(false)
+    expect(trustedOwnerFiledIssue(ownerConfig, ownerIssue({
+      body: '<!-- layout-failure-commit-deadbeef -->',
+    }))).toBe(false)
+    expect(trustedOwnerFiledIssue(ownerConfig, ownerIssue({
+      body: '<!-- admin-todo-uid:existing-admin-uid -->',
+    }))).toBe(false)
+    expect(trustedOwnerFiledIssue(ownerConfig, ownerIssue({
+      labels: [{ name: 'Controller:Manual' }],
+    }))).toBe(false)
+    expect(trustedOwnerFiledIssue(ownerConfig, ownerIssue({
+      labels: ['WONTFIX'],
+    }))).toBe(false)
+
+    const ownerRecord = buildGitHubIssueRecord(issue, 'github-owner', '2026-10-04T12:01:00.000Z')
+    expect(ownerRecord).toMatchObject({
+      description: issue.body,
+      issueNumber: 320,
+      origin: 'github-owner',
+      phase: 'queued',
+      uid: 'github-issue-320',
+    })
+    expect(ownerRecord.automationKind).toBeUndefined()
+    expect(ownerRecord.inputs).toEqual([expect.objectContaining({
+      body: 'Keep the control visible\n\nThe dashboard should keep this control visible.',
+      source: 'github-issue',
+    })])
+    const automationRecord = buildGitHubIssueRecord(
+      ownerIssue({ body: '<!-- layout-failure-commit-deadbeef -->' }),
+      'github-automation',
+      '2026-10-04T12:01:00.000Z',
+      'layout',
+    )
+    expect(automationRecord).toMatchObject({
+      automationKind: 'layout',
+      origin: 'github-automation',
+    })
+  })
+
+  it('parses owner GitHub origin state and canonical empty reports safely', () => {
+    const ownerRecord = buildGitHubIssueRecord(
+      ownerIssue({ body: null }),
+      'github-owner',
+      '2026-10-04T12:01:00.000Z',
+    )
+    const state: AdminIssueControllerState = {
+      baselineCompletedAt: '2026-10-04T12:00:00.000Z',
+      ignoredUids: [],
+      issues: { [ownerRecord.uid]: ownerRecord },
+      updatedAt: '2026-10-04T12:01:00.000Z',
+      version: 3,
+    }
+    expect(() => assertAdminIssueControllerState(state)).not.toThrow()
+    expect(adminTodoCompletionRequired(record())).toBe(true)
+    expect(adminTodoCompletionRequired(ownerRecord)).toBe(false)
+    const automationRecord = { ...ownerRecord, origin: 'github-automation' as const }
+    expect(adminTodoCompletionRequired(automationRecord)).toBe(false)
+
+    const invalid = structuredClone(state)
+    invalid.issues[ownerRecord.uid].automationKind = 'layout'
+    expect(() => assertAdminIssueControllerState(invalid)).toThrow('automationKind')
+
+    expect(canonicalWorkerIssueBody(ownerConfig, ownerRecord, ownerIssue({ body: null }))).toBe('')
+    expect(() => canonicalWorkerIssueBody(ownerConfig, ownerRecord, ownerIssue({
+      body: '<!-- dashboard-deployment-failure-run-1 -->',
+    }))).toThrow('trusted owner origin')
+    expect(() => canonicalWorkerIssueBody(ownerConfig, ownerRecord, ownerIssue({
+      body: '<!-- admin-todo-uid:other -->',
+    }))).toThrow('trusted owner origin')
+    expect(() => canonicalWorkerIssueBody(ownerConfig, ownerRecord, ownerIssue({
+      user: { id: 1, login: 'SFenton' },
+    }))).toThrow('trusted owner origin')
+  })
+
+  it('parses operational owner commands without turning them into requirements', () => {
+    expect(parseOwnerSlashCommand('\n /RETRY  explain the test failure\nand preserve the diagnostics')).toEqual({
+      command: 'retry',
+      note: 'explain the test failure\nand preserve the diagnostics',
+    })
+    expect(parseOwnerSlashCommand('/retriage\nStart again')).toEqual({
+      command: 'retriage',
+      note: 'Start again',
+    })
+    expect(parseOwnerSlashCommand('/retrying')).toBeUndefined()
+    expect(parseOwnerSlashCommand('Please /retry')).toBeUndefined()
+  })
+
+  it('plans blocked retries without weakening provenance and honors exponential backoff', () => {
+    expect(blockedRetryPlan({
+      provenance: { kind: 'legacy-untrusted' },
+    })).toBe('new-generation')
+    expect(blockedRetryPlan({
+      provenance: {
+        kind: 'active',
+        quarantine: {
+          detectedAt: '2026-10-04T12:00:00.000Z',
+          diagnosticsSha256: 'a'.repeat(64),
+          reason: 'unsafe',
+        },
+      },
+    })).toBe('new-generation')
+    expect(blockedRetryPlan({
+      provenance: { kind: 'active', merge: {} },
+    })).toBe('reverify-release')
+    expect(blockedRetryPlan({
+      pr: { number: 1, url: 'https://example.test/pull/1' },
+      provenance: { kind: 'active', candidate: {} },
+    })).toBe('recheck-pull-request')
+    expect(blockedRetryPlan({ provenance: { kind: 'none' } })).toBe('requeue-worker')
+
+    const blocked = record()
+    blocked.phase = 'blocked'
+    blocked.processedRevision = blocked.inputRevision
+    blocked.receipts = {
+      autoRetryCount: '0',
+      autoRetryEligible: 'true',
+      controllerBlockedAt: '2026-10-04T12:00:00.000Z',
+    }
+    const base = Date.parse(blocked.receipts.controllerBlockedAt)
+    expect(autoRetryDue(blocked, base + 30 * 60_000 - 1)).toBe(false)
+    expect(autoRetryDue(blocked, base + 30 * 60_000)).toBe(true)
+    blocked.receipts.autoRetryCount = '1'
+    expect(autoRetryDue(blocked, base + 60 * 60_000 - 1)).toBe(false)
+    expect(autoRetryDue(blocked, base + 60 * 60_000)).toBe(true)
+    blocked.receipts.autoRetryCount = '2'
+    expect(autoRetryDue(blocked, base + 120 * 60_000 - 1)).toBe(false)
+    expect(autoRetryDue(blocked, base + 120 * 60_000)).toBe(true)
+    blocked.receipts.autoRetryCount = '3'
+    expect(autoRetryDue(blocked, base + 240 * 60_000)).toBe(false)
+    blocked.receipts.autoRetryCount = '0'
+    blocked.receipts.autoRetryEligible = 'false'
+    expect(autoRetryDue(blocked, base + 30 * 60_000)).toBe(false)
+    blocked.receipts.autoRetryEligible = 'true'
+    blocked.inputRevision += 1
+    expect(autoRetryDue(blocked, base + 30 * 60_000)).toBe(false)
+    blocked.inputRevision -= 1
+    blocked.workerClaim = {
+      generation: blocked.generation,
+      id: 'claim',
+      inputRevision: blocked.inputRevision,
+      startedAt: '2026-10-04T12:00:00.000Z',
+    }
+    expect(autoRetryDue(blocked, base + 30 * 60_000)).toBe(false)
+    delete blocked.workerClaim
+
+    const legacy = record()
+    legacy.phase = 'blocked'
+    legacy.processedRevision = legacy.inputRevision
+    legacy.lastOutcome = {
+      decision: 'blocked',
+      iosFollowUp: { reason: '', required: false },
+      questions: [],
+      reason: 'Layout incident coverage is unverified',
+      schemaVersion: 1,
+      summary: 'The autonomous fix could not pass its required validation.',
+      visualEvidence: [],
+    }
+    legacy.receipts = {
+      controllerBlockedAt: '2026-10-04T12:00:00.000Z',
+      controllerBlockedReason: 'Layout incident coverage is unverified',
+    }
+    expect(autoRetryDue(legacy, base + 30 * 60_000)).toBe(true)
+    legacy.receipts.controllerBlockedReason = 'Pull request #9 was closed without being merged.'
+    expect(autoRetryDue(legacy, base + 30 * 60_000)).toBe(false)
+    legacy.receipts.controllerBlockedReason = 'Layout incident coverage is unverified'
+    legacy.lastOutcome = { ...legacy.lastOutcome, summary: 'Worker could not proceed.' }
+    expect(autoRetryDue(legacy, base + 30 * 60_000)).toBe(false)
+  })
+
+  it('receipts block retries compatibly and makes layout contract ownership repairable', () => {
+    const blocked = record()
+    expect(blockedCommentReceipt(blocked)).toBe('controller-blocked-r1-a0')
+    blocked.receipts.retryEpoch = '2'
+    expect(blockedCommentReceipt(blocked)).toBe('controller-blocked-r1-a0-t2')
+    const outcome = {
+      decision: 'blocked' as const,
+      iosFollowUp: { reason: '', required: false },
+      questions: [],
+      reason: 'A contract hunk is missing.',
+      schemaVersion: 1 as const,
+      summary: 'Validation failed.',
+      visualEvidence: [],
+    }
+    expect(formatBlockedComment(
+      blocked.uid,
+      blocked.inputRevision,
+      outcome,
+      'The controller will retry automatically in about 30 minutes (retry 1 of 3).',
+    )).toContain('retry automatically')
+    expect(formatBlockedComment(
+      blocked.uid,
+      blocked.inputRevision,
+      outcome,
+      'Automatic retries are exhausted (or not applicable to this block).',
+    )).toContain('Automatic retries are exhausted')
+    expect(() => focusedLayoutAcceptanceScenarios(
+      '@@ -3,1 +3,1 @@\n-  unknown: true\n+  unknown: false\n',
+    )).toThrow(AdminIssueRepairableValidationError)
+  })
+
+  it('preserves layout follow-up and retry epochs across a fresh generation', () => {
+    const issue = record()
+    issue.receipts.layoutFollowUpGenerations = '2'
+    issue.receipts.retryEpoch = '4'
+    beginAdminIssueGeneration(issue, '2026-10-04T12:30:00.000Z')
+    expect(issue.generation).toBe(2)
+    expect(issue.receipts.layoutFollowUpGenerations).toBe('2')
+    expect(issue.receipts.retryEpoch).toBe('4')
   })
 })
