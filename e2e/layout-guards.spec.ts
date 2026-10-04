@@ -8,7 +8,7 @@ import {
   waitForModalReady,
   waitForResponsiveScrollEnd,
 } from './layout/evidence'
-import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
+import { inspectRouteAddition, inspectTileAddition, normalizeInspectedAddition, normalizeInspectedTileAddition } from './layout/routeAdditions'
 import { openSurface } from './layout/app'
 import { createServer } from 'node:http'
 
@@ -54,6 +54,51 @@ guardedTest('declared route additions cannot conceal changed inherited cards or 
   await expect(inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')).rejects.toThrow()
   await candidate.setContent(document(addition.replace('height:120px', 'height:119px') + inherited))
   await expect(inspectRouteAddition(baseline, candidate, 'master-bedroom', 'phone-portrait')).rejects.toThrow()
+  await baseline.close()
+  await candidate.close()
+})
+
+// @covers e2e/layout/routeAdditions.ts
+guardedTest('declared tile additions cannot conceal changed inherited tiles or undeclared tiles', async ({ context }) => {
+  const baseline = await context.newPage()
+  const candidate = await context.newPage()
+  const tile = (name: string, kind = 'selection', height = 120) => `<div data-dynamic-grid-cell="true">
+    <button aria-label="${name}" data-action-kind="${kind}" data-variant="card" style="display:block;width:361px;height:${height}px;border-radius:32px;box-sizing:border-box">${name}</button>
+  </div>`
+  const grid = (cells: string[]) => `<div data-dynamic-grid="true" style="display:grid;gap:12px">${cells.join('')}</div>`
+  const remote = (sources: string[], extraSection = '') => `<main style="width:361px">
+    <section><h2>Climate</h2>${grid([tile('Music Room Thermostat', 'modal')])}</section>
+    <section><h2>Remote</h2>${grid([tile('Music Room Remote Off', 'modal')])}${grid(sources)}</section>${extraSection}
+  </main>`
+  const inherited = [tile('Xbox Off'), tile('Server Off')]
+  const added = tile('Windows PC Off')
+  await baseline.setContent(remote(inherited))
+  await candidate.setContent(remote([...inherited, added]))
+  const inspected = await inspectTileAddition(baseline, candidate, 'music-room')
+  expect(inspected).toMatchObject({ owner: 'navigation', section: 'Remote', index: 3, added: { name: 'Windows PC Off' } })
+  const restore = await normalizeInspectedTileAddition(candidate, inspected!)
+  await expect(candidate.getByRole('button', { name: 'Windows PC Off' })).not.toBeVisible()
+  await expect(candidate.getByRole('button', { name: 'Server Off' })).toBeVisible()
+  await restore()
+  await expect(candidate.getByRole('button', { name: 'Windows PC Off' })).toBeVisible()
+
+  await candidate.setContent(remote([tile('Xbox Off'), tile('Server Off', 'selection', 119), added]))
+  await expect(inspectTileAddition(baseline, candidate, 'music-room')).rejects.toThrow()
+  await candidate.setContent(remote([tile('Xbox Off'), added, tile('Server Off')]))
+  await expect(inspectTileAddition(baseline, candidate, 'music-room')).rejects.toThrow()
+  await candidate.setContent(remote([...inherited, added, tile('Undeclared Off')]))
+  await expect(inspectTileAddition(baseline, candidate, 'music-room')).rejects.toThrow()
+  await candidate.setContent(remote([...inherited, tile('Windows PC Off', 'modal')]))
+  await expect(inspectTileAddition(baseline, candidate, 'music-room')).rejects.toThrow()
+  await candidate.setContent(remote([...inherited, tile('Windows PC Off', 'selection', 175)]))
+  await expect(inspectTileAddition(baseline, candidate, 'music-room')).rejects.toThrow()
+  await candidate.setContent(remote([...inherited, added], '<section><h2>Remote</h2></section>'))
+  await expect(inspectTileAddition(baseline, candidate, 'music-room')).rejects.toThrow()
+
+  await baseline.setContent(remote([...inherited, added]))
+  await candidate.setContent(remote([...inherited, added]))
+  await expect(inspectTileAddition(baseline, candidate, 'music-room')).resolves.toBeNull()
+  await expect(inspectTileAddition(baseline, candidate, 'overview')).resolves.toBeNull()
   await baseline.close()
   await candidate.close()
 })
