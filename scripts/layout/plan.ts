@@ -142,12 +142,14 @@ evidence, not release gates.
 
 An incident repaired only in layout tooling may have a successful \`tooling\`
 run with zero product checkpoints; it does not resolve an earlier browser
-failure. An explicitly authorized replay on protected \`master\` can select
-the original ancestor independently of normal post-merge monitoring:
+failure. The Admin issue controller may dispatch a protected replay for a
+tracked layout incident whose fix merged, selecting the original ancestor
+independently of normal post-merge monitoring:
 \`gh workflow run playwright.yml --ref master -f layout_base_sha=<40-hex-ancestor>\`.
-Confirm the resulting plan includes the original failed contexts and actual
-checkpoints, then inspect the exact run artifact. The replay uses its own
-concurrency lane, never deploys, and does not automatically close an issue.
+It may close the incident only when the replay plan used that original base and
+its executed coverage satisfies the original failed contexts and checkpoints.
+Confirm the resulting plan and inspect the exact run artifact. Manual replays
+remain available; the replay uses its own concurrency lane and never deploys.
 
 1. Read the current UX contract. Do not redesign its geometry or HA behavior.
 2. Run \`npm run layout:plan -- --base <resolved-master-sha> --out artifacts/layout/<run-id>/plan.json\`.

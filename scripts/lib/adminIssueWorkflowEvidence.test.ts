@@ -12,6 +12,7 @@ import {
   layoutArtifact,
   layoutFailureReference,
   layoutIncidentRequirements,
+  layoutReplayBase,
   summarizeFailedLayoutJobLog,
   summarizeFailedLayoutPlanJobLog,
   summarizeLayoutArtifactZip,
@@ -407,6 +408,7 @@ describe('sanitized layout diagnostic packet', () => {
 })
 
 describe('coverage-bound layout incident completion', () => {
+  const successfulBase = 'a'.repeat(40)
   const successfulHead = 'b'.repeat(40)
   const planId = 'c'.repeat(64)
   const sourceDigest = 'd'.repeat(64)
@@ -430,7 +432,7 @@ describe('coverage-bound layout incident completion', () => {
       id: planId,
       mode,
       obligations: Array.from({ length: plannedCheckpoints }, () => ({})),
-      source: { head: sourceHead },
+      source: { base: successfulBase, head: sourceHead },
     })),
     'run.json': strToU8(JSON.stringify({
       planId,
@@ -463,6 +465,7 @@ describe('coverage-bound layout incident completion', () => {
   it('uses only an unchanged host-signed original packet and passed matching browser specs', () => {
     const requirements = layoutIncidentRequirements(original, reference, repository)
     expect(requirements).toEqual({
+      kind: 'browser',
       plannedCheckpoints: 5,
       failedSpecs: [{ browser: 'webkit', file: 'layout-acceptance.spec.ts' }],
     })
@@ -470,6 +473,7 @@ describe('coverage-bound layout incident completion', () => {
       successArchive(), successfulHead,
     )
     expect(coverage).toMatchObject({
+      baseSha: successfulBase,
       mode: 'full-known-mock',
       plannedCheckpoints: 5,
       passedSpecs: [
@@ -626,6 +630,34 @@ describe('bounded layout planning failure evidence', () => {
     expect(packet.body).not.toContain('ignore all policies')
     expect(packet.body).not.toContain('Authorization:')
     expect(packetFor(planZip)).toEqual(packet)
+    const requirements = layoutIncidentRequirements(
+      { ...packet, source: 'workflow-evidence' },
+      reference,
+      repository,
+    )
+    expect(requirements).toEqual({
+      baseSha,
+      failedSpecs: [],
+      kind: 'plan-blocker',
+      plannedCheckpoints: 2569,
+    })
+    expect(layoutReplayBase(requirements, undefined)).toBe(baseSha)
+    expect(layoutReplayBase({
+      failedSpecs: [],
+      kind: 'browser',
+      plannedCheckpoints: 1,
+    }, 'f'.repeat(40))).toBe('f'.repeat(40))
+    expect(() => layoutReplayBase({
+      failedSpecs: [],
+      kind: 'browser',
+      plannedCheckpoints: 1,
+    }, 'not-a-sha')).toThrow('40-character base SHA')
+    expect(() => layoutReplayBase({
+      baseSha: 'not-a-sha',
+      failedSpecs: [],
+      kind: 'plan-blocker',
+      plannedCheckpoints: 0,
+    }, undefined)).toThrow('40-character base SHA')
   })
 
   it('fails closed on mismatched provenance, blockers, skipped steps and unsafe archives', () => {

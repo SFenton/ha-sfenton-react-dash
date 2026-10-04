@@ -6,6 +6,7 @@
 // @covers docs/ux/layouts.md
 // @covers docs/ux/validation-matrix.md
 // @covers scripts/layout/plan.ts
+// @covers scripts/layout/plan.ts
 // @covers vitest.config.ts
 // @covers playwright.config.ts
 // @covers package.json

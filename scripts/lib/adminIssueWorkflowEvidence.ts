@@ -90,12 +90,15 @@ export interface LayoutArtifactSummary {
 }
 
 export interface LayoutIncidentRequirements {
+  baseSha?: string
   plannedCheckpoints: number
   failedSpecs: Array<{ browser: string; file: string }>
+  kind: 'browser' | 'plan-blocker'
 }
 
 export interface SuccessfulLayoutCoverage {
   archiveSha256: string
+  baseSha: string
   mode: string
   plannedCheckpoints: number
   passedSpecs: Array<{ browser: string; file: string }>
@@ -639,8 +642,19 @@ export function layoutIncidentRequirements(
   const plannedCheckpoints = boundedInteger(
     parsed.artifact.plannedCheckpoints, 'original planned checkpoints',
   )
+  const kind = parsed.failure.kind === 'layout-plan-blocker'
+    ? 'plan-blocker' as const
+    : 'browser' as const
+  const baseSha = kind === 'plan-blocker'
+    ? typeof parsed.artifact.baseSha === 'string' && SHA.test(parsed.artifact.baseSha)
+      ? parsed.artifact.baseSha
+      : undefined
+    : undefined
+  if (kind === 'plan-blocker' && !baseSha) {
+    throw new WorkflowEvidenceError('Original layout planning blocker has an invalid base SHA')
+  }
   const failures = parsed.failure.failedTests
-  if (failures === undefined && parsed.failure.kind !== 'layout-plan-blocker') {
+  if (failures === undefined && kind !== 'plan-blocker') {
     throw new WorkflowEvidenceError('Original layout diagnostic omitted failed browser evidence')
   }
   if (failures !== undefined && (!Array.isArray(failures) || failures.length > 100)) {
@@ -656,7 +670,12 @@ export function layoutIncidentRequirements(
     if (!location) throw new WorkflowEvidenceError('Original failed browser location is invalid')
     return { browser: failure.browser, file: basename(location[1]) }
   })
-  return { plannedCheckpoints, failedSpecs }
+  return {
+    ...(baseSha ? { baseSha } : {}),
+    failedSpecs,
+    kind,
+    plannedCheckpoints,
+  }
 }
 
 export function summarizeSuccessfulLayoutArtifactZip(
@@ -685,6 +704,7 @@ export function summarizeSuccessfulLayoutArtifactZip(
   if (!record(plan) || !record(plan.source) || !Array.isArray(plan.obligations) ||
     !Array.isArray(plan.blockers) || plan.blockers.length !== 0 ||
     !DIGEST.test(String(plan.id)) || plan.source.head !== headSha ||
+    !SHA.test(String(plan.source.base)) ||
     typeof plan.mode !== 'string' ||
     !record(run) || !record(run.source) || run.planId !== plan.id ||
     run.source.head !== headSha || !DIGEST.test(String(run.source.digest)) ||
@@ -700,6 +720,7 @@ export function summarizeSuccessfulLayoutArtifactZip(
   const plannedCheckpoints = boundedInteger(
     assessment.counts.plannedCheckpoints, 'successful planned checkpoints',
   )
+  const baseSha = String(plan.source.base)
   if (plannedCheckpoints !== plan.obligations.length ||
     boundedInteger(assessment.counts.executedCheckpoints, 'successful executed checkpoints') !== plannedCheckpoints ||
     boundedInteger(assessment.counts.passedCheckpoints, 'successful passed checkpoints') !== plannedCheckpoints ||
@@ -734,10 +755,24 @@ export function summarizeSuccessfulLayoutArtifactZip(
   }
   return {
     archiveSha256: createHash('sha256').update(zip).digest('hex'),
+    baseSha,
     mode: plan.mode,
     plannedCheckpoints,
     passedSpecs,
   }
+}
+
+export function layoutReplayBase(
+  requirements: LayoutIncidentRequirements,
+  originalFirstParentSha: string | undefined,
+) {
+  const baseSha = requirements.kind === 'plan-blocker'
+    ? requirements.baseSha
+    : originalFirstParentSha
+  if (!baseSha || !SHA.test(baseSha)) {
+    throw new WorkflowEvidenceError('Layout replay requires a lowercase 40-character base SHA')
+  }
+  return baseSha
 }
 
 export function assertLayoutIncidentCoverage(
