@@ -1,6 +1,10 @@
 import { devices, expect, test } from './layout/fixture'
 import { setSafeAreaInsets } from './safe-area'
 
+// The page scroller's entrance transform transition settles through sub-pixel offsets,
+// so a 44px control can measure ~43.99998px; tolerate float noise, not real shrinkage.
+const MIN_TOUCH_TARGET_MEASURED = 44 - 0.01
+
 test.describe('bathroom fan controls', () => {
   test.use({ viewport: { height: 852, width: 393 } })
 
@@ -31,10 +35,10 @@ test.describe('bathroom fan controls', () => {
       if (!gridBox || !tileBox || !labelBox || !lockBox || !powerBox) throw new Error('Bathroom fan tile was not measurable')
 
       expect(tileBox.width).toBeGreaterThan(gridBox.width * 0.9)
-      expect(lockBox.width).toBeGreaterThanOrEqual(44)
-      expect(lockBox.height).toBeGreaterThanOrEqual(44)
-      expect(powerBox.width).toBeGreaterThanOrEqual(44)
-      expect(powerBox.height).toBeGreaterThanOrEqual(44)
+      expect(lockBox.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_MEASURED)
+      expect(lockBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_MEASURED)
+      expect(powerBox.width).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_MEASURED)
+      expect(powerBox.height).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET_MEASURED)
       expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(Math.min(lockBox.x, powerBox.x) - 8)
     })
   }
