@@ -349,6 +349,7 @@ const EXISTING_RELEASE_NO_PR_CONFLICT =
   'No-PR resolution cannot retain candidate, pull-request, merge, or deployment state'
 const LAYOUT_WORKFLOW = 'playwright.yml'
 const LAYOUT_WORKFLOW_TIMEOUT_MINUTES = 390
+const LAYOUT_REPLAY_POLL_MINUTES = 5
 const PULL_REQUEST_HEAD_PROPAGATION_TIMEOUT_MS = 2 * 60_000
 const ALLOWED_WORKER_PATHS = ['e2e/', 'public/', 'src/']
 // Generated from src/ by `npm run i18n:sync`; any worker that changes copy must
@@ -7501,6 +7502,17 @@ async function handlePostMergeLayoutFailure(
   return 'blocked' as const
 }
 
+export function layoutReplayPollDeferred(
+  record: Pick<AdminIssueRecord, 'generation' | 'phase' | 'receipts'>,
+  nowMs: number,
+) {
+  const { layoutReplayKey, layoutReplayPollAfter, retryEpoch } = record.receipts
+  if (record.phase !== 'deploying' || !layoutReplayPollAfter ||
+    layoutReplayKey !== `${record.generation}:${retryEpoch ?? '0'}`) return false
+  const pollAfter = Date.parse(layoutReplayPollAfter)
+  return Number.isFinite(pollAfter) && pollAfter > nowMs
+}
+
 async function waitForLayoutReplay(
   config: AdminIssueControllerConfig,
   state: AdminIssueControllerState,
@@ -7512,15 +7524,24 @@ async function waitForLayoutReplay(
 ) {
   const replayBaseSha = await originalLayoutReplayBase(config, requirements, original)
   await requestLayoutReplay(config, state, record, replayBaseSha)
-  const deadline = Date.now() + LAYOUT_WORKFLOW_TIMEOUT_MINUTES * 60_000
+  const deadline = Date.parse(record.receipts.layoutReplayRequestedAt ?? '') +
+    LAYOUT_WORKFLOW_TIMEOUT_MINUTES * 60_000
+  if (!Number.isFinite(deadline)) {
+    throw new AdminIssueProvenanceError('Layout replay has no valid request receipt')
+  }
   while (Date.now() < deadline) {
     const replay = await findLayoutReplayRun(config, record, replayBaseSha)
-    if (replay) writeState(config, state)
     if (!replay || replay.run.status !== 'completed') {
-      await sleep(config.deploymentPollSeconds * 1000)
-      if (!(await refreshInputs())) return undefined
-      continue
+      // Replays take hours; release the serial lane and poll again on a later tick.
+      record.receipts.layoutReplayPollAfter = new Date(
+        Date.now() + LAYOUT_REPLAY_POLL_MINUTES * 60_000,
+      ).toISOString()
+      writeState(config, state)
+      return undefined
     }
+    delete record.receipts.layoutReplayPollAfter
+    writeState(config, state)
+    if (!(await refreshInputs())) return undefined
     if (!replay.verdict || replay.verdict.layout !== 'success') {
       if (replay.verdict?.layout !== 'failure') {
         throw new AdminIssueProvenanceError(
@@ -10167,7 +10188,8 @@ async function runOnce(config: AdminIssueControllerConfig, client: HassAdminTodo
     (record) => record.phase === 'blocked' && hasRecoverableTransition(record),
   )
   const inFlight = Object.values(state.issues).find((record) =>
-    ['pull-request', 'deploying', 'ready-for-pr', 'resolving'].includes(record.phase),
+    ['pull-request', 'deploying', 'ready-for-pr', 'resolving'].includes(record.phase) &&
+    !layoutReplayPollDeferred(record, Date.now()),
   )
   if (!recovering && !inFlight &&
     await recoverBlockedDeployments(config, client, state, reconcileInputs)) {
@@ -10437,7 +10459,8 @@ async function advanceParallelReleaseLane(
     available(record) && record.phase === 'blocked' && hasRecoverableTransition(record))
   const inFlight = Object.values(state.issues).find((record) =>
     available(record) &&
-    ['pull-request', 'deploying', 'ready-for-pr', 'resolving'].includes(record.phase))
+    ['pull-request', 'deploying', 'ready-for-pr', 'resolving'].includes(record.phase) &&
+    !layoutReplayPollDeferred(record, Date.now()))
   if (!recovering && !inFlight &&
     await recoverBlockedDeployments(config, client, state, reconcileInputs)) return
   const selected = recovering ?? inFlight

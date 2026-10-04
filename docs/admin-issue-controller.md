@@ -353,8 +353,11 @@ originally failed browser/spec must be covered. A zero-checkpoint tooling run
 cannot stand in for prior WebKit failures. For a tracked incident whose fix
 merged, the controller may dispatch the protected ancestor-bound replay and
 close only when its plan used the original base and its executed coverage
-satisfies the original contexts and checkpoints. Manual replays remain
-available; replay failures do not auto-file another issue.
+satisfies the original contexts and checkpoints. Because replays take hours,
+the incident releases the serial release lane while its replay runs and is
+polled again every five minutes; the replay times out 390 minutes after
+dispatch. Manual replays remain available; replay failures do not auto-file
+another issue.
 
 ## Independent intake and bounded workers
 

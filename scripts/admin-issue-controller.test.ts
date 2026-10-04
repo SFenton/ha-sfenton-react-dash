@@ -107,6 +107,7 @@ import {
   materializeWorkerInputAttachments,
   masterRedIssueDetails,
   dispatchedWorkflowRunId,
+  layoutReplayPollDeferred,
   ownerFiledBodyEdit,
   ownerRetriageStartGeneration,
   mediaInputRequired,
@@ -4033,6 +4034,31 @@ describe('admin issue controller domain', () => {
     expect(() => ownerRetriageStartGeneration({
       receipts: { ownerRetriageCommentId: '11', ownerRetriageFromGeneration: 'x' },
     }, 11)).toThrow('Owner re-triage receipt is invalid')
+  })
+
+  it('releases the serial lane while a protected replay is still running', () => {
+    const nowMs = Date.parse('2026-10-04T20:00:00Z')
+    const waiting = {
+      generation: 1,
+      phase: 'deploying' as const,
+      receipts: {
+        layoutReplayKey: '1:1',
+        layoutReplayPollAfter: '2026-10-04T20:05:00Z',
+        retryEpoch: '1',
+      },
+    }
+    expect(layoutReplayPollDeferred(waiting, nowMs)).toBe(true)
+    expect(layoutReplayPollDeferred(waiting, Date.parse('2026-10-04T20:05:00Z'))).toBe(false)
+    expect(layoutReplayPollDeferred({ ...waiting, phase: 'blocked' }, nowMs)).toBe(false)
+    expect(layoutReplayPollDeferred({ ...waiting, generation: 2 }, nowMs)).toBe(false)
+    expect(layoutReplayPollDeferred({
+      ...waiting,
+      receipts: { ...waiting.receipts, retryEpoch: '2' },
+    }, nowMs)).toBe(false)
+    expect(layoutReplayPollDeferred({
+      ...waiting,
+      receipts: { layoutReplayKey: '1:0', layoutReplayPollAfter: '2026-10-04T20:05:00Z' },
+    }, nowMs)).toBe(true)
   })
 
   it('binds a protected replay only to a valid dispatch run ID', () => {
