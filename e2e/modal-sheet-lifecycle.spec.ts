@@ -1,9 +1,10 @@
 // @covers e2e/modal-sheet-lifecycle.ts
-import { expect, test, type CDPSession, type Page } from './layout/fixture'
+import { expect, test, type CDPSession, type Locator, type Page } from './layout/fixture'
 import {
   assertAnimatedDesktopModalOpen,
   assertAnimatedModalOpen,
   assertTerminalModalLifecycle,
+  classifyModalExitWindow,
   installModalLifecycleProbe,
   readModalLifecycleProbe,
   startModalLifecycleProbe,
@@ -113,18 +114,35 @@ test.describe('thermostat modal close lifecycle', () => {
   })
 
   test('keeps the accelerated closed pose terminal through the mounted exit window', async ({ page }, testInfo) => {
-    const { dialog } = await openThermostatAdvancedControls(page)
-    await accelerateModalExit(page)
-    await startModalLifecycleProbe(page)
+    const maxAttempts = 3
+    let trace: ModalLifecycleTrace | null = null
+    let dialog: Locator | null = null
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if (attempt > 1) await page.goto('about:blank')
+      const opened = await openThermostatAdvancedControls(page)
+      await accelerateModalExit(page)
+      await startModalLifecycleProbe(page)
 
-    await dialog.getByRole('button', { name: 'Close' }).click()
-    await page.waitForTimeout(650)
+      await opened.dialog.getByRole('button', { name: 'Close' }).click()
+      await page.waitForTimeout(650)
 
-    const trace = await readModalLifecycleProbe(page)
-    await testInfo.attach('modal-lifecycle.json', {
-      body: Buffer.from(JSON.stringify(trace)),
-      contentType: 'application/json',
-    })
+      const attemptTrace = await readModalLifecycleProbe(page)
+      const popupMounted = await page.evaluate(() => Boolean(document.querySelector('[data-surface="hass-popup"]')))
+      const outcome = classifyModalExitWindow(attemptTrace, popupMounted)
+      await testInfo.attach(`modal-lifecycle-attempt-${attempt}-${outcome}.json`, {
+        body: Buffer.from(JSON.stringify(attemptTrace)),
+        contentType: 'application/json',
+      })
+      if (outcome !== 'inconclusive') {
+        trace = attemptTrace
+        dialog = opened.dialog
+        break
+      }
+    }
+    if (!trace || !dialog) {
+      throw new Error(`No close cycle in ${maxAttempts} attempts observed the closed-but-mounted window; each unmounted while data-ending-style was still set`)
+    }
+
     expect(trace.historyReplaceCount).toBe(1)
     expect(trace.frames.some((frame) => frame.animations.length > 0)).toBe(true)
     expect(observedAddedAttribute(trace, 'data-ending-style')).toBe(true)
