@@ -486,6 +486,7 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
     question: 'Does source navigation close the old sheet before opening the authoritative Pod editor, preserve execution weekdays and linked-room meaning, and return without duplicate writes?',
   },
   'solo-trip-settings': {
+    // Activating optimistically shows the active Away notice while Home Assistant settles the trip.
     family: 'page-shell-grid',
     states: ['idle', 'idle-selected', 'modal', 'scheduled', 'invalid-return', 'activating', 'active', 'active-home-viewer', 'active-unknown-viewer', 'degraded', 'ending', 'restore-required', 'unavailable'],
     owners: [
