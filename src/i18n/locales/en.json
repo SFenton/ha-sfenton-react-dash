@@ -74,5 +74,28 @@
     "unlocked": "Unlocked",
     "unlocking": "Unlocking",
     "unknown": "Unknown"
+  },
+  "roomGroups": {
+    "contact": {
+      "allClosed": "All Closed",
+      "allDoorsClosed": "All Doors Closed",
+      "allDoorsOpen": "All Doors Open",
+      "allWindowsClosed": "All Windows Closed",
+      "allWindowsOpen": "All Windows Open",
+      "doorClosed": "Door Closed",
+      "doorOpen": "Door Open",
+      "doorsOpenCount_one": "{{count}} Door Open",
+      "doorsOpenCount_other": "{{count}} Doors Open",
+      "windowClosed": "Window Closed",
+      "windowOpen": "Window Open",
+      "windowsOpenCount_one": "{{count}} Window Open",
+      "windowsOpenCount_other": "{{count}} Windows Open"
+    },
+    "sections": {
+      "contactSensors_one": "Contact Sensor",
+      "contactSensors_other": "Contact Sensors",
+      "occupancySensors_one": "Occupancy Sensor",
+      "occupancySensors_other": "Occupancy Sensors"
+    }
   }
 }

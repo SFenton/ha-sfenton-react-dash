@@ -892,8 +892,9 @@ test('Occupancy room tiles preserve portrait cards and centered square presentat
     }
 
     await occupiedSection.getByRole('button', { name: /Open Living Room Occupancy/i }).click()
-    await expect(dialog.getByRole('heading', { name: 'Living Room Occupancy' })).toBeVisible()
-    await dialog.getByRole('button', { name: 'Back to room occupancy' }).click()
+    const detailDialog = page.getByRole('dialog', { name: 'Living Room Occupancy' })
+    await expect(detailDialog.getByRole('heading', { level: 2, name: 'Living Room Occupancy' })).toBeVisible()
+    await detailDialog.getByRole('button', { name: 'Back', exact: true }).click()
     await expect(dialog.getByRole('region', { name: 'Occupied rooms' })).toBeVisible()
     await closeModal(dialog)
   }

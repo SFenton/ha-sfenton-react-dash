@@ -111,6 +111,7 @@ import {
 import { DASHBOARD_ROUTE_CHANGE_EVENT, dashboardEventTargets, dashboardHash, dashboardPathWithSearch, replaceDashboardUrl } from '../hooks/dashboardLocation'
 import { useHashModal } from '../hooks/useHashModal'
 import { useModalDetailPageScroll } from '../hooks/useModalDetailPageScroll'
+import { contactGroupOpenSummary } from './roomGroupSummaries'
 import { useOptimisticState } from '../hooks/useOptimisticState'
 import { useScheduleDetailPage } from '../hooks/useScheduleDetailPage'
 import { useSmoothDisplayedModalTab } from '../hooks/useSmoothDisplayedModalTab'
@@ -812,7 +813,12 @@ function SourceEntityModalContent({ card }: { card: RoomSourceCardConfig }) {
   )
 }
 
-function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string): ReactNode {
+interface RoomContactSelection {
+  onSelectGroup: (group: EntityGroupConfig) => void
+  selectedGroup: EntityGroupConfig | null
+}
+
+function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string, contactSelection?: RoomContactSelection): ReactNode {
   if (!card.hash) return null
 
   if (isDishwasherSourceCard(card)) return <DishwasherModalContent key="dishwasher" />
@@ -837,6 +843,7 @@ function renderRoomReusableSheet(card: RoomSourceCardConfig, roomTitle: string):
   if (card.kind === 'contact') {
     const group = roomContactGroup(roomTitle)
     if (group) return <ContactSheet directGroup={group} hideDirectHeader key={group.title} />
+    if (contactSelection) return <ContactSheet key="contact-sensors-overview" onSelectGroup={contactSelection.onSelectGroup} selectedGroup={contactSelection.selectedGroup} />
     return <ContactSheet key="contact-sensors-overview" />
   }
 
@@ -1290,21 +1297,40 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
   )) setBedEntry(null)
 
   const renderCard = currentRenderCard ?? retainedCard
+  const contactOverviewOpen = renderCard?.kind === 'contact' && !roomContactGroup(roomTitle)
+  const contactDetailKey = card?.hash ?? ''
+  const [contactDetail, setContactDetail] = useState<{ hash: string; group: EntityGroupConfig | null }>(() => ({ hash: contactDetailKey, group: null }))
+  if (contactDetail.hash !== contactDetailKey) setContactDetail({ hash: contactDetailKey, group: null })
+  const selectedContactGroup = contactDetail.hash === contactDetailKey ? contactDetail.group : null
+  const activeContactGroup = contactOverviewOpen ? selectedContactGroup : null
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(activeContactGroup?.title ?? 'overview')
+  const selectContactGroup = (group: EntityGroupConfig) => {
+    if (selectedContactGroup === null) resetDetailPageScroll()
+    enterDetailPage(group.title)
+    setContactDetail({ hash: contactDetailKey, group })
+  }
+  const showContactOverview = () => {
+    leaveDetailPage()
+    setContactDetail({ hash: contactDetailKey, group: null })
+  }
   const eightSleepSide = renderCard ? eightSleepSideForHash(renderCard.hash) : undefined
   const eightSleepModalState = eightSleepSide ? eightSleepModalStates?.[eightSleepSide.hash] : undefined
   const bathroomFan = renderCard?.control === 'bathroom-fan' ? bathroomFanForPowerEntity(renderCard.entityId) : undefined
   const mediaRemote = renderCard?.kind === 'media' && renderCard.hash ? MEDIA_REMOTE_CONFIGS[renderCard.hash] : undefined
   const content = renderCard && !eightSleepSide && !mediaRemote
-    ? renderRoomReusableSheet(renderCard, roomTitle)
+    ? renderRoomReusableSheet(renderCard, roomTitle, contactOverviewOpen ? { onSelectGroup: selectContactGroup, selectedGroup: activeContactGroup } : undefined)
     : null
   const plainTitle = renderCard?.kind === 'air' || renderCard?.kind === 'climate' || renderCard?.kind === 'contact' || renderCard?.kind === 'humidifier' || renderCard?.kind === 'light' || renderCard?.kind === 'occupancy'
   const mediaTitle = mediaRemote?.remoteTitle
-  const title = renderCard
+  const title = activeContactGroup
+    ? activeContactGroup.title
+    : renderCard
     ? isDishwasherSourceCard(renderCard)
       ? renderCard.modalTitle ?? renderCard.title
       : mediaTitle ?? `${roomTitle}${plainTitle ? ' ' : ': '}${renderCard.modalTitle ?? renderCard.title}`
     : roomTitle
   const subtitle = useHass((state) => {
+    if (activeContactGroup) return contactGroupOpenSummary(activeContactGroup, state.entities)
     if (renderCard && isDishwasherSourceCard(renderCard)) return undefined
     return renderCard && plainTitle && renderCard.kind !== 'contact' && renderCard.kind !== 'light' ? roomSourceModalSubtitle(renderCard, roomTitle, state.entities) : undefined
   })
@@ -1364,9 +1390,14 @@ function RoomSourceModal({ card, eightSleepModalStates, onClose, preload = false
 
   return (
     <ModalSheet
+      bodyElementRef={contactOverviewOpen ? bodyElementRef : undefined}
       centeredGeometry={modalSize === 'compact' ? ROOM_SOURCE_COMPACT_CENTERED_GEOMETRY : ROOM_SOURCE_STANDARD_CENTERED_GEOMETRY}
+      onBack={activeContactGroup ? showContactOverview : undefined}
       onClose={onClose}
+      onCloseComplete={contactOverviewOpen ? resetDetailPageScroll : undefined}
       open={Boolean(card)}
+      retainLatestOnControlledClose={contactOverviewOpen}
+      scrollResetKey={contactOverviewOpen ? activeContactGroup?.title ?? 'overview' : undefined}
       size={modalSize}
       subtitle={subtitle}
       title={title}

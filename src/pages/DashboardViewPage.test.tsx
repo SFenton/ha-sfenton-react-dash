@@ -23,6 +23,7 @@ import {
 import { entity, mockCallServiceCalls, mockDonetickTasksById, mockEntities, mockFreeSleepScheduleAttributes, mockScheduleMessages, mockState, mockTodoItemsByEntity, resetMockHass, setMockEntityState, setMockUser } from '../test/mocks/hakitCoreState'
 
 // @covers src/constants/portedDashboard.ts
+// @covers src/components/hass/SecurityDashboard.tsx
 // @covers src/constants/roomPages.ts
 // @covers src/constants/householdResidents.ts
 // @covers src/i18n/index.ts
@@ -6891,6 +6892,56 @@ describe('DashboardViewPage', () => {
       service: 'turn_off',
       target: 'automation.automatically_vacuum_or_mop_music_room',
     })
+  })
+
+  it('moves Security contact room identity and Back into the existing modal header', async () => {
+    render(<DashboardViewPage activePath="security" onNavigate={() => undefined} path="security" />)
+    fireEvent.click(screen.getByRole('button', { name: /Contact Sensors\s*All Closed/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveAccessibleName('Contact Sensors')
+    expect(within(dialog).queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    const opener = within(dialog).getByLabelText('Open Office Contact Sensors')
+    opener.focus()
+    fireEvent.click(opener)
+
+    expect(dialog).toHaveAccessibleName('Office Contact Sensors')
+    const title = within(dialog).getByRole('heading', { level: 2, name: 'Office Contact Sensors' })
+    const back = within(dialog).getByRole('button', { name: 'Back' })
+    expect(back.parentElement).toContainElement(title)
+    expect(title.parentElement).toHaveTextContent(/Closed|Open/)
+    expect(within(dialog).queryByRole('button', { name: 'Back to room contact sensors' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('article', { name: /PC Window Closed/i })).toBeInTheDocument()
+
+    fireEvent.click(back)
+    expect(dialog).toHaveAccessibleName('Contact Sensors')
+    await waitFor(() => expect(within(dialog).getByLabelText('Open Office Contact Sensors')).toHaveFocus())
+    expect(window.location.hash).toBe('#contact-sensors-overview')
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('moves Back Deck Doors contact room identity and Back into the existing modal header', async () => {
+    render(<DashboardViewPage activePath="back-deck" onNavigate={() => undefined} path="back-deck" />)
+    fireEvent.click(screen.getByRole('button', { name: /^Doors\b/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveAccessibleName('Back Deck Doors')
+    expect(within(dialog).queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
+    const opener = within(dialog).getByLabelText('Open Garage Contact Sensors')
+    opener.focus()
+    fireEvent.click(opener)
+
+    expect(dialog).toHaveAccessibleName('Garage Contact Sensors')
+    const title = within(dialog).getByRole('heading', { level: 2, name: 'Garage Contact Sensors' })
+    const back = within(dialog).getByRole('button', { name: 'Back' })
+    expect(back.parentElement).toContainElement(title)
+    expect(title.parentElement).toHaveTextContent(/Closed|Open/)
+    expect(within(dialog).queryByRole('button', { name: 'Back to room contact sensors' })).not.toBeInTheDocument()
+
+    fireEvent.click(back)
+    expect(dialog).toHaveAccessibleName('Back Deck Doors')
+    await waitFor(() => expect(within(dialog).getByLabelText('Open Garage Contact Sensors')).toHaveFocus())
+    expect(mockCallServiceCalls).toEqual([])
   })
 
   it('does not open the Security modal for a Home-only URL hash', () => {
