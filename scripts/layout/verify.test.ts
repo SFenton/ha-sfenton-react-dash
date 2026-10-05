@@ -121,6 +121,15 @@ describe('layout scope and selection', () => {
     expect(historical.unowned).toEqual([])
     expect(historical.reasons).toContain('Shared owner expands all surface families: src/constants/routes.ts')
   })
+  it('owns room contact-group summaries under the navigation contract', () => {
+    expect(SURFACE_CONTRACTS.navigation.owners).toContain('src/pages/roomGroupSummaries')
+    expect(classifyChanges(['src/pages/roomGroupSummaries.ts'])).toMatchObject({
+      mode: 'focused',
+      scenarios: ['navigation'],
+      unowned: [],
+    })
+    expect(classifyChanges(['src/pages/roomGroupSummaries.test.ts'])).toMatchObject({ mode: 'non-layout', scenarios: [] })
+  })
   it('limits shared modal navigation changes to modal surface families', () => {
     const result = classifyChanges(['src/components/core/ModalTabNav.tsx'])
     const modalScenarios = Object.entries(SURFACE_CONTRACTS)
