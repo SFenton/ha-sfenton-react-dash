@@ -436,3 +436,148 @@ test('weather carousels expose boundary-aware mouse and keyboard controls', asyn
     await context.close()
   }
 })
+
+type CarouselChromeSnapshot = { overflow: string | null; pageCount: string | null; paginationHidden: boolean }
+type CarouselStabilityWindow = Window & {
+  __heroCarouselStability?: {
+    firstVisible: CarouselChromeSnapshot | null
+    regressions: string[]
+    resizeSnapshots: Array<CarouselChromeSnapshot & { width: number }>
+  }
+}
+
+// Mutation callbacks run before the browser paints, so the recorded states are the ones a user could see.
+async function recordHeroCarouselStability(page: Page) {
+  await page.addInitScript(() => {
+    const stability: NonNullable<CarouselStabilityWindow['__heroCarouselStability']> = {
+      firstVisible: null,
+      regressions: [],
+      resizeSnapshots: [],
+    }
+    ;(window as CarouselStabilityWindow).__heroCarouselStability = stability
+    const established = new WeakSet<Element>()
+    const snapshot = (frame: HTMLElement): CarouselChromeSnapshot => {
+      const pagination = frame.querySelector<HTMLElement>('[data-weather-carousel-pagination]')
+      return {
+        overflow: frame.getAttribute('data-carousel-overflow'),
+        pageCount: pagination?.getAttribute('data-weather-carousel-page-count') ?? null,
+        paginationHidden: pagination?.hidden ?? true,
+      }
+    }
+    const inspect = () => {
+      document.querySelectorAll<HTMLElement>('[class*="weatherCardFrame"]').forEach((frame) => {
+        if (frame.getBoundingClientRect().width === 0 || !frame.checkVisibility()) return
+        const current = snapshot(frame)
+        stability.firstVisible ??= current
+        if (current.overflow === 'true' && !current.paginationHidden) established.add(frame)
+        else if (established.has(frame)) stability.regressions.push(JSON.stringify(current))
+      })
+    }
+    new MutationObserver(inspect).observe(document, { attributes: true, childList: true, subtree: true })
+  })
+}
+
+async function observeHeroCarouselResizes(page: Page) {
+  await page.evaluate(() => {
+    const stability = (window as CarouselStabilityWindow).__heroCarouselStability!
+    const frame = document.querySelector<HTMLElement>('[class*="weatherCardFrame"]')!
+    const strip = frame.querySelector<HTMLElement>('[data-weather-carousel="hero"]')!
+    // Created after the carousel's own observer, so it reports the chrome committed for that resize.
+    new ResizeObserver(() => {
+      const pagination = frame.querySelector<HTMLElement>('[data-weather-carousel-pagination]')
+      stability.resizeSnapshots.push({
+        overflow: frame.getAttribute('data-carousel-overflow'),
+        pageCount: pagination?.getAttribute('data-weather-carousel-page-count') ?? null,
+        paginationHidden: pagination?.hidden ?? true,
+        width: strip.clientWidth,
+      })
+    }).observe(strip)
+  })
+}
+
+async function expectResizeCommittedBeforePaint(page: Page, size: { height: number; width: number }) {
+  await page.evaluate(() => { (window as CarouselStabilityWindow).__heroCarouselStability!.resizeSnapshots = [] })
+  await page.setViewportSize(size)
+  const result = await page.evaluate(async () => {
+    for (let frame = 0; frame < 3; frame += 1) await new Promise<void>((done) => requestAnimationFrame(() => done()))
+    const frame = document.querySelector<HTMLElement>('[class*="weatherCardFrame"]')!
+    const pagination = frame.querySelector<HTMLElement>('[data-weather-carousel-pagination]')
+    return {
+      settled: {
+        overflow: frame.getAttribute('data-carousel-overflow'),
+        pageCount: pagination?.getAttribute('data-weather-carousel-page-count') ?? null,
+        paginationHidden: pagination?.hidden ?? true,
+      },
+      snapshots: (window as CarouselStabilityWindow).__heroCarouselStability!.resizeSnapshots,
+      width: frame.querySelector<HTMLElement>('[data-weather-carousel="hero"]')!.clientWidth,
+    }
+  })
+  // Grid reflow can pass through intermediate strip widths; every frame at the final width must already show the settled chrome.
+  const settledWidthSnapshots = result.snapshots
+    .filter((snapshot) => snapshot.width === result.width)
+    .map(({ overflow, pageCount, paginationHidden }) => ({ overflow, pageCount, paginationHidden }))
+  expect(settledWidthSnapshots.length).toBeGreaterThan(0)
+  for (const snapshot of settledWidthSnapshots) expect(snapshot).toEqual(result.settled)
+  return result.settled
+}
+
+async function heroCarouselStability(page: Page) {
+  return page.evaluate(() => (window as CarouselStabilityWindow).__heroCarouselStability!)
+}
+
+test('phone hero carousel chrome is present from first paint and stays until the route leaves', async ({ page }) => {
+  await recordHeroCarouselStability(page)
+  await page.setViewportSize({ height: 852, width: 393 })
+  await page.goto('/index.html?path=overview')
+
+  const heroFrame = page.locator('[data-route-path="overview"] [class*="weatherCardFrame"]')
+  const heroPagination = heroFrame.locator('[data-weather-carousel-pagination]')
+  await expect(heroPagination).toHaveAttribute('data-weather-carousel-page-count', '4')
+  await expect(heroPagination).toBeVisible()
+  const loaded = await heroCarouselStability(page)
+  expect(loaded.firstVisible).toMatchObject({ overflow: 'true', paginationHidden: false })
+  expect(loaded.regressions).toEqual([])
+
+  await observeHeroCarouselResizes(page)
+  const landscape = await expectResizeCommittedBeforePaint(page, { height: 393, width: 852 })
+  const portrait = await expectResizeCommittedBeforePaint(page, { height: 852, width: 393 })
+  expect(portrait).toEqual({ overflow: 'true', pageCount: '4', paginationHidden: false })
+  expect(landscape.pageCount).not.toBe(portrait.pageCount)
+  expect((await heroCarouselStability(page)).regressions).toEqual([])
+
+  const adaptiveNavigation = page.locator('[data-adaptive-navigation]:visible')
+  if (await adaptiveNavigation.count()) {
+    await adaptiveNavigation.getByRole('button', { name: 'Settings', exact: true }).click()
+  } else {
+    await page.getByRole('button', { name: 'Open navigation menu' }).click()
+    await page.locator('aside[data-state="open"]').getByRole('menuitem', { name: 'Settings', exact: true }).click()
+  }
+  await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible({ timeout: 15_000 })
+  await expect(heroFrame.filter({ visible: true })).toHaveCount(0, { timeout: 15_000 })
+  expect((await heroCarouselStability(page)).regressions).toEqual([])
+})
+
+test('desktop hero carousel chrome is present from first paint and follows resizes before paint', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({
+    deviceScaleFactor: 1,
+    hasTouch: false,
+    isMobile: false,
+    viewport: { height: 900, width: 1440 },
+  })
+  const page = await context.newPage()
+  try {
+    await recordHeroCarouselStability(page)
+    await page.goto(`${baseURL ?? 'http://127.0.0.1:5174'}/index.html?path=overview`)
+    const heroFrame = page.locator('[class*="weatherCardFrame"]')
+    await expect(heroFrame.locator('[data-weather-carousel-pagination]')).toHaveAttribute('data-weather-carousel-page-count', '2')
+    const loaded = await heroCarouselStability(page)
+    expect(loaded.firstVisible).toMatchObject({ overflow: 'true', paginationHidden: false })
+    expect(loaded.regressions).toEqual([])
+
+    await observeHeroCarouselResizes(page)
+    expect(await expectResizeCommittedBeforePaint(page, { height: 1080, width: 1920 })).toEqual({ overflow: null, pageCount: '1', paginationHidden: true })
+    expect(await expectResizeCommittedBeforePaint(page, { height: 900, width: 1440 })).toEqual({ overflow: 'true', pageCount: '2', paginationHidden: false })
+  } finally {
+    await context.close()
+  }
+})
