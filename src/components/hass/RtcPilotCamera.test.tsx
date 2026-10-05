@@ -1,5 +1,6 @@
 // @covers src/constants/rtcPilot.ts
 // @covers src/components/hass/rtcStreamRetention.ts
+// @covers src/components/hass/rtcCardPool.ts
 import { act, render, waitFor } from '@testing-library/react'
 import { CAMERA_ITEMS } from '../../constants/atAGlance'
 import { resetMockHass, setMockConnectionStatus } from '../../test/mocks/hakitCoreState'
@@ -10,6 +11,7 @@ import {
   toggleCameraStreamMuted,
 } from './cameraStreamActions'
 import { RtcPilotCamera } from './RtcPilotCamera'
+import { isRtcCameraWarm, resetRtcCardPoolForTests } from './rtcCardPool'
 import { isRtcStreamRetained, releaseRetainedRtcStreams } from './rtcStreamRetention'
 
 interface FakeRtcConfig {
@@ -20,7 +22,9 @@ interface FakeRtcConfig {
 
 class FakeRtcCard extends HTMLElement {
   static failuresRemaining = 0
+  static withVideo = false
   configuration?: FakeRtcConfig
+  video: HTMLVideoElement | null = FakeRtcCard.withVideo ? fakeVideo() : null
   hassState?: unknown
   setConfig(config: FakeRtcConfig) {
     if (FakeRtcCard.failuresRemaining > 0) {
@@ -36,8 +40,28 @@ class FakeRtcCard extends HTMLElement {
     return this.hassState
   }
   connectedCallback() {
-    this.setAttribute('data-stream-status', 'connecting')
+    // Like the shared stream manager, a reattached card resumes an already-connected stream synchronously.
+    if (this.getAttribute('data-stream-status') !== 'connected') this.setAttribute('data-stream-status', 'connecting')
   }
+}
+
+const fakeFrames = new WeakMap<HTMLVideoElement, { readyState: number; width: number; height: number }>()
+
+function fakeVideo() {
+  const video = document.createElement('video')
+  const frame = { readyState: 0, width: 0, height: 0 }
+  fakeFrames.set(video, frame)
+  Object.defineProperties(video, {
+    readyState: { get: () => frame.readyState },
+    videoWidth: { get: () => frame.width },
+    videoHeight: { get: () => frame.height },
+  })
+  return video
+}
+
+function decodeFrame(video: HTMLVideoElement) {
+  Object.assign(fakeFrames.get(video)!, { readyState: HTMLMediaElement.HAVE_ENOUGH_DATA, width: 1280, height: 720 })
+  video.dispatchEvent(new Event('loadeddata'))
 }
 
 if (!customElements.get('webrtc-camera-sfenton')) {
@@ -51,7 +75,115 @@ describe('RTC camera', () => {
     resetMockHass()
     setMockConnectionStatus('connected')
     FakeRtcCard.failuresRemaining = 0
+    FakeRtcCard.withVideo = false
     releaseRetainedRtcStreams()
+    resetRtcCardPoolForTests()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('attaches a registered card before paint and reuses the same element after a page unmount', async () => {
+    const first = render(<RtcPilotCamera camera={driveway} minHeight={190} variant="tile" />)
+    const card = first.container.querySelector('webrtc-camera-sfenton') as FakeRtcCard
+    expect(card).toBeInTheDocument()
+    await act(async () => card.setAttribute('data-stream-status', 'connected'))
+    expect(isRtcCameraWarm('garage_camera')).toBe(true)
+    first.unmount()
+    expect(card.isConnected).toBe(false)
+
+    const second = render(<RtcPilotCamera camera={driveway} minHeight={190} variant="tile" />)
+    expect(second.container.querySelector('webrtc-camera-sfenton')).toBe(card)
+    expect(second.container.querySelector('[data-status="live"]')).toHaveAttribute('data-loaded', 'true')
+    expect(card).toHaveAttribute('data-dashboard-visible', 'true')
+    second.unmount()
+  })
+
+  it('keeps a connected card hidden until its video decodes a first frame', async () => {
+    FakeRtcCard.withVideo = true
+    const onStatusChange = vi.fn()
+    const view = render(<RtcPilotCamera camera={driveway} minHeight={310} onStatusChange={onStatusChange} variant="modal" />)
+    const card = view.container.querySelector('webrtc-camera-sfenton') as FakeRtcCard
+
+    await act(async () => card.setAttribute('data-stream-status', 'connected'))
+    expect(onStatusChange).not.toHaveBeenCalledWith('live')
+    expect(card).toHaveAttribute('data-dashboard-visible', 'false')
+    expect(isRtcCameraWarm('garage_camera')).toBe(false)
+
+    await act(async () => decodeFrame(card.video!))
+    expect(onStatusChange).toHaveBeenLastCalledWith('live')
+    expect(card).toHaveAttribute('data-dashboard-visible', 'true')
+    view.unmount()
+  })
+
+  it('reveals a connected card after the first-frame fallback when no frame event arrives', async () => {
+    vi.useFakeTimers()
+    FakeRtcCard.withVideo = true
+    const view = render(<RtcPilotCamera camera={driveway} minHeight={310} variant="modal" />)
+    const card = view.container.querySelector('webrtc-camera-sfenton') as FakeRtcCard
+
+    await act(async () => card.setAttribute('data-stream-status', 'connected'))
+    await act(async () => vi.advanceTimersByTime(1_499))
+    expect(card).toHaveAttribute('data-dashboard-visible', 'false')
+    await act(async () => vi.advanceTimersByTime(1))
+    expect(card).toHaveAttribute('data-dashboard-visible', 'true')
+    view.unmount()
+  })
+
+  it('paints a poster from another decoded card of the same stream while a new card loads', async () => {
+    const drawImage = vi.fn()
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D)
+    FakeRtcCard.withVideo = true
+    const tile = render(<RtcPilotCamera camera={driveway} minHeight={190} variant="tile" />)
+    const tileCard = tile.container.querySelector('webrtc-camera-sfenton') as FakeRtcCard
+    await act(async () => {
+      decodeFrame(tileCard.video!)
+      tileCard.setAttribute('data-stream-status', 'connected')
+    })
+
+    const modal = render(<RtcPilotCamera camera={driveway} controls fill minHeight={310} variant="modal" />)
+    const modalCard = modal.container.querySelector('webrtc-camera-sfenton') as FakeRtcCard
+    expect(modalCard).not.toBe(tileCard)
+    const poster = modal.container.querySelector('canvas[data-camera-poster="true"]')
+    expect(poster).toHaveAttribute('data-fit', 'contain')
+    expect(poster).toHaveAttribute('aria-hidden', 'true')
+    expect(drawImage).toHaveBeenCalledWith(tileCard.video, 0, 0, 1280, 720)
+
+    await act(async () => {
+      modalCard.setAttribute('data-stream-status', 'connected')
+      decodeFrame(modalCard.video!)
+    })
+    expect(modal.container.querySelector('canvas[data-camera-poster]')).not.toBeInTheDocument()
+    modal.unmount()
+    tile.unmount()
+  })
+
+  it('mutes an unmuted modal card before parking it so a reopened modal starts muted', () => {
+    FakeRtcCard.withVideo = true
+    const view = render(<RtcPilotCamera camera={driveway} controls fill minHeight={310} variant="modal" />)
+    const card = view.container.querySelector('webrtc-camera-sfenton') as FakeRtcCard
+    card.video!.muted = false
+    const muteRequests: Event[] = []
+    card.addEventListener('webrtc-mute', (event) => muteRequests.push(event))
+
+    view.unmount()
+    expect(muteRequests).toHaveLength(1)
+    expect((muteRequests[0] as CustomEvent).detail).toEqual({ target_id: driveway.popupCardId })
+  })
+
+  it('does not reuse a card whose stream reported an error', async () => {
+    const first = render(<RtcPilotCamera camera={driveway} minHeight={190} variant="tile" />)
+    const card = first.container.querySelector('webrtc-camera-sfenton') as FakeRtcCard
+    await act(async () => card.setAttribute('data-stream-status', 'connected'))
+    await act(async () => card.setAttribute('data-stream-status', 'error'))
+    expect(isRtcCameraWarm('garage_camera')).toBe(false)
+    first.unmount()
+
+    const second = render(<RtcPilotCamera camera={driveway} minHeight={190} variant="tile" />)
+    expect(second.container.querySelector('webrtc-camera-sfenton')).not.toBe(card)
+    second.unmount()
   })
 
   it('uses an HA-signed shared video-and-audio stream and requires decoded status for Live', async () => {

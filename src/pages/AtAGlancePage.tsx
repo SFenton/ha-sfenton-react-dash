@@ -17,7 +17,7 @@ import { Separator } from '../components/core/Separator'
 import { SectionHeader } from '../components/core/SectionHeader'
 import { SurfaceAccessory } from '../components/core/SurfaceAccessory'
 import { CameraModalContent } from '../components/hass/CameraModalContent'
-import { CameraTile } from '../components/hass/CameraTile'; import { LightBrightnessCard } from '../components/hass/LightBrightnessCard'
+import { CameraTile } from '../components/hass/CameraTile'; import { isRtcCameraWarm } from '../components/hass/rtcCardPool'; import { LightBrightnessCard } from '../components/hass/LightBrightnessCard'
 import { SecurityControls } from '../components/hass/SecurityControls'
 import { SECURITY_SYSTEM_CENTERED_GEOMETRY, securitySystemModalSubtitle } from '../components/hass/securityControlsConfig'
 import { GuestPresenceSecurityModalContent, GuestPresenceSecuritySection, GUEST_PRESENCE_SECURITY_HASH } from '../components/hass/GuestPresenceSecurity'
@@ -1270,7 +1270,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
             <SectionHeader title="Cameras" />
             <DynamicGrid className={styles.cameraGrid} columns={2} fillRows={false} itemSizing="fixed" layout="fill" maxCellWidth={280} maxColumns={4}>
               {CAMERA_ITEMS.map((camera) => (
-                <CameraTile camera={camera} key={camera.entityId} live={hydrateHeavyContent && !preload} onOpen={openHash} />
+                <CameraTile camera={camera} key={camera.entityId} live={!preload && (hydrateHeavyContent || isRtcCameraWarm(camera.rtcStreamId))} onOpen={openHash} />
               ))}
             </DynamicGrid>
           </div>

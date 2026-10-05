@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useHass } from '@hakit/core'
 import type { CameraConfig } from '../../constants/atAGlance'
 import {
@@ -6,6 +6,17 @@ import {
   registerCameraStreamActionTarget,
 } from './cameraStreamActions'
 import { CAMERA_STREAM_PHASE, type CameraStreamStatus } from './cameraStreamStatus'
+import {
+  forgetRtcStreamCard,
+  parkRtcCard,
+  rememberRtcStreamCard,
+  rtcCardPoolKey,
+  rtcPosterSource,
+  rtcVideoHasFrame,
+  setRtcStreamWarm,
+  takePooledRtcCard,
+  type RtcCardElement,
+} from './rtcCardPool'
 import { rtcCardResourceUrl } from './rtcCardResource'
 import { retainRtcStream, rtcStreamConfig } from './rtcStreamRetention'
 import styles from './HlsCamera.module.css'
@@ -15,14 +26,11 @@ const RTC_CARD_TAG = 'webrtc-camera-sfenton'
 const RTC_CHROME_STYLE_ID = 'sfenton-rtc-chrome'
 const RTC_CARD_SETUP_RETRY_MS = 2_000
 const RTC_CARD_SETUP_MAX_RETRIES = 5
+const RTC_FIRST_FRAME_FALLBACK_MS = 1_500
+const RTC_FRAME_EVENTS = ['loadeddata', 'canplay', 'playing', 'timeupdate', 'resize'] as const
 
 let rtcModulePromise: Promise<void> | null = null
 let resourceRetry = 0
-
-interface RtcCardElement extends HTMLElement {
-  hass: unknown
-  setConfig: (config: Record<string, unknown>) => void
-}
 
 type RtcCardWindow = Window & {
   __webrtcGetMuteState?: (cardId: string) => boolean | undefined
@@ -88,21 +96,97 @@ function hideRtcChrome(card: RtcCardElement) {
   return () => window.cancelAnimationFrame(frame)
 }
 
+// Live waits for a decoded frame, or a short fallback when the browser never reports one.
 function watchRtcStatus(card: RtcCardElement, onStatus: (status: CameraStreamStatus) => void) {
-  const report = () => {
+  let last: CameraStreamStatus | null = null
+  let frameVideo: HTMLVideoElement | null = null
+  let fallbackTimer: number | null = null
+  let fallbackElapsed = false
+  const emit = (next: CameraStreamStatus) => {
+    if (next === last) return
+    last = next
+    onStatus(next)
+  }
+  const stopFrameWait = () => {
+    if (frameVideo) for (const type of RTC_FRAME_EVENTS) frameVideo.removeEventListener(type, report)
+    frameVideo = null
+    if (fallbackTimer !== null) window.clearTimeout(fallbackTimer)
+    fallbackTimer = null
+  }
+  function report() {
     const state = card.getAttribute('data-stream-status')
-    if (state === 'connected') onStatus('live')
-    else if (state === 'error') onStatus('error')
-    else if (state === null || state === 'idle' || state === 'connecting' || state === 'disconnected') onStatus('loading')
-    else {
-      console.error('Unknown RTC stream status:', state)
-      onStatus('error')
+    if (state !== 'connected') {
+      stopFrameWait()
+      fallbackElapsed = false
+      if (state === 'error') emit('error')
+      else if (state === null || state === 'idle' || state === 'connecting' || state === 'disconnected') emit('loading')
+      else {
+        console.error('Unknown RTC stream status:', state)
+        emit('error')
+      }
+      return
     }
+    const video = card.video
+    if (!video || rtcVideoHasFrame(video) || fallbackElapsed) {
+      stopFrameWait()
+      emit('live')
+      return
+    }
+    if (frameVideo !== video) {
+      stopFrameWait()
+      frameVideo = video
+      for (const type of RTC_FRAME_EVENTS) video.addEventListener(type, report)
+    }
+    if (fallbackTimer === null) {
+      fallbackTimer = window.setTimeout(() => {
+        fallbackTimer = null
+        fallbackElapsed = true
+        report()
+      }, RTC_FIRST_FRAME_FALLBACK_MS)
+    }
+    emit('loading')
   }
   const observer = new MutationObserver(report)
   observer.observe(card, { attributes: true, attributeFilter: ['data-stream-status'] })
   report()
-  return () => observer.disconnect()
+  return () => {
+    observer.disconnect()
+    stopFrameWait()
+  }
+}
+
+function createRtcPoster(host: HTMLElement, card: RtcCardElement, streamId: string, fit: 'cover' | 'contain') {
+  let poster: HTMLCanvasElement | null = null
+  const remove = () => {
+    poster?.remove()
+    poster = null
+  }
+  const update = (status: CameraStreamStatus) => {
+    if (status !== CAMERA_STREAM_PHASE.LOADING) {
+      remove()
+      return
+    }
+    if (poster) return
+    const source = rtcPosterSource(streamId, card)
+    if (!source) return
+    const canvas = document.createElement('canvas')
+    canvas.width = source.videoWidth
+    canvas.height = source.videoHeight
+    try {
+      const drawing = canvas.getContext('2d')
+      if (!drawing) return
+      drawing.drawImage(source, 0, 0, canvas.width, canvas.height)
+    } catch {
+      return
+    }
+    canvas.className = rtcStyles.poster
+    canvas.dataset.cameraPoster = 'true'
+    canvas.dataset.fit = fit
+    canvas.setAttribute('aria-hidden', 'true')
+    host.append(canvas)
+    poster = canvas
+  }
+  return { update, remove }
 }
 
 function setRtcCardPresentation(card: RtcCardElement, status: CameraStreamStatus) {
@@ -174,7 +258,9 @@ export function RtcPilotCamera({
     if (cardRef.current) cardRef.current.hass = hassShim
   }, [hassShim])
 
-  useEffect(() => {
+  // A layout effect attaches a pooled or already-registered card before the browser paints, so
+  // a returning tile never shows an empty frame for even one animation frame.
+  useLayoutEffect(() => {
     const host = hostRef.current
     if (!host) return
 
@@ -183,9 +269,7 @@ export function RtcPilotCamera({
     let queuedRetry = false
     let retryAttempts = 0
     let retryTimer: number | null = null
-    let stopWatching: (() => void) | null = null
-    let stopChrome: (() => void) | null = null
-    let unregisterActions: (() => void) | null = null
+    let detachCard: ((park: boolean) => void) | null = null
     const report = (next: CameraStreamStatus) => {
       if (cancelled) return
       if (cardRef.current) setRtcCardPresentation(cardRef.current, next)
@@ -198,31 +282,35 @@ export function RtcPilotCamera({
         publishCameraStreamMuteState(cardId, detail.muted)
       }
     }
-    const mountCard = async () => {
-      if (cancelled || loading || cardRef.current) return
-      if (retryTimer !== null) {
-        window.clearTimeout(retryTimer)
+    const scheduleRetry = () => {
+      if (retryAttempts >= RTC_CARD_SETUP_MAX_RETRIES) return
+      const delay = Math.min(30_000, RTC_CARD_SETUP_RETRY_MS * 2 ** retryAttempts)
+      retryAttempts += 1
+      retryTimer = window.setTimeout(() => {
         retryTimer = null
-      }
-      loading = true
-      report('loading')
-      let recoverable = true
-      try {
-        if (!camera.rtcStreamId) {
-          recoverable = false
-          throw new Error(`No RTC stream configured for ${camera.entityId}`)
-        }
-        await loadRtcCard()
-        if (cancelled) return
-
-        const card = document.createElement(RTC_CARD_TAG) as RtcCardElement
-        card.className = rtcStyles.card
-        card.style.display = 'block'
-        card.style.width = '100%'
-        card.dataset.dashboardVariant = variant
-        card.dataset.dashboardFill = fill ? 'true' : 'false'
-        setRtcCardPresentation(card, 'loading')
-        card.setConfig({
+        mountCard()
+      }, delay)
+    }
+    const fail = (error: unknown, recoverable: boolean) => {
+      detachCard?.(false)
+      detachCard = null
+      host.replaceChildren()
+      console.error('Unable to start RTC camera:', error)
+      report('error')
+      if (recoverable) scheduleRetry()
+    }
+    const attach = (streamId: string) => {
+      const poolKey = rtcCardPoolKey([cardId, streamId, camera.title, controls, fill, variant])
+      let card = takePooledRtcCard(poolKey)
+      if (!card) {
+        const created = document.createElement(RTC_CARD_TAG) as RtcCardElement
+        created.className = rtcStyles.card
+        created.style.display = 'block'
+        created.style.width = '100%'
+        created.dataset.dashboardVariant = variant
+        created.dataset.dashboardFill = fill ? 'true' : 'false'
+        setRtcCardPresentation(created, 'loading')
+        created.setConfig({
           card_id: cardId,
           id: cardId,
           label: camera.title,
@@ -233,51 +321,96 @@ export function RtcPilotCamera({
           controls,
           intersection: 0,
           digital_ptz: disabledDigitalPtzConfig(),
-          streams: [rtcStreamConfig(camera.rtcStreamId)],
+          streams: [rtcStreamConfig(streamId)],
         })
-        card.hass = hassShimRef.current
-        host.replaceChildren(card)
-        cardRef.current = card
-        retainRtcStream(camera.rtcStreamId)
-        window.addEventListener('webrtc-audio-state', handleAudioState)
-        stopChrome = hideRtcChrome(card)
-        stopWatching = watchRtcStatus(card, report)
-        unregisterActions = registerCameraStreamActionTarget(cardId, {
-          getMuted: () => cardMuted(cardId),
-          setMuted: (muted) => window.dispatchEvent(new CustomEvent(
-            muted ? 'webrtc-mute' : 'webrtc-unmute', { detail: { target_id: cardId } },
-          )),
-          takeSnapshot: () => window.dispatchEvent(new CustomEvent(
-            'webrtc-screenshot', { detail: { target_id: cardId } },
-          )),
-        })
-        retryAttempts = 0
-      } catch (error) {
-        if (cancelled) return
+        card = created
+      }
+      const mounted = card
+      let lastStatus: CameraStreamStatus = CAMERA_STREAM_PHASE.LOADING
+      let stopChrome: (() => void) | null = null
+      let stopWatching: (() => void) | null = null
+      let unregisterActions: (() => void) | null = null
+      const poster = createRtcPoster(host, mounted, streamId, variant === 'tile' ? 'cover' : 'contain')
+      detachCard = (park) => {
         stopWatching?.()
         stopChrome?.()
         unregisterActions?.()
+        poster.remove()
         window.removeEventListener('webrtc-audio-state', handleAudioState)
         cardRef.current = null
-        host.replaceChildren()
-        console.error('Unable to start RTC camera:', error)
-        report('error')
-        if (recoverable && retryAttempts < RTC_CARD_SETUP_MAX_RETRIES) {
-          const delay = Math.min(30_000, RTC_CARD_SETUP_RETRY_MS * 2 ** retryAttempts)
-          retryAttempts += 1
-          retryTimer = window.setTimeout(() => {
-            retryTimer = null
-            void mountCard()
-          }, delay)
-        }
-      } finally {
-        loading = false
-        if (queuedRetry && recoverable && !cardRef.current && !cancelled) {
-          queuedRetry = false
-          retryAttempts = 0
-          void mountCard()
+        if (park && lastStatus !== CAMERA_STREAM_PHASE.ERROR) {
+          // Pooled cards reopen with the muted default, like a newly configured card.
+          if (mounted.video && !mounted.video.muted) {
+            mounted.dispatchEvent(new CustomEvent('webrtc-mute', { detail: { target_id: cardId } }))
+          }
+          mounted.remove()
+          parkRtcCard(poolKey, streamId, mounted)
+        } else {
+          mounted.remove()
+          forgetRtcStreamCard(streamId, mounted)
         }
       }
+      mounted.hass = hassShimRef.current
+      host.replaceChildren(mounted)
+      cardRef.current = mounted
+      rememberRtcStreamCard(streamId, mounted)
+      retainRtcStream(streamId)
+      window.addEventListener('webrtc-audio-state', handleAudioState)
+      stopChrome = hideRtcChrome(mounted)
+      stopWatching = watchRtcStatus(mounted, (next) => {
+        lastStatus = next
+        poster.update(next)
+        if (next === CAMERA_STREAM_PHASE.LIVE) setRtcStreamWarm(streamId, true)
+        else if (next === CAMERA_STREAM_PHASE.ERROR) setRtcStreamWarm(streamId, false)
+        report(next)
+      })
+      unregisterActions = registerCameraStreamActionTarget(cardId, {
+        getMuted: () => cardMuted(cardId),
+        setMuted: (muted) => window.dispatchEvent(new CustomEvent(
+          muted ? 'webrtc-mute' : 'webrtc-unmute', { detail: { target_id: cardId } },
+        )),
+        takeSnapshot: () => window.dispatchEvent(new CustomEvent(
+          'webrtc-screenshot', { detail: { target_id: cardId } },
+        )),
+      })
+      retryAttempts = 0
+    }
+    const attachOrFail = (streamId: string) => {
+      try {
+        attach(streamId)
+      } catch (error) {
+        fail(error, true)
+      }
+    }
+    function mountCard() {
+      if (cancelled || loading || cardRef.current) return
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer)
+        retryTimer = null
+      }
+      const streamId = camera.rtcStreamId
+      if (!streamId) {
+        fail(new Error(`No RTC stream configured for ${camera.entityId}`), false)
+        return
+      }
+      if (customElements.get(RTC_CARD_TAG)) {
+        attachOrFail(streamId)
+        return
+      }
+      loading = true
+      report('loading')
+      loadRtcCard().then(() => {
+        if (!cancelled) attachOrFail(streamId)
+      }, (error: unknown) => {
+        if (!cancelled) fail(error, true)
+      }).finally(() => {
+        loading = false
+        if (queuedRetry && !cardRef.current && !cancelled) {
+          queuedRetry = false
+          retryAttempts = 0
+          mountCard()
+        }
+      })
     }
 
     mountCardRef.current = () => {
@@ -286,17 +419,15 @@ export function RtcPilotCamera({
         return
       }
       retryAttempts = 0
-      void mountCard()
+      mountCard()
     }
-    void mountCard()
+    mountCard()
     return () => {
       cancelled = true
       mountCardRef.current = null
       if (retryTimer !== null) window.clearTimeout(retryTimer)
-      stopWatching?.()
-      stopChrome?.()
-      unregisterActions?.()
-      window.removeEventListener('webrtc-audio-state', handleAudioState)
+      detachCard?.(true)
+      detachCard = null
       cardRef.current = null
       host.replaceChildren()
     }

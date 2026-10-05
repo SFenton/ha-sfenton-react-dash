@@ -77,6 +77,14 @@ export const PLAYWRIGHT_SPEC_COVERAGE = [
     spec: 'battery-title-desktop-responsive.spec.ts',
   },
   {
+    area: 'Per-frame RTC camera continuity across Home and Security tab returns and modal open',
+    landscape: 'owned',
+    landscapeOwner: 'feedback-regressions.spec.ts',
+    safeArea: 'owned',
+    safeAreaOwner: 'safe-area-responsive.spec.ts',
+    spec: 'camera-stream-continuity.spec.ts',
+  },
+  {
     area: 'Fine-pointer route, navigation, focus, Food, and vacuum behavior',
     landscape: 'direct',
     note: 'Desktop safe-area geometry remains the zero-inset baseline.',
@@ -364,8 +372,8 @@ export const SURFACE_CONTRACTS: Record<ScenarioId, {
   },
   camera: {
     family: 'modal', states: ['loading', 'live'],
-    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera.module.css', 'src/components/hass/RtcPilotCamera', 'src/components/hass/rtcCardResource', 'src/components/hass/rtcStreamRetention', 'src/components/hass/mockRtcCard', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/constants/rtcPilot'],
-    legacy: ['feedback-regressions.spec.ts', 'landscape-modal-adaptation.spec.ts'],
+    owners: ['src/components/hass/CameraTile', 'src/components/hass/HlsCamera.module.css', 'src/components/hass/RtcPilotCamera', 'src/components/hass/rtcCardResource', 'src/components/hass/rtcCardPool', 'src/components/hass/rtcStreamRetention', 'src/components/hass/mockRtcCard', 'src/components/hass/cameraStreamActions', 'src/components/hass/cameraStreamStatus', 'src/constants/rtcPilot'],
+    legacy: ['feedback-regressions.spec.ts', 'landscape-modal-adaptation.spec.ts', 'camera-stream-continuity.spec.ts'],
     question: 'Do the shared camera tiles and modal media preserve their geometry from loading to decoded live video? RTC is the production camera transport on every host; real decoded video and audible output require separate real-media evidence.',
   },
   summary: {
