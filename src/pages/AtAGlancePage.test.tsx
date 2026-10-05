@@ -3,7 +3,7 @@ import { AtAGlancePage, LightsSheet } from './AtAGlancePage'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
-import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass, setMockDailyWeatherForecast, setMockEntityAttribute, setMockEntityState, setMockConnectionStatus, setMockHourlyWeatherForecast } from '../test/mocks/hakitCoreState'
+import { entity, mockCallServiceCalls, mockEntities, mockState, resetMockHass, setMockCallServiceOutcome, setMockDailyWeatherForecast, setMockEntityAttribute, setMockEntityState, setMockConnectionStatus, setMockHourlyWeatherForecast } from '../test/mocks/hakitCoreState'
 import { resetDeferredRouteHydrationCache } from '../hooks/useDeferredRouteHydration'
 import { WeatherSummary } from '../components/hass/WeatherSummary'
 import { WEATHER_FORECAST_TTL_MS } from '../components/hass/useWeatherForecasts'
@@ -842,6 +842,67 @@ describe('Home weather forecast freshness and ranges', () => {
     expect(within(dialog).getByRole('article', { name: 'Now Cloudy 73°F' })).toBeInTheDocument()
     expect(within(dialog).getByRole('article', { name: 'Today Sunny H:86° L:48°' })).toBeInTheDocument()
     expect(dialog.querySelector('[data-metric="humidity"][data-value="51"]')).toBeInTheDocument()
+  })
+
+  function mockHeroCarouselLayout(viewportWidth: number) {
+    const isHeroScroller = (element: Element) => element.matches('[data-weather-carousel="hero"], [data-weather-carousel-placeholder="true"]')
+    const carouselItemIndex = (element: Element) => (
+      element.matches('[data-carousel-item="true"]') && element.parentElement
+        ? Array.prototype.indexOf.call(element.parentElement.children, element) as number
+        : -1
+    )
+    vi.spyOn(Element.prototype, 'clientWidth', 'get').mockImplementation(function clientWidth(this: Element) {
+      return isHeroScroller(this) ? viewportWidth : 0
+    })
+    vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockImplementation(function scrollWidth(this: Element) {
+      return isHeroScroller(this) ? this.children.length * 52 - 10 : 0
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockImplementation(function offsetLeft(this: HTMLElement) {
+      return Math.max(0, carouselItemIndex(this)) * 52
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function offsetWidth(this: HTMLElement) {
+      return carouselItemIndex(this) >= 0 ? 42 : 0
+    })
+  }
+
+  function heroCarouselFrame(container: HTMLElement) {
+    const frame = container.querySelector<HTMLElement>('[class*="weatherCardFrame"]')
+    if (!frame) throw new Error('Missing weather card frame')
+    const pagination = frame.querySelector<HTMLElement>(':scope > [data-weather-carousel-pagination="true"]')
+    if (!pagination) throw new Error('Missing hero carousel pagination')
+    return { frame, pagination }
+  }
+
+  it('keeps the measured hero carousel while route hydration is deferred', async () => {
+    mockHeroCarouselLayout(300)
+    const { container, rerender } = render(<WeatherSummary />)
+    await settle()
+    const { frame, pagination } = heroCarouselFrame(container)
+    expect(frame).toHaveAttribute('data-carousel-overflow', 'true')
+    expect(pagination).not.toHaveAttribute('hidden')
+    expect(pagination).toHaveAttribute('data-weather-carousel-page-count', '5')
+
+    rerender(<WeatherSummary deferRefresh />)
+
+    expect(frame).toHaveAttribute('data-carousel-overflow', 'true')
+    expect(pagination).not.toHaveAttribute('hidden')
+    expect(pagination).toHaveAttribute('data-weather-carousel-page-count', '5')
+  })
+
+  it('reserves the loaded hero carousel geometry while forecasts are pending', async () => {
+    setMockCallServiceOutcome('weather', 'get_forecasts', 'pending')
+    mockHeroCarouselLayout(300)
+    const { container } = render(<WeatherSummary />)
+    await settle()
+    const placeholder = container.querySelector('[data-weather-carousel-placeholder="true"]')
+    expect(placeholder?.querySelectorAll(':scope > [data-carousel-item="true"]')).toHaveLength(24)
+    const { frame, pagination } = heroCarouselFrame(container)
+    expect(frame).toHaveAttribute('data-carousel-overflow', 'true')
+    expect(pagination).not.toHaveAttribute('hidden')
+    expect(pagination).toHaveAttribute('data-weather-carousel-page-count', '5')
+    expect(pagination).toHaveAttribute('aria-hidden', 'true')
+    expect(pagination).toHaveAttribute('inert')
+    expect(frame.querySelector('[data-weather-carousel-next="true"]')?.parentElement).toHaveAttribute('inert')
   })
 
   it.each([

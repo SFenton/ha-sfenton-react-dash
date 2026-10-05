@@ -88,6 +88,37 @@ function Harness({
   )
 }
 
+function PrelaidHarness({ clientWidth, itemCount = 5 }: { clientWidth: { current: number }; itemCount?: number }) {
+  const { currentPage, hasOverflow, pageCount, scrollerRef } = useHorizontalScrollControls<HTMLDivElement>({ itemCount })
+  const attachScroller = (scroller: HTMLDivElement | null) => {
+    scrollerRef.current = scroller
+    if (!scroller) return
+    const items = Array.from(scroller.children) as HTMLElement[]
+    Object.defineProperties(scroller, {
+      clientWidth: { configurable: true, get: () => clientWidth.current },
+      scrollWidth: { configurable: true, value: 20 + itemCount * 80 + (itemCount - 1) * 10 },
+    })
+    scroller.style.paddingLeft = '10px'
+    scroller.style.paddingRight = '10px'
+    scroller.style.setProperty('--weather-carousel-base-padding', '10px')
+    items.forEach((item, index) => {
+      Object.defineProperties(item, {
+        offsetLeft: { configurable: true, value: 10 + index * 90 },
+        offsetWidth: { configurable: true, value: 80 },
+      })
+    })
+  }
+
+  return (
+    <>
+      <div data-overflow={hasOverflow ? 'true' : 'false'} data-testid="scroller" ref={attachScroller}>
+        {Array.from({ length: itemCount }, (_, index) => <span data-carousel-item="true" key={index}>{index}</span>)}
+      </div>
+      <output data-testid="page-state">{currentPage + 1}/{pageCount}</output>
+    </>
+  )
+}
+
 async function flushMeasurements() {
   await act(async () => {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
@@ -150,6 +181,58 @@ describe('useHorizontalScrollControls', () => {
     expect(screen.getByTestId('page-starts')).toBeEmptyDOMElement()
     expect(screen.getByTestId('item-0').style.getPropertyValue('--weather-carousel-page-leading-space')).toBe('55px')
     expect(screen.getByTestId('item-1').style.getPropertyValue('--weather-carousel-page-trailing-space')).toBe('55px')
+  })
+
+  it('commits overflow and pages before paint without waiting for an animation frame', () => {
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1)
+    try {
+      render(<PrelaidHarness clientWidth={{ current: 220 }} />)
+
+      expect(screen.getByTestId('scroller')).toHaveAttribute('data-overflow', 'true')
+      expect(screen.getByTestId('page-state')).toHaveTextContent('1/3')
+    } finally {
+      requestFrame.mockRestore()
+    }
+  })
+
+  it('recomputes overflow synchronously when the scroller is resized', () => {
+    const requestFrame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1)
+    const OriginalResizeObserver = window.ResizeObserver
+    const resizeCallbacks: ResizeObserverCallback[] = []
+    window.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallbacks.push(callback)
+      }
+
+      disconnect() {}
+
+      observe() {}
+
+      unobserve() {}
+    }
+    const clientWidth = { current: 220 }
+    const resize = () => resizeCallbacks.forEach((callback) => callback([], {} as ResizeObserver))
+    try {
+      render(<PrelaidHarness clientWidth={clientWidth} />)
+      expect(screen.getByTestId('page-state')).toHaveTextContent('1/3')
+
+      clientWidth.current = 700
+      act(() => {
+        resize()
+        expect(screen.getByTestId('scroller')).toHaveAttribute('data-overflow', 'false')
+        expect(screen.getByTestId('page-state')).toHaveTextContent('1/1')
+      })
+
+      clientWidth.current = 220
+      act(() => {
+        resize()
+        expect(screen.getByTestId('scroller')).toHaveAttribute('data-overflow', 'true')
+        expect(screen.getByTestId('page-state')).toHaveTextContent('1/3')
+      })
+    } finally {
+      window.ResizeObserver = OriginalResizeObserver
+      requestFrame.mockRestore()
+    }
   })
 
   it('uses immediate scrolling when reduced motion is requested', async () => {

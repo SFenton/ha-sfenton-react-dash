@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { flushSync } from 'react-dom'
 
 interface HorizontalScrollState {
   canScrollNext: boolean
@@ -120,7 +121,6 @@ export function useHorizontalScrollControls<T extends HTMLElement>({
   })
 
   const measure = useCallback(() => {
-    frameRef.current = 0
     const element = scrollerRef.current
     if (!enabled || !element) return
     const items = carouselItems(element)
@@ -211,36 +211,45 @@ export function useHorizontalScrollControls<T extends HTMLElement>({
 
   const scheduleMeasure = useCallback(() => {
     if (!enabled || frameRef.current) return
-    frameRef.current = window.requestAnimationFrame(measure)
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = 0
+      measure()
+    })
   }, [enabled, measure])
 
-  useEffect(() => {
+  // Measure before paint so carousel chrome (overflow padding, pagination) is
+  // committed with the first frame instead of popping in a frame later.
+  useLayoutEffect(() => {
     const element = scrollerRef.current
     if (!enabled || !element) return undefined
 
+    // Resize callbacks never run during a React commit, so flushing keeps
+    // orientation and layout changes from painting one stale carousel frame.
+    const measureResize = () => flushSync(measure)
     element.addEventListener('scroll', scheduleMeasure, { passive: true })
     const ResizeObserverConstructor = window.ResizeObserver
     const observer = typeof ResizeObserverConstructor === 'undefined'
       ? null
-      : new ResizeObserverConstructor(scheduleMeasure)
+      : new ResizeObserverConstructor(measureResize)
     if (observer) observer.observe(element)
-    else window.addEventListener('resize', scheduleMeasure)
+    else window.addEventListener('resize', measureResize)
+    measure()
     scheduleMeasure()
 
     return () => {
       element.removeEventListener('scroll', scheduleMeasure)
       observer?.disconnect()
-      if (!observer) window.removeEventListener('resize', scheduleMeasure)
+      if (!observer) window.removeEventListener('resize', measureResize)
       if (frameRef.current) window.cancelAnimationFrame(frameRef.current)
       frameRef.current = 0
       layoutSignatureRef.current = ''
       clearPageSpacing(carouselItems(element))
     }
-  }, [enabled, itemCount, revision, scheduleMeasure])
+  }, [enabled, itemCount, measure, revision, scheduleMeasure])
 
-  useEffect(() => {
-    scheduleMeasure()
-  }, [scheduleMeasure, state.hasOverflow])
+  useLayoutEffect(() => {
+    measure()
+  }, [measure, state.hasOverflow])
 
   const scrollToPage = useCallback((page: number) => {
     const element = scrollerRef.current

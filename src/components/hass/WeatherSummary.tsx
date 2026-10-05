@@ -299,7 +299,8 @@ export function WeatherGlyph({ condition, size = 24 }: { condition?: string; siz
 }
 
 const FORECAST_PLACEHOLDERS = Array.from({ length: 7 }, (_, index) => index)
-const HERO_HOURLY_PLACEHOLDERS = Array.from({ length: 8 }, (_, index) => index)
+// Matches the 24-hour forecast slice so pending forecasts reserve the loaded carousel geometry.
+const HERO_HOURLY_PLACEHOLDERS = Array.from({ length: 24 }, (_, index) => index)
 const PRESSURE_TICK_COUNT = 49
 const PRESSURE_ARC_START_DEGREES = 145
 const PRESSURE_ARC_SPAN_DEGREES = 250
@@ -1098,6 +1099,7 @@ function WeatherScrollControls({
   canScrollPrevious,
   fallbackRef,
   hidden,
+  inert = false,
   label,
   modal = false,
   onKeyDown,
@@ -1109,6 +1111,7 @@ function WeatherScrollControls({
   canScrollPrevious: boolean
   fallbackRef: RefObject<HTMLElement | null>
   hidden: boolean
+  inert?: boolean
   label: string
   modal?: boolean
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
@@ -1129,10 +1132,12 @@ function WeatherScrollControls({
 
   return (
     <span
+      aria-hidden={inert || undefined}
       aria-label={copy(CORE_COPY_KEYS.carousel.controls, { label })}
       className={`${styles.weatherCarouselControls} ${modal ? styles.weatherCarouselControlsModal : styles.weatherCarouselControlsHero}`}
       data-weather-carousel-controls="true"
       hidden={hidden}
+      inert={inert || undefined}
       onKeyDown={onKeyDown}
       ref={controlsRef}
       role="group"
@@ -1169,6 +1174,7 @@ function WeatherCarouselPagination({
   currentPage,
   hero = false,
   hidden,
+  inert = false,
   label,
   onPageChange,
   pageCount,
@@ -1176,6 +1182,7 @@ function WeatherCarouselPagination({
   currentPage: number
   hero?: boolean
   hidden: boolean
+  inert?: boolean
   label: string
   onPageChange: (page: number) => void
   pageCount: number
@@ -1184,11 +1191,13 @@ function WeatherCarouselPagination({
 
   return (
     <span
+      aria-hidden={inert || undefined}
       aria-label={copy(CORE_COPY_KEYS.carousel.pages, { label })}
       className={`${styles.weatherCarouselPagination} ${hero ? styles.weatherCarouselPaginationHero : styles.weatherCarouselPaginationModal}`}
       data-weather-carousel-page-count={pageCount}
       data-weather-carousel-pagination="true"
       hidden={hidden}
+      inert={inert || undefined}
       role="group"
     >
       {Array.from({ length: pageCount }, (_, page) => (
@@ -1242,6 +1251,7 @@ function HeroHourlyStrip({
   forecasts,
   onKeyDown,
   pageStartIndices,
+  reservePlaceholderCarousel,
   scrollerId,
   scrollerRef,
 }: {
@@ -1250,15 +1260,16 @@ function HeroHourlyStrip({
   forecasts: WeatherForecast[]
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void
   pageStartIndices: readonly number[]
+  reservePlaceholderCarousel: boolean
   scrollerId: string
   scrollerRef: RefObject<HTMLSpanElement | null>
 }) {
   const copy = useCopy(WEATHER_COPY_NAMESPACE)
   if (forecasts.length === 0) {
     return (
-      <span aria-hidden="true" className={`${styles.heroHourlyStrip} ${styles.heroHourlyStripPlaceholder}`}>
+      <span aria-hidden="true" className={`${styles.heroHourlyStrip} ${styles.heroHourlyStripPlaceholder}`} data-weather-carousel-placeholder="true" ref={reservePlaceholderCarousel ? scrollerRef : undefined}>
         {HERO_HOURLY_PLACEHOLDERS.map((item) => (
-          <span className={styles.heroHourlyItem} key={item}>
+          <span className={styles.heroHourlyItem} data-carousel-item={reservePlaceholderCarousel ? 'true' : undefined} key={item}>
             <span className={styles.heroHourlyPlaceholderLine} />
             <span className={styles.heroHourlyPlaceholderDot} />
             <span className={styles.heroHourlyPlaceholderLine} />
@@ -1605,6 +1616,8 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
     windSpeedUnit: weather?.attributes.wind_speed_unit,
   })
   const heroCarouselId = useId()
+  // Measurement performs no I/O, so the carousel stays measured while route hydration defers refreshes.
+  const heroCarouselItemCount = hourlyForecastLoading ? HERO_HOURLY_PLACEHOLDERS.length : hourlyForecasts.length
   const weatherCardButtonRef = useRef<HTMLButtonElement>(null)
   const {
     canScrollNext: canScrollHeroNext,
@@ -1619,8 +1632,9 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
     scrollPrevious: scrollHeroPrevious,
     scrollerRef: heroScrollerRef,
   } = useHorizontalScrollControls<HTMLSpanElement>({
-    enabled: !deferRefresh && hourlyForecasts.length > 0,
-    itemCount: hourlyForecasts.length,
+    enabled: heroCarouselItemCount > 0,
+    itemCount: heroCarouselItemCount,
+    revision: hourlyForecastLoading ? 'placeholder' : 'forecast',
   })
 
   const condition = { label: conditionLabel(copy, weather?.state) }
@@ -1662,6 +1676,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
               forecasts={hourlyForecasts}
               onKeyDown={handleHeroNavigationKeyDown}
               pageStartIndices={heroPageStartIndices}
+              reservePlaceholderCarousel={hourlyForecastLoading}
               scrollerId={heroCarouselId}
               scrollerRef={heroScrollerRef}
             />
@@ -1674,12 +1689,13 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
           canScrollPrevious={canScrollHeroPrevious}
           fallbackRef={weatherCardButtonRef}
           hidden={open || !heroHasOverflow}
+          inert={hourlyForecastLoading}
           label={heroCarouselLabel}
           onKeyDown={handleHeroNavigationKeyDown}
           onNext={scrollHeroNext}
           onPrevious={scrollHeroPrevious}
         />
-        <WeatherCarouselPagination currentPage={currentHeroPage} hero hidden={!heroHasOverflow || heroPageCount <= 1} label={heroCarouselLabel} onPageChange={scrollHeroToPage} pageCount={heroPageCount} />
+        <WeatherCarouselPagination currentPage={currentHeroPage} hero hidden={!heroHasOverflow || heroPageCount <= 1} inert={hourlyForecastLoading} label={heroCarouselLabel} onPageChange={scrollHeroToPage} pageCount={heroPageCount} />
       </div>
 
       <ModalSheet
