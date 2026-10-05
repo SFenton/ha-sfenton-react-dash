@@ -1634,7 +1634,7 @@ export function WeatherSummary({ deferRefresh = false }: WeatherSummaryProps) {
   } = useHorizontalScrollControls<HTMLSpanElement>({
     enabled: heroCarouselItemCount > 0,
     itemCount: heroCarouselItemCount,
-    revision: hourlyForecastLoading ? 'placeholder' : 'forecast',
+    revision: hourlyForecastLoading ? 0 : 1,
   })
 
   const condition = { label: conditionLabel(copy, weather?.state) }
