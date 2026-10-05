@@ -1,7 +1,7 @@
 import { LAYOUT_JOURNEYS, RESPONSIVE_ROUTES } from '../responsive-acceptance-data'
 import { DASHBOARD_ROUTES } from '../../src/constants/routes'
 import { ROOM_PAGE_CONFIGS } from '../../src/constants/roomPages'
-import { CONTEXTS, INTENTIONAL_NEW_ROUTES, INTENTIONAL_ROUTE_ADDITIONS, INTENTIONAL_ROUTE_REDESIGNS, SCENARIO_IDS, SURFACE_CONTRACTS, type ContextId, type ScenarioId } from './contracts'
+import { CONTEXTS, INTENTIONAL_NEW_ROUTES, INTENTIONAL_ROUTE_ADDITIONS, INTENTIONAL_ROUTE_REDESIGNS, INTENTIONAL_TILE_ADDITIONS, SCENARIO_IDS, SURFACE_CONTRACTS, type ContextId, type ScenarioId } from './contracts'
 import type { Obligation } from './types'
 
 export const SOURCE_ROUTES = RESPONSIVE_ROUTES
@@ -100,6 +100,15 @@ export function validateRegistry() {
         || Object.values(expected.shifts).some(shift => !Number.isFinite(shift.x) || !Number.isFinite(shift.y))) {
         throw new Error(`Invalid route-addition oracle: ${route}/${profile}`)
       }
+    }
+  }
+  for (const [route, addition] of Object.entries(INTENTIONAL_TILE_ADDITIONS)) {
+    if (!SOURCE_ROUTES.includes(route as typeof SOURCE_ROUTES[number]) || !SCENARIO_IDS.includes(addition.owner)
+      || !addition.source.trim() || !addition.section.trim() || !addition.tile.actionKind.trim()
+      || !(addition.tile.name instanceof RegExp) || addition.tile.name.global || addition.tile.name.sticky
+      || !Number.isInteger(addition.insertionIndex) || addition.insertionIndex < 0
+      || Object.hasOwn(INTENTIONAL_NEW_ROUTES, route) || Object.hasOwn(INTENTIONAL_ROUTE_REDESIGNS, route)) {
+      throw new Error(`Unbound intentional tile addition: ${route}`)
     }
   }
 }

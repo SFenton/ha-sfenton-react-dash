@@ -1,7 +1,9 @@
 // @covers scripts/layout/plan.ts
 // @covers e2e/layout/contracts.ts
+// @covers e2e/layout/scenarios.ts
 import type { Checkpoint, CollectedTest, ExecutionLedger, LayoutPlan, ManualLedger, RunIdentity } from '../../e2e/layout/types'
-import { SURFACE_CONTRACTS } from '../../e2e/layout/contracts'
+import { INTENTIONAL_TILE_ADDITIONS, SURFACE_CONTRACTS } from '../../e2e/layout/contracts'
+import { validateRegistry } from '../../e2e/layout/scenarios'
 import {
   capabilityMatches,
   canClaimFullAcceptance,
@@ -63,6 +65,25 @@ describe('layout scope and selection', () => {
     expect(classifyChanges(['src/components/hass/RtcPilotCamera.tsx']).scenarios).toContain('camera')
     expect(classifyChanges(['src/components/hass/HlsCamera.module.css'])).toMatchObject({ mode: 'focused', scenarios: ['camera'] })
     expect(classifyChanges(['src/panel/sfentonReactAppCard.ts']).scenarios).toContain('host')
+  })
+
+  it('binds the Music Room Windows PC source to declared tile additions instead of route exemptions', () => {
+    expect(SURFACE_CONTRACTS.navigation.owners).toContain('src/constants/roomPages')
+    for (const route of ['music-room', 'media']) {
+      expect(INTENTIONAL_TILE_ADDITIONS[route]).toMatchObject({ owner: 'navigation', source: 'PR #326', insertionIndex: 3, tile: { actionKind: 'selection' } })
+      expect(INTENTIONAL_TILE_ADDITIONS[route].tile.name.test('Windows PC Off')).toBe(true)
+      expect(INTENTIONAL_TILE_ADDITIONS[route].tile.name.test('Xbox Off')).toBe(false)
+    }
+    expect(() => validateRegistry()).not.toThrow()
+    const original = INTENTIONAL_TILE_ADDITIONS['music-room']
+    try {
+      INTENTIONAL_TILE_ADDITIONS['music-room'] = { ...original, insertionIndex: -1 }
+      expect(() => validateRegistry()).toThrow(/Unbound intentional tile addition: music-room/)
+      INTENTIONAL_TILE_ADDITIONS['music-room'] = { ...original, tile: { ...original.tile, name: /^Windows PC /g } }
+      expect(() => validateRegistry()).toThrow(/Unbound intentional tile addition: music-room/)
+    } finally {
+      INTENTIONAL_TILE_ADDITIONS['music-room'] = original
+    }
   })
 
   it('rejects a newly rendered or missing tab instead of deriving the expected set from observation', () => {

@@ -6,7 +6,7 @@ import { RESPONSIVE_ROUTES, type ResponsiveRoute } from './responsive-acceptance
 import { APPROVED_WEATHER_RENDER_MIGRATION_BASE, restoreSourceDeclaredBackdropFilters, selectedParityRoutes } from '../scripts/required-mobile-parity'
 import type { RunIdentity } from './layout/types'
 import { INTENTIONAL_NEW_ROUTES, INTENTIONAL_ROUTE_REDESIGNS } from './layout/contracts'
-import { inspectRouteAddition, normalizeInspectedAddition } from './layout/routeAdditions'
+import { inspectRouteAddition, inspectTileAddition, normalizeInspectedAddition, normalizeInspectedTileAddition } from './layout/routeAdditions'
 
 type PixelRegion = { x: number; y: number; width: number; height: number }
 
@@ -34,6 +34,7 @@ type RouteParityResult = {
   meanChannelDelta: number
   intendedBackMenuRemoval: boolean
   intentionalAddition: Awaited<ReturnType<typeof inspectRouteAddition>>
+  intentionalTileAddition: Awaited<ReturnType<typeof inspectTileAddition>>
   route: ResponsiveRoute
   signatureCount: number
   viewport: string
@@ -569,7 +570,18 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           const restoreAddition = intentionalAddition
             ? await normalizeInspectedAddition(candidate.page, intentionalAddition)
             : null
+          let restoreTileAddition: (() => Promise<void>) | null = null
           try {
+          const intentionalTileAddition = await inspectTileAddition(baseline.page, candidate.page, route)
+          if (intentionalTileAddition && screenshotDirectory) {
+            await candidate.page.screenshot({
+              path: path.join(screenshotDirectory, `${sanitizeRoute(route)}-with-declared-tile-addition.png`),
+              animations: 'disabled',
+            })
+          }
+          restoreTileAddition = intentionalTileAddition
+            ? await normalizeInspectedTileAddition(candidate.page, intentionalTileAddition)
+            : null
           const [rawBaselineSignature, rawCandidateSignature] = await Promise.all([
             pageSignature(baseline.page),
             pageSignature(candidate.page),
@@ -645,6 +657,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             geometryDifferences,
             intendedBackMenuRemoval: baselineBackMenus > 0,
             intentionalAddition,
+            intentionalTileAddition,
             signatureCount: baselineSignature.length,
             viewport: parityViewport.name,
             rawDifferentPixelRatio: rawDifference.differentPixels / (parityViewport.width * parityViewport.height),
@@ -655,6 +668,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
             ...difference,
           })
           } finally {
+            await restoreTileAddition?.()
             await restoreAddition?.()
           }
         })
@@ -669,7 +683,7 @@ for (const parityViewport of PHONE_PARITY_VIEWPORTS) {
           baselineURL: BASELINE_URL,
           candidateURL: CANDIDATE_URL,
           generatedAt: new Date().toISOString(),
-          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. On routes changed by the DynamicGrid migration, each baseline/candidate grid is normalized to the same one-column geometry and only those exact grid rectangles are masked; the rest of each route remains in geometry, perceptual, and maximum-channel comparison. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. A registry-declared added section is hidden only after its exact geometry/semantics and every inherited section are asserted; its visible layout is captured separately. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
+          screenshotNormalization: 'Obsolete Back-page menu glyphs are hidden without changing layout. On routes changed by the DynamicGrid migration, each baseline/candidate grid is normalized to the same one-column geometry and only those exact grid rectangles are masked; the rest of each route remains in geometry, perceptual, and maximum-channel comparison. Only for the attested ab84f9a approved rendering migration, baseline-browser CSS replays its source-declared filters and the approved decorative hero rail region is compared by unchanged geometry/labels plus focused rail guards. A registry-declared added section is hidden only after its exact geometry/semantics and every inherited section are asserted; its visible layout is captured separately. A registry-declared tile added to an existing section is hidden only after every inherited tile in that section is asserted unchanged and the added tile matches its sibling geometry and semantics; its visible layout is captured separately. Raw baseline/candidate PNGs and raw deltas are retained. No candidate filter is repaired and numeric parity tolerances are unchanged.',
           baselineFilterRepairs: baseline.filterRepairs,
           routeCount: SELECTED_ROUTES.length,
           intentionalDynamicGridRoutes: [...INTENTIONAL_DYNAMIC_GRID_ROUTES],

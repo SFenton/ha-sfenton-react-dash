@@ -112,6 +112,12 @@ authorize a live browser, arbitrary service, or external destination.
   new geometry/semantics and all inherited sections are asserted first, with the
   added section visible in separate captures. Only that validated section may be
   removed for inherited-content pixel comparison; all original thresholds remain.
+- A registry-owned tile addition (`INTENTIONAL_TILE_ADDITIONS`) is narrower still:
+  one tile at its declared section, grid index, action kind and accessible name.
+  Every inherited tile in that section must keep its baseline order, name, kind
+  and style, and the added tile must match its neighboring sibling's shape. Only
+  that validated grid cell is hidden for inherited geometry and pixel comparison;
+  the candidate is captured with it visible first.
 - No commit, push, deployment, live service call, or external-system mutation is
   authorized by validation. Preserve one React tree, optimistic path and HA owner.
 
