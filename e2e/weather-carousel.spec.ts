@@ -442,7 +442,7 @@ type CarouselStabilityWindow = Window & {
   __heroCarouselStability?: {
     firstVisible: CarouselChromeSnapshot | null
     regressions: string[]
-    resizeSnapshots: CarouselChromeSnapshot[]
+    resizeSnapshots: Array<CarouselChromeSnapshot & { width: number }>
   }
 }
 
@@ -489,6 +489,7 @@ async function observeHeroCarouselResizes(page: Page) {
         overflow: frame.getAttribute('data-carousel-overflow'),
         pageCount: pagination?.getAttribute('data-weather-carousel-page-count') ?? null,
         paginationHidden: pagination?.hidden ?? true,
+        width: strip.clientWidth,
       })
     }).observe(strip)
   })
@@ -508,10 +509,15 @@ async function expectResizeCommittedBeforePaint(page: Page, size: { height: numb
         paginationHidden: pagination?.hidden ?? true,
       },
       snapshots: (window as CarouselStabilityWindow).__heroCarouselStability!.resizeSnapshots,
+      width: frame.querySelector<HTMLElement>('[data-weather-carousel="hero"]')!.clientWidth,
     }
   })
-  expect(result.snapshots.length).toBeGreaterThan(0)
-  expect(result.snapshots[0]).toEqual(result.settled)
+  // Grid reflow can pass through intermediate strip widths; every frame at the final width must already show the settled chrome.
+  const settledWidthSnapshots = result.snapshots
+    .filter((snapshot) => snapshot.width === result.width)
+    .map(({ overflow, pageCount, paginationHidden }) => ({ overflow, pageCount, paginationHidden }))
+  expect(settledWidthSnapshots.length).toBeGreaterThan(0)
+  for (const snapshot of settledWidthSnapshots) expect(snapshot).toEqual(result.settled)
   return result.settled
 }
 
