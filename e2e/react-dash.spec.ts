@@ -2940,7 +2940,6 @@ test.describe('desktop modal layout', () => {
 
   const squareOverviewCases = [
     {
-      backButtonName: 'Back to room climates',
       buttonName: /Open Living Room Climate/i,
       detailHeading: 'Living Room Climate',
       dialogName: 'Climate',
@@ -2948,7 +2947,6 @@ test.describe('desktop modal layout', () => {
       sectionLabel: 'Climate by room',
     },
     {
-      backButtonName: 'Back to room occupancy',
       buttonName: /Open Living Room Occupancy/i,
       detailHeading: 'Living Room Occupancy',
       dialogName: 'Occupancy',
@@ -2956,7 +2954,6 @@ test.describe('desktop modal layout', () => {
       sectionLabel: 'Occupancy by room',
     },
     {
-      backButtonName: 'Back to room contact sensors',
       buttonName: /Open Living Room Contact Sensors/i,
       detailHeading: 'Living Room Contact Sensors',
       dialogName: 'Contact Sensors',
@@ -2981,12 +2978,13 @@ test.describe('desktop modal layout', () => {
 
       if ('buttonName' in modalCase) {
         await clickWithPointerJitter(page, grid.getByRole('button', { name: modalCase.buttonName }))
-        await expect(dialog).toBeVisible()
-        await expect(dialog.getByRole('heading', { name: modalCase.detailHeading })).toBeVisible()
-        await expect(dialog.getByRole('button', { name: modalCase.backButtonName })).toBeVisible()
-        await expectSharedDesktopFrame(dialog)
+        const detailDialog = page.getByRole('dialog', { name: modalCase.detailHeading })
+        await expect(detailDialog).toBeVisible()
+        await expect(detailDialog.getByRole('heading', { level: 2, name: modalCase.detailHeading })).toBeVisible()
+        await expect(detailDialog.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
+        await expectSharedDesktopFrame(detailDialog)
         if (modalCase.dialogName === 'Contact Sensors') {
-          const detailDialogBox = await dialog.boundingBox()
+          const detailDialogBox = await detailDialog.boundingBox()
           expect(Math.abs(Math.round(detailDialogBox?.height ?? 0) - Math.round(overviewDialogBox?.height ?? 0))).toBeLessThanOrEqual(2)
         }
       }
@@ -3026,9 +3024,10 @@ test.describe('desktop modal layout', () => {
     const overviewDialogBox = await dialog.boundingBox()
 
     await clickWithPointerJitter(page, grid.getByRole('button', { name: /Open Living Room Contact Sensors/i }))
-    await expect(dialog.getByRole('heading', { name: 'Living Room Contact Sensors' })).toBeVisible()
-    await expect(dialog.getByRole('button', { name: 'Back to room contact sensors' })).toBeVisible()
-    const detailDialogBox = await dialog.boundingBox()
+    const detailDialog = page.getByRole('dialog', { name: 'Living Room Contact Sensors' })
+    await expect(detailDialog.getByRole('heading', { level: 2, name: 'Living Room Contact Sensors' })).toBeVisible()
+    await expect(detailDialog.getByRole('button', { name: 'Back', exact: true })).toBeVisible()
+    const detailDialogBox = await detailDialog.boundingBox()
     expect(Math.abs(Math.round(detailDialogBox?.height ?? 0) - Math.round(overviewDialogBox?.height ?? 0))).toBeLessThanOrEqual(2)
   })
 })
@@ -4081,8 +4080,8 @@ test('security page opens ported security, contact, and camera modals', async ({
   await expect(page.getByLabel('Contact sensors by room')).toBeVisible()
   await expect(page.getByRole('button', { name: /Open Living Room Contact Sensors/i })).toBeVisible()
   await page.getByRole('button', { name: /Open Living Room Contact Sensors/i }).click()
-  await expect(page.getByRole('heading', { name: 'Living Room Contact Sensors' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Back to room contact sensors' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 2, name: 'Living Room Contact Sensors' })).toBeVisible()
+  await expect(page.getByRole('dialog').getByRole('button', { name: 'Back', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Close' }).click()
 
   await page.getByRole('button', { name: 'Open Front Door camera' }).click()

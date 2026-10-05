@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { AtAGlancePage, LightsSheet } from './AtAGlancePage'
+import { AtAGlancePage, ClimateSheet, ContactSheet, LightsSheet, OccupancySheet } from './AtAGlancePage'
 import { CONTACT_GROUPS, LIGHT_GROUPS, OCCUPANCY_GROUPS, SECURITY_ENTITY } from '../constants/atAGlance'
 import { GUEST_CONTROLS_DESCRIPTION } from '../constants/portedDashboard'
 import { GUEST_PRESENCE_SECURITY_HASH, GUEST_PRESENCE_SECURITY_SUMMARY } from '../components/hass/GuestPresenceSecurity'
@@ -165,6 +165,80 @@ describe('AtAGlancePage', () => {
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Open Guest Room Lights' })).toHaveFocus())
     expect(window.location.hash).toBe('#lights-overview')
     expect(mockCallServiceCalls.filter((call) => call.domain === 'light' || call.domain === 'homeassistant')).toEqual([])
+  })
+
+  it.each([
+    {
+      sheet: 'Climate',
+      open: () => fireEvent.click(document.querySelector('[data-status-chip="Climate"] button')!),
+      group: 'Office Climate',
+      hash: '#climate-overview',
+      inBodyBack: 'Back to room climates',
+      section: /^Temperature Sensors?$/,
+    },
+    {
+      sheet: 'Occupancy',
+      open: () => fireEvent.click(screen.getByRole('button', { name: /^Occupancy\b/i })),
+      group: 'Office Occupancy',
+      hash: '#occupancy-overview',
+      inBodyBack: 'Back to room occupancy',
+      section: /^Occupancy Sensors?$/,
+      subtitle: /sensors? occupied$/,
+    },
+    {
+      sheet: 'Contact',
+      open: () => fireEvent.click(screen.getByRole('button', { name: /^Contact Sensors\b/i })),
+      group: 'Office Contact Sensors',
+      hash: '#contact-sensors-overview',
+      inBodyBack: 'Back to room contact sensors',
+      section: /^Contact Sensors?$/,
+      subtitle: /Closed|Open/,
+    },
+  ])('moves Home $sheet room identity and Back into the existing modal header', async ({ group, hash, inBodyBack, open, section, subtitle }) => {
+    render(<AtAGlancePage />)
+    open()
+
+    const dialog = await screen.findByRole('dialog')
+    const overviewName = dialog.getAttribute('aria-labelledby') ? document.getElementById(dialog.getAttribute('aria-labelledby')!)!.textContent : null
+    expect(window.location.hash).toBe(hash)
+    const opener = within(dialog).getByLabelText(`Open ${group}`)
+    opener.focus()
+    fireEvent.click(opener)
+
+    expect(dialog).toHaveAccessibleName(group)
+    const title = within(dialog).getByRole('heading', { level: 2, name: group })
+    const back = within(dialog).getByRole('button', { name: 'Back' })
+    expect(back.parentElement).toContainElement(title)
+    if (subtitle) expect(title.parentElement).toHaveTextContent(subtitle)
+    expect(within(dialog).queryByRole('button', { name: inBodyBack })).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('heading', { level: 3, name: group })).not.toBeInTheDocument()
+    const sectionHeading = within(dialog).getByRole('heading', { level: 3, name: section })
+    await waitFor(() => expect(sectionHeading).toHaveFocus())
+
+    fireEvent.click(back)
+    if (overviewName) expect(dialog).toHaveAccessibleName(overviewName)
+    expect(dialog).not.toHaveAccessibleName(group)
+    await waitFor(() => expect(within(dialog).getByLabelText(`Open ${group}`)).toHaveFocus())
+    expect(window.location.hash).toBe(hash)
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it('keeps the in-body room Back for standalone Climate, Occupancy and Contact sheets', () => {
+    const { unmount } = render(<ClimateSheet />)
+    fireEvent.click(screen.getByLabelText('Open Office Climate'))
+    expect(screen.getByRole('button', { name: 'Back to room climates' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Office Climate' })).toBeInTheDocument()
+    unmount()
+
+    const occupancy = render(<OccupancySheet />)
+    fireEvent.click(screen.getByLabelText('Open Office Occupancy'))
+    expect(screen.getByRole('button', { name: 'Back to room occupancy' })).toBeInTheDocument()
+    occupancy.unmount()
+
+    render(<ContactSheet />)
+    fireEvent.click(screen.getByLabelText('Open Office Contact Sensors'))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to room contact sensors' }))
+    expect(screen.getByLabelText('Open Office Contact Sensors')).toBeInTheDocument()
   })
 
   it('disables the group slider when the Home Assistant light group is unavailable', () => {
