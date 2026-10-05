@@ -659,6 +659,37 @@ export const INTENTIONAL_ROUTE_ADDITIONS: Record<string, {
   },
 }
 
+/**
+ * A tile added to an existing DynamicGrid section. Parity hides only that validated
+ * tile after every inherited tile in the section is asserted unchanged; a baseline
+ * that already renders the tile disables the declaration.
+ */
+export const INTENTIONAL_TILE_ADDITIONS: Record<string, {
+  owner: ScenarioId
+  source: string
+  section: string
+  insertionIndex: number
+  tile: {
+    actionKind: string
+    name: RegExp
+  }
+}> = {
+  'music-room': {
+    owner: 'navigation',
+    source: 'PR #326',
+    section: 'Remote',
+    insertionIndex: 3,
+    tile: { actionKind: 'selection', name: /^Windows PC (On|Off)$/ },
+  },
+  media: {
+    owner: 'navigation',
+    source: 'PR #326',
+    section: 'Music Room',
+    insertionIndex: 3,
+    tile: { actionKind: 'selection', name: /^Windows PC (On|Off)$/ },
+  },
+}
+
 export const SHARED_OWNER_ROOTS = [
   'src/pages/Page.', 'src/components/core/ModalSheet', 'src/components/core/modalSheet',
   'src/components/core/DynamicGrid', 'src/components/core/dynamicGrid', 'src/components/core/modalSquareGrid',
