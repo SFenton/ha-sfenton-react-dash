@@ -1,11 +1,12 @@
 import { useEntity, useHass } from '@hakit/core'
+import { useState } from 'react'
 import { CameraTile } from './CameraTile'
 import { DynamicGrid } from '../core/DynamicGrid'
 import { ResponsiveSectionGrid, ResponsiveSectionItem } from '../core/ResponsiveSectionGrid'
 import { Section } from '../core/Section'
 import { GlassTile, type TileTone } from '../core/GlassTile'
 import { ModalSheet, type ModalCenteredGeometry, type ModalSheetSize } from '../core/ModalSheet'
-import { CAMERA_ITEMS, CONTACT_GROUPS, SECURITY_ENTITY } from '../../constants/atAGlance'
+import { CAMERA_ITEMS, CONTACT_GROUPS, SECURITY_ENTITY, type EntityGroupConfig } from '../../constants/atAGlance'
 import {
   SECURITY_CONTROL_TILES,
   SECURITY_MACHE_TILES,
@@ -13,6 +14,8 @@ import {
   type SecurityTileConfig,
 } from '../../constants/securityPage'
 import { ContactSheet } from '../../pages/AtAGlancePage'
+import { contactGroupOpenSummary } from '../../pages/roomGroupSummaries'
+import { useModalDetailPageScroll } from '../../hooks/useModalDetailPageScroll'
 import { modalSquareGridCenteredGeometry, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../core/modalSquareGrid'
 import { CameraModalContent } from './CameraModalContent'
 import { asEntityName, formatCompactEntityState, isActiveState, isContactOpen } from './entityState'
@@ -159,15 +162,25 @@ function SecurityModalContent({
   contactGridStyle,
   hash,
   live = true,
+  onSelectContactGroup,
+  selectedContactGroup,
 }: {
   contactGridRef?: (node: HTMLElement | null) => void
   contactGridStyle?: ModalSquareGridStyle
   hash: string
   live?: boolean
+  onSelectContactGroup?: (group: EntityGroupConfig) => void
+  selectedContactGroup?: EntityGroupConfig | null
 }) {
   if (hash === '#security-system') return <SecurityControls />
   if (hash === GUEST_PRESENCE_SECURITY_HASH) return <GuestPresenceSecurityModalContent />
-  if (hash === CONTACT_SENSORS_HASH) return <ContactSheet overviewGridRef={contactGridRef} overviewGridStyle={contactGridStyle} />
+  if (hash === CONTACT_SENSORS_HASH) {
+    if (onSelectContactGroup) {
+      if (selectedContactGroup === undefined) throw new Error('Security contact sensor selection is not configured')
+      return <ContactSheet onSelectGroup={onSelectContactGroup} overviewGridRef={contactGridRef} overviewGridStyle={contactGridStyle} selectedGroup={selectedContactGroup} />
+    }
+    return <ContactSheet overviewGridRef={contactGridRef} overviewGridStyle={contactGridStyle} />
+  }
   const camera = CAMERA_ITEMS.find((item) => item.hash === hash)
   if (camera) return <CameraModalContent camera={camera} live={live} />
   return null
@@ -193,7 +206,13 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
   const contactModalContentActive = contentHash === CONTACT_SENSORS_HASH
   const [contactGridRef, contactGridLayout] = useModalSquareGridLayout(contactModalOpen, CONTACT_GROUPS.length)
   const contactGridStyle = modalSquareGridStyle(contactGridLayout)
-  const modalSubtitle = contentHash === '#security-system' ? securitySubtitle : undefined
+  const [contactDetail, setContactDetail] = useState<{ hash: string; group: EntityGroupConfig | null }>(() => ({ hash: activeHash, group: null }))
+  if (contactDetail.hash !== activeHash) setContactDetail({ hash: activeHash, group: null })
+  const selectedContactGroup = contactDetail.hash === activeHash ? contactDetail.group : null
+  const activeContactGroup = contactModalContentActive ? selectedContactGroup : null
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(selectedContactGroup?.title ?? 'overview')
+  const contactDetailSubtitle = useHass((state) => activeContactGroup ? contactGroupOpenSummary(activeContactGroup, state.entities) : undefined)
+  const modalSubtitle = activeContactGroup ? contactDetailSubtitle : contentHash === '#security-system' ? securitySubtitle : undefined
   const centeredGeometry = contentHash === '#security-system'
     ? SECURITY_SYSTEM_CENTERED_GEOMETRY
     : contactModalContentActive
@@ -209,6 +228,17 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
         ? 'media'
         : 'standard'
   const preloadModalHashes = preloadHashes.filter(isSecurityModalHash)
+
+  const selectContactGroup = (group: EntityGroupConfig) => {
+    if (selectedContactGroup === null) resetDetailPageScroll()
+    enterDetailPage(group.title)
+    setContactDetail({ hash: activeHash, group })
+  }
+
+  const showContactOverview = () => {
+    leaveDetailPage()
+    setContactDetail({ hash: activeHash, group: null })
+  }
 
   return (
     <>
@@ -240,8 +270,28 @@ export function SecurityDashboard({ closeHash, hash, onOpenHash, preload = false
         )}
       </ResponsiveSectionGrid>
 
-      <ModalSheet centeredGeometry={centeredGeometry} contentWidth={contentHash === '#security-system' || contentHash === GUEST_PRESENCE_SECURITY_HASH ? 'full' : 'readable'} landscapeDensity={contactModalContentActive ? 'regular' : 'compact'} onClose={closeHash} open={activeHash !== ''} size={modalSize} subtitle={modalSubtitle} title={modalTitle(contentHash)}>
-        <SecurityModalContent contactGridRef={contactGridRef} contactGridStyle={contactGridStyle} hash={contentHash} />
+      <ModalSheet
+        bodyElementRef={contactModalContentActive ? bodyElementRef : undefined}
+        centeredGeometry={centeredGeometry}
+        contentWidth={contentHash === '#security-system' || contentHash === GUEST_PRESENCE_SECURITY_HASH ? 'full' : 'readable'}
+        landscapeDensity={contactModalContentActive ? 'regular' : 'compact'}
+        onBack={activeContactGroup ? showContactOverview : undefined}
+        onClose={closeHash}
+        onCloseComplete={resetDetailPageScroll}
+        open={activeHash !== ''}
+        retainLatestOnControlledClose={contactModalContentActive}
+        scrollResetKey={contactModalContentActive ? activeContactGroup?.title ?? 'overview' : undefined}
+        size={modalSize}
+        subtitle={modalSubtitle}
+        title={activeContactGroup?.title ?? modalTitle(contentHash)}
+      >
+        <SecurityModalContent
+          contactGridRef={contactGridRef}
+          contactGridStyle={contactGridStyle}
+          hash={contentHash}
+          onSelectContactGroup={selectContactGroup}
+          selectedContactGroup={activeContactGroup}
+        />
       </ModalSheet>
       {preloadModalHashes.map((preloadTargetHash) => (
         <div data-preload-modal={`security${preloadTargetHash}`} key={`security-preload-${preloadTargetHash}`}>

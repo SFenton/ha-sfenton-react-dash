@@ -48,7 +48,7 @@ import type { RouteTransitionState } from '../components/shell/SmoothRouteOutlet
 import { modalSquareGridCenteredGeometry, modalSquareGridStyle, useModalSquareGridLayout, type ModalSquareGridStyle } from '../components/core/modalSquareGrid'
 import styles from './AtAGlancePage.module.css'
 import { Page } from './Page'
-import { COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS, PAGE_CHORES_COPY_KEYS, PAGE_CHORES_COPY_NAMESPACE, copy } from '../i18n'
+import { COMMON_COPY_NAMESPACE, HOUSEHOLD_COPY_KEYS, PAGE_CHORES_COPY_KEYS, PAGE_CHORES_COPY_NAMESPACE, ROOM_GROUP_COPY_KEYS, copy } from '../i18n'
 import { householdResidentForHaUserId, householdResidentName } from '../constants/householdResidents'
 
 const SHEET_TITLES: Record<string, string> = {
@@ -438,10 +438,10 @@ function SettingsPreviewSheet({ closeHash, onNavigate }: { closeHash: () => void
   )
 }
 
-function RoomSectionHeader({ showSeparator = true, title }: { showSeparator?: boolean; title: string }) {
+function RoomSectionHeader({ children, detailAutofocus = false, showSeparator = true, title }: { children?: ReactNode; detailAutofocus?: boolean; showSeparator?: boolean; title?: string }) {
   return (
     <div className={styles.lightSectionHeader}>
-      <h3 className={styles.lightSectionLabel}>{title}</h3>
+      <h3 className={styles.lightSectionLabel} data-modal-detail-autofocus={detailAutofocus ? 'true' : undefined} tabIndex={detailAutofocus ? -1 : undefined}>{children ?? title}</h3>
       <Separator className={styles.lightSectionSeparator} visible={showSeparator} />
     </div>
   )
@@ -713,7 +713,7 @@ function RoomClimateDetailHeader({ group, onBack }: { group: EntityGroupConfig; 
   )
 }
 
-function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
+function RoomClimateDetailCards({ detailAutofocus = false, group }: { detailAutofocus?: boolean; group: EntityGroupConfig }) {
   const color = climateGroupColor(group)
   const temperatureItems = group.items.filter((item) => !isVentClimateItem(item.entityId))
   const ventItems = group.items.filter((item) => isVentClimateItem(item.entityId))
@@ -733,19 +733,13 @@ function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
       <div className={styles.roomClimateDetailContent}>
         {temperatureItems.length > 0 && (
           <section className={styles.roomClimateDetailSection}>
-            <div className={styles.lightSectionHeader}>
-              <h3 className={styles.lightSectionLabel}>{temperatureItems.length === 1 ? 'Temperature Sensor' : 'Temperature Sensors'}</h3>
-              <Separator className={styles.lightSectionSeparator} />
-            </div>
+            <RoomSectionHeader detailAutofocus={detailAutofocus}>{temperatureItems.length === 1 ? 'Temperature Sensor' : 'Temperature Sensors'}</RoomSectionHeader>
             {renderCards(temperatureItems)}
           </section>
         )}
         {ventItems.length > 0 && (
           <section className={styles.roomClimateDetailSection}>
-            <div className={styles.lightSectionHeader}>
-              <h3 className={styles.lightSectionLabel}>{climateVentSectionTitle(ventItems)}</h3>
-              <Separator className={styles.lightSectionSeparator} />
-            </div>
+            <RoomSectionHeader detailAutofocus={detailAutofocus && temperatureItems.length === 0} title={climateVentSectionTitle(ventItems)} />
             {renderCards(ventItems)}
           </section>
         )}
@@ -754,22 +748,27 @@ function RoomClimateDetailCards({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-interface RoomOverviewSheetProps {
+type RoomOverviewSheetProps = {
   directGroup?: EntityGroupConfig
   hideDirectHeader?: boolean
   overviewGridRef?: (node: HTMLElement | null) => void
   overviewGridStyle?: ModalSquareGridStyle
-}
+} & (
+  | { selectedGroup: EntityGroupConfig | null; onSelectGroup: (group: EntityGroupConfig) => void }
+  | { selectedGroup?: never; onSelectGroup?: never }
+)
 
-export function ClimateSheet({ directGroup, hideDirectHeader = false, overviewGridRef, overviewGridStyle }: RoomOverviewSheetProps = {}) {
-  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
+function useRoomSheetSelection(
+  sheetName: string,
+  directGroup: EntityGroupConfig | undefined,
+  controlledGroup: EntityGroupConfig | null | undefined,
+  onSelectGroup: ((group: EntityGroupConfig) => void) | undefined,
+) {
+  const [localSelectedGroup, setLocalSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
   const [roomCardsExiting, setRoomCardsExiting] = useState(false)
   const transitionTimer = useRef<number | null>(null)
-  const roomGroups = ROOM_CLIMATE_GROUPS
-  const directMode = Boolean(directGroup)
-  const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
-  const climateGridClassName = squareGridClassName(styles.roomClimateGrid, squareOverview)
-  const cardShellClassName = squareGridCellClassName(squareOverview)
+  const controlled = controlledGroup !== undefined
+  const selectedGroup = controlled ? controlledGroup : localSelectedGroup
 
   useEffect(() => {
     return () => {
@@ -778,30 +777,48 @@ export function ClimateSheet({ directGroup, hideDirectHeader = false, overviewGr
   }, [])
 
   const selectGroup = (group: EntityGroupConfig) => {
-    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, setSelectedGroup)
+    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, (nextGroup) => {
+      if (controlled) {
+        if (!onSelectGroup) throw new Error(`Controlled ${sheetName} requires a selection handler`)
+        onSelectGroup(nextGroup)
+      } else {
+        setLocalSelectedGroup(nextGroup)
+      }
+    })
   }
 
   const showRoomOverview = () => {
     if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
     transitionTimer.current = null
     setRoomCardsExiting(false)
-    setSelectedGroup(null)
+    setLocalSelectedGroup(null)
   }
+
+  return { controlled, roomCardsExiting, selectedGroup, selectGroup, showRoomOverview }
+}
+
+export function ClimateSheet({ directGroup, hideDirectHeader = false, onSelectGroup, overviewGridRef, overviewGridStyle, selectedGroup: controlledGroup }: RoomOverviewSheetProps = {}) {
+  const { controlled, roomCardsExiting, selectedGroup, selectGroup, showRoomOverview } = useRoomSheetSelection('ClimateSheet', directGroup, controlledGroup, onSelectGroup)
+  const roomGroups = ROOM_CLIMATE_GROUPS
+  const directMode = Boolean(directGroup)
+  const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
+  const climateGridClassName = squareGridClassName(styles.roomClimateGrid, squareOverview)
+  const cardShellClassName = squareGridCellClassName(squareOverview)
 
   return (
     <div
       className={styles.climateSheet}
       data-square-overview={squareOverview ? 'true' : 'false'}
     >
-      {selectedGroup ? (!hideDirectHeader && <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
+      {selectedGroup ? (!hideDirectHeader && !controlled && <RoomClimateDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
       <div className={styles.climateContent}>
         {selectedGroup ? (
-          <RoomClimateDetailCards group={selectedGroup} />
+          <RoomClimateDetailCards detailAutofocus={controlled} group={selectedGroup} />
         ) : (
           <section aria-label="Climate by room" className={styles.roomClimateOverview} data-exiting={roomCardsExiting}>
             <div className={climateGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
               {roomGroups.map((group) => (
-                <div className={cardShellClassName} key={group.title}>
+                <div className={cardShellClassName} data-modal-detail-trigger={controlled ? group.title : undefined} key={group.title}>
                   <RoomClimateOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -866,10 +883,8 @@ function RoomOccupancyDetailCards({ group }: { group: EntityGroupConfig }) {
   )
 }
 
-export function OccupancySheet({ directGroup, hideDirectHeader = false, overviewGridRef, overviewGridStyle }: RoomOverviewSheetProps = {}) {
-  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
-  const [roomCardsExiting, setRoomCardsExiting] = useState(false)
-  const transitionTimer = useRef<number | null>(null)
+export function OccupancySheet({ directGroup, hideDirectHeader = false, onSelectGroup, overviewGridRef, overviewGridStyle, selectedGroup: controlledGroup }: RoomOverviewSheetProps = {}) {
+  const { controlled, roomCardsExiting, selectedGroup, selectGroup, showRoomOverview } = useRoomSheetSelection('OccupancySheet', directGroup, controlledGroup, onSelectGroup)
   const roomGroups = ROOM_OCCUPANCY_GROUPS
   const entities = useHass((state) => state.entities)
   const groupedRoomGroups = splitRoomGroupsByState(roomGroups, entities, (group, entities) => occupancyGroupActiveCount(group, entities) > 0)
@@ -878,29 +893,13 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false, overview
   const occupancyGridClassName = squareGridClassName(styles.roomOccupancyGrid, squareOverview)
   const cardShellClassName = squareGridCellClassName(squareOverview)
 
-  useEffect(() => {
-    return () => {
-      if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
-    }
-  }, [])
-
-  const selectGroup = (group: EntityGroupConfig) => {
-    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, setSelectedGroup)
-  }
-
-  const showRoomOverview = () => {
-    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
-    transitionTimer.current = null
-    setRoomCardsExiting(false)
-    setSelectedGroup(null)
-  }
-
   return (
     <div
       className={styles.occupancySheet}
       data-square-overview="false"
     >
-      {selectedGroup && !hideDirectHeader && <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />}
+      {selectedGroup && !hideDirectHeader && !controlled && <RoomOccupancyDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />}
+      {selectedGroup && controlled && <RoomSectionHeader detailAutofocus title={copy(COMMON_COPY_NAMESPACE, ROOM_GROUP_COPY_KEYS.sections.occupancySensors, { count: selectedGroup.items.length })} />}
       <div className={styles.occupancyContent}>
         {selectedGroup ? (
           <RoomOccupancyDetailCards group={selectedGroup} />
@@ -913,6 +912,7 @@ export function OccupancySheet({ directGroup, hideDirectHeader = false, overview
               gridClassName={occupancyGridClassName}
               inactiveGroups={groupedRoomGroups.inactive}
               inactiveTitle="Clear"
+              markDetailTriggers={controlled}
               overviewGridRef={overviewGridRef}
               overviewGridStyle={overviewGridStyle}
               renderCard={(group) => <RoomOccupancyOverviewCard group={group} onSelect={selectGroup} />}
@@ -981,40 +981,24 @@ function RoomContactDetailCards({ group }: { group: EntityGroupConfig }) {
 export function ContactSheet({
   directGroup,
   hideDirectHeader = false,
+  onSelectGroup,
   overviewGridRef,
   overviewGridStyle,
+  selectedGroup: controlledGroup,
 }: RoomOverviewSheetProps = {}) {
-  const [selectedGroup, setSelectedGroup] = useState<EntityGroupConfig | null>(directGroup ?? null)
-  const [roomCardsExiting, setRoomCardsExiting] = useState(false)
-  const transitionTimer = useRef<number | null>(null)
+  const { controlled, roomCardsExiting, selectedGroup, selectGroup, showRoomOverview } = useRoomSheetSelection('ContactSheet', directGroup, controlledGroup, onSelectGroup)
   const roomGroups = ROOM_CONTACT_GROUPS
   const directMode = Boolean(directGroup)
   const squareOverview = !selectedGroup && Boolean(overviewGridStyle)
   const contactGridClassName = squareGridClassName(styles.roomContactGrid, squareOverview)
   const cardShellClassName = squareGridCellClassName(squareOverview)
 
-  useEffect(() => {
-    return () => {
-      if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
-    }
-  }, [])
-
-  const selectGroup = (group: EntityGroupConfig) => {
-    immediateSelectGroup(group, transitionTimer, setRoomCardsExiting, setSelectedGroup)
-  }
-
-  const showRoomOverview = () => {
-    if (transitionTimer.current !== null) window.clearTimeout(transitionTimer.current)
-    transitionTimer.current = null
-    setRoomCardsExiting(false)
-    setSelectedGroup(null)
-  }
-
   return (
     <div
       className={styles.contactSheet}
     >
-      {selectedGroup ? (!hideDirectHeader && <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
+      {selectedGroup ? (!hideDirectHeader && !controlled && <RoomContactDetailHeader group={selectedGroup} onBack={directMode ? undefined : showRoomOverview} />) : <RoomsHeader />}
+      {selectedGroup && controlled && <RoomSectionHeader detailAutofocus title={copy(COMMON_COPY_NAMESPACE, ROOM_GROUP_COPY_KEYS.sections.contactSensors, { count: selectedGroup.items.length })} />}
       <div className={styles.contactContent}>
         {selectedGroup ? (
           <RoomContactDetailCards group={selectedGroup} />
@@ -1022,7 +1006,7 @@ export function ContactSheet({
           <section aria-label="Contact sensors by room" className={styles.roomContactOverview} data-exiting={roomCardsExiting}>
             <div className={contactGridClassName} ref={overviewGridRef} style={overviewGridStyle}>
               {roomGroups.map((group) => (
-                <div className={cardShellClassName} key={group.title}>
+                <div className={cardShellClassName} data-modal-detail-trigger={controlled ? group.title : undefined} key={group.title}>
                   <RoomContactOverviewCard group={group} onSelect={selectGroup} />
                 </div>
               ))}
@@ -1101,43 +1085,56 @@ function modalSquareGridCount(hash: string) {
   return 0
 }
 
+const ROOM_DETAIL_HASHES = new Set(['#lights-overview', '#climate-overview', '#occupancy-overview', '#contact-sensors-overview'])
+
+function isRoomDetailHash(hash: string) {
+  return ROOM_DETAIL_HASHES.has(hash)
+}
+
+function roomDetailSubtitle(hash: string, group: EntityGroupConfig, entities: Record<string, HassEntity | undefined>) {
+  if (hash === '#lights-overview') return lightGroupSubtitle(group, entities)
+  if (hash === '#climate-overview') return normalizeClimateRangeText(group.rangeEntityId ? entities[group.rangeEntityId]?.state : undefined) ?? climateGroupSubtitle(group, entities)
+  if (hash === '#occupancy-overview') return occupancyGroupSensorSubtitle(group, entities)
+  if (hash === '#contact-sensors-overview') return contactGroupSensorSubtitle(group, entities)
+  return undefined
+}
+
 function SheetContent({
   closeHash,
   hash,
-  onSelectLightGroup,
+  onSelectRoomGroup,
   overviewGridRef,
   overviewGridStyle,
   onNavigate,
   preload = false,
-  selectedLightGroup,
+  selectedRoomGroup,
 }: {
   closeHash: () => void
   hash: string
-  onSelectLightGroup?: (group: EntityGroupConfig) => void
+  onSelectRoomGroup?: (group: EntityGroupConfig) => void
   overviewGridRef?: (node: HTMLElement | null) => void
   overviewGridStyle?: ModalSquareGridStyle
   onNavigate: (path: string) => void
   preload?: boolean
-  selectedLightGroup?: EntityGroupConfig | null
+  selectedRoomGroup?: EntityGroupConfig | null
 }) {
+  if (onSelectRoomGroup && selectedRoomGroup === undefined) throw new Error('Home room selection is not configured')
+  const roomSelection = onSelectRoomGroup ? { onSelectGroup: onSelectRoomGroup, selectedGroup: selectedRoomGroup ?? null } : {}
+
   if (hash === '#lights-overview') {
-    if (onSelectLightGroup) {
-      if (selectedLightGroup === undefined) throw new Error('Home Lights selection is not configured')
-      return <LightsSheet onSelectGroup={onSelectLightGroup} overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} selectedGroup={selectedLightGroup} />
-    }
-    return <LightsSheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
+    return <LightsSheet {...roomSelection} overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#climate-overview') {
-    return <ClimateSheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
+    return <ClimateSheet {...roomSelection} overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#occupancy-overview') {
-    return <OccupancySheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
+    return <OccupancySheet {...roomSelection} overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#contact-sensors-overview') {
-    return <ContactSheet overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
+    return <ContactSheet {...roomSelection} overviewGridRef={overviewGridRef} overviewGridStyle={overviewGridStyle} />
   }
 
   if (hash === '#aqi-overview') {
@@ -1169,10 +1166,10 @@ interface AtAGlancePageProps {
 
 export function AtAGlancePage({ activePath = 'overview', deferRouteContent = false, loadingPhase: routeLoadingPhase, onHydrationPhaseChange, onNavigate = () => undefined, preload = false, preloadHash, preloadHashes = [], routeTransitionState = 'idle', withShell = true }: AtAGlancePageProps) {
   const { hash, openHash, closeHash } = useHashModal({ disabled: preload })
-  const [lightDetail, setLightDetail] = useState<{ hash: string; group: EntityGroupConfig | null }>(() => ({ hash, group: null }))
-  if (lightDetail.hash !== hash) setLightDetail({ hash, group: null })
-  const selectedLightGroup = lightDetail.hash === hash ? lightDetail.group : null
-  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(selectedLightGroup?.title ?? 'overview')
+  const [roomDetail, setRoomDetail] = useState<{ hash: string; group: EntityGroupConfig | null }>(() => ({ hash, group: null }))
+  if (roomDetail.hash !== hash) setRoomDetail({ hash, group: null })
+  const selectedRoomGroup = roomDetail.hash === hash ? roomDetail.group : null
+  const { bodyElementRef, enterDetailPage, leaveDetailPage, resetDetailPageScroll } = useModalDetailPageScroll(selectedRoomGroup?.title ?? 'overview')
   const { hydrateHeavyContent, loadingPhase: homeHydrationPhase, showContent } = useDeferredRouteHydration({
     cacheKey: 'home',
     enabled: deferRouteContent,
@@ -1181,8 +1178,8 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   const activeRoomLightCount = useHass((state) =>
     ROOM_LIGHT_ENTITY_IDS.reduce((count, entityId) => count + (isActiveState(state.entities[entityId] ?? null) ? 1 : 0), 0),
   )
-  const selectedLightSubtitle = useHass((state) =>
-    selectedLightGroup ? lightGroupSubtitle(selectedLightGroup, state.entities) : undefined,
+  const selectedRoomSubtitle = useHass((state) =>
+    selectedRoomGroup ? roomDetailSubtitle(hash, selectedRoomGroup, state.entities) : undefined,
   )
   const openContactSensorCount = useHass((state) =>
     ROOM_CONTACT_ENTITY_IDS.reduce((count, entityId) => count + (isContactOpen(state.entities[entityId]) ? 1 : 0), 0),
@@ -1200,7 +1197,9 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   const lightStatusSubtitle = lightCountSubtitle(activeRoomLightCount)
   const contactStatusSubtitle = contactSensorStatusSubtitle(openContactSensorCount)
   const lightsOpen = contentHash === '#lights-overview'
-  const modalTitle = lightsOpen ? selectedLightGroup?.title ?? lightsSheetTitle(activeRoomLightCount) : sheetTitle(contentHash)
+  const roomDetailOpen = isRoomDetailHash(contentHash)
+  const activeRoomGroup = roomDetailOpen ? selectedRoomGroup : null
+  const modalTitle = activeRoomGroup?.title ?? (lightsOpen ? lightsSheetTitle(activeRoomLightCount) : sheetTitle(contentHash))
   const squareGridStyle = modalSquareGridStyle(overviewGridLayout)
   const centeredGeometry = homeCenteredGeometry(contentHash, squareGridModalCount)
   const sheetSize: ModalSheetSize = CAMERA_ITEMS.some((camera) => camera.hash === contentHash)
@@ -1210,7 +1209,7 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
       : squareGridModalOpen
         ? 'media'
         : 'standard'
-  const sheetSubtitle = lightsOpen && selectedLightGroup ? selectedLightSubtitle : contentHash === '#security-system' ? securitySystemSubtitle : undefined
+  const sheetSubtitle = activeRoomGroup ? selectedRoomSubtitle : contentHash === '#security-system' ? securitySystemSubtitle : undefined
   const preloadModalHashes = useMemo(() => [...new Set(preloadHashes.filter((targetHash) => targetHash !== contentHash))], [contentHash, preloadHashes])
   const homeLoadingPhase: DashboardPageLoadingPhase | undefined = showContent ? undefined : homeHydrationPhase === 'loading-exiting' ? 'exiting' : 'loading'
   const activeLoadingPhase = routeLoadingPhase ?? homeLoadingPhase
@@ -1223,22 +1222,22 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
   }, [preload])
 
   const openHomeHash = (nextHash: string) => {
-    if (nextHash === '#lights-overview') {
+    if (isRoomDetailHash(nextHash)) {
       resetDetailPageScroll()
-      setLightDetail({ hash: nextHash, group: null })
+      setRoomDetail({ hash: nextHash, group: null })
     }
     openHash(nextHash)
   }
 
-  const selectLightGroup = (group: EntityGroupConfig) => {
-    if (selectedLightGroup === null) resetDetailPageScroll()
+  const selectRoomGroup = (group: EntityGroupConfig) => {
+    if (selectedRoomGroup === null) resetDetailPageScroll()
     enterDetailPage(group.title)
-    setLightDetail({ hash, group })
+    setRoomDetail({ hash, group })
   }
 
-  const showAllLights = () => {
+  const showRoomOverview = () => {
     leaveDetailPage()
-    setLightDetail({ hash, group: null })
+    setRoomDetail({ hash, group: null })
   }
 
   const page = (
@@ -1278,21 +1277,21 @@ export function AtAGlancePage({ activePath = 'overview', deferRouteContent = fal
       </Page>
 
       <ModalSheet
-        bodyElementRef={lightsOpen ? bodyElementRef : undefined}
+        bodyElementRef={roomDetailOpen ? bodyElementRef : undefined}
         centeredGeometry={centeredGeometry}
         contentWidth={contentHash === '#security-system' || contentHash === GUEST_PRESENCE_SECURITY_HASH ? 'full' : 'readable'}
         landscapeDensity={squareGridModalOpen ? 'regular' : 'compact'}
-        onBack={lightsOpen && selectedLightGroup ? showAllLights : undefined}
+        onBack={activeRoomGroup ? showRoomOverview : undefined}
         onClose={closeHash}
         onCloseComplete={resetDetailPageScroll}
         open={hash !== ''}
-        retainLatestOnControlledClose={lightsOpen}
-        scrollResetKey={lightsOpen ? selectedLightGroup?.title ?? 'overview' : undefined}
+        retainLatestOnControlledClose={roomDetailOpen}
+        scrollResetKey={roomDetailOpen ? activeRoomGroup?.title ?? 'overview' : undefined}
         size={sheetSize}
         subtitle={sheetSubtitle}
         title={modalTitle}
       >
-        <SheetContent closeHash={closeHash} hash={contentHash} onSelectLightGroup={selectLightGroup} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} selectedLightGroup={selectedLightGroup} />
+        <SheetContent closeHash={closeHash} hash={contentHash} onSelectRoomGroup={selectRoomGroup} overviewGridRef={overviewGridRef} overviewGridStyle={squareGridStyle} onNavigate={onNavigate} selectedRoomGroup={selectedRoomGroup} />
       </ModalSheet>
       {preloadModalHashes.map((preloadTargetHash) => (
         <div data-preload-modal={`overview${preloadTargetHash}`} key={`overview-preload-${preloadTargetHash}`}>

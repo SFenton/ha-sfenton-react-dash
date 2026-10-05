@@ -25,6 +25,29 @@ export const HOUSEHOLD_COPY_KEYS = {
   yourSide: 'household.yourSide',
   yourSummary: 'household.yourSummary',
 } as const
+export const ROOM_GROUP_COPY_KEYS = {
+  contact: {
+    allClosed: 'roomGroups.contact.allClosed',
+    door: {
+      allClosed: 'roomGroups.contact.allDoorsClosed',
+      allOpen: 'roomGroups.contact.allDoorsOpen',
+      closed: 'roomGroups.contact.doorClosed',
+      open: 'roomGroups.contact.doorOpen',
+      openCount: 'roomGroups.contact.doorsOpenCount',
+    },
+    window: {
+      allClosed: 'roomGroups.contact.allWindowsClosed',
+      allOpen: 'roomGroups.contact.allWindowsOpen',
+      closed: 'roomGroups.contact.windowClosed',
+      open: 'roomGroups.contact.windowOpen',
+      openCount: 'roomGroups.contact.windowsOpenCount',
+    },
+  },
+  sections: {
+    contactSensors: 'roomGroups.sections.contactSensors',
+    occupancySensors: 'roomGroups.sections.occupancySensors',
+  },
+} as const
 export const PAGE_FOOD_COPY_NAMESPACE = 'pageFood' as const
 export const PAGE_SETTINGS_COPY_NAMESPACE = 'pageSettings' as const
 export const PAGE_SETTINGS_COPY_KEYS = {
