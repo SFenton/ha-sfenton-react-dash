@@ -1,3 +1,4 @@
+// @covers src/constants/wakeLights.ts
 import { describe, expect, it } from 'vitest'
 import { MASTER_BEDROOM_WAKE_LIGHT } from '../../../constants/wakeLights'
 import {
@@ -9,14 +10,15 @@ import {
 } from './wakeLightContract'
 
 describe('wakeLightContract', () => {
-  it('keeps the Master Bedroom wake profile explicit and excludes the bathroom leaf', () => {
+  it('keeps the Master Bedroom wake profile explicit, including the bathroom leaf but not the closet', () => {
     expect(MASTER_BEDROOM_WAKE_LIGHT.targetLightEntityIds).toEqual([
       'light.master_bedroom_window_light',
       'light.master_bedroom_door_light',
+      'light.master_bedroom_bathroom_light',
       'light.stephen_nightstand_light',
       'light.steph_nightstand_light',
     ])
-    expect(MASTER_BEDROOM_WAKE_LIGHT.targetLightEntityIds).not.toContain('light.master_bedroom_bathroom_light')
+    expect(MASTER_BEDROOM_WAKE_LIGHT.targetLightEntityIds).not.toContain('light.master_bedroom_closet_light')
   })
 
   it('parses a generic profile snapshot and fails unavailable entities closed', () => {

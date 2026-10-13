@@ -53,6 +53,7 @@ export const MASTER_BEDROOM_WAKE_LIGHT: WakeLightConfig = {
   targetLightEntityIds: [
     'light.master_bedroom_window_light',
     'light.master_bedroom_door_light',
+    'light.master_bedroom_bathroom_light',
     'light.stephen_nightstand_light',
     'light.steph_nightstand_light',
   ],
