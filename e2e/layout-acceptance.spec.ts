@@ -467,12 +467,11 @@ async function stateFacts(page: Page, dialog: Locator, scenario: ScenarioId, sta
     const visibleTabs = await dialog.getByRole('tab').evaluateAll((elements) => (
       elements.map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '')
     ))
-    const expectedTabs = state === 'docked'
+    const expectedTabs = state === 'docked' || state === 'dock-cleaning'
       ? ['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info']
-      : state === 'dock-cleaning'
-        ? ['Controls', 'Auto-Clean', 'Actions', 'Info']
-        : ['Controls', 'Auto-Clean', 'Info']
+      : ['Controls', 'Auto-Clean', 'Info']
     expect(visibleTabs).toEqual(expectedTabs)
+    await expect(dialog.getByRole('note', { name: 'Controls on Hold' })).toHaveCount(state === 'dock-cleaning' ? 1 : 0)
     await expect(dialog.getByRole('tab', { name: 'Controls' })).toHaveAttribute('aria-selected', 'true')
     facts.vacuumTabs = { state, visibleTabs }
 

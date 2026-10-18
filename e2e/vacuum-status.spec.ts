@@ -2046,7 +2046,7 @@ test('tab membership reversal restores the five-tab layout after in-flight shrin
   expect(afterControls.transform).toBe('')
 })
 
-test('busy dock minimal mode shows Actions only for the active dock stop control', async ({ page }) => {
+test('busy dock keeps the full layout with held controls, a reason, and the active dock stop', async ({ page }) => {
   await page.goto('/at-a-glance/vacuums')
   await page.getByRole('button', { name: /Main Floor Docked/i }).click()
 
@@ -2056,20 +2056,35 @@ test('busy dock minimal mode shows Actions only for the active dock stop control
 
   await setMainFloorDockStatus(page, 'cleaning')
 
-  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Auto-Clean', 'Actions', 'Info'])
-  const controlsPane = dialog.getByRole('group', { name: 'Main Floor controls, auto-clean, actions, info' })
-  await expect(controlsPane.getByRole('button', { name: 'Stop Dock Clean' })).toHaveCount(0)
-  await expect(controlsPane.getByRole('button', { name: 'Clean Mop Dock' })).toHaveCount(0)
-  await expect(controlsPane.getByRole('button', { name: 'Dry Mops' })).toHaveCount(0)
-  await expect(controlsPane.getByRole('button', { name: 'Empty Bin' })).toHaveCount(0)
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+  const controlsPane = dialog.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
+  await expect(controlsPane.getByRole('note', { name: 'Controls on Hold' })).toContainText('The dock is washing the mop pads.')
+  await expect(controlsPane.getByRole('button', { name: 'Clean', exact: true })).toBeDisabled()
 
   await dialog.getByRole('tab', { name: 'Actions' }).click()
-  await expect(controlsPane.getByRole('button', { name: 'Stop Dock Clean' })).toBeVisible()
+  await expect(controlsPane.getByRole('button', { name: 'Stop Dock Clean' })).toBeEnabled()
+  await expect(controlsPane.getByRole('button', { name: 'Empty Bin' })).toBeDisabled()
   await controlsPane.getByRole('button', { name: 'Stop Dock Clean' }).click()
   await expect.poll(() => page.evaluate(() => window.__mockHass?.calls ?? [])).toContainEqual({
     domain: 'script',
     service: 'main_floor_vacuum_mop_dock_clean',
   })
+})
+
+test('a latched dock pause leaves every cleaning control enabled', async ({ page }) => {
+  await page.goto('/at-a-glance/vacuums')
+  await page.getByRole('button', { name: /Main Floor Docked/i }).click()
+
+  const dialog = page.getByRole('dialog')
+  await waitForModalReady(dialog, undefined, 'vacuum-tabs')
+  await waitForVacuumLayoutReady(dialog)
+
+  await setMainFloorDockStatus(page, 'pause')
+
+  await expect.poll(async () => mainFloorTabLabels(dialog)).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+  const controlsPane = dialog.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
+  await expect(controlsPane.getByRole('note', { name: 'Controls on Hold' })).toHaveCount(0)
+  await expect(controlsPane.getByRole('button', { name: 'Clean', exact: true })).toBeEnabled()
 })
 
 test('minimal short landscape controls keep a visible status fallback and close the area editor', async ({ page }) => {

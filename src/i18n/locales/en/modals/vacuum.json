@@ -45,7 +45,17 @@
     "lastReportedMapHelp": "This is the last map the vacuum reported before contact was lost. The exact report time is unknown, and the vacuum may have been moved since then.",
     "lastReportedPosition": "Last Reported Position",
     "mapUnavailable": "Map Unavailable",
-    "mapUnavailableHelp": "Home Assistant cannot currently confirm the vacuum's map or position."
+    "mapUnavailableHelp": "Home Assistant cannot currently confirm the vacuum's map or position.",
+    "commandHold": {
+      "title": "Controls on Hold",
+      "dockCleaning": "The dock is washing the mop pads. Cleaning controls return when it finishes.",
+      "dockEmptying": "The dock is emptying the dustbin. Cleaning controls return when it finishes.",
+      "dockError": "The dock reports an error. Clear it at the dock to use cleaning controls.",
+      "dockOther": "The dock reports {{status}}. Cleaning controls return when the dock is ready.",
+      "currentIssue": "Cleaning controls return when the current issue clears.",
+      "sourceUnreadable": "Home Assistant can't read every vacuum sensor. Cleaning controls return when it can.",
+      "generic": "Home Assistant is holding cleaning commands. Controls return when the vacuum is ready."
+    }
   },
   "outcomes": {
     "sectionTitle": "{{room}} Cleaning Report",
@@ -233,6 +243,13 @@
       "roomUnreachable": "The vacuum could not reach the requested room.",
       "dockUnreachable": "The vacuum could not reach its dock.",
       "unknown": "The vacuum outcome reason was not recognized."
+    },
+    "notStarted": {
+      "title": "No Rooms Cleaned",
+      "waitingForPreviousTask": "The vacuum didn't start because Home Assistant was still waiting for the previous cleaning task to finish at the dock.",
+      "blocked": "The vacuum didn't start. Reason: {{reason}}",
+      "generic": "The vacuum didn't start before the away session ended.",
+      "ended": "Session ended: {{reason}}"
     }
   },
   "roomsSection": "Rooms",

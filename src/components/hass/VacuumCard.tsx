@@ -103,7 +103,8 @@ const CONDITION_FALLBACK_PATTERN = /fallback/
 const CONDITION_RESUME_PATTERN = /resume/
 const CONDITION_VACUUM_ONLY_PATTERN = /vacuum_only/
 const NORMAL_COMMAND_STATES = new Set(['docked', 'idle'])
-const BUSY_DOCK_STATES = new Set(['cleaning', 'drying', 'emptying', 'error', 'pause', 'paused'])
+// Drying and a latched dock pause are idle enough to start a clean; only active dock work or a dock error holds commands.
+const BUSY_DOCK_STATES = new Set(['cleaning', 'emptying', 'error'])
 const COMMAND_POLICY_RANK: Record<VacuumCommandPolicyMode, number> = {
   [VACUUM_COMMAND_NONE]: 2,
   [VACUUM_COMMAND_NORMAL]: 0,
@@ -1226,6 +1227,30 @@ function VacuumStatusNotice({
   )
 }
 
+function vacuumCommandHoldText(copy: ReturnType<typeof useCopy>, reason: string | null) {
+  if (reason === 'dock_cleaning') return copy(VACUUM_COPY_KEYS.status.commandHold.dockCleaning)
+  if (reason === 'dock_emptying') return copy(VACUUM_COPY_KEYS.status.commandHold.dockEmptying)
+  if (reason === 'dock_error') return copy(VACUUM_COPY_KEYS.status.commandHold.dockError)
+  const dockState = reason ? /^dock_(.+)$/.exec(reason)?.[1] : undefined
+  if (dockState) return copy(VACUUM_COPY_KEYS.status.commandHold.dockOther, { status: formatStateValue(dockState).toLowerCase() })
+  if (reason === 'current_issue') return copy(VACUUM_COPY_KEYS.status.commandHold.currentIssue)
+  if (reason === SOURCE_UNREADABLE_REASON) return copy(VACUUM_COPY_KEYS.status.commandHold.sourceUnreadable)
+  return copy(VACUUM_COPY_KEYS.status.commandHold.generic)
+}
+
+function VacuumCommandHoldNotice({ runtimeMode, status }: { runtimeMode: VacuumRuntimeMode; status: ResolvedVacuumStatus }) {
+  const copy = useCopy(VACUUM_COPY_NAMESPACE)
+  if (runtimeMode !== 'full' || status.commandPolicyMode !== VACUUM_COMMAND_RESTRICTED) return null
+
+  return (
+    <div data-vacuum-command-hold={status.commandPolicyReason ?? 'unknown'}>
+      <VacuumStatusNotice role="note" title={copy(VACUUM_COPY_KEYS.status.commandHold.title)}>
+        {vacuumCommandHoldText(copy, status.commandPolicyReason)}
+      </VacuumStatusNotice>
+    </div>
+  )
+}
+
 function VacuumStatusSummary({
   displayState,
   liveState,
@@ -1355,10 +1380,12 @@ function VacuumInfoSection({ vacuum }: { vacuum: VacuumConfig }) {
 }
 
 function VacuumPowerSettings({
+  commandPolicyMode,
   coordinator,
   runtimeMode,
   vacuum,
 }: {
+  commandPolicyMode: VacuumCommandPolicyMode
   coordinator: VacuumCommandCoordinator
   runtimeMode: VacuumRuntimeMode
   vacuum: VacuumConfig
@@ -1374,7 +1401,7 @@ function VacuumPowerSettings({
   const showFan = Boolean(vacuum.fanEntityId && fan && !isUnavailableState(fan.state) && optimisticModeState !== 'mop')
   const showWater = Boolean(vacuum.waterEntityId && water && !isUnavailableState(water.state) && (!hasMode || optimisticModeState !== 'vacuum'))
   const modeLabel = optimisticModeState === modeState && isMeaningfulText(modeText?.state) ? modeText?.state : formatStateValue(optimisticModeState, 'Mode')
-  const disabled = coordinator.controlsDisabled || runtimeMode !== 'full'
+  const disabled = coordinator.controlsDisabled || runtimeMode !== 'full' || commandPolicyMode !== VACUUM_COMMAND_NORMAL
 
   if (runtimeMode !== 'full' || (!hasMode && !showFan && !showWater)) return null
 
@@ -1755,6 +1782,7 @@ function VacuumControlsSection({
 
   return (
     <div className={styles.controlStack}>
+      <VacuumCommandHoldNotice runtimeMode={runtimeMode} status={status} />
       <VacuumStateActions
         areaEditorMeta={areaEditorMeta}
         areaSelection={areaSelection}
@@ -1773,7 +1801,7 @@ function VacuumControlsSection({
           <Description>{fallbackMessage}</Description>
         </ControlSection>
       )}
-      <VacuumPowerSettings coordinator={coordinator} runtimeMode={runtimeMode} vacuum={vacuum} />
+      <VacuumPowerSettings commandPolicyMode={commandPolicyMode} coordinator={coordinator} runtimeMode={runtimeMode} vacuum={vacuum} />
     </div>
   )
 }
@@ -1795,6 +1823,25 @@ function VacuumWhileAwaySection({
   }
   if (presentation.kind === 'incomplete' || presentation.kind === 'malformed' || presentation.kind === 'incompatible') {
     return <VacuumOutcomeProtocolNotice presentation={presentation} vacuum={vacuum} />
+  }
+  if (presentation.kind === 'notStarted') {
+    const notStarted = VACUUM_COPY_KEYS.outcomes.notStarted
+    const reason = presentation.waitingForPreviousTask
+      ? copy(notStarted.waitingForPreviousTask)
+      : presentation.blockedReason
+        ? copy(notStarted.blocked, { reason: presentation.blockedReason })
+        : copy(notStarted.generic)
+    return (
+      <section className={styles.section} data-vacuum-while-away="not-started">
+        <SectionHeader title={copy(VACUUM_COPY_KEYS.outcomes.sectionTitle, { room: vacuum.title })} />
+        <div className={styles.awaySummary}>
+          <InfoBox title={copy(notStarted.title)} tone="warning">
+            <Description>{reason}</Description>
+            {presentation.endedReason && <Description>{copy(notStarted.ended, { reason: presentation.endedReason })}</Description>}
+          </InfoBox>
+        </div>
+      </section>
+    )
   }
   const cleaned = presentation.cleaned
   const issues = presentation.issues
@@ -1827,16 +1874,18 @@ function VacuumZones({
   coordinator,
   onToggleZone,
   runtimeMode,
+  status,
   vacuum,
 }: {
   coordinator: VacuumCommandCoordinator
   onToggleZone: (zone: VacuumZoneConfig) => void
   runtimeMode: VacuumRuntimeMode
+  status: ResolvedVacuumStatus
   vacuum: VacuumConfig
 }) {
   const copy = useCopy(VACUUM_COPY_NAMESPACE)
   const entities = useHass((hass) => hass.entities) as unknown as Record<string, EntityLike | undefined>
-  const editableZones = runtimeMode === 'full'
+  const editableZones = runtimeMode === 'full' && status.commandPolicyMode === VACUUM_COMMAND_NORMAL
 
   if (vacuum.zones.length === 0) return null
   const cleaningOrder = new Map(orderedSelectedVacuumZones(vacuum.zones, entities, coordinator).map(({ zone }, index) => [zone.entityId, index + 1]))
@@ -1844,6 +1893,7 @@ function VacuumZones({
   return (
     <section className={styles.section}>
       <SectionHeader title={copy(VACUUM_COPY_KEYS.roomsSection)} />
+      <VacuumCommandHoldNotice runtimeMode={runtimeMode} status={status} />
       <SectionText lines={vacuum.zoneDescription} />
       <Description>{ROOM_ORDER_DESCRIPTION}</Description>
       <div className={styles.zones}>
@@ -1984,8 +2034,9 @@ function VacuumModalTabContent({
     callService({ domain: 'select', service: 'select_option', target: vacuum.modeEntityId, serviceData: { option } })
   }, [callService, coordinator, entities, vacuum.modeEntityId])
 
+  const commandsEditable = runtimeMode === 'full' && status.commandPolicyMode === VACUUM_COMMAND_NORMAL
   const toggleRoom = useCallback((zone: VacuumZoneConfig) => {
-    if (runtimeMode !== 'full') return
+    if (!commandsEditable) return
     const active = vacuumZoneSelected(zone, entities, coordinator)
     if (!active && areaSelection && !window.confirm(copy(VACUUM_COPY_KEYS.confirmations.switchToRooms))) return
     if (!active && areaSelection) onAreaSelectionChange(null)
@@ -1996,17 +2047,17 @@ function VacuumModalTabContent({
       candidate.entityId === zone.entityId ? nextActive : vacuumZoneSelected(candidate, entities, coordinator)
     ))
     setRoomMode(nextSelectedRooms)
-  }, [areaSelection, callService, coordinator, copy, entities, onAreaSelectionChange, runtimeMode, setRoomMode, vacuum.zones])
+  }, [areaSelection, callService, commandsEditable, coordinator, copy, entities, onAreaSelectionChange, setRoomMode, vacuum.zones])
 
   const editArea = useCallback(() => {
-    if (!onEditArea || runtimeMode !== 'full') return
+    if (!onEditArea || !commandsEditable) return
     if (selectedRooms.length > 0 && !window.confirm(copy(VACUUM_COPY_KEYS.confirmations.switchToArea))) return
     for (const { zone } of selectedRooms) {
       coordinator.registerIntent(zone.entityId, 'off')
       callService({ domain: 'input_boolean', service: 'turn_off', target: zone.entityId })
     }
     onEditArea()
-  }, [callService, coordinator, copy, onEditArea, runtimeMode, selectedRooms])
+  }, [callService, commandsEditable, coordinator, copy, onEditArea, selectedRooms])
   const openRoomsTab = useCallback(() => {
     if (!visibleTabs.some((tab) => tab.tab === 'zones')) return
     onActiveTabChange('zones')
@@ -2226,7 +2277,7 @@ function VacuumModalTabContent({
           onLocate={locate}
           onOpenOutcomes={onOpenOutcomes}
           onResetAreaView={onResetAreaView}
-          onRoomToggle={runtimeMode === 'full' ? toggleRoom : undefined}
+          onRoomToggle={commandsEditable ? toggleRoom : undefined}
           optimisticState={optimisticState}
           outcomePresentation={outcomePresentation}
           resetAreaViewRevision={resetAreaViewRevision}
@@ -2280,16 +2331,19 @@ function VacuumModalTabContent({
                 </div>
               </>
             )}
-            {displayedActiveTab === 'zones' && <VacuumZones coordinator={coordinator} onToggleZone={toggleRoom} runtimeMode={runtimeMode} vacuum={vacuum} />}
+            {displayedActiveTab === 'zones' && <VacuumZones coordinator={coordinator} onToggleZone={toggleRoom} runtimeMode={runtimeMode} status={status} vacuum={vacuum} />}
             {displayedActiveTab === 'autoClean' && <VacuumAutoCleanDisabledRooms vacuum={vacuum} />}
             {displayedActiveTab === 'more' && (
-              <VacuumDockControlsSection
-                activeRuntimeOnly={runtimeMode === 'minimal'}
-                commandPolicyMode={status.commandPolicyMode}
-                coordinator={coordinator}
-                optimisticState={optimisticState}
-                vacuum={vacuum}
-              />
+              <>
+                <VacuumCommandHoldNotice runtimeMode={runtimeMode} status={status} />
+                <VacuumDockControlsSection
+                  activeRuntimeOnly={runtimeMode === 'minimal'}
+                  commandPolicyMode={status.commandPolicyMode}
+                  coordinator={coordinator}
+                  optimisticState={optimisticState}
+                  vacuum={vacuum}
+                />
+              </>
             )}
             {displayedActiveTab === 'info' && <VacuumInfoSection vacuum={vacuum} />}
           </div>
