@@ -6466,7 +6466,7 @@ describe('DashboardViewPage', () => {
     ]), { timeout: 1500 })
   })
 
-  it('keeps dock-cleaning state in minimal mode with an Actions stop command and Info visible', async () => {
+  it('holds docked dock-cleaning controls disabled with an Actions stop command and Info visible', async () => {
     mockEntities['sensor.valetudo_exaltedsneakydeer_dock_status'].state = 'cleaning'
     try {
       render(<DashboardViewPage activePath="living-room" onNavigate={() => undefined} path="living-room" />)
@@ -6475,8 +6475,10 @@ describe('DashboardViewPage', () => {
       const dockStatus = await within(dialog).findByRole('group', { name: 'Dock Status Cleaning' })
       expect(dockStatus).toHaveAttribute('data-icon', 'mdi:water')
       expect(dockStatus).toHaveAttribute('data-tone', 'active')
-      expect(within(dialog).getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['Controls', 'Auto-Clean', 'Actions', 'Info'])
-      const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, auto-clean, actions, info' })
+      expect(within(dialog).getAllByRole('tab').map((tab) => tab.getAttribute('aria-label'))).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+      const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
+      expect(within(controlsPane).getByRole('note', { name: 'Controls on Hold' })).toHaveTextContent('The dock is washing the mop pads. Cleaning controls return when it finishes.')
+      expect(within(controlsPane).getByRole('button', { name: 'Clean' })).toBeDisabled()
       expect(within(controlsPane).queryByRole('button', { name: 'Stop Dock Clean' })).not.toBeInTheDocument()
       expect(within(controlsPane).queryByRole('button', { name: 'Clean Mop Dock' })).not.toBeInTheDocument()
       expect(within(controlsPane).queryByRole('button', { name: 'Dry Mops' })).not.toBeInTheDocument()
@@ -8792,7 +8794,7 @@ describe('DashboardViewPage', () => {
     expect(within(dialog).getByLabelText('Error Source Unavailable')).toHaveTextContent('The current vacuum error status cannot be confirmed because its error source is unavailable.')
     expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Locate' })).toBeEnabled()
-    expect(within(dialog).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Clean' })).toBeDisabled()
     expect(mockCallServiceCalls).toEqual([])
   })
 
