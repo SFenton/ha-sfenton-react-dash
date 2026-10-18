@@ -2,6 +2,7 @@ import { type VacuumConfig } from '../../constants/portedDashboard'
 import { VACUUM_MODAL_TABS } from '../../constants/surfaceSemantics'
 import {
   VACUUM_COMMAND_NORMAL,
+  VACUUM_COMMAND_RESTRICTED,
   type VacuumCommandPolicyMode,
 } from './vacuumStatus'
 
@@ -32,7 +33,16 @@ function canStartVacuumCleaning(
   )
 }
 
+function heldAtRest(snapshot: VacuumRuntimeSnapshot) {
+  return snapshot.commandPolicyMode === VACUUM_COMMAND_RESTRICTED
+    && !isResumable(snapshot.liveStatusFlag)
+    && (snapshot.displayState === 'docked' || snapshot.displayState === 'idle')
+}
+
+// A robot resting at the dock keeps the full layout while Home Assistant holds commands;
+// the held controls render disabled with a reason instead of disappearing.
 export function vacuumRuntimeMode(snapshot: VacuumRuntimeSnapshot): VacuumRuntimeMode {
+  if (heldAtRest(snapshot)) return 'full'
   return snapshot.commandPolicyMode === VACUUM_COMMAND_NORMAL
     && canStartVacuumCleaning(
       snapshot.displayState,

@@ -14,7 +14,8 @@ describe('vacuumModalRuntime', () => {
     ['cleaning normal', { commandPolicyMode: VACUUM_COMMAND_NORMAL, displayState: 'cleaning', liveError: '', liveStatusFlag: 'none' }, 'minimal'],
     ['error low battery', { commandPolicyMode: VACUUM_COMMAND_NORMAL, displayState: 'error', liveError: 'Low battery', liveStatusFlag: 'none' }, 'minimal'],
     ['docked resumable', { commandPolicyMode: VACUUM_COMMAND_NORMAL, displayState: 'docked', liveError: '', liveStatusFlag: 'resumable' }, 'minimal'],
-    ['restricted docked', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'docked', liveError: '', liveStatusFlag: 'none' }, 'minimal'],
+    ['restricted docked', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'docked', liveError: '', liveStatusFlag: 'none' }, 'full'],
+    ['restricted cleaning', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'cleaning', liveError: '', liveStatusFlag: 'segment' }, 'minimal'],
     ['none unavailable', { commandPolicyMode: VACUUM_COMMAND_NONE, displayState: 'unavailable', liveError: 'unavailable', liveStatusFlag: 'unavailable' }, 'minimal'],
   ])('classifies %s as %s', (_label, snapshot, expected) => {
     expect(vacuumRuntimeMode(snapshot)).toBe(expected)

@@ -383,4 +383,45 @@ describe('vacuum while-away source selection', () => {
   it('renders nothing when neither typed nor legacy data exists', () => {
     expect(vacuumWhileAwayPresentation({})).toEqual({ kind: 'empty' })
   })
+
+  describe('away sessions that ended before cleaning started', () => {
+    const emptyReport = { complete: true, day: '2026-10-17', events: [], rooms: [], version: 2 }
+    const endedBeforePreflight = {
+      blocked_reason: null,
+      cancelled: true,
+      preflight_complete: false,
+      retained_task_phase: null,
+      session_id: '2026-10-17T17:53:21.622203+00:00',
+      terminal_message: 'Tracked person arrived home',
+      terminal_reason: 'returned_home',
+      while_away_outcomes: emptyReport,
+    }
+
+    it.each([
+      ['waiting on the previous task', { retained_task_phase: 'operator_required', blocked_reason: 'Dock busy' }, { blockedReason: 'Dock busy', waitingForPreviousTask: true }],
+      ['blocked', { blocked_reason: 'Mop pads need attention' }, { blockedReason: 'Mop pads need attention', waitingForPreviousTask: false }],
+      ['without a recorded reason', {}, { blockedReason: null, waitingForPreviousTask: false }],
+    ])('explains a session %s', (_label, overrides, expected) => {
+      expect(vacuumWhileAwayPresentation({ ...endedBeforePreflight, ...overrides })).toEqual({
+        endedReason: 'Tracked person arrived home',
+        kind: 'notStarted',
+        ...expected,
+      })
+    })
+
+    it('uses the same explanation when only empty legacy lists exist', () => {
+      const legacyOnly: Record<string, unknown> = { ...endedBeforePreflight }
+      delete legacyOnly.while_away_outcomes
+      expect(vacuumWhileAwayPresentation({ ...legacyOnly, while_away_cleaned: [], while_away_issues: [], terminal_reason: null })).toMatchObject({ kind: 'notStarted' })
+    })
+
+    it.each([
+      ['still running', { cancelled: false, terminal_reason: null }],
+      ['past preflight', { preflight_complete: true }],
+      ['missing preflight state', { preflight_complete: undefined }],
+      ['without a session', { session_id: null }],
+    ])('stays empty for a session %s', (_label, overrides) => {
+      expect(vacuumWhileAwayPresentation({ ...endedBeforePreflight, ...overrides })).toEqual({ kind: 'empty' })
+    })
+  })
 })

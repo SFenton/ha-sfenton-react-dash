@@ -154,7 +154,14 @@ export type VacuumWhileAwayPresentation =
   | ({ kind: 'incomplete'; version: VacuumOutcomeContractVersion } & VacuumOutcomeLegacyData)
   | ({ kind: 'malformed'; version?: VacuumOutcomeContractVersion } & VacuumOutcomeLegacyData)
   | ({ kind: 'incompatible'; version: number } & VacuumOutcomeLegacyData)
+  | ({ kind: 'notStarted' } & VacuumOutcomeNotStarted)
   | { kind: 'empty' }
+
+export interface VacuumOutcomeNotStarted {
+  blockedReason: string | null
+  endedReason: string | null
+  waitingForPreviousTask: boolean
+}
 
 export type VacuumOutcomeReconciledAttempts = Readonly<Record<string, string | null | undefined>>
 
@@ -629,6 +636,23 @@ function stringListAttribute(attributes: Record<string, unknown>, name: string) 
     : []
 }
 
+function textAttribute(attributes: Record<string, unknown>, name: string) {
+  const value = attributes[name]
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+// An away session that ended before preflight finished cleaned nothing; say why instead of hiding the report.
+function notStartedPresentation(attributes: Record<string, unknown>): VacuumWhileAwayPresentation {
+  const ended = attributes.cancelled === true || textAttribute(attributes, 'terminal_reason') !== null
+  if (!textAttribute(attributes, 'session_id') || !ended || attributes.preflight_complete !== false) return { kind: 'empty' }
+  return {
+    blockedReason: textAttribute(attributes, 'blocked_reason'),
+    endedReason: textAttribute(attributes, 'terminal_message'),
+    kind: 'notStarted',
+    waitingForPreviousTask: attributes.retained_task_phase === 'operator_required',
+  }
+}
+
 export function vacuumWhileAwayPresentation(
   attributes: Record<string, unknown> | null | undefined,
   reconciledAttemptEventIds: VacuumOutcomeReconciledAttempts = {},
@@ -642,12 +666,12 @@ export function vacuumWhileAwayPresentation(
     const contract = reconcileVacuumOutcomeContract(parsed.contract, reconciledAttemptEventIds)
     return contract.rooms.length > 0
       ? { contract, kind: 'typed' }
-      : { kind: 'empty' }
+      : notStartedPresentation(attributes)
   }
   if (parsed.kind === 'incomplete') return { ...legacy, kind: 'incomplete', version: parsed.version }
   if (parsed.kind === 'malformed') return { ...legacy, kind: 'malformed', ...(parsed.version ? { version: parsed.version } : {}) }
   if (parsed.kind === 'unsupported') return { ...legacy, kind: 'incompatible', version: parsed.version }
-  return cleaned.length || issues.length ? { ...legacy, kind: 'legacy' } : { kind: 'empty' }
+  return cleaned.length || issues.length ? { ...legacy, kind: 'legacy' } : notStartedPresentation(attributes)
 }
 
 export function vacuumOutcomeEventsForRoom(contract: VacuumOutcomeContract, room: VacuumOutcomeRoom) {

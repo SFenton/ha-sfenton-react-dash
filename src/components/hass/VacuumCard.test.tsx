@@ -54,6 +54,24 @@ function setMainFloorDockStatus(state: string) {
   mockEntities[mainFloorDockControls.dockStatusEntityId].state = state
 }
 
+function setMainFloorStatusContract(commandPolicy: { mode: string; reason: string | null }) {
+  mockEntities[mainFloorVacuum.statusEntityId] = {
+    ...mockEntities['input_text.main_floor_vacuum_error_message'],
+    attributes: {
+      active_conditions: [],
+      availability: { since: null, status: 'available' },
+      command_policy: commandPolicy,
+      current_issue: { code: null, raw: null, reported_at: null, status: 'clear' },
+      last_issue: null,
+      observed_vacuum_state: mockEntities[mainFloorVacuum.entityId].state,
+      vacuum_entity_id: mainFloorVacuum.entityId,
+      version: 1,
+    },
+    entity_id: mainFloorVacuum.statusEntityId,
+    state: 'docked',
+  }
+}
+
 function renderMainFloorRoomSource() {
   return render(<VacuumRoomSourceModalContent vacuum={mainFloorVacuum} />)
 }
@@ -107,8 +125,11 @@ describe('VacuumCard runtime mode', () => {
     ['error low battery', { commandPolicyMode: VACUUM_COMMAND_NORMAL, displayState: 'error', liveError: 'Low battery', liveStatusFlag: 'none' }, 'minimal'],
     ['docked resumable', { commandPolicyMode: VACUUM_COMMAND_NORMAL, displayState: 'docked', liveError: '', liveStatusFlag: 'resumable' }, 'minimal'],
     ['idle resumable', { commandPolicyMode: VACUUM_COMMAND_NORMAL, displayState: 'idle', liveError: '', liveStatusFlag: 'resumable' }, 'minimal'],
-    ['restricted docked', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'docked', liveError: '', liveStatusFlag: 'none' }, 'minimal'],
-    ['restricted idle', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'idle', liveError: '', liveStatusFlag: 'none' }, 'minimal'],
+    ['restricted docked', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'docked', liveError: '', liveStatusFlag: 'none' }, 'full'],
+    ['restricted idle', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'idle', liveError: '', liveStatusFlag: 'none' }, 'full'],
+    ['restricted docked resumable', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'docked', liveError: '', liveStatusFlag: 'resumable' }, 'minimal'],
+    ['restricted cleaning', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'cleaning', liveError: '', liveStatusFlag: 'segment' }, 'minimal'],
+    ['restricted error', { commandPolicyMode: VACUUM_COMMAND_RESTRICTED, displayState: 'error', liveError: 'Brush stuck', liveStatusFlag: 'none' }, 'minimal'],
     ['none unavailable', { commandPolicyMode: VACUUM_COMMAND_NONE, displayState: 'unavailable', liveError: 'unavailable', liveStatusFlag: 'unavailable' }, 'minimal'],
     ['none unknown', { commandPolicyMode: VACUUM_COMMAND_NONE, displayState: 'unknown', liveError: 'unavailable', liveStatusFlag: 'unavailable' }, 'minimal'],
   ])('classifies %s as %s', (_label, snapshot, expected) => {
@@ -156,6 +177,7 @@ describe('VacuumRoomSourceModalContent', () => {
 
   afterEach(() => {
     for (const { entityId } of mainFloorOutcomeReconciliations) delete mockEntities[entityId]
+    delete mockEntities[mainFloorVacuum.statusEntityId]
     window.__vacuumModalPreview?.setMode('live')
     vi.unstubAllEnvs()
   })
@@ -280,35 +302,112 @@ describe('VacuumRoomSourceModalContent', () => {
     }
   })
 
-  it('adds minimal Actions only for an active dock runtime action', () => {
+  it('keeps the full layout with held controls and a reason while the dock washes the mop pads', () => {
     setMainFloorDockStatus('cleaning')
     renderMainFloorRoomSource()
 
-    expect(visibleTabs()).toEqual(['Controls', 'Auto-Clean', 'Actions', 'Info'])
-    expect(screen.queryByRole('tab', { name: 'Rooms' })).not.toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Actions' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Info' })).toBeInTheDocument()
+    expect(visibleTabs()).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
+    const hold = within(controlsPane).getByRole('note', { name: 'Controls on Hold' })
+    expect(hold).toHaveTextContent('The dock is washing the mop pads. Cleaning controls return when it finishes.')
+    expect(within(controlsPane).getByRole('button', { name: 'Clean' })).toBeDisabled()
+    expect(within(controlsPane).getByRole('heading', { name: 'Power Settings' })).toBeInTheDocument()
+    expect(within(controlsPane).getByRole('combobox', { name: /Fan /i })).toBeDisabled()
+
+    fireEvent.click(within(controlsPane).getByRole('button', { name: 'Clean' }))
+    expect(mockCallServiceCalls).toEqual([])
   })
 
-  it('surfaces Stop Dock Clean only in minimal Actions and calls the existing stop service', async () => {
+  it('keeps Stop Dock Clean enabled in the full Actions tab while other dock actions wait', async () => {
     setMainFloorDockStatus('cleaning')
     renderMainFloorRoomSource()
-
-    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, auto-clean, actions, info' })
-    expect(within(controlsPane).queryByRole('button', { name: 'Stop Dock Clean' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Actions' }))
     await waitFor(() => expect(selectedTab()).toHaveAttribute('aria-label', 'Actions'))
-    const stopDockClean = await screen.findByRole('button', { name: 'Stop Dock Clean' })
-    expect(within(controlsPane).queryByRole('button', { name: 'Clean Mop Dock' })).not.toBeInTheDocument()
-    expect(within(controlsPane).queryByRole('button', { name: 'Dry Mops' })).not.toBeInTheDocument()
-    expect(within(controlsPane).queryByRole('button', { name: 'Empty Bin' })).not.toBeInTheDocument()
+    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
+    const stopDockClean = await within(controlsPane).findByRole('button', { name: 'Stop Dock Clean' })
+    expect(within(controlsPane).getByRole('note', { name: 'Controls on Hold' })).toBeInTheDocument()
+    expect(stopDockClean).toBeEnabled()
+    expect(within(controlsPane).getByRole('button', { name: 'Dry Mops' })).toBeDisabled()
+    expect(within(controlsPane).getByRole('button', { name: 'Empty Bin' })).toBeDisabled()
 
     fireEvent.click(stopDockClean)
 
     expect(mockCallServiceCalls).toEqual([
       { domain: 'script', service: 'main_floor_vacuum_mop_dock_clean' },
     ])
+  })
+
+  it('holds room selection with the emptying reason on the Rooms tab', async () => {
+    setMainFloorDockStatus('emptying')
+    renderMainFloorRoomSource()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Rooms' }))
+    await waitFor(() => expect(selectedTab()).toHaveAttribute('aria-label', 'Rooms'))
+    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
+    const firstRoom = mainFloorVacuum.zones[0]
+    const roomControl = await within(controlsPane).findByRole('button', { name: new RegExp(`^${firstRoom.title}`) })
+    expect(within(controlsPane).getByRole('note', { name: 'Controls on Hold' })).toHaveTextContent(
+      'The dock is emptying the dustbin. Cleaning controls return when it finishes.',
+    )
+    expect(roomControl).toBeDisabled()
+    fireEvent.click(roomControl)
+    expect(mockCallServiceCalls).toEqual([])
+  })
+
+  it.each(['pause', 'drying'])('treats a %s dock as ready and keeps every cleaning control enabled', async (dockState) => {
+    setMainFloorDockStatus(dockState)
+    renderMainFloorRoomSource()
+
+    expect(visibleTabs()).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
+    expect(within(controlsPane).queryByRole('note', { name: 'Controls on Hold' })).not.toBeInTheDocument()
+    expect(within(controlsPane).getByRole('button', { name: 'Clean' })).toBeEnabled()
+    expect(within(controlsPane).getByRole('combobox', { name: /Fan /i })).toBeEnabled()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Actions' }))
+    await waitFor(() => expect(selectedTab()).toHaveAttribute('aria-label', 'Actions'))
+    if (dockState === 'pause') {
+      expect(await within(controlsPane).findByRole('button', { name: 'Empty Bin' })).toBeEnabled()
+    } else {
+      expect(await within(controlsPane).findByRole('button', { name: 'Stop Mop Drying' })).toBeEnabled()
+    }
+  })
+
+  it('shows Home Assistant dock holds as disabled controls with the reported dock status', () => {
+    setMainFloorDockStatus('pause')
+    setMainFloorStatusContract({ mode: VACUUM_COMMAND_RESTRICTED, reason: 'dock_pause' })
+    renderMainFloorRoomSource()
+
+    expect(visibleTabs()).toEqual(['Controls', 'Rooms', 'Auto-Clean', 'Actions', 'Info'])
+    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, rooms, auto-clean, actions, info' })
+    expect(within(controlsPane).getByRole('note', { name: 'Controls on Hold' })).toHaveTextContent(
+      'The dock reports pause. Cleaning controls return when the dock is ready.',
+    )
+    expect(within(controlsPane).getByRole('button', { name: 'Clean' })).toBeDisabled()
+  })
+
+  it('reports a not-started away session instead of hiding the cleaning report', () => {
+    mockEntities[mainFloorVacuum.coordinatorSessionEntityId].attributes = {
+      blocked_reason: null,
+      cancelled: true,
+      preflight_complete: false,
+      retained_task_phase: 'operator_required',
+      session_id: 'session-not-started',
+      terminal_message: 'Tracked person arrived home',
+      terminal_reason: 'returned_home',
+      while_away_outcomes: { complete: true, day: '2026-10-17', events: [], rooms: [], version: 2 },
+    }
+
+    renderMainFloorRoomSource()
+
+    expect(screen.getByRole('heading', { name: 'Main Floor Cleaning Report' })).toBeInTheDocument()
+    const notice = screen.getByRole('note', { name: 'No Rooms Cleaned' })
+    expect(notice).toHaveTextContent(
+      "The vacuum didn't start because Home Assistant was still waiting for the previous cleaning task to finish at the dock.",
+    )
+    expect(notice).toHaveTextContent('Session ended: Tracked person arrived home')
+    expect(mockCallServiceCalls).toEqual([])
   })
 
   it('offers one session cancel and disables Pause while the dock prepares mop pads for cleaning', () => {
@@ -358,27 +457,6 @@ describe('VacuumRoomSourceModalContent', () => {
     expect(within(controlsPane).getByRole('button', { name: 'Pause' })).toBeEnabled()
     expect(within(controlsPane).getByRole('button', { name: 'Stop' })).toBeEnabled()
     expect(within(controlsPane).queryByRole('button', { name: 'Cancel Cleaning Session' })).not.toBeInTheDocument()
-  })
-
-  it('surfaces Stop Mop Drying only in minimal Actions and calls the existing stop service', async () => {
-    setMainFloorDockStatus('drying')
-    renderMainFloorRoomSource()
-
-    const controlsPane = screen.getByRole('group', { name: 'Main Floor controls, auto-clean, actions, info' })
-    expect(within(controlsPane).queryByRole('button', { name: 'Stop Mop Drying' })).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Actions' }))
-    await waitFor(() => expect(selectedTab()).toHaveAttribute('aria-label', 'Actions'))
-    const stopMopDrying = await screen.findByRole('button', { name: 'Stop Mop Drying' })
-    expect(within(controlsPane).queryByRole('button', { name: 'Clean Mop Dock' })).not.toBeInTheDocument()
-    expect(within(controlsPane).queryByRole('button', { name: 'Dry Mops' })).not.toBeInTheDocument()
-    expect(within(controlsPane).queryByRole('button', { name: 'Empty Bin' })).not.toBeInTheDocument()
-
-    fireEvent.click(stopMopDrying)
-
-    expect(mockCallServiceCalls).toEqual([
-      { domain: 'script', service: 'main_floor_vacuum_mop_dock_dry' },
-    ])
   })
 
   it('retargets hidden tabs to Controls without restoring the old tab when full mode returns', async () => {
@@ -447,7 +525,7 @@ describe('VacuumRoomSourceModalContent', () => {
     expect(screen.getByRole('heading', { name: 'Docked' })).toBeInTheDocument()
   })
 
-  it('does not render a redundant Docked fallback when a clear docked vacuum is restricted', () => {
+  it('explains held controls without a redundant Docked fallback when a docked vacuum has unreadable sensors', () => {
     const battery = mockEntities[mainFloorVacuum.batteryEntityId]
     const originalBatteryState = battery.state
     battery.state = 'unavailable'
@@ -456,8 +534,11 @@ describe('VacuumRoomSourceModalContent', () => {
 
       const runtimeContent = document.querySelector<HTMLElement>('[data-vacuum-runtime-content-transition="true"]')
       if (!runtimeContent) throw new Error('Expected vacuum runtime content transition wrapper')
-      expect(within(runtimeContent).queryByRole('heading', { name: 'Docked' })).not.toBeInTheDocument()
-      expect(within(runtimeContent).queryByText('Docked')).not.toBeInTheDocument()
+      expect(within(runtimeContent).getByRole('note', { name: 'Controls on Hold' })).toHaveTextContent(
+        "Home Assistant can't read every vacuum sensor. Cleaning controls return when it can.",
+      )
+      expect(within(runtimeContent).getAllByRole('heading', { name: 'Docked' })).toHaveLength(1)
+      expect(within(runtimeContent).getByRole('button', { name: 'Clean' })).toBeDisabled()
     } finally {
       battery.state = originalBatteryState
     }
