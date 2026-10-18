@@ -61,10 +61,13 @@ async function expectLandscapeFrame(dialog: Locator, profile: Profile, readiness
   }, 'shared landscape frame')
 }
 
-async function close(dialog: Locator) {
+async function close(dialog: Locator, { tap = false }: { tap?: boolean } = {}) {
   const node = await dialog.elementHandle()
   if (!node) throw new Error('Cannot close a missing modal')
-  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+  const button = dialog.getByRole('button', { name: 'Close', exact: true })
+  // A real tap delivers mousedown/focus/mouseup/click in one task; click() splits them, letting the keyboard rebase move the button mid-click.
+  if (tap) await button.tap()
+  else await button.click()
   await expect.poll(() => node.evaluate((element) => ({
     state: element.getAttribute('data-state'),
     inert: element.hasAttribute('inert'),
@@ -555,7 +558,7 @@ test.describe('touch keyboard viewport', () => {
     expectBox(await outerBox(dialog), { x: 0, y: 85.203125, width: 393, height: 766.796875 }, 'contracted-dvh keyboard-backed portrait form')
     const footer = await dialog.locator('[data-modal-sheet-footer="true"]').boundingBox()
     expect(Math.abs(footer!.y + footer!.height - 520)).toBeLessThanOrEqual(1)
-    await close(dialog)
+    await close(dialog, { tap: true })
   })
 
   test('closed keyboard ignores a stale viewport height after a mounted resize', async ({ page }) => {
