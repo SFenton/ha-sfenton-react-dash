@@ -1,0 +1,709 @@
+{
+  "daytimeRecovery": {
+    "id": "1788118381307",
+    "alias": "Master Bedroom PBL - Daytime Recovery",
+    "description": "Safely restores the active master-bedroom PBL flow after an eligible overnight HomeKit bedroom-light pause. A separately gated adaptive-bed fast path restores after both fresh SleepyPod load sensors remain clear for 10 seconds, keyed to actual journey state. Existing all-away, attributed-room, shower, and PC/arrival paths remain fallbacks. The controlled bedroom light must remain off for five minutes, and recovery never directly controls a light.",
+    "triggers": [
+      {
+        "trigger": "time_pattern",
+        "minutes": "/5",
+        "id": "periodic"
+      },
+      {
+        "trigger": "state",
+        "entity_id": "binary_sensor.master_bedroom_pbl_overnight_recovery_eligible",
+        "to": "on",
+        "id": "eligible"
+      },
+      {
+        "trigger": "state",
+        "entity_id": "group.household_presence",
+        "from": "home",
+        "to": "not_home",
+        "for": {
+          "minutes": 5
+        },
+        "id": "both_away"
+      },
+      {
+        "trigger": "state",
+        "entity_id": [
+          "input_datetime.master_bedroom_pbl_stephen_pc_awake_at",
+          "input_datetime.master_bedroom_pbl_steph_pc_awake_at",
+          "input_datetime.household_journey_stephen_arrived_at",
+          "input_datetime.household_journey_steph_arrived_at",
+          "input_datetime.master_bedroom_pbl_stephen_room_awake_at",
+          "input_datetime.master_bedroom_pbl_steph_room_awake_at",
+          "input_datetime.master_bedroom_pbl_two_actor_awake_at"
+        ],
+        "id": "person_evidence"
+      },
+      {
+        "trigger": "state",
+        "entity_id": [
+          "binary_sensor.office_presence_sensor_presence",
+          "binary_sensor.kitchen_presence_sensor_presence",
+          "binary_sensor.living_room_presence_sensor_presence",
+          "binary_sensor.hallway_office_bedroom_presence_sensor_presence",
+          "binary_sensor.guest_bathroom_any_activity"
+        ],
+        "to": "on",
+        "for": {
+          "minutes": 2
+        },
+        "id": "non_suite_activity"
+      },
+      {
+        "trigger": "state",
+        "entity_id": [
+          "binary_sensor.hallway_office_bedroom_presence_sensor_pir_detection",
+          "binary_sensor.master_bedroom_bathroom_presence_sensor_presence",
+          "binary_sensor.master_bedroom_bathroom_presence_sensor_pir_detection",
+          "binary_sensor.master_bedroom_closet_presence_sensor_presence",
+          "binary_sensor.master_bedroom_closet_presence_sensor_pir_detection",
+          "binary_sensor.master_bedroom_window_presence_sensor_presence",
+          "binary_sensor.master_bedroom_window_presence_sensor_pir_detection",
+          "binary_sensor.master_bathroom_presence_sensor_presence",
+          "binary_sensor.master_bathroom_presence_sensor_pir_detection",
+          "binary_sensor.master_bedroom_bed_presence_sensor_presence",
+          "binary_sensor.master_bedroom_bed_presence_sensor_pir_detection"
+        ],
+        "to": "off",
+        "for": {
+          "minutes": 20
+        },
+        "id": "suite_clear"
+      },
+      {
+        "trigger": "state",
+        "entity_id": [
+          "binary_sensor.master_bedroom_sleepypod_eight_pod_left_bed_occupancy",
+          "binary_sensor.master_bedroom_sleepypod_eight_pod_right_bed_occupancy"
+        ],
+        "to": "off",
+        "for": {
+          "seconds": 10
+        },
+        "id": "adaptive_bed_clear"
+      },
+      {
+        "trigger": "state",
+        "entity_id": "input_boolean.master_bedroom_pbl_adaptive_bed_fast_path_enabled",
+        "to": "on",
+        "id": "adaptive_bed_fast_path_enabled"
+      },
+      {
+        "trigger": "state",
+        "entity_id": [
+          "binary_sensor.household_journey_stephen_home",
+          "binary_sensor.household_journey_steph_home"
+        ],
+        "to": "off",
+        "for": {
+          "minutes": 5
+        },
+        "id": "adaptive_resident_away"
+      }
+    ],
+    "conditions": [
+      {
+        "condition": "state",
+        "entity_id": "input_select.master_bedroom_pbl_daytime_recovery_mode",
+        "state": "Live"
+      },
+      {
+        "condition": "state",
+        "entity_id": "binary_sensor.master_bedroom_pbl_overnight_recovery_eligible",
+        "state": "on"
+      },
+      {
+        "condition": "state",
+        "entity_id": "input_boolean.vacation_mode",
+        "state": "off"
+      },
+      {
+        "condition": "state",
+        "entity_id": [
+          "input_boolean.guests_staying_in_guest_room",
+          "input_boolean.guests_staying_in_music_room",
+          "input_boolean.guests_staying_in_theater_room"
+        ],
+        "state": "off"
+      },
+      {
+        "condition": "state",
+        "entity_id": "input_select.master_suite_lighting_mode",
+        "state": "normal"
+      },
+      {
+        "condition": "state",
+        "entity_id": "input_boolean.household_journey_startup_quarantine",
+        "state": "off"
+      },
+      {
+        "condition": "state",
+        "entity_id": "input_boolean.is_master_bedroom_presence_sensor_off",
+        "state": "on"
+      },
+      {
+        "condition": "state",
+        "entity_id": "input_boolean.is_master_bedroom_presence_sensor_on",
+        "state": "off"
+      },
+      {
+        "condition": "state",
+        "entity_id": "light.master_bedroom",
+        "state": "off",
+        "for": {
+          "minutes": 5
+        }
+      },
+      {
+        "condition": "not",
+        "conditions": [
+          {
+            "condition": "state",
+            "entity_id": "binary_sensor.nightcanvasrestful_left_presence",
+            "state": "on"
+          },
+          {
+            "condition": "state",
+            "entity_id": "binary_sensor.nightcanvasrestful_right_presence",
+            "state": "on"
+          }
+        ]
+      },
+      {
+        "condition": "template",
+        "value_template": "{% set override = state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at') | string %}{{ override not in states('input_text.master_bedroom_pbl_recovery_last_decision') }}"
+      }
+    ],
+    "actions": [
+      {
+        "choose": [
+          {
+            "alias": "Adaptive bed clear with both residents home",
+            "conditions": [
+              {
+                "condition": "state",
+                "entity_id": "input_boolean.master_bedroom_pbl_adaptive_bed_fast_path_enabled",
+                "state": "on"
+              },
+              {
+                "condition": "state",
+                "entity_id": "input_boolean.master_bedroom_pbl_main_floor_vacuum_clear_stable",
+                "state": "on"
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.master_bedroom_sleepypod_eight_pod_left_bed_occupancy",
+                  "binary_sensor.master_bedroom_sleepypod_eight_pod_right_bed_occupancy"
+                ],
+                "state": "off",
+                "for": {
+                  "seconds": 10
+                }
+              },
+              {
+                "condition": "time",
+                "after": "05:00:00",
+                "before": "13:00:00"
+              },
+              {
+                "condition": "state",
+                "entity_id": "group.household_presence",
+                "state": "home"
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.household_journey_stephen_home",
+                  "binary_sensor.household_journey_steph_home"
+                ],
+                "state": "on",
+                "for": {
+                  "seconds": 10
+                }
+              },
+              {
+                "condition": "state",
+                "entity_id": "alarm_control_panel.aqara_hub_m3_0056_security_system_2",
+                "state": [
+                  "armed_home",
+                  "disarmed"
+                ]
+              }
+            ],
+            "sequence": [
+              {
+                "action": "script.master_bedroom_pbl_daytime_recovery_activate",
+                "data": {
+                  "reason": "adaptive_bed_clear_both_home_10s; trigger={{ trigger.id }}",
+                  "override_at": "{{ state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at') }}"
+                }
+              }
+            ]
+          },
+          {
+            "alias": "Adaptive bed clear with exactly one resident home",
+            "conditions": [
+              {
+                "condition": "state",
+                "entity_id": "input_boolean.master_bedroom_pbl_adaptive_bed_fast_path_enabled",
+                "state": "on"
+              },
+              {
+                "condition": "state",
+                "entity_id": "input_boolean.master_bedroom_pbl_main_floor_vacuum_clear_stable",
+                "state": "on"
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.master_bedroom_sleepypod_eight_pod_left_bed_occupancy",
+                  "binary_sensor.master_bedroom_sleepypod_eight_pod_right_bed_occupancy"
+                ],
+                "state": "off",
+                "for": {
+                  "seconds": 10
+                }
+              },
+              {
+                "condition": "time",
+                "after": "05:00:00",
+                "before": "13:00:00"
+              },
+              {
+                "condition": "state",
+                "entity_id": "group.household_presence",
+                "state": "home"
+              },
+              {
+                "condition": "or",
+                "conditions": [
+                  {
+                    "condition": "and",
+                    "conditions": [
+                      {
+                        "condition": "state",
+                        "entity_id": "binary_sensor.household_journey_stephen_home",
+                        "state": "on",
+                        "for": {
+                          "seconds": 10
+                        }
+                      },
+                      {
+                        "condition": "state",
+                        "entity_id": "binary_sensor.household_journey_steph_home",
+                        "state": "off",
+                        "for": {
+                          "minutes": 5
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "condition": "and",
+                    "conditions": [
+                      {
+                        "condition": "state",
+                        "entity_id": "binary_sensor.household_journey_stephen_home",
+                        "state": "off",
+                        "for": {
+                          "minutes": 5
+                        }
+                      },
+                      {
+                        "condition": "state",
+                        "entity_id": "binary_sensor.household_journey_steph_home",
+                        "state": "on",
+                        "for": {
+                          "seconds": 10
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "condition": "state",
+                "entity_id": "alarm_control_panel.aqara_hub_m3_0056_security_system_2",
+                "state": [
+                  "armed_home",
+                  "disarmed"
+                ]
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.front_door_contact_sensor_contact",
+                  "binary_sensor.kitchen_door_contact_sensor_contact",
+                  "binary_sensor.dining_room_door_contact_sensor_contact",
+                  "binary_sensor.back_deck_doors"
+                ],
+                "state": "off",
+                "for": {
+                  "minutes": 5
+                }
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "cover.garage_left_door",
+                  "cover.garage_right_door"
+                ],
+                "state": "closed",
+                "for": {
+                  "minutes": 5
+                }
+              }
+            ],
+            "sequence": [
+              {
+                "action": "script.master_bedroom_pbl_daytime_recovery_activate",
+                "data": {
+                  "reason": "adaptive_bed_clear_one_home_10s; trigger={{ trigger.id }}",
+                  "override_at": "{{ state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at') }}"
+                }
+              }
+            ]
+          },
+          {
+            "alias": "Adaptive bed clear with everyone away",
+            "conditions": [
+              {
+                "condition": "state",
+                "entity_id": "input_boolean.master_bedroom_pbl_adaptive_bed_fast_path_enabled",
+                "state": "on"
+              },
+              {
+                "condition": "state",
+                "entity_id": "input_boolean.master_bedroom_pbl_main_floor_vacuum_clear_stable",
+                "state": "on"
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.master_bedroom_sleepypod_eight_pod_left_bed_occupancy",
+                  "binary_sensor.master_bedroom_sleepypod_eight_pod_right_bed_occupancy"
+                ],
+                "state": "off",
+                "for": {
+                  "seconds": 10
+                }
+              },
+              {
+                "condition": "time",
+                "after": "05:00:00",
+                "before": "16:00:00"
+              },
+              {
+                "condition": "state",
+                "entity_id": "group.household_presence",
+                "state": "not_home",
+                "for": {
+                  "minutes": 5
+                }
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.household_journey_stephen_home",
+                  "binary_sensor.household_journey_steph_home"
+                ],
+                "state": "off",
+                "for": {
+                  "minutes": 5
+                }
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.front_door_contact_sensor_contact",
+                  "binary_sensor.kitchen_door_contact_sensor_contact",
+                  "binary_sensor.dining_room_door_contact_sensor_contact",
+                  "binary_sensor.back_deck_doors"
+                ],
+                "state": "off",
+                "for": {
+                  "minutes": 5
+                }
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "cover.garage_left_door",
+                  "cover.garage_right_door"
+                ],
+                "state": "closed",
+                "for": {
+                  "minutes": 5
+                }
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "sensor.hallway_hallway_office_bedroom_presence_sensor_hallway_office_bedroom_presence_sensor_pir_detection_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_bathroom_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_closet_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_window_presence_sensor_pir_detection_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_window_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_bed_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_bed_presence_sensor_pir_detection_real_last_changed"
+                ],
+                "state": "off",
+                "attribute": "previous_valid_state"
+              }
+            ],
+            "sequence": [
+              {
+                "action": "script.master_bedroom_pbl_daytime_recovery_activate",
+                "data": {
+                  "reason": "adaptive_bed_clear_all_away_10s; trigger={{ trigger.id }}",
+                  "override_at": "{{ state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at') }}"
+                }
+              }
+            ]
+          },
+          {
+            "alias": "Everyone away after the overnight pause",
+            "conditions": [
+              {
+                "condition": "time",
+                "after": "05:00:00",
+                "before": "16:00:00"
+              },
+              {
+                "condition": "state",
+                "entity_id": "group.household_presence",
+                "state": "not_home",
+                "for": {
+                  "minutes": 5
+                }
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.hallway_office_bedroom_presence_sensor_pir_detection",
+                  "binary_sensor.master_bedroom_bathroom_presence_sensor_presence",
+                  "binary_sensor.master_bedroom_bathroom_presence_sensor_pir_detection",
+                  "binary_sensor.master_bedroom_closet_presence_sensor_presence",
+                  "binary_sensor.master_bedroom_closet_presence_sensor_pir_detection",
+                  "binary_sensor.master_bedroom_window_presence_sensor_presence",
+                  "binary_sensor.master_bedroom_window_presence_sensor_pir_detection",
+                  "binary_sensor.master_bathroom_presence_sensor_presence",
+                  "binary_sensor.master_bathroom_presence_sensor_pir_detection",
+                  "binary_sensor.master_bedroom_bed_presence_sensor_presence",
+                  "binary_sensor.master_bedroom_bed_presence_sensor_pir_detection"
+                ],
+                "state": "off",
+                "for": {
+                  "minutes": 10
+                }
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "sensor.hallway_hallway_office_bedroom_presence_sensor_hallway_office_bedroom_presence_sensor_pir_detection_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_bathroom_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_closet_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_window_presence_sensor_pir_detection_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_window_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_bed_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_bed_presence_sensor_pir_detection_real_last_changed"
+                ],
+                "attribute": "previous_valid_state",
+                "state": "off"
+              }
+            ],
+            "sequence": [
+              {
+                "action": "script.master_bedroom_pbl_daytime_recovery_activate",
+                "data": {
+                  "reason": "both_away; trigger={{ trigger.id }}",
+                  "override_at": "{{ state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at') }}"
+                }
+              }
+            ]
+          },
+          {
+            "alias": "Exactly one resident away with attributed room activity",
+            "conditions": [
+              {
+                "condition": "state",
+                "entity_id": "input_boolean.master_bedroom_pbl_room_attribution_live_enabled",
+                "state": "on"
+              },
+              {
+                "condition": "time",
+                "after": "05:00:00",
+                "before": "13:00:00"
+              },
+              {
+                "condition": "state",
+                "entity_id": "group.household_presence",
+                "state": "home"
+              },
+              {
+                "condition": "state",
+                "entity_id": "alarm_control_panel.aqara_hub_m3_0056_security_system_2",
+                "state": [
+                  "armed_home",
+                  "disarmed"
+                ]
+              },
+              {
+                "condition": "template",
+                "value_template": "{% set freshness = 2700 %}{% set now_ts = as_timestamp(now()) %}{% set stephen_home = states('binary_sensor.household_journey_stephen_home') %}{% set steph_home = states('binary_sensor.household_journey_steph_home') %}{% set stephen_room_ts = as_timestamp(states('input_datetime.master_bedroom_pbl_stephen_room_awake_at'), 0) %}{% set steph_room_ts = as_timestamp(states('input_datetime.master_bedroom_pbl_steph_room_awake_at'), 0) %}{{ (stephen_home == 'on' and steph_home == 'off' and 0 <= now_ts - stephen_room_ts <= freshness) or (steph_home == 'on' and stephen_home == 'off' and 0 <= now_ts - steph_room_ts <= freshness) }}"
+              }
+            ],
+            "sequence": [
+              {
+                "action": "script.master_bedroom_pbl_daytime_recovery_activate",
+                "data": {
+                  "reason": "one_away_room_attributed; trigger={{ trigger.id }}",
+                  "override_at": "{{ state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at') }}"
+                }
+              }
+            ]
+          },
+          {
+            "alias": "Both residents home with pre-existing settled room during master shower",
+            "conditions": [
+              {
+                "condition": "time",
+                "after": "05:00:00",
+                "before": "13:00:00"
+              },
+              {
+                "condition": "state",
+                "entity_id": "group.household_presence",
+                "state": "home"
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.household_journey_stephen_home",
+                  "binary_sensor.household_journey_steph_home"
+                ],
+                "state": "on"
+              },
+              {
+                "condition": "state",
+                "entity_id": "alarm_control_panel.aqara_hub_m3_0056_security_system_2",
+                "state": [
+                  "armed_home",
+                  "disarmed"
+                ]
+              },
+              {
+                "condition": "template",
+                "value_template": "{% set evidence_ts = as_timestamp(states('input_datetime.master_bedroom_pbl_two_actor_awake_at'), 0) %}{% set override_ts = as_timestamp(state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at'), 0) %}{{ evidence_ts > 0 and override_ts > 0 and evidence_ts >= override_ts and states('input_text.master_bedroom_pbl_two_actor_awake_rooms') != 'none' }}"
+              }
+            ],
+            "sequence": [
+              {
+                "action": "script.master_bedroom_pbl_daytime_recovery_activate",
+                "data": {
+                  "reason": "two_actor_shower_preexisting_room; rooms={{ states('input_text.master_bedroom_pbl_two_actor_awake_rooms') }}; trigger={{ trigger.id }}",
+                  "override_at": "{{ state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at') }}"
+                }
+              }
+            ]
+          },
+          {
+            "alias": "Every resident has recent captured awake evidence or is away",
+            "conditions": [
+              {
+                "condition": "time",
+                "after": "05:00:00",
+                "before": "13:00:00"
+              },
+              {
+                "condition": "state",
+                "entity_id": "group.household_presence",
+                "state": "home"
+              },
+              {
+                "condition": "state",
+                "entity_id": "alarm_control_panel.aqara_hub_m3_0056_security_system_2",
+                "state": [
+                  "armed_home",
+                  "disarmed"
+                ]
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "sensor.sleepypod_stephen_schedule_phase",
+                  "sensor.sleepypod_steph_schedule_phase"
+                ],
+                "state": "outside"
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "binary_sensor.hallway_office_bedroom_presence_sensor_pir_detection",
+                  "binary_sensor.master_bedroom_bathroom_presence_sensor_presence",
+                  "binary_sensor.master_bedroom_bathroom_presence_sensor_pir_detection",
+                  "binary_sensor.master_bedroom_closet_presence_sensor_presence",
+                  "binary_sensor.master_bedroom_closet_presence_sensor_pir_detection",
+                  "binary_sensor.master_bedroom_window_presence_sensor_presence",
+                  "binary_sensor.master_bedroom_window_presence_sensor_pir_detection",
+                  "binary_sensor.master_bathroom_presence_sensor_presence",
+                  "binary_sensor.master_bathroom_presence_sensor_pir_detection",
+                  "binary_sensor.master_bedroom_bed_presence_sensor_presence",
+                  "binary_sensor.master_bedroom_bed_presence_sensor_pir_detection"
+                ],
+                "state": "off",
+                "for": {
+                  "minutes": 20
+                }
+              },
+              {
+                "condition": "template",
+                "value_template": "{% set freshness = 2700 %}{% set now_ts = as_timestamp(now()) %}{% set stephen_home = states('binary_sensor.household_journey_stephen_home') %}{% set steph_home = states('binary_sensor.household_journey_steph_home') %}{% set stephen_pc_ts = as_timestamp(states('input_datetime.master_bedroom_pbl_stephen_pc_awake_at'), 0) %}{% set steph_pc_ts = as_timestamp(states('input_datetime.master_bedroom_pbl_steph_pc_awake_at'), 0) %}{% set stephen_arrived_ts = as_timestamp(states('input_datetime.household_journey_stephen_arrived_at'), 0) %}{% set steph_arrived_ts = as_timestamp(states('input_datetime.household_journey_steph_arrived_at'), 0) %}{% set stephen_pc_recent = stephen_home == 'on' and 0 <= now_ts - stephen_pc_ts <= freshness %}{% set steph_pc_recent = steph_home == 'on' and 0 <= now_ts - steph_pc_ts <= freshness %}{% set stephen_arrived_recent = stephen_home == 'on' and 0 <= now_ts - stephen_arrived_ts <= freshness %}{% set steph_arrived_recent = steph_home == 'on' and 0 <= now_ts - steph_arrived_ts <= freshness %}{% set stephen_accounted = stephen_home == 'off' or stephen_pc_recent or stephen_arrived_recent %}{% set steph_accounted = steph_home == 'off' or steph_pc_recent or steph_arrived_recent %}{{ (stephen_home == 'on' or steph_home == 'on') and stephen_accounted and steph_accounted }}"
+              },
+              {
+                "condition": "state",
+                "entity_id": [
+                  "sensor.hallway_hallway_office_bedroom_presence_sensor_hallway_office_bedroom_presence_sensor_pir_detection_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_bathroom_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_closet_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_window_presence_sensor_pir_detection_real_last_changed",
+                  "sensor.master_bedroom_master_bedroom_window_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_bed_presence_sensor_presence_real_last_changed",
+                  "sensor.master_bedroom_bed_presence_sensor_pir_detection_real_last_changed"
+                ],
+                "attribute": "previous_valid_state",
+                "state": "off"
+              }
+            ],
+            "sequence": [
+              {
+                "action": "script.master_bedroom_pbl_daytime_recovery_activate",
+                "data": {
+                  "reason": "residents_accounted_recently; trigger={{ trigger.id }}",
+                  "override_at": "{{ state_attr('switch.master_bedroom_presence_master_bedroom_presence_allowed', 'external_override_at') }}"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "mode": "single",
+    "trace": {
+      "stored_traces": 200
+    }
+  },
+  "eligibilityOptions": {
+    "additional_options": {
+      "availability": "{{ states('switch.master_bedroom_presence_master_bedroom_presence_allowed') not in ['unknown', 'unavailable'] }}"
+    },
+    "name": "Master Bedroom PBL Overnight Recovery Eligible",
+    "state": "{% set pbl = 'switch.master_bedroom_presence_master_bedroom_presence_allowed' %}{% set override_ts = as_timestamp(state_attr(pbl, 'external_override_at'), 0) %}{% set manual_off_ts = as_timestamp(states('input_datetime.master_bedroom_pbl_manual_off_at'), 0) %}{{ is_state(pbl, 'on') and state_attr(pbl, 'automation_paused') == true and state_attr(pbl, 'external_override_policy') == 'pause' and state_attr(pbl, 'external_override_source') in ['homekit_batch', 'homekit_single'] and override_ts >= as_timestamp(today_at('00:00') - timedelta(hours=2, minutes=30)) and override_ts <= as_timestamp(today_at('03:00')) and manual_off_ts <= override_ts }}",
+    "template_type": "binary_sensor"
+  }
+}

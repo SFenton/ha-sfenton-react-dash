@@ -227,6 +227,36 @@ recovering lease ID with the remaining original TTL. It resumes the current
 max/monotonic curve only within catch-up; otherwise it records a missed
 recovery and releases safely.
 
+### Bed-clear PBL recovery (Home Assistant layer)
+
+Only a clean `hold_complete` release resumes master-bedroom PBL. A cancelled,
+`end_episode`, or interrupted episode, or a lights-off while someone is still
+in bed, leaves PBL paused with an external override. The HA automation
+`Master Bedroom PBL - Daytime Recovery` restores the active flow. Neither
+integration does this, and recovery never controls a light directly.
+
+- `Master Bedroom PBL - Bed Pause Evidence` copies `external_override_at` into
+  `input_text.master_bedroom_pbl_bed_pause_override_at` in two cases. The
+  first is a pause that began while a home resident's SleepyPod side was
+  occupied. The second is a pause within 60 seconds of
+  `sensor.master_bedroom_wake_light` `last_cancellation.at`. Pausing while out
+  of bed records nothing, so a deliberate lights-off stays paused.
+- `binary_sensor.master_bedroom_pbl_overnight_recovery_eligible` is on for the
+  original overnight HomeKit pause. It is also on for a pause with matching
+  bed evidence that is at most 18 hours old.
+- The adaptive bed-clear branches run from 05:00 to 20:00. A side counts as
+  clear when it has been off for 10 seconds, or when its owner's journey
+  sensor has been off for 5 minutes. This keeps a false load on an absent
+  resident's side from blocking recovery.
+- The bedroom light must be either off for 5 minutes or on for 1 minute, with
+  no active or recovering PBL control lease. Lights left on after a failed
+  wake therefore no longer block recovery.
+
+Manage this configuration with `npm run ha:master-bedroom-pbl-recovery`. The
+default `--mode=plan` is read-only. `--mode=apply --apply` writes a snapshot
+under `artifacts/master-bedroom-pbl-recovery/` before changing anything.
+`--mode=rollback --apply --snapshot=<file>` restores that snapshot.
+
 ### Supported lifetime and interruption policy
 
 The acquire-only budget is 105 minutes. Configuration commands reject connected
