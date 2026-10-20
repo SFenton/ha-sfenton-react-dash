@@ -302,6 +302,15 @@ describe('VacuumRoomSourceModalContent', () => {
     }
   })
 
+  it.each(['docked', 'idle'])('does not surface a retained %s task as a Home Assistant condition', (state) => {
+    setMainFloorRuntime({ state, statusFlag: 'resumable' })
+    renderMainFloorRoomSource()
+
+    expect(screen.getByRole('group', { name: /Main Floor controls/ })).toBeInTheDocument()
+    expect(screen.queryByText('Kept for Later')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Home Assistant Condition')).not.toBeInTheDocument()
+  })
+
   it('keeps the full layout with held controls and a reason while the dock washes the mop pads', () => {
     setMainFloorDockStatus('cleaning')
     renderMainFloorRoomSource()

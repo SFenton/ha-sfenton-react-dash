@@ -379,6 +379,12 @@ function conditionStatusText(copy: ReturnType<typeof useCopy>, condition: Vacuum
   return titleCaseState(condition.code.split('.').at(-1)?.replaceAll('_', ' ') ?? condition.code)
 }
 
+// A retained (resumable) task only shapes the action matrix; it is coordinator
+// bookkeeping, not something to explain to the household.
+function isHouseholdVisibleCondition(condition: VacuumActiveCondition) {
+  return !CONDITION_RESUME_PATTERN.test(condition.code.toLowerCase())
+}
+
 function coherentContractIssue(contractIssue: VacuumCurrentIssue, nativeIssue: VacuumCurrentIssue) {
   if (nativeIssue.status === VACUUM_ISSUE_UNKNOWN) return nativeIssue
   if (contractIssue.status === VACUUM_ISSUE_PRESENT) {
@@ -1280,6 +1286,7 @@ function VacuumStatusSummary({
   const visual = vacuumStateVisual(state)
   const dockVisual = dockStatusVisual(dockStatus?.state)
   const currentIssueText = status.currentIssue.status === VACUUM_ISSUE_PRESENT ? status.currentIssue.raw : null
+  const visibleConditions = status.activeConditions.filter(isHouseholdVisibleCondition)
   const liveStatusText = !status.primaryAvailable
     ? copy(VACUUM_COPY_KEYS.status.unavailableLiveStatus, { status: stateLabel })
     : currentIssueText
@@ -1321,7 +1328,7 @@ function VacuumStatusSummary({
           </VacuumStatusNotice>
         </div>
       )}
-      {status.activeConditions.map((condition) => (
+      {visibleConditions.map((condition) => (
         <div className={styles.statusNoticeWide} key={`${condition.source}:${condition.code}`}>
           <VacuumStatusNotice role="note" title={copy(VACUUM_COPY_KEYS.status.homeAssistantCondition)}>
             {conditionStatusText(copy, condition)}
@@ -1340,9 +1347,9 @@ function VacuumStatusSummary({
       )}
       <span aria-atomic="true" aria-live="polite" className={styles.visuallyHidden} data-vacuum-live-status="true" role="status">
         <span>{liveStatusText}</span>
-        {status.activeConditions.length > 0 && (
+        {visibleConditions.length > 0 && (
           <ul>
-            {status.activeConditions.map((condition) => (
+            {visibleConditions.map((condition) => (
               <li key={`${condition.source}:${condition.code}`}>{conditionStatusText(copy, condition)}</li>
             ))}
           </ul>
