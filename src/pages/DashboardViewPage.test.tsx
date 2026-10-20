@@ -6294,8 +6294,8 @@ describe('DashboardViewPage', () => {
     const dialog = await screen.findByRole('dialog')
     const controlsPane = within(dialog).getByRole('group', { name: 'Main Floor controls, auto-clean, info' })
     expect(within(controlsPane).getByRole('heading', { name: heading })).toBeInTheDocument()
-    expect(within(dialog).getByLabelText('Home Assistant Condition')).toHaveTextContent('Kept for Later')
-    expect(dialog.querySelector('[data-vacuum-live-status="true"]')).toHaveTextContent('Kept for Later')
+    expect(within(dialog).queryByLabelText('Home Assistant Condition')).not.toBeInTheDocument()
+    expect(dialog.querySelector('[data-vacuum-live-status="true"]')).not.toHaveTextContent('Kept for Later')
     expect(within(controlsPane).queryByRole('button', { name: 'Clean' })).not.toBeInTheDocument()
     expect(within(controlsPane).queryByRole('group', { name: 'Cleaning target' })).not.toBeInTheDocument()
     if (state === 'idle') {
