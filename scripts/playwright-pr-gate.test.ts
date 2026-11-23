@@ -61,9 +61,9 @@ describe('dashboard Playwright workflow policy', () => {
   it('pins browser installs to a supported Ubuntu image', () => {
     const workflow = read('.github/workflows/playwright.yml')
     for (const job of ['layout', 'test']) {
-      const definition = workflow.split(`\n  ${job}:\n`)[1]?.split(/\n  [\w-]+:\n/)[0]
+      const definition = workflow.split(`\n  ${job}:\n`)[1]?.split(/\n {2}[\w-]+:\n/)[0]
       expect(definition).toContain('playwright install --with-deps')
-      expect(definition).toMatch(/^    runs-on: ubuntu-24\.04$/m)
+      expect(definition).toMatch(/^ {4}runs-on: ubuntu-24\.04$/m)
     }
   })
 
