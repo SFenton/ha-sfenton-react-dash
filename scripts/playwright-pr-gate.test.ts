@@ -58,6 +58,15 @@ describe('dashboard Playwright workflow policy', () => {
     expect(workflow).toContain('queue: max')
   })
 
+  it('pins browser installs to a supported Ubuntu image', () => {
+    const workflow = read('.github/workflows/playwright.yml')
+    for (const job of ['layout', 'test']) {
+      const definition = workflow.split(`\n  ${job}:\n`)[1]?.split(/\n  [\w-]+:\n/)[0]
+      expect(definition).toContain('playwright install --with-deps')
+      expect(definition).toMatch(/^    runs-on: ubuntu-24\.04$/m)
+    }
+  })
+
   it('runs automated layout on protected master pushes and explicit ancestor-bound replays, never PRs', () => {
     const workflow = read('.github/workflows/playwright.yml')
     const layoutPlan = read('scripts/layout/plan.ts')
