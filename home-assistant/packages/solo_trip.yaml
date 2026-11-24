@@ -264,23 +264,25 @@ script:
                if sleepypod_phase_side in ['left', 'right']
                else 'unknown' }}
           wake_current_revision: "{{ state_attr(wake_light_entity_id, 'revision') | int(0) }}"
+          current_schedule_state: "{{ states(sleepypod_schedule_entity_id) }}"
           current_schedule_payload: >-
             {{ {
               'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
               'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
             } }}
           current_schedule_ready: >-
-            {{ current_schedule_payload is mapping
-               and current_schedule_payload.left is mapping
-               and current_schedule_payload.right is mapping
-               and current_schedule_payload.left | count > 0
-               and current_schedule_payload.right | count > 0 }}
+            {% from 'solo_trip.jinja' import schedule_ready %}
+            {{ schedule_ready(current_schedule_state, current_schedule_payload) | from_json }}
           current_away_fingerprint: >-
             {% from 'solo_trip.jinja' import side_fingerprint %}
             {{ side_fingerprint(current_schedule_payload[away_side]) }}
           current_full_schedule_fingerprint: >-
             {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
             {{ full_schedule_fingerprint(current_schedule_payload) }}
+          current_away_overlay_matches: >-
+            {{ current_schedule_ready
+               and current_journal.get('last_confirmed_overlay_fingerprint') is string
+               and current_away_fingerprint == current_journal.get('last_confirmed_overlay_fingerprint') }}
           request_start_iso: >-
             {% if start_date is string and start_time is string %}
               {% set parsed = strptime(start_date ~ ' ' ~ start_time, '%Y-%m-%d %H:%M', none) %}
@@ -300,6 +302,18 @@ script:
           plan_start_timestamp: "{{ as_timestamp(journal_plan.starts_at) if journal_plan is mapping and journal_plan.starts_at is defined else none }}"
           plan_end_timestamp: "{{ as_timestamp(journal_plan.ends_at) if journal_plan is mapping and journal_plan.ends_at is defined else none }}"
           now_timestamp: "{{ as_timestamp(now()) }}"
+          active_end_requested: >-
+            {{ journal_phase == 'active'
+               and (
+                 is_state('input_boolean.solo_trip_enabled', 'off')
+                 or is_state('input_boolean.vacation_mode', 'on')
+                 or (plan_end_timestamp is number and now_timestamp >= plan_end_timestamp)
+                 or (
+                   traveler_state == 'home'
+                   and presence_evidence is mapping
+                   and presence_evidence.post_start_away | default(false)
+                 )
+               ) }}
           request_payload: >-
             {{ {
               'operation': normalized_operation,
@@ -1516,11 +1530,13 @@ script:
                           qos: 1
                           retain: false
                       - wait_template: >-
-                          {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
-                          {{ full_schedule_fingerprint({
+                          {% from 'solo_trip.jinja' import full_schedule_fingerprint, schedule_ready %}
+                          {% set observed_schedule = {
                             'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
                             'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
-                          }) == mirrored_full_schedule_fingerprint }}
+                          } %}
+                          {{ (schedule_ready(states(sleepypod_schedule_entity_id), observed_schedule) | from_json)
+                             and full_schedule_fingerprint(observed_schedule) == mirrored_full_schedule_fingerprint }}
                         timeout: "00:02:00"
                         continue_on_timeout: true
                       - choose:
@@ -1606,13 +1622,9 @@ script:
                         response_variable: household_away_response
 
                   - conditions: >-
-                      {% from 'solo_trip.jinja' import side_fingerprint %}
                       {{ journal_phase == 'active'
-                         and (
-                           current_journal.get('last_confirmed_overlay_fingerprint') is not string
-                           or side_fingerprint(current_schedule_payload[away_side])
-                             != current_journal.get('last_confirmed_overlay_fingerprint')
-                         ) }}
+                         and current_schedule_ready
+                         and not current_away_overlay_matches }}
                     sequence:
                       - variables:
                           active_divergence_journal_payload: >-
@@ -1761,17 +1773,16 @@ script:
                         response_variable: household_away_response
 
                   - conditions: >-
-                      {{ journal_phase in ['active', 'restore_required']
-                         and (
-                           is_state('input_boolean.solo_trip_enabled', 'off')
-                           or is_state('input_boolean.vacation_mode', 'on')
-                           or (plan_end_timestamp is number and now_timestamp >= plan_end_timestamp)
-                           or (
-                             traveler_state == 'home'
-                             and presence_evidence is mapping
-                             and presence_evidence.post_start_away | default(false)
-                           )
-                         ) }}
+                      {{ active_end_requested and not current_schedule_ready }}
+                    sequence:
+                      - variables:
+                          household_away_response: >-
+                            {{ dict(default_response, error_code='schedule_unavailable', retryable=true) }}
+                      - stop: Solo Trip end deferred until the SleepyPod schedule is readable
+                        response_variable: household_away_response
+
+                  - conditions: >-
+                      {{ active_end_requested and current_schedule_ready }}
                     sequence:
                       - variables:
                           ending_reason: >-
@@ -1944,7 +1955,7 @@ script:
                                       - stop: Away alarm did not clear during end
                                         response_variable: household_away_response
                       - choose:
-                          - conditions: "{{ current_away_fingerprint != current_journal.get('last_confirmed_overlay_fingerprint') }}"
+                          - conditions: "{{ not current_away_overlay_matches }}"
                             sequence:
                               - action: mqtt.publish
                                 data:
@@ -1969,11 +1980,13 @@ script:
                           qos: 1
                           retain: false
                       - wait_template: >-
-                          {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
-                          {{ full_schedule_fingerprint({
+                          {% from 'solo_trip.jinja' import full_schedule_fingerprint, schedule_ready %}
+                          {% set observed_schedule = {
                             'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
                             'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
-                          }) == restored_full_schedule_fingerprint }}
+                          } %}
+                          {{ (schedule_ready(states(sleepypod_schedule_entity_id), observed_schedule) | from_json)
+                             and full_schedule_fingerprint(observed_schedule) == restored_full_schedule_fingerprint }}
                         timeout: "00:02:00"
                         continue_on_timeout: true
                       - choose:
@@ -2091,6 +2104,13 @@ script:
                           household_away_response: "{{ dict(default_response, error_code='unknown_resolve_action') }}"
                       - stop: Unknown restore action
                         response_variable: household_away_response
+                  - conditions: "{{ normalized_resolve_action == 'restore_saved' and not current_schedule_ready }}"
+                    sequence:
+                      - variables:
+                          household_away_response: >-
+                            {{ dict(default_response, error_code='schedule_unavailable', retryable=true) }}
+                      - stop: Saved SleepyPod schedule cannot be restored until the current schedule is readable
+                        response_variable: household_away_response
               - variables:
                   resolve_release_token: "{{ 'release-v1-r' ~ (current_revision + 1) }}"
                   resolve_pending_response: >-
@@ -2194,11 +2214,13 @@ script:
                           qos: 1
                           retain: false
                       - wait_template: >-
-                          {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
-                          {{ full_schedule_fingerprint({
+                          {% from 'solo_trip.jinja' import full_schedule_fingerprint, schedule_ready %}
+                          {% set observed_schedule = {
                             'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
                             'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
-                          }) == resolve_full_schedule_fingerprint }}
+                          } %}
+                          {{ (schedule_ready(states(sleepypod_schedule_entity_id), observed_schedule) | from_json)
+                             and full_schedule_fingerprint(observed_schedule) == resolve_full_schedule_fingerprint }}
                         timeout: "00:02:00"
                         continue_on_timeout: true
                       - choose:
@@ -2374,6 +2396,16 @@ script:
                       - variables:
                           household_away_response: "{{ dict(default_response, error_code='invalid_alarm_rows') }}"
                       - stop: Invalid alarm rows
+                        response_variable: household_away_response
+                  - conditions: >-
+                      {{ normalized_sleepypod_action in ['set_schedule', 'replace_alarms']
+                         and not internal_sleepypod_bypass
+                         and not current_schedule_ready }}
+                    sequence:
+                      - variables:
+                          household_away_response: >-
+                            {{ dict(default_response, error_code='schedule_unavailable', retryable=true) }}
+                      - stop: Current SleepyPod schedule is not readable
                         response_variable: household_away_response
               - variables:
                   sleepypod_effective_side: "{{ home_side if journal_phase == 'active' else normalized_side }}"
@@ -2630,11 +2662,13 @@ script:
                           qos: 1
                           retain: false
                       - wait_template: >-
-                          {% from 'solo_trip.jinja' import full_schedule_fingerprint %}
-                          {{ full_schedule_fingerprint({
+                          {% from 'solo_trip.jinja' import full_schedule_fingerprint, schedule_ready %}
+                          {% set observed_schedule = {
                             'left': state_attr(sleepypod_schedule_entity_id, 'left') | default({}, true),
                             'right': state_attr(sleepypod_schedule_entity_id, 'right') | default({}, true)
-                          }) == sleepypod_full_schedule_fingerprint }}
+                          } %}
+                          {{ (schedule_ready(states(sleepypod_schedule_entity_id), observed_schedule) | from_json)
+                             and full_schedule_fingerprint(observed_schedule) == sleepypod_full_schedule_fingerprint }}
                         timeout: "00:02:00"
                         continue_on_timeout: true
                       - choose:

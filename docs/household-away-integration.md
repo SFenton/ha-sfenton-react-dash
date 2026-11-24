@@ -59,6 +59,14 @@ leave the journal.
 
 Any post-effect timeout or Wake ownership failure returns an indeterminate
 result and holds or re-enters `restore_required` instead of faking success.
+SleepyPod schedule evidence is authoritative only while the MQTT schedule
+sensor is available and both side mappings are present and nonempty. Cached
+attributes while the sensor is `unknown`, `unavailable`, or `offline` do not
+prove a match: active reconciliation defers end/restoration work without
+changing the journal revision, status, or a device, while independent presence
+evidence can still advance. The minute watchdog and schedule-entity state
+trigger retry that work after the adapter returns. Real complete overlay
+differences still enter `restore_required`.
 
 ## SleepyPod policy
 
@@ -74,6 +82,14 @@ and `replace_alarms` rebuilds alarms from ordered `alarm_rows` without dynamic
 service names. Tonight and outside target commands are rejected when the
 selected side is not in the matching schedule phase rather than returning an
 accepted no-effect result from an underlying script guard.
+
+Automatic end is reserved for `active`; once a run is in `restore_required`,
+elapsed end, traveler return, or explicit end intent cannot replace its manual
+recovery record by cycling back through `ending`. Only `keep_current` or
+`restore_saved` resolves the state. `restore_saved` first requires a readable
+complete current schedule so the home-side mapping is preserved; `keep_current`
+does not require schedule evidence because it intentionally performs no
+schedule write.
 
 ## Authorized live validation
 

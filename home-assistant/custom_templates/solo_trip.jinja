@@ -109,6 +109,17 @@
   {{ ns.items | to_json(sort_keys=true) }}
 {%- endmacro %}
 
+{% macro schedule_ready(entity_state, schedule) -%}
+  {{ (
+    entity_state not in ['unknown', 'unavailable', 'offline']
+    and schedule is mapping
+    and schedule.get('left') is mapping
+    and schedule.get('right') is mapping
+    and schedule.get('left') | count > 0
+    and schedule.get('right') | count > 0
+  ) | to_json }}
+{%- endmacro %}
+
 {% macro observable_side(side_schedule) -%}
   {%- set days = namespace(items={}) -%}
   {%- if side_schedule is mapping -%}

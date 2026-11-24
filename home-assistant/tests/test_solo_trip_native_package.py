@@ -11,12 +11,15 @@
 
 from __future__ import annotations
 
+import ast
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
 import re
 import unittest
 
+from jinja2 import Environment, FileSystemLoader
 import yaml
 
 
@@ -30,6 +33,7 @@ INITIAL_JOURNAL = ROOT / "solo_trip" / "initial_journal.json"
 INITIAL_STATUS = ROOT / "solo_trip" / "initial_status.json"
 DEPLOY = REPO_ROOT / "scripts" / "deploy.ts"
 SRC = REPO_ROOT / "src"
+FIXTURES = ROOT / "tests" / "fixtures"
 
 
 class SoloTripNativePackageTests(unittest.TestCase):
@@ -42,6 +46,160 @@ class SoloTripNativePackageTests(unittest.TestCase):
         self.initial_journal = json.loads(INITIAL_JOURNAL.read_text())
         self.initial_status = json.loads(INITIAL_STATUS.read_text())
         self.deploy_text = DEPLOY.read_text()
+        self.script_sequence = self.parsed["script"]["household_away_command"]["sequence"]
+        self.script_variables = {}
+        for step in self.script_sequence:
+            self.script_variables.update(step.get("variables", {}))
+        self.jinja = Environment(loader=FileSystemLoader(TEMPLATE.parent))
+        self.jinja.filters["from_json"] = json.loads
+        self.jinja.filters["sha256"] = lambda value: hashlib.sha256(str(value).encode()).hexdigest()
+        self.jinja.filters["to_json"] = self._to_json
+        self.jinja.globals["dict"] = dict
+        self.schedule_fixture = json.loads((FIXTURES / "sleepypod-alarm-idless-live.json").read_text())
+
+    @staticmethod
+    def _to_json(value: object, **kwargs: object) -> str:
+        return json.dumps(
+            value,
+            sort_keys=bool(kwargs.get("sort_keys")),
+            separators=(",", ":"),
+        )
+
+    @staticmethod
+    def _walk(value: object):
+        if isinstance(value, dict):
+            yield value
+            for child in value.values():
+                yield from SoloTripNativePackageTests._walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from SoloTripNativePackageTests._walk(child)
+
+    def _choice(self, marker: str) -> dict:
+        matches = [
+            node
+            for node in self._walk(self.script_sequence)
+            if "conditions" in node
+            and "sequence" in node
+            and any(
+                isinstance(step, dict) and step.get("stop") == marker
+                for step in node["sequence"]
+            )
+        ]
+        self.assertEqual(len(matches), 1, marker)
+        return matches[0]
+
+    def _render(self, template: str, context: dict) -> object:
+        rendered = self.jinja.from_string(template).render(**context).strip()
+        if not rendered:
+            return None
+        try:
+            return json.loads(rendered)
+        except json.JSONDecodeError:
+            try:
+                return ast.literal_eval(rendered)
+            except (SyntaxError, ValueError):
+                return rendered
+
+    def _fingerprint(self, side: dict) -> str:
+        result = self._render(
+            "{% from 'solo_trip.jinja' import side_fingerprint %}"
+            "{{ side_fingerprint(side) }}",
+            {"side": side},
+        )
+        self.assertIsInstance(result, str)
+        return result
+
+    def _full_fingerprint(self, schedule: dict) -> str:
+        result = self._render(
+            "{% from 'solo_trip.jinja' import full_schedule_fingerprint %}"
+            "{{ full_schedule_fingerprint(schedule) }}",
+            {"schedule": schedule},
+        )
+        self.assertIsInstance(result, str)
+        return result
+
+    def _schedule_context(
+        self,
+        *,
+        schedule: dict,
+        sensor_state: str = "ready",
+        traveler: str = "stephen",
+        journal_phase: str = "active",
+        enabled: bool = True,
+        vacation: bool = False,
+        plan_end_timestamp: float = 200,
+        now_timestamp: float = 100,
+        traveler_state: str = "not_home",
+        post_start_away: bool = False,
+        confirmed_fingerprint: str | None = None,
+    ) -> dict:
+        schedule_entity = "sensor.master_bedroom_sleepypod_eight_pod_schedules"
+        away_side = "left" if traveler == "stephen" else "right"
+        entities = {
+            schedule_entity: {
+                "state": sensor_state,
+                "attributes": deepcopy(schedule),
+            },
+            "input_boolean.solo_trip_enabled": {"state": "on" if enabled else "off"},
+            "input_boolean.vacation_mode": {"state": "on" if vacation else "off"},
+        }
+
+        def states(entity_id: str) -> str:
+            return entities.get(entity_id, {}).get("state", "unknown")
+
+        def state_attr(entity_id: str, attribute: str) -> object:
+            return entities.get(entity_id, {}).get("attributes", {}).get(attribute)
+
+        context = {
+            "sleepypod_schedule_entity_id": schedule_entity,
+            "away_side": away_side,
+            "journal_phase": journal_phase,
+            "traveler_state": traveler_state,
+            "presence_evidence": {
+                "entity_id": (
+                    "person.stephen_fenton"
+                    if traveler == "stephen"
+                    else "person.stephanie_hobart"
+                ),
+                "observed_state": traveler_state,
+                "post_start_away": post_start_away,
+            },
+            "plan_end_timestamp": plan_end_timestamp,
+            "now_timestamp": now_timestamp,
+            "states": states,
+            "state_attr": state_attr,
+            "is_state": lambda entity_id, expected: states(entity_id) == expected,
+        }
+        for name in (
+            "current_schedule_state",
+            "current_schedule_payload",
+            "current_schedule_ready",
+            "current_away_fingerprint",
+        ):
+            context[name] = self._render(self.script_variables[name], context)
+        if confirmed_fingerprint is None:
+            confirmed_fingerprint = self._fingerprint(schedule.get(away_side, {}))
+        context["current_journal"] = {
+            "last_confirmed_overlay_fingerprint": confirmed_fingerprint,
+        }
+        context["current_away_overlay_matches"] = self._render(
+            self.script_variables["current_away_overlay_matches"],
+            context,
+        )
+        context["active_end_requested"] = self._render(
+            self.script_variables["active_end_requested"],
+            context,
+        )
+        return context
+
+    @staticmethod
+    def _actions(node: object) -> list[str]:
+        return [
+            value["action"]
+            for value in SoloTripNativePackageTests._walk(node)
+            if isinstance(value, dict) and "action" in value
+        ]
 
     def test_native_inventory_uses_exact_entities_and_one_writer(self) -> None:
         self.assertEqual(set(self.parsed["input_boolean"]), {"solo_trip_enabled"})
@@ -61,6 +219,7 @@ class SoloTripNativePackageTests(unittest.TestCase):
             "request_hash",
             "pending_request_record",
             "append_terminal_result",
+            "schedule_ready",
             "merged_schedule",
             "restored_schedule",
             "replaced_alarms",
@@ -197,6 +356,182 @@ class SoloTripNativePackageTests(unittest.TestCase):
         self.assertIn("active_divergence_journal_payload", self.package_text)
         self.assertIn("Active SleepyPod schedule diverged", self.package_text)
         self.assertIn("'blockers': ['sleepypod_schedule_diverged']", self.package_text)
+
+    def test_active_reconcile_treats_offline_or_incomplete_cached_schedule_as_non_authoritative(self) -> None:
+        divergence = self._choice("Active SleepyPod schedule diverged")
+        presence = self._choice("Presence evidence updated")
+        deferred_end = self._choice("Solo Trip end deferred until the SleepyPod schedule is readable")
+        ending = self._choice("Solo Trip ended")
+
+        matching = self._schedule_context(
+            schedule=self.schedule_fixture,
+            sensor_state="ready",
+        )
+        self.assertTrue(matching["current_schedule_ready"])
+        self.assertTrue(matching["current_away_overlay_matches"])
+        self.assertFalse(self._render(divergence["conditions"], matching))
+
+        for sensor_state in ("unknown", "unavailable", "offline"):
+            unavailable = self._schedule_context(
+                schedule=self.schedule_fixture,
+                sensor_state=sensor_state,
+                enabled=False,
+                traveler_state="not_home",
+            )
+            with self.subTest(sensor_state=sensor_state):
+                self.assertFalse(unavailable["current_schedule_ready"])
+                self.assertFalse(unavailable["current_away_overlay_matches"])
+                self.assertFalse(self._render(divergence["conditions"], unavailable))
+                self.assertTrue(self._render(presence["conditions"], unavailable))
+                self.assertTrue(self._render(deferred_end["conditions"], unavailable))
+                self.assertFalse(self._render(ending["conditions"], unavailable))
+                self.assertEqual(self._actions(deferred_end["sequence"]), [])
+
+        for missing_side in ("left", "right"):
+            for state in ("missing", "empty"):
+                incomplete = deepcopy(self.schedule_fixture)
+                if state == "missing":
+                    del incomplete[missing_side]
+                else:
+                    incomplete[missing_side] = {}
+                context = self._schedule_context(schedule=incomplete)
+                with self.subTest(missing_side=missing_side, state=state):
+                    self.assertFalse(context["current_schedule_ready"])
+                    self.assertFalse(self._render(divergence["conditions"], context))
+
+        reconnected = self._schedule_context(
+            schedule=self.schedule_fixture,
+            sensor_state="ready",
+        )
+        self.assertTrue(reconnected["current_schedule_ready"])
+        self.assertTrue(reconnected["current_away_overlay_matches"])
+        self.assertFalse(self._render(divergence["conditions"], reconnected))
+
+    def test_active_reconcile_flags_real_schedule_changes_for_both_travelers(self) -> None:
+        divergence = self._choice("Active SleepyPod schedule diverged")
+        for traveler, away_side in (("stephen", "left"), ("steph", "right")):
+            original = deepcopy(self.schedule_fixture)
+            changed = deepcopy(original)
+            alarms = changed[away_side]["monday"]["alarms"]
+            if alarms:
+                alarms[0]["time"] = "08:42"
+            else:
+                alarms.append(
+                    {
+                        "alarmTemperature": 81,
+                        "duration": 90,
+                        "enabled": True,
+                        "time": "08:42",
+                        "vibrationIntensity": 80,
+                        "vibrationPattern": "pulse",
+                    }
+                )
+            confirmed = self._fingerprint(original[away_side])
+            context = self._schedule_context(
+                schedule=changed,
+                traveler=traveler,
+                confirmed_fingerprint=confirmed,
+            )
+            with self.subTest(traveler=traveler):
+                self.assertTrue(context["current_schedule_ready"])
+                self.assertFalse(context["current_away_overlay_matches"])
+                self.assertTrue(self._render(divergence["conditions"], context))
+
+    def test_end_waits_for_schedule_and_restore_required_stays_sticky(self) -> None:
+        deferred_end = self._choice("Solo Trip end deferred until the SleepyPod schedule is readable")
+        ending = self._choice("Solo Trip ended")
+
+        offline = self._schedule_context(
+            schedule=self.schedule_fixture,
+            sensor_state="unavailable",
+            enabled=False,
+        )
+        self.assertTrue(self._render(deferred_end["conditions"], offline))
+        self.assertFalse(self._render(ending["conditions"], offline))
+
+        ready = self._schedule_context(
+            schedule=self.schedule_fixture,
+            enabled=False,
+        )
+        self.assertFalse(self._render(deferred_end["conditions"], ready))
+        self.assertTrue(self._render(ending["conditions"], ready))
+
+        for sensor_state in ("ready", "unavailable"):
+            restore_required = self._schedule_context(
+                schedule=self.schedule_fixture,
+                sensor_state=sensor_state,
+                journal_phase="restore_required",
+                enabled=False,
+                vacation=True,
+                plan_end_timestamp=50,
+                now_timestamp=100,
+                traveler_state="home",
+                post_start_away=True,
+            )
+            with self.subTest(sensor_state=sensor_state):
+                self.assertFalse(restore_required["active_end_requested"])
+                self.assertFalse(self._render(deferred_end["conditions"], restore_required))
+                self.assertFalse(self._render(ending["conditions"], restore_required))
+
+    def test_restore_saved_requires_readable_schedule_but_keep_current_does_not(self) -> None:
+        guard = self._choice(
+            "Saved SleepyPod schedule cannot be restored until the current schedule is readable"
+        )
+        unavailable = self._schedule_context(
+            schedule=self.schedule_fixture,
+            sensor_state="unavailable",
+            journal_phase="restore_required",
+        )
+        unavailable["normalized_resolve_action"] = "restore_saved"
+        self.assertTrue(self._render(guard["conditions"], unavailable))
+        self.assertEqual(self._actions(guard["sequence"]), [])
+
+        unavailable["normalized_resolve_action"] = "keep_current"
+        self.assertFalse(self._render(guard["conditions"], unavailable))
+
+        readable = self._schedule_context(
+            schedule=self.schedule_fixture,
+            journal_phase="restore_required",
+        )
+        readable["normalized_resolve_action"] = "restore_saved"
+        self.assertFalse(self._render(guard["conditions"], readable))
+
+    def test_schedule_writes_and_echoes_reject_offline_cached_attributes(self) -> None:
+        command_guard = self._choice("Current SleepyPod schedule is not readable")
+        offline = self._schedule_context(
+            schedule=self.schedule_fixture,
+            sensor_state="unavailable",
+        )
+        offline.update(
+            normalized_sleepypod_action="set_schedule",
+            internal_sleepypod_bypass=False,
+        )
+        self.assertTrue(self._render(command_guard["conditions"], offline))
+        self.assertEqual(self._actions(command_guard["sequence"]), [])
+
+        waits = [
+            node["wait_template"]
+            for node in self._walk(self.script_sequence)
+            if "wait_template" in node
+            and "full_schedule_fingerprint" in node["wait_template"]
+        ]
+        self.assertEqual(len(waits), 4)
+        self.assertTrue(all("schedule_ready" in wait_template for wait_template in waits))
+        expected_fingerprint = self._full_fingerprint(self.schedule_fixture)
+        for sensor_state, expected in (("unavailable", False), ("ready", True)):
+            context = self._schedule_context(
+                schedule=self.schedule_fixture,
+                sensor_state=sensor_state,
+            )
+            context.update(
+                mirrored_full_schedule_fingerprint=expected_fingerprint,
+                restored_full_schedule_fingerprint=expected_fingerprint,
+                resolve_full_schedule_fingerprint=expected_fingerprint,
+                sleepypod_full_schedule_fingerprint=expected_fingerprint,
+            )
+            for wait_template in waits:
+                with self.subTest(sensor_state=sensor_state, wait_template=wait_template[:48]):
+                    self.assertIs(self._render(wait_template, context), expected)
 
     def test_stage_writer_migration_artifact_routes_through_single_boundary(self) -> None:
         self.assertEqual(self.stage_migration["version"], 1)
